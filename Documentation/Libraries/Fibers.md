@@ -117,8 +117,22 @@ rolls back every deque allocated by that call. The worker overloads of `runOne()
 manual execution: jobs spawned by a running worker publish to its local deque, and another supplied worker can steal
 from the opposite end. Once worker-local work exists, callers must continue with a worker overload; plain `run()`
 reports that it cannot drain local deques. The bounded external queue is serialized independently, so caller-managed
-threads may invoke worker `runOne()` concurrently and execute jobs in parallel. Library-owned OS-thread startup,
-wake/parking, stop, and join are not part of the current Draft slice yet.
+threads may invoke worker `runOne()` concurrently and execute jobs in parallel.
+
+`FiberJobWorkerPool` adds library-owned OS threads without depending on `Threading`. Worker records and thread records
+remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. `join()` drains
+accepted jobs; `requestStop()` wakes parked workers and makes cancellation observable through `FiberJobContext` before
+draining. No stack is reserved for a job.
+
+```cpp
+FiberJobWorkerPoolOptions options;
+options.dequeAllocator         = &allocator;
+options.dequeCapacityPerWorker = 256;
+
+SC_TRY(jobScheduler.spawn(job, procedure));
+SC_TRY(workerPool.start(jobScheduler, workers, threads, options));
+SC_TRY(workerPool.join());
+```
 
 # Capacity Is Part of Control Flow
 
@@ -403,6 +417,7 @@ Current support includes:
 - fixed-storage or allocator-backed `FiberJobPool` reuse with explicit completed-result retention and release;
 - bounded `FiberJobGroup` waves with cancellation, aggregate errors, and explicit pooled-record reset;
 - caller-owned `FiberJobWorker` records with allocator-backed bounded deque storage and startup rollback;
+- no-allocation `FiberJobWorkerPool` execution with work stealing, cooperative stop, and parked-worker wake-up;
 - fixed-storage and class-backed `FiberTaskPool`;
 - single-threaded `FiberScheduler` spawn, run, yield, and no-progress detection;
 - worker-pool execution with work stealing and optional allocator-backed worker deques;

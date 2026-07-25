@@ -68,6 +68,12 @@ therefore claim external work concurrently, publish children to their owner dequ
 funneling owner-local work through a global queue. This lock is an initial bounded external-publication mechanism, not
 permission to replace worker-owned scheduling with a globally locked production queue.
 
+`FiberJobWorkerPool` owns no hidden memory. It receives caller-owned worker/thread spans, obtains each deque from the
+explicit allocator in its options, and duplicates the contained private OS-thread lifecycle needed to keep Fibers
+independent from Threading. Workers spin for a bounded caller-selected interval and then park on the generation-based
+wake event. `join()` drains accepted work; `requestStop()` is visible through `FiberJobContext` so pending work is
+cancelled before invocation and running work can cooperate before the pool drains and releases every deque.
+
 ## Consequences
 
 Parallel job workers can scale CPU callbacks independently from stackful fibers and can be sized without reserving

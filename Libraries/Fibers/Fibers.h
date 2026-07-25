@@ -45,6 +45,9 @@ struct FiberJobGroup;
 struct FiberJobPool;
 struct FiberJobScheduler;
 struct FiberJobWorker;
+struct FiberJobWorkerPool;
+struct FiberJobWorkerPoolThreadEntry;
+struct FiberJobWorkerThread;
 struct FiberMutex;
 struct FiberSemaphore;
 struct FiberScheduler;
@@ -758,10 +761,10 @@ struct SC_FIBERS_EXPORT FiberJobWorker
     bool               workerActive        = false;
 };
 
-//! Single-thread-driven, fixed-capacity scheduler for stackless run-to-completion jobs.
+//! Fixed-capacity scheduler for stackless run-to-completion jobs.
 //!
-//! This first concrete scheduler intentionally does not create worker threads. Calls must not overlap across threads.
-//! A later worker-pool topology can build on the same FiberJob state and ownership contract without adding stacks.
+//! Plain run calls are single-thread-driven. External spawn and worker run calls may overlap while a
+//! FiberJobWorkerPool or caller-managed FiberJobWorker threads own execution.
 struct SC_FIBERS_EXPORT FiberJobScheduler
 {
     FiberJobScheduler();
@@ -798,6 +801,9 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     void workerDiagnostics(const FiberJobWorker& worker, FiberJobWorkerDiagnostics& outDiagnostics) const;
 
   private:
+    friend struct FiberJobContext;
+    friend struct FiberJobWorkerPool;
+
     Span<FiberJob*> queueStorage;
     FiberJob*       runningJob = nullptr;
     size_t          queueHead  = 0;
@@ -808,6 +814,8 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
 
     mutable volatile int32_t queueLock = 0;
 
+    FiberJobWorkerPool* workerPool = nullptr;
+
     struct QueueLockGuard;
 
     void      initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
@@ -816,6 +824,101 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     FiberJob* popWorkerReady(FiberJobWorker& worker);
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
     FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);
+    bool      isWorkerStopRequested() const;
+};
+
+//! Caller-owned OS thread storage used by FiberJobWorkerPool.
+struct SC_FIBERS_EXPORT FiberJobWorkerThread
+{
+    FiberJobWorkerThread();
+    ~FiberJobWorkerThread();
+
+    FiberJobWorkerThread(const FiberJobWorkerThread&)            = delete;
+    FiberJobWorkerThread& operator=(const FiberJobWorkerThread&) = delete;
+
+    [[nodiscard]] bool   wasStarted() const;
+    [[nodiscard]] Result result() const;
+
+  private:
+    friend struct FiberJobWorkerPool;
+    friend struct FiberJobWorkerPoolThreadEntry;
+
+    AlignedStorage<FiberWorkerThreadStorageSize, FiberWorkerThreadStorageAlignment> threadStorage;
+
+    FiberJobWorkerPool* pool         = nullptr;
+    size_t              workerIndex  = 0;
+    uint64_t            affinityMask = 0;
+    uint8_t             priority     = 0;
+    Result              threadResult = Result(true);
+    bool                started      = false;
+
+    Result startThread();
+    Result joinThread();
+    Result runThreadEntry();
+    Result applyThreadPolicy();
+};
+
+struct SC_FIBERS_EXPORT FiberJobWorkerPoolOptions
+{
+    FiberAllocator*           dequeAllocator         = nullptr;
+    size_t                    dequeCapacityPerWorker = 0;
+    size_t                    idleSpinAttempts       = 32;
+    Span<const uint64_t>      affinityMasks;
+    FiberWorkerThreadPriority threadPriority = FiberWorkerThreadPriority::Default;
+};
+
+//! No-allocation OS-thread-owning pool for bounded stackless FiberJob execution.
+struct SC_FIBERS_EXPORT FiberJobWorkerPool
+{
+    FiberJobWorkerPool();
+    ~FiberJobWorkerPool();
+
+    FiberJobWorkerPool(const FiberJobWorkerPool&)            = delete;
+    FiberJobWorkerPool& operator=(const FiberJobWorkerPool&) = delete;
+
+    Result start(FiberJobScheduler& scheduler, Span<FiberJobWorker> workerStorage,
+                 Span<FiberJobWorkerThread> threadStorage, const FiberJobWorkerPoolOptions& options);
+    Result requestStop();
+    Result join();
+    Result shutdown();
+
+    [[nodiscard]] bool   isRunning() const;
+    [[nodiscard]] size_t workerCount() const;
+    [[nodiscard]] size_t parkedWorkerCount() const;
+
+    struct WakeEventDefinition
+    {
+        static constexpr int Windows = sizeof(void*) * 16;
+        static constexpr int Apple   = sizeof(void*) * 16;
+        static constexpr int Linux   = sizeof(void*) * 16;
+        static constexpr int Default = Linux;
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = FiberWorkerPoolWakeEvent;
+    };
+
+    using WakeEventOpaque = OpaqueObject<WakeEventDefinition>;
+
+  private:
+    friend struct FiberJobScheduler;
+    friend struct FiberJobWorkerThread;
+
+    FiberJobScheduler*         poolScheduler = nullptr;
+    Span<FiberJobWorker>       workers;
+    Span<FiberJobWorkerThread> threads;
+    WakeEventOpaque            wakeEvent;
+    mutable volatile int32_t   stopRequested    = 0;
+    mutable volatile int32_t   running          = 0;
+    size_t                     idleSpinAttempts = 0;
+
+    void                   wakeOneWorker();
+    void                   wakeAllWorkers();
+    [[nodiscard]] bool     waitForWork(uint32_t observedGeneration);
+    [[nodiscard]] uint32_t wakeGeneration() const;
+    [[nodiscard]] bool     isStopRequested() const;
+
+    Result workerMain(size_t workerIndex);
 };
 
 struct SC_FIBERS_EXPORT FiberJobPoolDiagnostics

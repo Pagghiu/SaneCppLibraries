@@ -1449,6 +1449,21 @@ void FiberWorkerPool::WakeEventOpaque::destruct(Object& obj)
     obj.~Object();
 }
 
+static_assert(sizeof(FiberWorkerPoolWakeEvent) <= FiberJobWorkerPool::WakeEventDefinition::Default,
+              "Increase FiberJobWorkerPool::WakeEventDefinition opaque storage size");
+
+template <>
+void FiberJobWorkerPool::WakeEventOpaque::construct(Handle& buffer)
+{
+    placementNew(buffer.reinterpret_as<Object>());
+}
+
+template <>
+void FiberJobWorkerPool::WakeEventOpaque::destruct(Object& obj)
+{
+    obj.~Object();
+}
+
 struct FiberScheduler::LockGuard
 {
     explicit LockGuard(const FiberScheduler& fiberScheduler, LockCategory category = LockCategory::Control)
@@ -1678,6 +1693,146 @@ Result FiberWorkerThread::runThreadEntry()
     if (pool == nullptr)
     {
         return Result::Error("FiberWorkerThread has no pool");
+    }
+    SC_TRY(applyThreadPolicy());
+    return pool->workerMain(workerIndex);
+}
+
+struct FiberJobWorkerPoolThreadEntry
+{
+#if SC_PLATFORM_WINDOWS
+    static DWORD WINAPI run(void* argument)
+#else
+    static void* run(void* argument)
+#endif
+    {
+        FiberJobWorkerThread& thread = *static_cast<FiberJobWorkerThread*>(argument);
+        thread.threadResult          = thread.runThreadEntry();
+#if SC_PLATFORM_WINDOWS
+        return 0;
+#else
+        return nullptr;
+#endif
+    }
+};
+
+FiberJobWorkerThread::FiberJobWorkerThread() = default;
+
+FiberJobWorkerThread::~FiberJobWorkerThread() { SC_FIBERS_ASSERT_RELEASE(not started); }
+
+bool FiberJobWorkerThread::wasStarted() const { return started; }
+
+Result FiberJobWorkerThread::result() const { return threadResult; }
+
+Result FiberJobWorkerThread::applyThreadPolicy()
+{
+    const FiberWorkerThreadPriority threadPriority = static_cast<FiberWorkerThreadPriority>(priority);
+#if SC_PLATFORM_WINDOWS
+    if (threadPriority != FiberWorkerThreadPriority::Default)
+    {
+        int nativePriority = THREAD_PRIORITY_NORMAL;
+        switch (threadPriority)
+        {
+        case FiberWorkerThreadPriority::Default:
+        case FiberWorkerThreadPriority::Normal: nativePriority = THREAD_PRIORITY_NORMAL; break;
+        case FiberWorkerThreadPriority::Low: nativePriority = THREAD_PRIORITY_BELOW_NORMAL; break;
+        case FiberWorkerThreadPriority::High: nativePriority = THREAD_PRIORITY_ABOVE_NORMAL; break;
+        }
+        SC_TRY_MSG(::SetThreadPriority(::GetCurrentThread(), nativePriority) != 0,
+                   "FiberJobWorkerThread SetThreadPriority failed");
+    }
+    if (affinityMask != 0)
+    {
+        SC_TRY_MSG(::SetThreadAffinityMask(::GetCurrentThread(), static_cast<DWORD_PTR>(affinityMask)) != 0,
+                   "FiberJobWorkerThread SetThreadAffinityMask failed");
+    }
+#elif SC_PLATFORM_LINUX
+    if (threadPriority != FiberWorkerThreadPriority::Default and threadPriority != FiberWorkerThreadPriority::Normal)
+    {
+        return Result::Error("FiberJobWorkerThread priority is not supported on this platform");
+    }
+    if (affinityMask != 0)
+    {
+        cpu_set_t cpuSet;
+        CPU_ZERO(&cpuSet);
+        for (size_t bit = 0; bit < 64; ++bit)
+        {
+            if ((affinityMask & (uint64_t(1) << bit)) != 0)
+            {
+                CPU_SET(bit, &cpuSet);
+            }
+        }
+        SC_TRY_MSG(::pthread_setaffinity_np(::pthread_self(), sizeof(cpuSet), &cpuSet) == 0,
+                   "FiberJobWorkerThread pthread_setaffinity_np failed");
+    }
+#else
+    if (threadPriority != FiberWorkerThreadPriority::Default and threadPriority != FiberWorkerThreadPriority::Normal)
+    {
+        return Result::Error("FiberJobWorkerThread priority is not supported on this platform");
+    }
+    if (affinityMask != 0)
+    {
+        return Result::Error("FiberJobWorkerThread affinity is not supported on this platform");
+    }
+#endif
+    return Result(true);
+}
+
+Result FiberJobWorkerThread::startThread()
+{
+    SC_FIBERS_ASSERT_RELEASE(not started);
+    threadResult = Result(true);
+#if SC_PLATFORM_WINDOWS
+    DWORD   threadID     = 0;
+    HANDLE& threadHandle = threadStorage.reinterpret_as<HANDLE>();
+    threadHandle = ::CreateThread(0, 512 * 1024, FiberJobWorkerPoolThreadEntry::run, this, CREATE_SUSPENDED, &threadID);
+    if (threadHandle == nullptr)
+    {
+        return Result::Error("FiberJobWorkerThread CreateThread failed");
+    }
+    started = true;
+    ::ResumeThread(threadHandle);
+#else
+    pthread_t& threadHandle = threadStorage.reinterpret_as<pthread_t>();
+    static_assert(sizeof(pthread_t) <= FiberWorkerThreadStorageSize, "Increase FiberWorkerThreadStorageSize");
+    const int result = ::pthread_create(&threadHandle, nullptr, FiberJobWorkerPoolThreadEntry::run, this);
+    if (result != 0)
+    {
+        return Result::Error("FiberJobWorkerThread pthread_create failed");
+    }
+    started = true;
+#endif
+    return Result(true);
+}
+
+Result FiberJobWorkerThread::joinThread()
+{
+    if (not started)
+    {
+        return Result(true);
+    }
+#if SC_PLATFORM_WINDOWS
+    HANDLE& threadHandle = threadStorage.reinterpret_as<HANDLE>();
+    ::WaitForSingleObject(threadHandle, INFINITE);
+    ::CloseHandle(threadHandle);
+    threadHandle = nullptr;
+#else
+    pthread_t& threadHandle = threadStorage.reinterpret_as<pthread_t>();
+    const int  result       = ::pthread_join(threadHandle, nullptr);
+    if (result != 0)
+    {
+        return Result::Error("FiberJobWorkerThread pthread_join failed");
+    }
+#endif
+    started = false;
+    return threadResult;
+}
+
+Result FiberJobWorkerThread::runThreadEntry()
+{
+    if (pool == nullptr)
+    {
+        return Result::Error("FiberJobWorkerThread has no pool");
     }
     SC_TRY(applyThreadPolicy());
     return pool->workerMain(workerIndex);
@@ -1974,6 +2129,201 @@ Result FiberWorkerPool::workerMain(size_t workerIndex)
             {
                 break;
             }
+        }
+    }
+    return Result(true);
+}
+
+FiberJobWorkerPool::FiberJobWorkerPool() = default;
+
+FiberJobWorkerPool::~FiberJobWorkerPool() { SC_FIBERS_ASSERT_RELEASE(not isRunning()); }
+
+Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWorker> workerStorage,
+                                 Span<FiberJobWorkerThread> threadStorage, const FiberJobWorkerPoolOptions& options)
+{
+    if (isRunning())
+    {
+        return Result::Error("FiberJobWorkerPool already running");
+    }
+    if (not scheduler.isOpen())
+    {
+        return Result::Error("FiberJobScheduler is not open");
+    }
+    if (workerStorage.empty() or threadStorage.empty())
+    {
+        return Result::Error("FiberJobWorkerPool storage is empty");
+    }
+    if (workerStorage.sizeInElements() != threadStorage.sizeInElements())
+    {
+        return Result::Error("FiberJobWorkerPool worker/thread storage size mismatch");
+    }
+    if (options.dequeAllocator == nullptr or options.dequeCapacityPerWorker == 0)
+    {
+        return Result::Error("FiberJobWorkerPool requires deque allocator and capacity");
+    }
+    if (not options.affinityMasks.empty() and options.affinityMasks.sizeInElements() != workerStorage.sizeInElements())
+    {
+        return Result::Error("FiberJobWorkerPool affinity mask count must match worker count");
+    }
+#if SC_PLATFORM_APPLE
+    if (not options.affinityMasks.empty())
+    {
+        return Result::Error("FiberJobWorkerPool affinity is not supported on this platform");
+    }
+#endif
+#if not SC_PLATFORM_WINDOWS
+    if (options.threadPriority != FiberWorkerThreadPriority::Default and
+        options.threadPriority != FiberWorkerThreadPriority::Normal)
+    {
+        return Result::Error("FiberJobWorkerPool priority is not supported on this platform");
+    }
+#endif
+
+    SC_TRY(scheduler.createWorkerDeques(*options.dequeAllocator, workerStorage, options.dequeCapacityPerWorker));
+    fiberSchedulerLock(scheduler.queueLock);
+    if (scheduler.workerPool != nullptr)
+    {
+        fiberSchedulerUnlock(scheduler.queueLock);
+        scheduler.releaseWorkerDeques(workerStorage);
+        return Result::Error("FiberJobScheduler already has a running worker pool");
+    }
+    scheduler.workerPool = this;
+    fiberSchedulerUnlock(scheduler.queueLock);
+
+    poolScheduler    = &scheduler;
+    workers          = workerStorage;
+    threads          = threadStorage;
+    idleSpinAttempts = options.idleSpinAttempts;
+    wakeEvent.get().resetDiagnostics();
+    fiberAtomicStore(stopRequested, 0);
+    fiberAtomicStore(running, 1);
+
+    for (size_t index = 0; index < threads.sizeInElements(); ++index)
+    {
+        FiberJobWorkerThread& thread = threads[index];
+        SC_FIBERS_ASSERT_RELEASE(not thread.started);
+        thread.pool         = this;
+        thread.workerIndex  = index;
+        thread.affinityMask = options.affinityMasks.empty() ? 0 : options.affinityMasks[index];
+        thread.priority     = static_cast<uint8_t>(options.threadPriority);
+    }
+
+    for (FiberJobWorkerThread& thread : threads)
+    {
+        Result startResult = thread.startThread();
+        if (not startResult)
+        {
+            SC_FIBERS_TRUST_RESULT(requestStop());
+            SC_FIBERS_TRUST_RESULT(join());
+            return startResult;
+        }
+    }
+    return Result(true);
+}
+
+Result FiberJobWorkerPool::requestStop()
+{
+    fiberAtomicStore(stopRequested, 1);
+    wakeAllWorkers();
+    return Result(true);
+}
+
+Result FiberJobWorkerPool::join()
+{
+    Result firstError = Result(true);
+    bool   hasError   = false;
+    for (FiberJobWorkerThread& thread : threads)
+    {
+        Result joinResult = thread.joinThread();
+        if (not joinResult and not hasError)
+        {
+            firstError = joinResult;
+            hasError   = true;
+        }
+        thread.pool         = nullptr;
+        thread.workerIndex  = 0;
+        thread.affinityMask = 0;
+        thread.priority     = 0;
+    }
+
+    if (poolScheduler != nullptr)
+    {
+        fiberSchedulerLock(poolScheduler->queueLock);
+        if (poolScheduler->workerPool == this)
+        {
+            poolScheduler->workerPool = nullptr;
+        }
+        fiberSchedulerUnlock(poolScheduler->queueLock);
+        poolScheduler->releaseWorkerDeques(workers);
+    }
+
+    workers          = {};
+    threads          = {};
+    poolScheduler    = nullptr;
+    idleSpinAttempts = 0;
+    fiberAtomicStore(stopRequested, 0);
+    fiberAtomicStore(running, 0);
+    return hasError ? firstError : Result(true);
+}
+
+Result FiberJobWorkerPool::shutdown()
+{
+    SC_TRY(requestStop());
+    return join();
+}
+
+bool FiberJobWorkerPool::isRunning() const { return fiberAtomicLoad(running) != 0; }
+
+size_t FiberJobWorkerPool::workerCount() const { return workers.sizeInElements(); }
+
+size_t FiberJobWorkerPool::parkedWorkerCount() const { return wakeEvent.get().parkedCount(); }
+
+void FiberJobWorkerPool::wakeOneWorker() { wakeEvent.get().notifyOne(); }
+
+void FiberJobWorkerPool::wakeAllWorkers() { wakeEvent.get().notifyAll(); }
+
+bool FiberJobWorkerPool::waitForWork(uint32_t observedGeneration) { return wakeEvent.get().wait(observedGeneration); }
+
+uint32_t FiberJobWorkerPool::wakeGeneration() const { return wakeEvent.get().currentGeneration(); }
+
+bool FiberJobWorkerPool::isStopRequested() const { return fiberAtomicLoad(stopRequested) != 0; }
+
+Result FiberJobWorkerPool::workerMain(size_t workerIndex)
+{
+    if (poolScheduler == nullptr or workerIndex >= workers.sizeInElements())
+    {
+        return Result::Error("FiberJobWorkerPool worker index is invalid");
+    }
+
+    FiberJobScheduler& scheduler = *poolScheduler;
+    FiberJobWorker&    worker    = workers[workerIndex];
+    size_t             idleSpins = 0;
+    while (scheduler.hasActiveJobs())
+    {
+        bool ranJob = false;
+        SC_TRY(scheduler.runOne(worker, workers, ranJob));
+        if (ranJob)
+        {
+            idleSpins = 0;
+            continue;
+        }
+        if (not scheduler.hasActiveJobs())
+        {
+            break;
+        }
+        if (idleSpins < idleSpinAttempts)
+        {
+            idleSpins += 1;
+            fiberCpuRelax();
+            continue;
+        }
+
+        idleSpins                         = 0;
+        const uint32_t observedGeneration = wakeGeneration();
+        if (scheduler.hasActiveJobs() and not scheduler.hasReadyJobs())
+        {
+            const bool wasWoken = waitForWork(observedGeneration);
+            static_cast<void>(wasWoken);
         }
     }
     return Result(true);
@@ -2662,7 +3012,10 @@ FiberJob& FiberJobContext::job() const
     return *currentJob;
 }
 
-bool FiberJobContext::isCancellationRequested() const { return job().isCancellationRequested(); }
+bool FiberJobContext::isCancellationRequested() const
+{
+    return job().isCancellationRequested() or scheduler().isWorkerStopRequested();
+}
 
 Result FiberJobContext::checkCancellation() const
 {
@@ -3054,6 +3407,10 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
             initializeJobForSpawn(job, procedure, token);
             SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReady(*worker, job));
             fiberAtomicFetchAddSize(activeJobs, 1);
+            if (workerPool != nullptr)
+            {
+                workerPool->wakeOneWorker();
+            }
             return Result(true);
         }
     }
@@ -3073,6 +3430,10 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
     queueCount += 1;
     fiberAtomicFetchAddSize(readyJobs, 1);
     fiberAtomicFetchAddSize(activeJobs, 1);
+    if (workerPool != nullptr)
+    {
+        workerPool->wakeOneWorker();
+    }
     return Result(true);
 }
 
@@ -3121,7 +3482,7 @@ Result FiberJobScheduler::runOne(bool& outRanJob)
     fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
     FiberJobContext context(*this, *job);
     const Result    result =
-        job->isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
+        context.isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
     outRanJob = true;
     return complete(*job, result);
 }
@@ -3165,7 +3526,7 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
     fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
     FiberJobContext context(*this, *job);
     const Result    procedureResult =
-        job->isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
+        context.isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
     outRanJob              = true;
     const Result runResult = complete(*job, procedureResult);
     worker.end();
@@ -3303,8 +3664,18 @@ Result FiberJobScheduler::complete(FiberJob& job, Result result)
         QueueLockGuard guard(*this);
         runningJob = nullptr;
     }
-    fiberAtomicFetchSubSize(activeJobs, 1);
+    const size_t previousActive = fiberAtomicFetchSubSize(activeJobs, 1);
+    SC_FIBERS_ASSERT_RELEASE(previousActive > 0);
+    if (previousActive == 1 and workerPool != nullptr)
+    {
+        workerPool->wakeAllWorkers();
+    }
     return Result(true);
+}
+
+bool FiberJobScheduler::isWorkerStopRequested() const
+{
+    return workerPool != nullptr and workerPool->isStopRequested();
 }
 
 struct FiberJobClassInternal
