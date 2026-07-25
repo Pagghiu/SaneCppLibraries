@@ -111,6 +111,11 @@ retention and group membership are serialized in preparation for parallel worker
 before scheduler publication. The current `FiberJobScheduler` remains single-thread-driven; its calls must not overlap
 across threads.
 
+`FiberJobWorker` is the caller-owned record reserved for the parallel runtime. Its bounded local deque storage is
+created explicitly through `FiberJobScheduler::createWorkerDeques()` and a `FiberAllocator`; partial setup failure
+rolls back every deque allocated by that call. Thread startup, stealing, and worker-driven execution are not part of
+the current Draft slice yet.
+
 # Capacity Is Part of Control Flow
 
 When producing more work than the pool can hold at once, capacity pressure is explicit. From inside a fiber,
@@ -393,6 +398,7 @@ Current support includes:
 - caller-owned stackless `FiberJob` records with a fixed-capacity, single-thread-driven scheduler prototype;
 - fixed-storage or allocator-backed `FiberJobPool` reuse with explicit completed-result retention and release;
 - bounded `FiberJobGroup` waves with cancellation, aggregate errors, and explicit pooled-record reset;
+- caller-owned `FiberJobWorker` records with allocator-backed bounded deque storage and startup rollback;
 - fixed-storage and class-backed `FiberTaskPool`;
 - single-threaded `FiberScheduler` spawn, run, yield, and no-progress detection;
 - worker-pool execution with work stealing and optional allocator-backed worker deques;

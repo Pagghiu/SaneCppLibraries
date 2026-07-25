@@ -58,6 +58,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobRecursiveFanout();
         }
+        if (test_section("fiber job worker storage"))
+        {
+            fiberJobWorkerStorage();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -809,6 +813,59 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(pool.close());
             SC_TEST_EXPECT(scheduler.close());
         }
+    }
+
+    void fiberJobWorkerStorage()
+    {
+        FiberJobScheduler scheduler;
+        FiberJobWorker    workers[3];
+        FiberAllocator    closedAllocator;
+
+        SC_TEST_EXPECT(not scheduler.createWorkerDeques(closedAllocator, workers, 4));
+
+        char           allocatorStorage[1024]        = {};
+        char           existingAllocatorStorage[256] = {};
+        FiberAllocator allocator;
+        FiberAllocator existingAllocator;
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        SC_TEST_EXPECT(existingAllocator.createFixed(existingAllocatorStorage));
+        SC_TEST_EXPECT(not scheduler.createWorkerDeques(allocator, {}, 4));
+        SC_TEST_EXPECT(not scheduler.createWorkerDeques(allocator, workers, 0));
+
+        SC_TEST_EXPECT(scheduler.createWorkerDeques(existingAllocator, {workers + 1, 1}, 4));
+        SC_TEST_EXPECT(existingAllocator.used() != 0);
+        SC_TEST_EXPECT(not scheduler.createWorkerDeques(allocator, workers, 4));
+        SC_TEST_EXPECT(allocator.used() == 0);
+
+        FiberJobWorkerDiagnostics diagnostics;
+        scheduler.workerDiagnostics(workers[0], diagnostics);
+        SC_TEST_EXPECT(diagnostics.dequeCapacity == 0);
+        SC_TEST_EXPECT(diagnostics.readyJobs == 0);
+        scheduler.workerDiagnostics(workers[1], diagnostics);
+        SC_TEST_EXPECT(diagnostics.dequeCapacity == 4);
+        SC_TEST_EXPECT(diagnostics.readyJobs == 0);
+        scheduler.workerDiagnostics(workers[2], diagnostics);
+        SC_TEST_EXPECT(diagnostics.dequeCapacity == 0);
+        SC_TEST_EXPECT(diagnostics.readyJobs == 0);
+
+        scheduler.releaseWorkerDeques({workers + 1, 1});
+        SC_TEST_EXPECT(existingAllocator.used() == 0);
+        SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, workers, 4));
+        SC_TEST_EXPECT(allocator.used() != 0);
+        for (FiberJobWorker& worker : workers)
+        {
+            SC_TEST_EXPECT(not worker.isActive());
+            SC_TEST_EXPECT(worker.scheduler() == nullptr);
+            SC_TEST_EXPECT(worker.runningJob() == nullptr);
+            scheduler.workerDiagnostics(worker, diagnostics);
+            SC_TEST_EXPECT(diagnostics.dequeCapacity == 4);
+            SC_TEST_EXPECT(diagnostics.readyJobs == 0);
+            SC_TEST_EXPECT(diagnostics.readyPeakJobs == 0);
+        }
+        scheduler.releaseWorkerDeques(workers);
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(allocator.close());
+        SC_TEST_EXPECT(existingAllocator.close());
     }
 
     void explicitWorker()

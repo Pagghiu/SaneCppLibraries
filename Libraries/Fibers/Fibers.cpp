@@ -2681,6 +2681,30 @@ FiberJobStatus FiberJob::status() const { return static_cast<FiberJobStatus>(fib
 
 Result FiberJob::result() const { return jobResult; }
 
+FiberJobWorker::FiberJobWorker() = default;
+
+FiberJobWorker::~FiberJobWorker()
+{
+    SC_FIBERS_ASSERT_RELEASE(not workerActive);
+    SC_FIBERS_ASSERT_RELEASE(workerScheduler == nullptr);
+    SC_FIBERS_ASSERT_RELEASE(workerJob == nullptr);
+    SC_FIBERS_ASSERT_RELEASE(localDeque == nullptr);
+    SC_FIBERS_ASSERT_RELEASE(localDequeAllocator == nullptr);
+    SC_FIBERS_ASSERT_RELEASE(localDequeCapacity == 0);
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(localDequeTop) == 0);
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(localDequeBottom) == 0);
+}
+
+bool FiberJobWorker::isActive() const { return workerActive; }
+
+FiberJobScheduler* FiberJobWorker::scheduler() { return workerScheduler; }
+
+const FiberJobScheduler* FiberJobWorker::scheduler() const { return workerScheduler; }
+
+FiberJob* FiberJobWorker::runningJob() { return workerJob; }
+
+const FiberJob* FiberJobWorker::runningJob() const { return workerJob; }
+
 FiberJobScheduler::FiberJobScheduler() = default;
 
 FiberJobScheduler::~FiberJobScheduler()
@@ -2724,6 +2748,94 @@ Result FiberJobScheduler::close()
     queueTail    = 0;
     queueCount   = 0;
     return Result(true);
+}
+
+Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberJobWorker> workers,
+                                             size_t capacityPerWorker)
+{
+    if (not allocator.isOpen())
+    {
+        return Result::Error("FiberAllocator is not open");
+    }
+    if (workers.empty())
+    {
+        return Result::Error("FiberJobWorker storage is empty");
+    }
+    if (capacityPerWorker == 0)
+    {
+        return Result::Error("FiberJobWorker deque capacity is zero");
+    }
+    if (capacityPerWorker > static_cast<size_t>(-1) / sizeof(FiberJob*))
+    {
+        return Result::Error("FiberJobWorker deque size overflow");
+    }
+
+    size_t allocatedWorkers = 0;
+    for (FiberJobWorker& worker : workers)
+    {
+        if (worker.localDeque != nullptr)
+        {
+            releaseWorkerDeques({workers.data(), allocatedWorkers});
+            return Result::Error("FiberJobWorker already has a local deque");
+        }
+        if (worker.workerActive or worker.workerScheduler != nullptr or worker.workerJob != nullptr)
+        {
+            releaseWorkerDeques({workers.data(), allocatedWorkers});
+            return Result::Error("FiberJobWorker is active");
+        }
+
+        const size_t dequeBytes = capacityPerWorker * sizeof(FiberJob*);
+        void*        memory     = allocator.allocate(&worker, dequeBytes, alignof(FiberJob*));
+        if (memory == nullptr)
+        {
+            releaseWorkerDeques({workers.data(), allocatedWorkers});
+            return Result::Error("FiberJobWorker deque allocation failed");
+        }
+
+        worker.localDeque          = static_cast<FiberJob**>(memory);
+        worker.localDequeAllocator = &allocator;
+        worker.localDequeCapacity  = capacityPerWorker;
+        worker.localReadyPeakJobs  = 0;
+        fiberAtomicStoreSize(worker.localDequeTop, 0);
+        fiberAtomicStoreSize(worker.localDequeBottom, 0);
+        for (size_t index = 0; index < capacityPerWorker; ++index)
+        {
+            worker.localDeque[index] = nullptr;
+        }
+        allocatedWorkers += 1;
+    }
+    return Result(true);
+}
+
+void FiberJobScheduler::releaseWorkerDeques(Span<FiberJobWorker> workers)
+{
+    for (FiberJobWorker& worker : workers)
+    {
+        SC_FIBERS_ASSERT_RELEASE(not worker.workerActive);
+        SC_FIBERS_ASSERT_RELEASE(worker.workerScheduler == nullptr);
+        SC_FIBERS_ASSERT_RELEASE(worker.workerJob == nullptr);
+        SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(worker.localDequeTop) ==
+                                 fiberAtomicLoadSize(worker.localDequeBottom));
+        if (worker.localDeque != nullptr and worker.localDequeAllocator != nullptr)
+        {
+            worker.localDequeAllocator->release(worker.localDeque);
+        }
+        worker.localDeque          = nullptr;
+        worker.localDequeAllocator = nullptr;
+        worker.localDequeCapacity  = 0;
+        worker.localReadyPeakJobs  = 0;
+        fiberAtomicStoreSize(worker.localDequeTop, 0);
+        fiberAtomicStoreSize(worker.localDequeBottom, 0);
+    }
+}
+
+void FiberJobScheduler::workerDiagnostics(const FiberJobWorker& worker, FiberJobWorkerDiagnostics& outDiagnostics) const
+{
+    const size_t top             = fiberAtomicLoadSize(worker.localDequeTop);
+    const size_t bottom          = fiberAtomicLoadSize(worker.localDequeBottom);
+    outDiagnostics.readyJobs     = bottom >= top ? bottom - top : 0;
+    outDiagnostics.readyPeakJobs = worker.localReadyPeakJobs;
+    outDiagnostics.dequeCapacity = worker.localDequeCapacity;
 }
 
 Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure)

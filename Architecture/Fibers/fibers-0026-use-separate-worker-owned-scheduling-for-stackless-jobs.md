@@ -56,6 +56,10 @@ is linked to its group before scheduler publication, so a worker can never repor
 If publication fails after record acquisition, group membership and pool retention both roll back before `spawn()`
 returns. This does not make the manually driven `FiberJobScheduler` itself safe for overlapping calls.
 
+The parallel runtime starts from separate caller-owned `FiberJobWorker` records. Each worker deque is obtained from an
+explicit `FiberAllocator`; startup validation or allocation failure releases only the deques acquired by that attempt
+and leaves every input immediately reusable. Worker records and diagnostics do not reuse or enlarge `FiberWorker`.
+
 ## Consequences
 
 Parallel job workers can scale CPU callbacks independently from stackful fibers and can be sized without reserving

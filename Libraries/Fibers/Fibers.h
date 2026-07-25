@@ -44,6 +44,7 @@ struct FiberJobContext;
 struct FiberJobGroup;
 struct FiberJobPool;
 struct FiberJobScheduler;
+struct FiberJobWorker;
 struct FiberMutex;
 struct FiberSemaphore;
 struct FiberScheduler;
@@ -710,6 +711,42 @@ struct SC_FIBERS_EXPORT FiberJob
     bool                   poolRetained    = false;
 };
 
+struct SC_FIBERS_EXPORT FiberJobWorkerDiagnostics
+{
+    size_t readyJobs     = 0;
+    size_t readyPeakJobs = 0;
+    size_t dequeCapacity = 0;
+};
+
+//! Caller-owned execution agent for the future parallel FiberJob runtime.
+struct SC_FIBERS_EXPORT FiberJobWorker
+{
+    FiberJobWorker();
+    ~FiberJobWorker();
+
+    FiberJobWorker(const FiberJobWorker&)            = delete;
+    FiberJobWorker& operator=(const FiberJobWorker&) = delete;
+
+    [[nodiscard]] bool                     isActive() const;
+    [[nodiscard]] FiberJobScheduler*       scheduler();
+    [[nodiscard]] const FiberJobScheduler* scheduler() const;
+    [[nodiscard]] FiberJob*                runningJob();
+    [[nodiscard]] const FiberJob*          runningJob() const;
+
+  private:
+    friend struct FiberJobScheduler;
+
+    FiberJobScheduler* workerScheduler     = nullptr;
+    FiberJob*          workerJob           = nullptr;
+    FiberJob**         localDeque          = nullptr;
+    FiberAllocator*    localDequeAllocator = nullptr;
+    size_t             localDequeCapacity  = 0;
+    volatile size_t    localDequeTop       = 0;
+    volatile size_t    localDequeBottom    = 0;
+    size_t             localReadyPeakJobs  = 0;
+    bool               workerActive        = false;
+};
+
 //! Single-thread-driven, fixed-capacity scheduler for stackless run-to-completion jobs.
 //!
 //! This first concrete scheduler intentionally does not create worker threads. Calls must not overlap across threads.
@@ -724,6 +761,9 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
 
     Result create(Span<FiberJob*> readyStorage);
     Result close();
+
+    Result createWorkerDeques(FiberAllocator& allocator, Span<FiberJobWorker> workers, size_t capacityPerWorker);
+    void   releaseWorkerDeques(Span<FiberJobWorker> workers);
 
     Result spawn(FiberJob& job, FiberJob::Procedure procedure);
     Result spawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
@@ -742,6 +782,7 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     [[nodiscard]] size_t    readyJobCount() const;
     [[nodiscard]] size_t    activeJobCount() const;
     [[nodiscard]] FiberJob* currentJob();
+    void workerDiagnostics(const FiberJobWorker& worker, FiberJobWorkerDiagnostics& outDiagnostics) const;
 
   private:
     Span<FiberJob*> queueStorage;
