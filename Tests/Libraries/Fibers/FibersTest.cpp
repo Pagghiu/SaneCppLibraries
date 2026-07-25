@@ -54,6 +54,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobGroup();
         }
+        if (test_section("fiber job recursive fanout"))
+        {
+            fiberJobRecursiveFanout();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -699,6 +703,88 @@ struct SC::FibersTest : public SC::TestCase
 
         SC_TEST_EXPECT(pool.close());
         SC_TEST_EXPECT(scheduler.close());
+    }
+
+    void fiberJobRecursiveFanout()
+    {
+        struct State
+        {
+            FiberJobGroup* group    = nullptr;
+            FiberJobPool*  pool     = nullptr;
+            size_t         maxDepth = 0;
+            size_t         nodes    = 0;
+            size_t         leaves   = 0;
+
+            Result spawn(size_t depth)
+            {
+                return group->spawn(*pool,
+                                    FiberJob::Procedure([this, depth](FiberJobContext&) { return execute(depth); }));
+            }
+
+            Result execute(size_t depth)
+            {
+                nodes += 1;
+                if (depth == maxDepth)
+                {
+                    leaves += 1;
+                    return Result(true);
+                }
+                for (size_t child = 0; child < 3; ++child)
+                {
+                    SC_TRY(spawn(depth + 1));
+                }
+                return Result(true);
+            }
+        };
+
+        {
+            FiberJob          jobs[40];
+            FiberJob*         readyStorage[40] = {};
+            FiberJobPool      pool;
+            FiberJobScheduler scheduler;
+            FiberJobGroup     group(scheduler);
+            State             state;
+            state.group    = &group;
+            state.pool     = &pool;
+            state.maxDepth = 3;
+
+            SC_TEST_EXPECT(pool.create(jobs));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SC_TEST_EXPECT(state.spawn(0));
+            SC_TEST_EXPECT(group.run());
+            SC_TEST_EXPECT(state.nodes == 40);
+            SC_TEST_EXPECT(state.leaves == 27);
+            SC_TEST_EXPECT(group.jobCount() == 40);
+            SC_TEST_EXPECT(group.countErrors() == 0);
+            SC_TEST_EXPECT(group.reset());
+            SC_TEST_EXPECT(pool.availableCount() == 40);
+            SC_TEST_EXPECT(pool.close());
+            SC_TEST_EXPECT(scheduler.close());
+        }
+
+        {
+            FiberJob          jobs[2];
+            FiberJob*         readyStorage[2] = {};
+            FiberJobPool      pool;
+            FiberJobScheduler scheduler;
+            FiberJobGroup     group(scheduler);
+            State             state;
+            state.group    = &group;
+            state.pool     = &pool;
+            state.maxDepth = 1;
+
+            SC_TEST_EXPECT(pool.create(jobs));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SC_TEST_EXPECT(state.spawn(0));
+            SC_TEST_EXPECT(group.run());
+            SC_TEST_EXPECT(state.nodes == 2);
+            SC_TEST_EXPECT(state.leaves == 1);
+            SC_TEST_EXPECT(group.countErrors() == 1);
+            SC_TEST_EXPECT(group.reset());
+            SC_TEST_EXPECT(pool.availableCount() == 2);
+            SC_TEST_EXPECT(pool.close());
+            SC_TEST_EXPECT(scheduler.close());
+        }
     }
 
     void explicitWorker()

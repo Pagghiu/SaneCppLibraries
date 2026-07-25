@@ -258,6 +258,67 @@ static Result runFiberJobBenchmark(Console& console)
     return Result(true);
 }
 
+static Result runFiberJobPoolBenchmark(Console& console)
+{
+    static constexpr size_t BatchCapacity = 8192;
+    static constexpr size_t TotalJobs     = 10'000'000;
+
+    struct State
+    {
+        size_t completed = 0;
+        size_t checksum  = 0;
+    };
+
+    static FiberJob   jobs[BatchCapacity];
+    static FiberJob*  readyStorage[BatchCapacity] = {};
+    static FiberJob*  batchJobs[BatchCapacity]    = {};
+    FiberJobPool      pool;
+    FiberJobScheduler scheduler;
+    State             state;
+
+    SC_TRY(pool.create(jobs));
+    SC_TRY(scheduler.create(readyStorage));
+    Time::HighResolutionCounter start;
+    start.snap();
+    while (state.completed < TotalJobs)
+    {
+        const size_t remaining = TotalJobs - state.completed;
+        const size_t batchSize = remaining < BatchCapacity ? remaining : BatchCapacity;
+        for (size_t index = 0; index < batchSize; ++index)
+        {
+            SC_TRY(pool.spawn(scheduler,
+                              FiberJob::Procedure(
+                                  [&state](FiberJobContext&)
+                                  {
+                                      state.checksum += state.completed + 1;
+                                      state.completed += 1;
+                                      return Result(true);
+                                  }),
+                              batchJobs[index]));
+        }
+        SC_TRY(scheduler.run());
+        for (size_t index = 0; index < batchSize; ++index)
+        {
+            SC_TRY(pool.release(*batchJobs[index]));
+            batchJobs[index] = nullptr;
+        }
+    }
+    Time::HighResolutionCounter finish;
+    finish.snap();
+    SC_TRY(pool.close());
+    SC_TRY(scheduler.close());
+    SC_TRY_MSG(state.completed == TotalJobs, "FiberJobPool benchmark did not complete every job");
+    SC_TRY_MSG(state.checksum == TotalJobs * (TotalJobs + 1) / 2, "FiberJobPool benchmark checksum mismatch");
+
+    const Time::HighResolutionCounter elapsed       = finish.subtractExact(start);
+    const int64_t                     elapsedNs     = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
+    const size_t                      jobsPerSecond = static_cast<size_t>(TotalJobs * 1000000000ull / elapsedNs);
+    console.print("FibersBenchmark pooled stackless jobs\n");
+    console.print("  jobs={} batchCapacity={} elapsedNs={} jobsPerSec={} checksum={}\n", TotalJobs, BatchCapacity,
+                  static_cast<size_t>(elapsedNs), jobsPerSecond, state.checksum);
+    return Result(true);
+}
+
 static Result runForcedStealingBenchmark(Console& console)
 {
     static constexpr size_t NumWorkers             = 4;
@@ -1147,10 +1208,11 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
 
     bool    schedulerThroughput = false;
     bool    jobThroughput       = false;
+    bool    jobPoolThroughput   = false;
     int32_t massSuspensionCount = 0;
     int32_t externalProducers   = 1;
 
-    CommandLineOption options[4];
+    CommandLineOption options[5];
     options[0].longName = "scheduler-throughput";
     options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
     options[0].value    = CommandLineValue::boolean(schedulerThroughput);
@@ -1159,15 +1221,19 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     options[1].help     = "Run the single-thread-driven stackless FiberJob workload";
     options[1].value    = CommandLineValue::boolean(jobThroughput);
 
-    options[2].longName  = "mass-suspension";
-    options[2].help      = "Run one mass-suspension workload with the requested live fiber count";
-    options[2].valueName = "COUNT";
-    options[2].value     = CommandLineValue::int32(massSuspensionCount);
+    options[2].longName = "job-pool-throughput";
+    options[2].help     = "Run stackless FiberJob acquire, execute, retain, and release batches";
+    options[2].value    = CommandLineValue::boolean(jobPoolThroughput);
 
-    options[3].longName  = "external-producers";
-    options[3].help      = "Use concurrent external producers in scheduler throughput workloads";
+    options[3].longName  = "mass-suspension";
+    options[3].help      = "Run one mass-suspension workload with the requested live fiber count";
     options[3].valueName = "COUNT";
-    options[3].value     = CommandLineValue::int32(externalProducers);
+    options[3].value     = CommandLineValue::int32(massSuspensionCount);
+
+    options[4].longName  = "external-producers";
+    options[4].help      = "Use concurrent external producers in scheduler throughput workloads";
+    options[4].valueName = "COUNT";
+    options[4].value     = CommandLineValue::int32(externalProducers);
 
     CommandLineSpec spec;
     spec.programName = "FibersBenchmark";
@@ -1192,8 +1258,9 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
         console.flushStdErr();
         return Result::Error("Invalid FibersBenchmark arguments");
     }
-    if ((schedulerThroughput and massSuspensionCount != 0) or (jobThroughput and schedulerThroughput) or
-        (jobThroughput and massSuspensionCount != 0))
+    const size_t selectedModes = static_cast<size_t>(schedulerThroughput) + static_cast<size_t>(jobThroughput) +
+                                 static_cast<size_t>(jobPoolThroughput) + static_cast<size_t>(massSuspensionCount != 0);
+    if (selectedModes > 1)
     {
         return Result::Error("Throughput and mass-suspension modes are mutually exclusive");
     }
@@ -1201,7 +1268,7 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     {
         return Result::Error("External producer count must be between one and eight");
     }
-    if (massSuspensionCount < 0 or (not schedulerThroughput and not jobThroughput and
+    if (massSuspensionCount < 0 or (not schedulerThroughput and not jobThroughput and not jobPoolThroughput and
                                     arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
     {
         return Result::Error("Mass-suspension fiber count must be greater than zero");
@@ -1213,6 +1280,10 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     if (jobThroughput)
     {
         return runFiberJobBenchmark(console);
+    }
+    if (jobPoolThroughput)
+    {
+        return runFiberJobPoolBenchmark(console);
     }
     if (schedulerThroughput)
     {
