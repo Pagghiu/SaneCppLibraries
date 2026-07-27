@@ -425,8 +425,9 @@ diagnostics types.
   storage.
 - `Examples/FibersSkynetBenchmark` is enabled after `./SC.sh package install taskflow-benchmarks` and compares the
   stackful scheduler and stackless jobs with Taskflow's pinned upstream Skynet backend. The stackful depth limit is
-  explicit because each live `FiberTask` owns a fixed stack; the `FiberJob` continuation backend supports the canonical
-  million-leaf workload without per-job stacks.
+  explicit because each live `FiberTask` owns a fixed stack; the `FiberJob` backend uses distinct stable continuation
+  records and supports the canonical million-leaf workload without per-job stacks. Its persistent worker pool is reused
+  across warm-up and measured waves at each depth.
 - `Tests/Libraries/Fibers/FibersTest.cpp` is the best source of focused examples for cancellation, primitives,
   task pools, worker pools, work stealing, diagnostics, virtual stacks, and allocator-backed storage.
 

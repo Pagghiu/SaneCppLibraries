@@ -36,13 +36,13 @@ struct FibersSkynetState
 struct FiberJobSkynetNode
 {
     FiberJob            job;
+    FiberJob            continuationJob;
     FiberJobSkynetNode* parent     = nullptr;
     uint64_t            baseNumber = 0;
     uint64_t            result     = 0;
     uint32_t            depth      = 0;
     uint32_t            firstChild = 0;
     Atomic<int32_t>     pendingChildren;
-    bool                childrenPublished = false;
 };
 
 struct FiberJobSkynetState
@@ -155,6 +155,15 @@ static Result runFibersSkynetNode(FibersSkynetState& state, SkynetNode& node)
 }
 
 static Result runFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNode& node);
+static Result completeFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNode& node);
+
+static void recordFiberJobSkynetResult(FiberJobSkynetState& state, Result result)
+{
+    if (not result)
+    {
+        state.failedJobs.fetch_add(1, memory_order_release);
+    }
+}
 
 static Result spawnFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNode& node)
 {
@@ -164,12 +173,32 @@ static Result spawnFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynet
                                                 [statePointer, nodePointer](FiberJobContext&)
                                                 {
                                                     Result result = runFiberJobSkynetNode(*statePointer, *nodePointer);
-                                                    if (not result)
-                                                    {
-                                                        statePointer->failedJobs.fetch_add(1, memory_order_relaxed);
-                                                    }
+                                                    recordFiberJobSkynetResult(*statePointer, result);
                                                     return result;
                                                 }));
+}
+
+static Result spawnFiberJobSkynetContinuation(FiberJobSkynetState& state, FiberJobSkynetNode& node)
+{
+    FiberJobSkynetState* statePointer = &state;
+    FiberJobSkynetNode*  nodePointer  = &node;
+    return state.scheduler->spawn(node.continuationJob,
+                                  FiberJob::Procedure(
+                                      [statePointer, nodePointer](FiberJobContext&)
+                                      {
+                                          Result result(true);
+                                          for (uint32_t childIndex = 0; childIndex < 10; ++childIndex)
+                                          {
+                                              nodePointer->result +=
+                                                  statePointer->nodes[nodePointer->firstChild + childIndex].result;
+                                          }
+                                          if (nodePointer->parent != nullptr)
+                                          {
+                                              result = completeFiberJobSkynetNode(*statePointer, *nodePointer);
+                                          }
+                                          recordFiberJobSkynetResult(*statePointer, result);
+                                          return result;
+                                      }));
 }
 
 static Result completeFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNode& node)
@@ -182,7 +211,7 @@ static Result completeFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSky
     SC_TRY_MSG(previousPending > 0, "FiberJob Skynet parent completion underflow");
     if (previousPending == 1)
     {
-        SC_TRY(spawnFiberJobSkynetNode(state, *node.parent));
+        SC_TRY(spawnFiberJobSkynetContinuation(state, *node.parent));
     }
     return Result(true);
 }
@@ -194,21 +223,9 @@ static Result runFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNo
         node.result = node.baseNumber;
         return completeFiberJobSkynetNode(state, node);
     }
-    if (node.childrenPublished)
-    {
-        SC_TRY_MSG(node.pendingChildren.load(memory_order_acquire) == 0,
-                   "FiberJob Skynet continuation ran before its children completed");
-        for (uint32_t childIndex = 0; childIndex < 10; ++childIndex)
-        {
-            node.result += state.nodes[node.firstChild + childIndex].result;
-        }
-        return completeFiberJobSkynetNode(state, node);
-    }
-
     const int32_t firstChild = state.nextNode.fetch_add(10, memory_order_relaxed);
     SC_TRY_MSG(firstChild >= 0, "FiberJob Skynet node index overflowed");
-    node.firstChild        = static_cast<uint32_t>(firstChild);
-    node.childrenPublished = true;
+    node.firstChild = static_cast<uint32_t>(firstChild);
     node.pendingChildren.store(10, memory_order_relaxed);
 
     const uint64_t depthOffset = powerOfTen(state.maxDepth - node.depth - 1);
@@ -338,93 +355,175 @@ static Result measureFibersSkynet(uint32_t numWorkers, uint32_t maxDepth, uint64
     return benchmarkResult;
 }
 
-static Result measureFiberJobsSkynet(uint32_t numWorkers, uint32_t maxDepth, uint64_t& result, int64_t& elapsedUs)
+struct FiberJobsSkynetRuntime
 {
     static constexpr size_t DequeCapacityPerWorker = 1024;
 
-    const uint32_t numNodes = nodeCountForDepth(maxDepth);
+    FiberJobSkynetNode*   nodes        = nullptr;
+    FiberJob**            readyStorage = nullptr;
+    FiberJobWorker*       workers      = nullptr;
+    FiberJobWorkerThread* threads      = nullptr;
 
-    FiberJobSkynetNode*   nodes        = new (std::nothrow) FiberJobSkynetNode[numNodes];
-    FiberJob**            readyStorage = new (std::nothrow) FiberJob*[numNodes];
-    FiberJobWorker*       workers      = new (std::nothrow) FiberJobWorker[numWorkers];
-    FiberJobWorkerThread* threads      = new (std::nothrow) FiberJobWorkerThread[numWorkers];
+    uint32_t numNodes   = 0;
+    uint32_t numWorkers = 0;
 
-    if (nodes == nullptr or readyStorage == nullptr or workers == nullptr or threads == nullptr)
+    FiberJobScheduler   scheduler;
+    FiberJobWorkerPool  workerPool;
+    FiberAllocator      allocator;
+    FiberJobSkynetState state;
+
+    Result create(uint32_t workersCount, uint32_t depth)
     {
+        numNodes   = nodeCountForDepth(depth);
+        numWorkers = workersCount;
+
+        nodes        = new (std::nothrow) FiberJobSkynetNode[numNodes];
+        readyStorage = new (std::nothrow) FiberJob*[numNodes];
+        workers      = new (std::nothrow) FiberJobWorker[numWorkers];
+        threads      = new (std::nothrow) FiberJobWorkerThread[numWorkers];
+
+        if (nodes == nullptr or readyStorage == nullptr or workers == nullptr or threads == nullptr)
+        {
+            static_cast<void>(close());
+            return Result::Error("Cannot allocate caller-owned FiberJob Skynet benchmark storage");
+        }
+
+        state.scheduler = &scheduler;
+        state.nodes     = nodes;
+        state.maxDepth  = depth;
+
+        FiberJobWorkerPoolOptions options;
+        options.dequeAllocator         = &allocator;
+        options.dequeCapacityPerWorker = DequeCapacityPerWorker;
+        options.keepAliveWhenIdle      = true;
+
+        FiberAllocatorVirtualOptions allocatorOptions;
+        allocatorOptions.reserveBytes =
+            static_cast<size_t>(numWorkers) * DequeCapacityPerWorker * sizeof(FiberJob*) + 1024 * 1024;
+        allocatorOptions.initialCommitBytes = 64 * 1024;
+
+        Result result = allocator.createVirtual(allocatorOptions);
+        if (result)
+        {
+            result = scheduler.create({readyStorage, numNodes});
+        }
+        if (result)
+        {
+            result = workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, options);
+        }
+        if (not result)
+        {
+            static_cast<void>(close());
+        }
+        return result;
+    }
+
+    Result measure(uint64_t& result, int64_t& elapsedUs)
+    {
+        state.nextNode.store(1, memory_order_relaxed);
+        state.failedJobs.store(0, memory_order_relaxed);
+        for (uint32_t index = 0; index < numNodes; ++index)
+        {
+            FiberJobSkynetNode& node = nodes[index];
+            node.parent              = nullptr;
+            node.baseNumber          = 0;
+            node.result              = 0;
+            node.depth               = 0;
+            node.firstChild          = 0;
+            node.pendingChildren.store(0, memory_order_relaxed);
+        }
+
+        Time::HighResolutionCounter start;
+        Time::HighResolutionCounter finish;
+        start.snap();
+        SC_TRY(spawnFiberJobSkynetNode(state, nodes[0]));
+        SC_TRY(workerPool.waitIdle());
+        finish.snap();
+
+        result    = nodes[0].result;
+        elapsedUs = finish.subtractExact(start).toNanoseconds().ns / 1000;
+        SC_TRY_MSG(state.failedJobs.load(memory_order_acquire) == 0, "A FiberJob Skynet node failed");
+        return Result(true);
+    }
+
+    Result close()
+    {
+        Result firstError = Result(true);
+        if (workerPool.isRunning())
+        {
+            Result stopResult = workerPool.requestStop();
+            if (firstError and not stopResult)
+            {
+                firstError = stopResult;
+            }
+            Result joinResult = workerPool.join();
+            if (firstError and not joinResult)
+            {
+                firstError = joinResult;
+            }
+        }
+        if (scheduler.isOpen())
+        {
+            Result schedulerResult = scheduler.close();
+            if (firstError and not schedulerResult)
+            {
+                firstError = schedulerResult;
+            }
+        }
+        Result allocatorResult = allocator.close();
+        if (firstError and not allocatorResult)
+        {
+            firstError = allocatorResult;
+        }
+
         delete[] threads;
         delete[] workers;
         delete[] readyStorage;
         delete[] nodes;
-        return Result::Error("Cannot allocate caller-owned FiberJob Skynet benchmark storage");
+        threads      = nullptr;
+        workers      = nullptr;
+        readyStorage = nullptr;
+        nodes        = nullptr;
+        return firstError;
+    }
+};
+
+static Result measureFiberJobsSkynetSamples(Console& console, uint32_t numWorkers, uint32_t depth, int32_t rounds,
+                                            uint64_t leaves, uint64_t expected)
+{
+    FiberJobsSkynetRuntime runtime;
+    SC_TRY(runtime.create(numWorkers, depth));
+
+    uint64_t measuredResult = 0;
+    int64_t  warmupUs       = 0;
+    Result   result         = runtime.measure(measuredResult, warmupUs);
+    if (result and measuredResult != expected)
+    {
+        result = Result::Error("FiberJob Skynet warm-up sum mismatch");
     }
 
-    FiberJobScheduler  scheduler;
-    FiberJobWorkerPool workerPool;
-    FiberAllocator     allocator;
-
-    FiberJobSkynetState state;
-    state.scheduler = &scheduler;
-    state.nodes     = nodes;
-    state.maxDepth  = maxDepth;
-    state.nextNode.store(1, memory_order_relaxed);
-    state.failedJobs.store(0, memory_order_relaxed);
-
-    FiberJobWorkerPoolOptions options;
-    options.dequeAllocator         = &allocator;
-    options.dequeCapacityPerWorker = DequeCapacityPerWorker;
-
-    FiberAllocatorVirtualOptions allocatorOptions;
-    allocatorOptions.reserveBytes =
-        static_cast<size_t>(numWorkers) * DequeCapacityPerWorker * sizeof(FiberJob*) + 1024 * 1024;
-    allocatorOptions.initialCommitBytes = 64 * 1024;
-
-    Result benchmarkResult = allocator.createVirtual(allocatorOptions);
-    if (benchmarkResult)
+    int64_t elapsedSamples[15] = {};
+    for (int32_t round = 0; result and round < rounds; ++round)
     {
-        benchmarkResult = scheduler.create({readyStorage, numNodes});
-    }
-    if (benchmarkResult)
-    {
-        benchmarkResult = spawnFiberJobSkynetNode(state, nodes[0]);
-    }
-
-    Time::HighResolutionCounter start;
-    Time::HighResolutionCounter finish;
-    if (benchmarkResult)
-    {
-        start.snap();
-        benchmarkResult = workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, options);
-    }
-    if (benchmarkResult)
-    {
-        benchmarkResult = workerPool.join();
-        finish.snap();
-    }
-    if (benchmarkResult)
-    {
-        result    = nodes[0].result;
-        elapsedUs = finish.subtractExact(start).toNanoseconds().ns / 1000;
-        if (state.failedJobs.load(memory_order_relaxed) != 0)
+        result = runtime.measure(measuredResult, elapsedSamples[round]);
+        if (result and measuredResult != expected)
         {
-            benchmarkResult = Result::Error("A FiberJob Skynet node failed");
+            result = Result::Error("FiberJob Skynet sum mismatch");
         }
     }
 
-    Result closeResult = scheduler.close();
-    if (closeResult)
+    Result closeResult = runtime.close();
+    if (result and not closeResult)
     {
-        closeResult = allocator.close();
+        result = closeResult;
     }
-    if (benchmarkResult and not closeResult)
-    {
-        benchmarkResult = closeResult;
-    }
+    SC_TRY(result);
 
-    delete[] threads;
-    delete[] workers;
-    delete[] readyStorage;
-    delete[] nodes;
-    return benchmarkResult;
+    SmallString<32> resultText(StringEncoding::Ascii);
+    SC_TRY(StringBuilder::format(resultText, "{}", measuredResult));
+    printSkynetSamples(console, "jobs", depth, leaves, expected, resultText.view(),
+                       {elapsedSamples, static_cast<size_t>(rounds)});
+    return Result(true);
 }
 
 static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
@@ -491,12 +590,14 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
                   static_cast<size_t>(workers), static_cast<size_t>(rounds));
     console.print(
         "allocation: Fibers receives bounded task, 16 KiB virtual-stack, deque, and injection capacity; FiberJob "
-        "receives stable node/job, ready-pointer, worker, thread, and deque capacity; all SC capacity is reserved "
+        "receives stable node, initial/continuation-job, ready-pointer, worker, thread, and deque capacity; all SC "
+        "capacity is reserved "
         "before timing and runtime slots come only from those explicit bounds, while Taskflow uses its upstream "
         "runtime allocation policy\n");
     console.print(
-        "timing: one warm-up precedes every backend/depth sample set; each SC sample includes worker-pool startup "
-        "and shutdown, while the unchanged upstream Taskflow function reuses its static executor\n");
+        "timing: one warm-up precedes every backend/depth sample set; FiberTask samples include worker-pool startup "
+        "and shutdown, while FiberJob samples reuse one persistent pool per depth and the unchanged upstream Taskflow "
+        "function reuses its static executor\n");
     console.print(
         "backend depth leaves expected reportedResult elapsedUsMin elapsedUsMedian elapsedUsMean elapsedUsMax\n");
 
@@ -528,23 +629,8 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
 
         if (backend == "all" or backend == "jobs")
         {
-            uint64_t measuredResult = 0;
-            int64_t  warmupUs       = 0;
-            SC_TRY(measureFiberJobsSkynet(static_cast<uint32_t>(workers), static_cast<uint32_t>(depth), measuredResult,
-                                          warmupUs));
-            SC_TRY_MSG(measuredResult == expected, "FiberJob Skynet warm-up sum mismatch");
-
-            int64_t elapsedSamples[15] = {};
-            for (int32_t round = 0; round < rounds; ++round)
-            {
-                SC_TRY(measureFiberJobsSkynet(static_cast<uint32_t>(workers), static_cast<uint32_t>(depth),
-                                              measuredResult, elapsedSamples[round]));
-                SC_TRY_MSG(measuredResult == expected, "FiberJob Skynet sum mismatch");
-            }
-            SmallString<32> resultText(StringEncoding::Ascii);
-            SC_TRY(StringBuilder::format(resultText, "{}", measuredResult));
-            printSkynetSamples(console, "jobs", static_cast<uint32_t>(depth), leaves, expected, resultText.view(),
-                               {elapsedSamples, static_cast<size_t>(rounds)});
+            SC_TRY(measureFiberJobsSkynetSamples(console, static_cast<uint32_t>(workers), static_cast<uint32_t>(depth),
+                                                 rounds, leaves, expected));
         }
 
         if (backend == "all" or backend == "taskflow")
