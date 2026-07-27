@@ -392,7 +392,10 @@ diagnostics types.
 
 - `Examples/FibersDemo` shows a tiny CPU fiber workload, `FibersAsync` sleeps, and worker-pool I/O.
 - `Examples/FibersBenchmark` contains explicit benchmark-style workloads for yield/resume, sustained micro-tasking,
-  raw stackless dispatch, and pooled stackless acquire/run/release overhead.
+  raw stackless dispatch, and pooled stackless acquire/run/release overhead. Its
+  `--job-worker-matrix --job-rounds <COUNT>` mode runs one warm-up and bounded repeated samples at unique
+  1/2/4/8/hardware-worker counts, reporting minimum, median, mean, and maximum throughput without allocating sample
+  storage.
 - `Examples/FibersSkynetBenchmark` is enabled after `./SC.sh package install taskflow-benchmarks` and compares the
   stackful scheduler with Taskflow's pinned upstream Skynet backend. Its current depth limit is explicit because each
   live `FiberTask` owns a fixed stack; the future stackless `FiberJob` backend is the intended million-leaf comparison.
