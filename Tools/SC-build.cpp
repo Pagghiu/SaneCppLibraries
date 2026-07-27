@@ -772,12 +772,9 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
             project.link.linkStdCpp = true;
             SC_TRY(addSaneCppLibraries(project, parameters));
 
-            String skynetRoot     = StringEncoding::Utf8;
-            String taskflowSource = StringEncoding::Utf8;
+            String skynetRoot = StringEncoding::Utf8;
             SC_TRY(Path::join(skynetRoot, {taskflowBenchmarksRoot.view(), "benchmarks", "skynet"}));
-            SC_TRY(Path::join(taskflowSource, {skynetRoot.view(), "taskflow.cpp"}));
             SC_TRY(project.addIncludePaths({taskflowBenchmarksRoot.view(), skynetRoot.view()}));
-            project.addFile(taskflowSource.view());
         }
         else if (name.startsWith("Await"))
         {
