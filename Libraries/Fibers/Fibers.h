@@ -897,9 +897,13 @@ struct SC_FIBERS_EXPORT FiberJobWorkerThread
 
 struct SC_FIBERS_EXPORT FiberJobWorkerPoolOptions
 {
-    FiberAllocator*           dequeAllocator         = nullptr;
-    size_t                    dequeCapacityPerWorker = 0;
-    size_t                    idleSpinAttempts       = 32;
+    FiberAllocator* dequeAllocator         = nullptr;
+    size_t          dequeCapacityPerWorker = 0;
+    size_t          idleSpinAttempts       = 32;
+
+    //! Keep worker threads parked and ready to accept later waves after the scheduler becomes idle.
+    bool keepAliveWhenIdle = false;
+
     Span<const uint64_t>      affinityMasks;
     FiberWorkerThreadPriority threadPriority = FiberWorkerThreadPriority::Default;
 };
@@ -915,7 +919,10 @@ struct SC_FIBERS_EXPORT FiberJobWorkerPool
 
     Result start(FiberJobScheduler& scheduler, Span<FiberJobWorker> workerStorage,
                  Span<FiberJobWorkerThread> threadStorage, const FiberJobWorkerPoolOptions& options);
+    //! Waits for the scheduler to reach an idle observation point without stopping a persistent pool.
+    Result waitIdle();
     Result requestStop();
+    //! Persistent pools reject join until requestStop() has established the terminal boundary.
     Result join();
     Result shutdown();
 
@@ -945,9 +952,10 @@ struct SC_FIBERS_EXPORT FiberJobWorkerPool
     Span<FiberJobWorker>       workers;
     Span<FiberJobWorkerThread> threads;
     WakeEventOpaque            wakeEvent;
-    mutable volatile int32_t   stopRequested    = 0;
-    mutable volatile int32_t   running          = 0;
-    size_t                     idleSpinAttempts = 0;
+    mutable volatile int32_t   stopRequested     = 0;
+    mutable volatile int32_t   running           = 0;
+    size_t                     idleSpinAttempts  = 0;
+    bool                       keepAliveWhenIdle = false;
 
     void                   wakeOneWorker();
     void                   wakeAllWorkers();

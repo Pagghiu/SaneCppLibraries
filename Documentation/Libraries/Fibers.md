@@ -120,9 +120,11 @@ reports that it cannot drain local deques. The bounded external queue is seriali
 threads may invoke worker `runOne()` concurrently and execute jobs in parallel.
 
 `FiberJobWorkerPool` adds library-owned OS threads without depending on `Threading`. Worker records and thread records
-remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. `join()` drains
-accepted jobs; `requestStop()` wakes parked workers and makes cancellation observable through `FiberJobContext` before
-draining. Multi-worker pools transfer claimed batches to cache-line-isolated worker active counters, so completion does
+remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. By default,
+`join()` drains one accepted wave. Set `keepAliveWhenIdle` to keep the same threads and deques parked between waves;
+`waitIdle()` then marks each wave boundary, and `requestStop()` is required before the final `join()`. Stop wakes every
+parked worker and makes cancellation observable through `FiberJobContext`. Multi-worker pools transfer claimed batches
+to cache-line-isolated worker active counters, so completion does
 not contend on one scheduler-wide counter. `activeJobCount()` is exact at stable observation points and can only
 conservatively overcount during a concurrent ownership transfer; it never reports a false zero. No stack is reserved
 for a job.
@@ -136,6 +138,28 @@ SC_TRY(jobScheduler.spawn(job, procedure));
 SC_TRY(workerPool.start(jobScheduler, workers, threads, options));
 SC_TRY(workerPool.join());
 ```
+
+Long-lived runtimes can accept repeated bounded waves without recreating their OS threads:
+
+```cpp
+FiberJobWorkerPoolOptions options;
+options.dequeAllocator         = &allocator;
+options.dequeCapacityPerWorker = 256;
+options.keepAliveWhenIdle      = true;
+
+SC_TRY(workerPool.start(jobScheduler, workers, threads, options));
+SC_TRY(jobScheduler.spawn(firstJob, firstProcedure));
+SC_TRY(workerPool.waitIdle());
+SC_TRY(jobScheduler.spawn(secondJob, secondProcedure));
+SC_TRY(workerPool.waitIdle());
+SC_TRY(workerPool.requestStop());
+SC_TRY(workerPool.join());
+```
+
+`waitIdle()` observes that all work accepted before that idle point has completed. External producers must be stopped
+or otherwise coordinated if the caller needs a closed submission boundary; a concurrent later spawn begins a new wave.
+A persistent pool rejects `join()` until stop has been requested, avoiding an accidental indefinite wait while it is
+still accepting work.
 
 # Capacity Is Part of Control Flow
 

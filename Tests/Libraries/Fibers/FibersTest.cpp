@@ -1305,6 +1305,62 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());
         }
+
+        {
+            static constexpr size_t PersistentWorkers = 2;
+            static constexpr size_t PersistentJobs    = 8;
+
+            struct PersistentState
+            {
+                Atomic<int32_t> completed;
+            };
+
+            FiberJob                  jobs[PersistentJobs];
+            FiberJob*                 readyStorage[PersistentJobs] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[PersistentWorkers];
+            FiberJobWorkerThread      threads[PersistentWorkers];
+            FiberJobWorkerPool        workerPool;
+            FiberJobWorkerPoolOptions options;
+            char                      allocatorStorage[4096] = {};
+            FiberAllocator            allocator;
+            PersistentState           state;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = PersistentJobs;
+            options.idleSpinAttempts       = 0;
+            options.keepAliveWhenIdle      = true;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+            while (workerPool.parkedWorkerCount() != PersistentWorkers) {}
+
+            for (size_t wave = 0; wave < 2; ++wave)
+            {
+                for (FiberJob& job : jobs)
+                {
+                    SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
+                                                            [&state](FiberJobContext&)
+                                                            {
+                                                                state.completed.fetch_add(1);
+                                                                return Result(true);
+                                                            })));
+                }
+                SC_TEST_EXPECT(workerPool.waitIdle());
+                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * PersistentJobs));
+                SC_TEST_EXPECT(workerPool.isRunning());
+            }
+
+            SC_TEST_EXPECT(not workerPool.join());
+            SC_TEST_EXPECT(workerPool.isRunning());
+            SC_TEST_EXPECT(workerPool.requestStop());
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(not workerPool.isRunning());
+            SC_TEST_EXPECT(not workerPool.waitIdle());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
     }
 
     void explicitWorker()

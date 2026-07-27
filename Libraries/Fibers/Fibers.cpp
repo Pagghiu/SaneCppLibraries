@@ -2190,10 +2190,11 @@ Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWork
     scheduler.workerPool = this;
     fiberSchedulerUnlock(scheduler.queueLock);
 
-    poolScheduler    = &scheduler;
-    workers          = workerStorage;
-    threads          = threadStorage;
-    idleSpinAttempts = options.idleSpinAttempts;
+    poolScheduler     = &scheduler;
+    workers           = workerStorage;
+    threads           = threadStorage;
+    idleSpinAttempts  = options.idleSpinAttempts;
+    keepAliveWhenIdle = options.keepAliveWhenIdle;
     wakeEvent.get().resetDiagnostics();
     fiberAtomicStore(stopRequested, 0);
     fiberAtomicStore(running, 1);
@@ -2228,8 +2229,29 @@ Result FiberJobWorkerPool::requestStop()
     return Result(true);
 }
 
+Result FiberJobWorkerPool::waitIdle()
+{
+    if (not isRunning() or poolScheduler == nullptr)
+    {
+        return Result::Error("FiberJobWorkerPool is not running");
+    }
+    while (poolScheduler->hasActiveJobs())
+    {
+        const uint32_t observedGeneration = wakeGeneration();
+        if (poolScheduler->hasActiveJobs())
+        {
+            static_cast<void>(waitForWork(observedGeneration));
+        }
+    }
+    return Result(true);
+}
+
 Result FiberJobWorkerPool::join()
 {
+    if (isRunning() and keepAliveWhenIdle and not isStopRequested())
+    {
+        return Result::Error("Persistent FiberJobWorkerPool requires requestStop before join");
+    }
     Result firstError = Result(true);
     bool   hasError   = false;
     for (FiberJobWorkerThread& thread : threads)
@@ -2257,10 +2279,11 @@ Result FiberJobWorkerPool::join()
         poolScheduler->releaseWorkerDeques(workers);
     }
 
-    workers          = {};
-    threads          = {};
-    poolScheduler    = nullptr;
-    idleSpinAttempts = 0;
+    workers           = {};
+    threads           = {};
+    poolScheduler     = nullptr;
+    idleSpinAttempts  = 0;
+    keepAliveWhenIdle = false;
     fiberAtomicStore(stopRequested, 0);
     fiberAtomicStore(running, 0);
     return hasError ? firstError : Result(true);
@@ -2309,7 +2332,10 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
         }
         if (not scheduler.hasActiveJobs())
         {
-            break;
+            if (not keepAliveWhenIdle or isStopRequested())
+            {
+                break;
+            }
         }
         if (idleSpins < idleSpinAttempts)
         {
@@ -2320,7 +2346,7 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
 
         idleSpins                         = 0;
         const uint32_t observedGeneration = wakeGeneration();
-        if (scheduler.hasActiveJobs() and not scheduler.hasReadyJobs())
+        if ((keepAliveWhenIdle or scheduler.hasActiveJobs()) and not scheduler.hasReadyJobs())
         {
             const bool wasWoken = waitForWork(observedGeneration);
             static_cast<void>(wasWoken);

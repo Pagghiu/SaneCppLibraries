@@ -20,6 +20,10 @@ per-worker deques for bounded work stealing.
 or class-backed storage through `FiberTaskClass` and `FiberStackClass`. Completed pooled fibers return task and stack
 slots only after the fiber has switched back to a worker root context, preserving safe reuse of non-movable fiber state.
 
+`FiberJobScheduler` is the separate stackless run-to-completion path. `FiberJobWorkerPool` executes bounded job records
+on caller-owned worker and thread storage, and can remain parked between explicit waves without allocating or changing
+the stackful scheduler hot path.
+
 ## Boundaries
 
 `Fibers` owns stackful context switching, cooperative scheduling, task lifecycle, worker-pool execution, work stealing,
@@ -126,3 +130,6 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0023 - Batch fiber task pool capacity waits](fibers-0023-batch-fiber-task-pool-capacity-waits.md)
 - [FIBERS-0024 - Reject unnecessary wake locking atomically](fibers-0024-reject-unnecessary-wake-locking-atomically.md)
 - [FIBERS-0025 - Prototype stackless jobs with separate bounded scheduling](fibers-0025-prototype-stackless-jobs-with-separate-bounded-scheduling.md)
+- [FIBERS-0026 - Use separate worker-owned scheduling for stackless jobs](fibers-0026-use-separate-worker-owned-scheduling-for-stackless-jobs.md)
+- [FIBERS-0027 - Distribute stackless active job accounting](fibers-0027-distribute-stackless-active-job-accounting.md)
+- [FIBERS-0028 - Keep job worker pools alive between waves](fibers-0028-keep-job-worker-pools-alive-between-waves.md)
