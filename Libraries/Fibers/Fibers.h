@@ -806,6 +806,9 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
 
     Result spawn(FiberJob& job, FiberJob::Procedure procedure);
     Result spawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
+    //! Transactionally publishes distinct contiguous records under one bounded queue lock.
+    Result spawn(Span<FiberJob> jobs, FiberJob::Procedure procedure);
+    Result spawn(Span<FiberJob> jobs, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result runOne(bool& outRanJob);
     Result runOne(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup, bool& outRanJob);
     Result run();

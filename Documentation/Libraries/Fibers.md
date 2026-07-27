@@ -119,6 +119,12 @@ from the opposite end. Once worker-local work exists, callers must continue with
 reports that it cannot drain local deques. The bounded external queue is serialized independently, so caller-managed
 threads may invoke worker `runOne()` concurrently and execute jobs in parallel.
 
+External producers that already own contiguous stable records can publish them transactionally with
+`FiberJobScheduler::spawn(Span<FiberJob>, Procedure)`. The scheduler validates the entire span and bounded queue before
+changing any job, copies the fixed-size procedure into each record under one queue lock, updates accounting once, and
+wakes the worker pool as a batch. Empty spans, active records, invalid pooled records, or insufficient queue capacity
+return an error without partially publishing the span. Scalar `spawn()` remains the owner-local fast path.
+
 `FiberJobWorkerPool` adds library-owned OS threads without depending on `Threading`. Worker records and thread records
 remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. By default,
 `join()` drains one accepted wave. Set `keepAliveWhenIdle` to keep the same threads and deques parked between waves;

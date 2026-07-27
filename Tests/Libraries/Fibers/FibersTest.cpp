@@ -519,6 +519,67 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(scheduler.close());
         SC_TEST_EXPECT(not scheduler.isOpen());
         SC_TEST_EXPECT(not scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+
+        {
+            FiberJob          batchJobs[4];
+            FiberJob*         batchStorage[4] = {};
+            FiberJobScheduler batchScheduler;
+            int32_t           completed = 0;
+
+            SC_TEST_EXPECT(batchScheduler.create(batchStorage));
+            SC_TEST_EXPECT(not batchScheduler.spawn(
+                Span<FiberJob>(), FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+            SC_TEST_EXPECT(
+                batchScheduler.spawn(batchJobs[1], FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+            SC_TEST_EXPECT(not batchScheduler.spawn(batchJobs, FiberJob::Procedure(
+                                                                   [&completed](FiberJobContext&)
+                                                                   {
+                                                                       completed += 1;
+                                                                       return Result(true);
+                                                                   })));
+            SC_TEST_EXPECT(not batchScheduler.spawn({batchJobs, 3}, FiberJob::Procedure(
+                                                                        [&completed](FiberJobContext&)
+                                                                        {
+                                                                            completed += 1;
+                                                                            return Result(true);
+                                                                        })));
+            SC_TEST_EXPECT(not batchJobs[0].isActive());
+            SC_TEST_EXPECT(not batchJobs[2].isActive());
+            SC_TEST_EXPECT(batchScheduler.run());
+
+            SC_TEST_EXPECT(batchScheduler.spawn(batchJobs, FiberJob::Procedure(
+                                                               [&completed](FiberJobContext&)
+                                                               {
+                                                                   completed += 1;
+                                                                   return Result(true);
+                                                               })));
+            SC_TEST_EXPECT(batchScheduler.readyJobCount() == 4);
+            SC_TEST_EXPECT(batchScheduler.activeJobCount() == 4);
+            SC_TEST_EXPECT(batchScheduler.run());
+            SC_TEST_EXPECT(completed == 4);
+            for (FiberJob& job : batchJobs)
+            {
+                SC_TEST_EXPECT(job.result());
+            }
+
+            FiberCancellationTokenSource batchCancellation;
+            SC_TEST_EXPECT(batchScheduler.spawn(batchJobs,
+                                                FiberJob::Procedure(
+                                                    [&completed](FiberJobContext&)
+                                                    {
+                                                        completed += 1;
+                                                        return Result(true);
+                                                    }),
+                                                batchCancellation.token()));
+            SC_TEST_EXPECT(batchScheduler.requestCancel(batchCancellation));
+            SC_TEST_EXPECT(batchScheduler.run());
+            SC_TEST_EXPECT(completed == 4);
+            for (FiberJob& job : batchJobs)
+            {
+                SC_TEST_EXPECT(not job.result());
+            }
+            SC_TEST_EXPECT(batchScheduler.close());
+        }
     }
 
     void fiberJobPool()
@@ -1337,15 +1398,12 @@ struct SC::FibersTest : public SC::TestCase
 
             for (size_t wave = 0; wave < 2; ++wave)
             {
-                for (FiberJob& job : jobs)
-                {
-                    SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
-                                                            [&state](FiberJobContext&)
-                                                            {
-                                                                state.completed.fetch_add(1);
-                                                                return Result(true);
-                                                            })));
-                }
+                SC_TEST_EXPECT(scheduler.spawn(jobs, FiberJob::Procedure(
+                                                         [&state](FiberJobContext&)
+                                                         {
+                                                             state.completed.fetch_add(1);
+                                                             return Result(true);
+                                                         })));
                 SC_TEST_EXPECT(workerPool.waitIdle());
                 SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * PersistentJobs));
                 SC_TEST_EXPECT(workerPool.isRunning());

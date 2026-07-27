@@ -133,3 +133,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0026 - Use separate worker-owned scheduling for stackless jobs](fibers-0026-use-separate-worker-owned-scheduling-for-stackless-jobs.md)
 - [FIBERS-0027 - Distribute stackless active job accounting](fibers-0027-distribute-stackless-active-job-accounting.md)
 - [FIBERS-0028 - Keep job worker pools alive between waves](fibers-0028-keep-job-worker-pools-alive-between-waves.md)
+- [FIBERS-0029 - Publish contiguous job batches transactionally](fibers-0029-publish-contiguous-job-batches-transactionally.md)

@@ -3504,6 +3504,60 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
     return Result(true);
 }
 
+Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedure)
+{
+    return spawn(jobs, procedure, FiberCancellationToken());
+}
+
+Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedure, FiberCancellationToken token)
+{
+    if (not isOpen())
+    {
+        return Result::Error("FiberJobScheduler is not open");
+    }
+    if (jobs.empty())
+    {
+        return Result::Error("FiberJobScheduler batch is empty");
+    }
+    if (not procedure.isValid())
+    {
+        return Result::Error("FiberJob procedure is not valid");
+    }
+
+    {
+        QueueLockGuard guard(*this);
+        if (jobs.sizeInElements() > queueStorage.sizeInElements() - queueCount)
+        {
+            return Result::Error("FiberJobScheduler ready queue is full");
+        }
+        for (FiberJob& job : jobs)
+        {
+            if (job.isActive())
+            {
+                return Result::Error("FiberJob batch contains an active job");
+            }
+            if (job.ownerPool != nullptr and (not job.poolRetained or job.status() != FiberJobStatus::Invalid))
+            {
+                return Result::Error("FiberJob batch contains a job not newly acquired from its pool");
+            }
+        }
+        for (FiberJob& job : jobs)
+        {
+            initializeJobForSpawn(job, procedure, token);
+            queueStorage[queueTail] = &job;
+            queueTail               = (queueTail + 1) % queueStorage.sizeInElements();
+        }
+        queueCount += jobs.sizeInElements();
+        fiberAtomicFetchAddSize(readyJobs, jobs.sizeInElements());
+        fiberAtomicFetchAddSize(activeJobs, jobs.sizeInElements());
+    }
+    if (workerPool != nullptr)
+    {
+        workerPool->wakeAllWorkers();
+    }
+    return Result(true);
+}
+
 void FiberJobScheduler::initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure,
                                               FiberCancellationToken token)
 {
