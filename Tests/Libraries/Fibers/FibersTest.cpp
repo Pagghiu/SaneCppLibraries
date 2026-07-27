@@ -1198,6 +1198,7 @@ struct SC::FibersTest : public SC::TestCase
             }
             SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
             while (state.entered.load() != static_cast<int32_t>(CancelWorkers)) {}
+            SC_TEST_EXPECT(scheduler.activeJobCount() == CancelJobs);
             SC_TEST_EXPECT(scheduler.requestCancelAll());
             state.release.store(true);
             SC_TEST_EXPECT(workerPool.join());

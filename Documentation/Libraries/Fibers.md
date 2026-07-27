@@ -70,9 +70,9 @@ but no OS thread is blocked waiting for preemption.
 
 # Stackless Jobs
 
-`FiberJob` is for small CPU callbacks that never yield or wait. The first Draft scheduler is intentionally
-single-thread-driven: the caller supplies fixed ready-queue storage and explicitly runs it. Job failures remain on the
-completed job, while `run()` reports scheduler failures.
+`FiberJob` is for small CPU callbacks that never yield or wait. The caller supplies fixed ready-queue storage and can
+either drive the scheduler explicitly or attach a bounded worker pool. Job failures remain on the completed job, while
+`run()` reports scheduler failures.
 
 ```cpp
 FiberJobScheduler jobScheduler;
@@ -95,8 +95,8 @@ SC_TRY(jobScheduler.close());
 
 The queue never allocates or grows. `spawn()` reports capacity exhaustion, and a running job may submit children only
 while a slot is available. `FiberJobContext` intentionally has no `yield()` or fiber synchronization API. Parallel job
-workers and help-while-full fan-out remain future Draft work; use `FiberTask` whenever the callback must suspend or
-call `FibersAsync`.
+workers execute and steal accepted jobs without reserving per-job stacks. Recursive help-while-full fan-out remains
+future Draft work; use `FiberTask` whenever the callback must suspend or call `FibersAsync`.
 
 `FiberJobPool` provides O(1) acquisition from a fixed `Span<FiberJob>`. A completed job remains retained until the
 caller has inspected `result()` and calls `release()`. This makes result lifetime and backpressure explicit: failed
@@ -108,10 +108,10 @@ bind the pool with `pool.create(jobClass)`. The class owns only stable record st
 for `countErrors()` or caller-provided `collectErrors()` storage. Call `reset()` after inspection to return all records
 to their originating pools. A group never allocates and cannot start another completed wave before reset. Internal pool
 retention and group membership are serialized in preparation for parallel workers, and group ownership is established
-before scheduler publication. The current `FiberJobScheduler` remains single-thread-driven; its calls must not overlap
-across threads.
+before scheduler publication. Group wave construction and result inspection remain caller-driven lifecycle operations;
+do not mutate one group concurrently.
 
-`FiberJobWorker` is the caller-owned record reserved for the parallel runtime. Its bounded local deque storage is
+`FiberJobWorker` is a caller-owned parallel execution record. Its bounded local deque storage is
 created explicitly through `FiberJobScheduler::createWorkerDeques()` and a `FiberAllocator`; partial setup failure
 rolls back every deque allocated by that call. The worker overloads of `runOne()` and `run()` provide deterministic
 manual execution: jobs spawned by a running worker publish to its local deque, and another supplied worker can steal
@@ -122,7 +122,10 @@ threads may invoke worker `runOne()` concurrently and execute jobs in parallel.
 `FiberJobWorkerPool` adds library-owned OS threads without depending on `Threading`. Worker records and thread records
 remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. `join()` drains
 accepted jobs; `requestStop()` wakes parked workers and makes cancellation observable through `FiberJobContext` before
-draining. No stack is reserved for a job.
+draining. Multi-worker pools transfer claimed batches to cache-line-isolated worker active counters, so completion does
+not contend on one scheduler-wide counter. `activeJobCount()` is exact at stable observation points and can only
+conservatively overcount during a concurrent ownership transfer; it never reports a false zero. No stack is reserved
+for a job.
 
 ```cpp
 FiberJobWorkerPoolOptions options;

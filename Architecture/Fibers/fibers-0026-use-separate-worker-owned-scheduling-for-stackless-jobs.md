@@ -134,7 +134,8 @@ worker deques. On the same macOS ARM64 Release host, cache-line isolation raised
 from approximately 7.7M/2.6M/1.3M jobs/sec to 16.0M/11.5M/9.7M jobs/sec while preserving approximately 60M jobs/sec
 with one worker. These are diagnostic samples rather than a quiet-machine baseline. The remaining tiny-job scaling
 limit is the exact shared active-job completion count and requires a separate ownership decision rather than relaxed
-count semantics.
+count semantics. FIBERS-0027 resolves that decision with exact distributed worker ownership and conservative
+never-false-zero transfers.
 
 ## Related
 
@@ -143,5 +144,6 @@ count semantics.
 - [FIBERS-0010 - Use worker-owned scheduling with bounded injection](fibers-0010-use-worker-owned-scheduling-with-bounded-injection.md)
 - [FIBERS-0020 - Use slot-sequenced bounded injection](fibers-0020-use-slot-sequenced-bounded-injection.md)
 - [FIBERS-0025 - Prototype stackless jobs with separate bounded scheduling](fibers-0025-prototype-stackless-jobs-with-separate-bounded-scheduling.md)
+- [FIBERS-0027 - Distribute stackless active-job accounting](fibers-0027-distribute-stackless-active-job-accounting.md)
 - [Fibers architecture](fibers-architecture.md)
 - [Fibers documentation](../../Documentation/Libraries/Fibers.md)

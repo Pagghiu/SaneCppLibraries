@@ -708,6 +708,7 @@ struct SC_FIBERS_EXPORT FiberJob
     FiberJobGroup*         originGroup    = nullptr;
     FiberJob*              nextGroup      = nullptr;
     FiberCancellationToken cancellationToken;
+    FiberJobWorker*        accountingWorker = nullptr;
     Result                 jobResult        = Result(true);
     volatile int32_t       jobStatus        = static_cast<int32_t>(FiberJobStatus::Invalid);
     uint32_t               cancelGeneration = 0;
@@ -729,7 +730,11 @@ struct SC_FIBERS_EXPORT FiberJobWorkerDiagnostics
     size_t failedSteals   = 0;
 };
 
-//! Caller-owned execution agent for the future parallel FiberJob runtime.
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
+//! Caller-owned parallel execution agent for the FiberJob runtime.
 struct SC_FIBERS_EXPORT FiberJobWorker
 {
     FiberJobWorker();
@@ -759,17 +764,23 @@ struct SC_FIBERS_EXPORT FiberJobWorker
     size_t             lastDequeCapacity   = 0;
     volatile size_t    localDequeTop       = 0;
     volatile size_t    localDequeBottom    = 0;
-    size_t             localReadyPeakJobs  = 0;
-    size_t             executedJobs        = 0;
-    size_t             claimBatches        = 0;
-    size_t             claimedJobs         = 0;
-    size_t             claimBatchPeak      = 0;
-    size_t             stealCursor         = 0;
-    size_t             stealAttempts       = 0;
-    size_t             stolenJobs          = 0;
-    size_t             failedSteals        = 0;
-    bool               workerActive        = false;
+
+    size_t localReadyPeakJobs = 0;
+    size_t executedJobs       = 0;
+    size_t claimBatches       = 0;
+    size_t claimedJobs        = 0;
+    size_t claimBatchPeak     = 0;
+    size_t stealCursor        = 0;
+    size_t stealAttempts      = 0;
+    size_t stolenJobs         = 0;
+    size_t failedSteals       = 0;
+    bool   workerActive       = false;
+
+    alignas(128) volatile size_t ownedActiveJobs = 0;
 };
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+#pragma warning(pop)
+#endif
 
 //! Fixed-capacity scheduler for stackless run-to-completion jobs.
 //!
@@ -805,11 +816,13 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     Result requestCancel(FiberCancellationTokenSource& tokenSource);
     Result requestCancelAll();
 
-    [[nodiscard]] bool      isOpen() const;
-    [[nodiscard]] bool      hasReadyJobs() const;
-    [[nodiscard]] bool      hasActiveJobs() const;
-    [[nodiscard]] size_t    capacity() const;
-    [[nodiscard]] size_t    readyJobCount() const;
+    [[nodiscard]] bool isOpen() const;
+    [[nodiscard]] bool hasReadyJobs() const;
+    //! Never reports false while active work transfers from the external queue to a worker.
+    [[nodiscard]] bool   hasActiveJobs() const;
+    [[nodiscard]] size_t capacity() const;
+    [[nodiscard]] size_t readyJobCount() const;
+    //! Returns the exact stable count. A concurrent batch ownership transfer may conservatively overcount.
     [[nodiscard]] size_t    activeJobCount() const;
     [[nodiscard]] FiberJob* currentJob();
 
@@ -844,6 +857,7 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     FiberJob* popWorkerReady(FiberJobWorker& worker);
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
     FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);
+    bool      usesDistributedAccounting(const FiberJobWorker& worker) const;
     bool      isWorkerStopRequested() const;
 };
 #if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
