@@ -422,7 +422,8 @@ diagnostics types.
   raw stackless dispatch, and pooled stackless acquire/run/release overhead. Its
   `--job-worker-matrix --job-rounds <COUNT>` mode runs one warm-up and bounded repeated samples at unique
   1/2/4/8/hardware-worker counts, reporting minimum, median, mean, and maximum throughput without allocating sample
-  storage.
+  storage. Its `--job-worker-sustained --job-workers <COUNT>` mode keeps one job worker pool alive and reuses a fixed
+  8,192-record batch across one million jobs, timing owner-local publication through each explicit idle boundary.
 - `Examples/FibersSkynetBenchmark` is enabled after `./SC.sh package install taskflow-benchmarks` and compares the
   stackful scheduler and stackless jobs with Taskflow's pinned upstream Skynet backend. The stackful depth limit is
   explicit because each live `FiberTask` owns a fixed stack; the `FiberJob` backend uses distinct stable continuation
