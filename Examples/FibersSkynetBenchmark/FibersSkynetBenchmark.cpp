@@ -35,8 +35,6 @@ struct FibersSkynetState
 
 struct FiberJobSkynetNode
 {
-    FiberJob            job;
-    FiberJob            continuationJob;
     FiberJobSkynetNode* parent     = nullptr;
     uint64_t            baseNumber = 0;
     uint64_t            result     = 0;
@@ -47,9 +45,11 @@ struct FiberJobSkynetNode
 
 struct FiberJobSkynetState
 {
-    FiberJobScheduler*  scheduler = nullptr;
-    FiberJobSkynetNode* nodes     = nullptr;
-    uint32_t            maxDepth  = 0;
+    FiberJobScheduler*  scheduler     = nullptr;
+    FiberJobSkynetNode* nodes         = nullptr;
+    FiberJob*           jobs          = nullptr;
+    FiberJob*           continuations = nullptr;
+    uint32_t            maxDepth      = 0;
     Atomic<int32_t>     nextNode;
     Atomic<int32_t>     failedJobs;
 };
@@ -168,25 +168,30 @@ static void recordFiberJobSkynetResult(FiberJobSkynetState& state, Result result
 static Result spawnFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNode& node)
 {
     FiberJobSkynetState* statePointer = &state;
-    FiberJobSkynetNode*  nodePointer  = &node;
-    return state.scheduler->spawn(node.job, FiberJob::Procedure(
-                                                [statePointer, nodePointer](FiberJobContext&)
-                                                {
-                                                    Result result = runFiberJobSkynetNode(*statePointer, *nodePointer);
-                                                    recordFiberJobSkynetResult(*statePointer, result);
-                                                    return result;
-                                                }));
+    const size_t         nodeIndex    = static_cast<size_t>(&node - state.nodes);
+    return state.scheduler->spawn(
+        state.jobs[nodeIndex], FiberJob::Procedure(
+                                   [statePointer](FiberJobContext& context)
+                                   {
+                                       const size_t index = static_cast<size_t>(&context.job() - statePointer->jobs);
+                                       Result result = runFiberJobSkynetNode(*statePointer, statePointer->nodes[index]);
+                                       recordFiberJobSkynetResult(*statePointer, result);
+                                       return result;
+                                   }));
 }
 
 static Result spawnFiberJobSkynetContinuation(FiberJobSkynetState& state, FiberJobSkynetNode& node)
 {
     FiberJobSkynetState* statePointer = &state;
-    FiberJobSkynetNode*  nodePointer  = &node;
-    return state.scheduler->spawn(node.continuationJob,
+    const size_t         nodeIndex    = static_cast<size_t>(&node - state.nodes);
+    return state.scheduler->spawn(state.continuations[nodeIndex],
                                   FiberJob::Procedure(
-                                      [statePointer, nodePointer](FiberJobContext&)
+                                      [statePointer](FiberJobContext& context)
                                       {
-                                          Result result(true);
+                                          const size_t index =
+                                              static_cast<size_t>(&context.job() - statePointer->continuations);
+                                          FiberJobSkynetNode* nodePointer = &statePointer->nodes[index];
+                                          Result              result(true);
                                           for (uint32_t childIndex = 0; childIndex < 10; ++childIndex)
                                           {
                                               nodePointer->result +=
@@ -235,9 +240,18 @@ static Result runFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSkynetNo
         child.parent              = &node;
         child.baseNumber          = node.baseNumber + depthOffset * childIndex;
         child.depth               = node.depth + 1;
-        SC_TRY(spawnFiberJobSkynetNode(state, child));
     }
-    return Result(true);
+    FiberJobSkynetState* statePointer = &state;
+    return state.scheduler->spawn({state.jobs + node.firstChild, 10},
+                                  FiberJob::Procedure(
+                                      [statePointer](FiberJobContext& context)
+                                      {
+                                          const size_t index = static_cast<size_t>(&context.job() - statePointer->jobs);
+                                          Result       result =
+                                              runFiberJobSkynetNode(*statePointer, statePointer->nodes[index]);
+                                          recordFiberJobSkynetResult(*statePointer, result);
+                                          return result;
+                                      }));
 }
 
 static Result measureFibersSkynet(uint32_t numWorkers, uint32_t maxDepth, uint64_t& result, int64_t& elapsedUs)
@@ -359,10 +373,12 @@ struct FiberJobsSkynetRuntime
 {
     static constexpr size_t DequeCapacityPerWorker = 1024;
 
-    FiberJobSkynetNode*   nodes        = nullptr;
-    FiberJob**            readyStorage = nullptr;
-    FiberJobWorker*       workers      = nullptr;
-    FiberJobWorkerThread* threads      = nullptr;
+    FiberJobSkynetNode*   nodes         = nullptr;
+    FiberJob*             jobs          = nullptr;
+    FiberJob*             continuations = nullptr;
+    FiberJob**            readyStorage  = nullptr;
+    FiberJobWorker*       workers       = nullptr;
+    FiberJobWorkerThread* threads       = nullptr;
 
     uint32_t numNodes   = 0;
     uint32_t numWorkers = 0;
@@ -377,20 +393,25 @@ struct FiberJobsSkynetRuntime
         numNodes   = nodeCountForDepth(depth);
         numWorkers = workersCount;
 
-        nodes        = new (std::nothrow) FiberJobSkynetNode[numNodes];
-        readyStorage = new (std::nothrow) FiberJob*[numNodes];
-        workers      = new (std::nothrow) FiberJobWorker[numWorkers];
-        threads      = new (std::nothrow) FiberJobWorkerThread[numWorkers];
+        nodes         = new (std::nothrow) FiberJobSkynetNode[numNodes];
+        jobs          = new (std::nothrow) FiberJob[numNodes];
+        continuations = new (std::nothrow) FiberJob[numNodes];
+        readyStorage  = new (std::nothrow) FiberJob*[numNodes];
+        workers       = new (std::nothrow) FiberJobWorker[numWorkers];
+        threads       = new (std::nothrow) FiberJobWorkerThread[numWorkers];
 
-        if (nodes == nullptr or readyStorage == nullptr or workers == nullptr or threads == nullptr)
+        if (nodes == nullptr or jobs == nullptr or continuations == nullptr or readyStorage == nullptr or
+            workers == nullptr or threads == nullptr)
         {
             static_cast<void>(close());
             return Result::Error("Cannot allocate caller-owned FiberJob Skynet benchmark storage");
         }
 
-        state.scheduler = &scheduler;
-        state.nodes     = nodes;
-        state.maxDepth  = depth;
+        state.scheduler     = &scheduler;
+        state.nodes         = nodes;
+        state.jobs          = jobs;
+        state.continuations = continuations;
+        state.maxDepth      = depth;
 
         FiberJobWorkerPoolOptions options;
         options.dequeAllocator         = &allocator;
@@ -479,11 +500,15 @@ struct FiberJobsSkynetRuntime
         delete[] threads;
         delete[] workers;
         delete[] readyStorage;
+        delete[] continuations;
+        delete[] jobs;
         delete[] nodes;
-        threads      = nullptr;
-        workers      = nullptr;
-        readyStorage = nullptr;
-        nodes        = nullptr;
+        threads       = nullptr;
+        workers       = nullptr;
+        readyStorage  = nullptr;
+        continuations = nullptr;
+        jobs          = nullptr;
+        nodes         = nullptr;
         return firstError;
     }
 };
