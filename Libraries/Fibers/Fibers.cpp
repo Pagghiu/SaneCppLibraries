@@ -3273,6 +3273,7 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
         worker.lastDequeCapacity   = capacityPerWorker;
         fiberAtomicStoreSize(worker.localDequeTop, 0);
         fiberAtomicStoreSize(worker.localDequeBottom, 0);
+        fiberAtomicStoreSize(worker.ownedReadyJobs, 0);
         fiberAtomicStoreSize(worker.ownedActiveJobs, 0);
         for (size_t index = 0; index < capacityPerWorker; ++index)
         {
@@ -3292,6 +3293,7 @@ void FiberJobScheduler::releaseWorkerDeques(Span<FiberJobWorker> workers)
         SC_FIBERS_ASSERT_RELEASE(worker.workerJob == nullptr);
         SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(worker.localDequeTop) ==
                                  fiberAtomicLoadSize(worker.localDequeBottom));
+        SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(worker.ownedReadyJobs) == 0);
         SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(worker.ownedActiveJobs) == 0);
         if (worker.localDeque != nullptr and worker.localDequeAllocator != nullptr)
         {
@@ -3375,8 +3377,9 @@ FiberJob* FiberJobScheduler::popWorkerReady(FiberJobWorker& worker)
     }
     if (job != nullptr)
     {
-        SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyJobs) > 0);
-        fiberAtomicFetchSubSize(readyJobs, 1);
+        volatile size_t& readyCounter = usesDistributedAccounting(worker) ? worker.ownedReadyJobs : readyJobs;
+        SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyCounter) > 0);
+        fiberAtomicFetchSubSize(readyCounter, 1);
     }
     return job;
 }
@@ -3395,8 +3398,9 @@ FiberJob* FiberJobScheduler::stealWorkerReady(FiberJobWorker& victim)
     {
         return nullptr;
     }
-    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyJobs) > 0);
-    fiberAtomicFetchSubSize(readyJobs, 1);
+    volatile size_t& readyCounter = usesDistributedAccounting(victim) ? victim.ownedReadyJobs : readyJobs;
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyCounter) > 0);
+    fiberAtomicFetchSubSize(readyCounter, 1);
     return job;
 }
 
@@ -3464,13 +3468,14 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
             const bool distributedAccounting = usesDistributedAccounting(*worker);
             job.accountingWorker             = distributedAccounting ? worker : nullptr;
             // Exact accounting must be visible before the release-store publishes the deque bottom to thieves.
-            fiberAtomicFetchAddSize(readyJobs, 1);
             if (distributedAccounting)
             {
+                fiberAtomicFetchAddSize(worker->ownedReadyJobs, 1);
                 fiberAtomicFetchAddSize(worker->ownedActiveJobs, 1);
             }
             else
             {
+                fiberAtomicFetchAddSize(readyJobs, 1);
                 fiberAtomicFetchAddSize(activeJobs, 1);
             }
             SC_FIBERS_ASSERT_RELEASE(tryPushWorkerDeque(*worker, job));
@@ -3633,8 +3638,6 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
             queueStorage[queueHead]          = nullptr;
             queueHead                        = (queueHead + 1) % queueStorage.sizeInElements();
             queueCount -= 1;
-            SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyJobs) > 0);
-            fiberAtomicFetchSubSize(readyJobs, 1);
             claimedJobs += 1;
 
             const size_t localTop      = fiberAtomicLoadSize(worker.localDequeTop);
@@ -3658,9 +3661,17 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
             {
                 // Add the worker ownership first so a concurrent control-path snapshot can overcount but never see
                 // zero.
+                fiberAtomicFetchAddSize(worker.ownedReadyJobs, transferred);
                 fiberAtomicFetchAddSize(worker.ownedActiveJobs, claimedJobs);
+                const size_t previousReady  = fiberAtomicFetchSubSize(readyJobs, claimedJobs);
                 const size_t previousActive = fiberAtomicFetchSubSize(activeJobs, claimedJobs);
+                SC_FIBERS_ASSERT_RELEASE(previousReady >= claimedJobs);
                 SC_FIBERS_ASSERT_RELEASE(previousActive >= claimedJobs);
+            }
+            else
+            {
+                SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyJobs) > 0);
+                fiberAtomicFetchSubSize(readyJobs, 1);
             }
             if (transferred != 0)
             {
@@ -3777,13 +3788,24 @@ Result FiberJobScheduler::requestCancelAll()
 
 bool FiberJobScheduler::isOpen() const { return queueStorage.sizeInElements() != 0; }
 
-bool FiberJobScheduler::hasReadyJobs() const { return fiberAtomicLoadSize(readyJobs) != 0; }
+bool FiberJobScheduler::hasReadyJobs() const { return readyJobCount() != 0; }
 
 bool FiberJobScheduler::hasActiveJobs() const { return activeJobCount() != 0; }
 
 size_t FiberJobScheduler::capacity() const { return queueStorage.sizeInElements(); }
 
-size_t FiberJobScheduler::readyJobCount() const { return fiberAtomicLoadSize(readyJobs); }
+size_t FiberJobScheduler::readyJobCount() const
+{
+    size_t ready = fiberAtomicLoadSize(readyJobs);
+    if (workerPool != nullptr and workerPool->workers.sizeInElements() > 1)
+    {
+        for (const FiberJobWorker& worker : workerPool->workers)
+        {
+            ready += fiberAtomicLoadSize(worker.ownedReadyJobs);
+        }
+    }
+    return ready;
+}
 
 size_t FiberJobScheduler::activeJobCount() const
 {

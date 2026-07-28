@@ -634,14 +634,28 @@ static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWork
     }
     SC_TRY_MSG(completedJobs == TotalJobs, "Sustained FiberJob benchmark did not complete every job");
 
-    size_t executedJobs = 0;
-    size_t stolenJobs   = 0;
+    size_t executedJobs    = 0;
+    size_t minExecutedJobs = TotalJobs;
+    size_t maxExecutedJobs = 0;
+    size_t claimBatches    = 0;
+    size_t claimedJobs     = 0;
+    size_t claimBatchPeak  = 0;
+    size_t stealAttempts   = 0;
+    size_t stolenJobs      = 0;
+    size_t failedSteals    = 0;
     for (size_t workerIndex = 0; workerIndex < numWorkers; ++workerIndex)
     {
         FiberJobWorkerDiagnostics diagnostics;
         scheduler.workerDiagnostics(workers[workerIndex], diagnostics);
         executedJobs += diagnostics.executedJobs;
+        minExecutedJobs = diagnostics.executedJobs < minExecutedJobs ? diagnostics.executedJobs : minExecutedJobs;
+        maxExecutedJobs = diagnostics.executedJobs > maxExecutedJobs ? diagnostics.executedJobs : maxExecutedJobs;
+        claimBatches += diagnostics.claimBatches;
+        claimedJobs += diagnostics.claimedJobs;
+        claimBatchPeak = diagnostics.claimBatchPeak > claimBatchPeak ? diagnostics.claimBatchPeak : claimBatchPeak;
+        stealAttempts += diagnostics.stealAttempts;
         stolenJobs += diagnostics.stolenJobs;
+        failedSteals += diagnostics.failedSteals;
     }
     SC_TRY_MSG(executedJobs == TotalJobs, "Sustained FiberJob benchmark execution count mismatch");
 
@@ -659,6 +673,9 @@ static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWork
         numWorkers, TotalJobs, BatchCapacity, static_cast<size_t>(WorkIterations));
     console.print("  elapsedNs={} jobsPerSec={} checksum={} executedJobs={} stolenJobs={}\n",
                   static_cast<size_t>(elapsedNs), jobsPerSecond, checksum, executedJobs, stolenJobs);
+    console.print("  workerExecutedMin={} workerExecutedMax={} claimBatches={} claimedJobs={} claimBatchPeak={}\n",
+                  minExecutedJobs, maxExecutedJobs, claimBatches, claimedJobs, claimBatchPeak);
+    console.print("  stealAttempts={} failedSteals={}\n", stealAttempts, failedSteals);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures);
     return Result(true);

@@ -776,6 +776,7 @@ struct SC_FIBERS_EXPORT FiberJobWorker
     size_t failedSteals       = 0;
     bool   workerActive       = false;
 
+    alignas(128) volatile size_t ownedReadyJobs  = 0;
     alignas(128) volatile size_t ownedActiveJobs = 0;
 };
 #if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
@@ -820,10 +821,12 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     Result requestCancelAll();
 
     [[nodiscard]] bool isOpen() const;
+    //! Never reports false while ready work transfers from the external queue to a worker.
     [[nodiscard]] bool hasReadyJobs() const;
     //! Never reports false while active work transfers from the external queue to a worker.
     [[nodiscard]] bool   hasActiveJobs() const;
     [[nodiscard]] size_t capacity() const;
+    //! Returns the exact stable count. A concurrent batch ownership transfer may conservatively overcount.
     [[nodiscard]] size_t readyJobCount() const;
     //! Returns the exact stable count. A concurrent batch ownership transfer may conservatively overcount.
     [[nodiscard]] size_t    activeJobCount() const;
