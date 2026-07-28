@@ -510,7 +510,7 @@ static Result runFiberJobWorkerPoolBenchmarkMatrix(Console& console, size_t numR
     return Result(true);
 }
 
-static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
+static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWorkers, bool sharedAtomicPayload)
 {
     static constexpr size_t MaxWorkers             = 64;
     static constexpr size_t TotalJobs              = 1'000'000;
@@ -520,6 +520,10 @@ static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
 
     struct State
     {
+        FiberJob* jobs             = nullptr;
+        uint32_t* localCompletions = nullptr;
+        uint32_t* localValues      = nullptr;
+
         Atomic<int32_t> submitted;
         Atomic<int32_t> completed;
         Atomic<int32_t> checksum;
@@ -528,7 +532,9 @@ static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
     SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "FiberJob worker count must be between one and 64");
 
     static FiberJob  jobs[BatchCapacity];
-    static FiberJob* readyStorage[BatchCapacity] = {};
+    static FiberJob* readyStorage[BatchCapacity]     = {};
+    static uint32_t  localCompletions[BatchCapacity] = {};
+    static uint32_t  localValues[BatchCapacity]      = {};
 
     FiberJobScheduler         scheduler;
     FiberJobWorker            workers[MaxWorkers];
@@ -542,6 +548,14 @@ static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
     options.dequeAllocator         = &allocator;
     options.dequeCapacityPerWorker = DequeCapacityPerWorker;
     options.keepAliveWhenIdle      = true;
+    state.jobs                     = jobs;
+    state.localCompletions         = localCompletions;
+    state.localValues              = localValues;
+    for (size_t index = 0; index < BatchCapacity; ++index)
+    {
+        localCompletions[index] = 0;
+        localValues[index]      = 0;
+    }
 
     SC_TRY(allocator.createFixed(allocatorStorage));
     SC_TRY(scheduler.create(readyStorage));
@@ -555,20 +569,42 @@ static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
         const size_t submitted = static_cast<size_t>(state.submitted.load(memory_order_relaxed));
         const size_t remaining = TotalJobs - submitted;
         const size_t batchSize = remaining < BatchCapacity ? remaining : BatchCapacity;
-        SC_TRY(scheduler.spawn({jobs, batchSize},
-                               FiberJob::Procedure(
-                                   [&state](FiberJobContext&)
-                                   {
-                                       uint32_t value =
-                                           static_cast<uint32_t>(state.completed.load(memory_order_relaxed)) + 1;
-                                       for (int iteration = 0; iteration < WorkIterations; ++iteration)
+        if (sharedAtomicPayload)
+        {
+            SC_TRY(scheduler.spawn({jobs, batchSize},
+                                   FiberJob::Procedure(
+                                       [&state](FiberJobContext&)
                                        {
-                                           value = (value * 1664525u) ^ static_cast<uint32_t>(iteration + 1013904223u);
-                                       }
-                                       state.checksum.fetch_add(static_cast<int32_t>(value), memory_order_relaxed);
-                                       state.completed.fetch_add(1, memory_order_relaxed);
-                                       return Result(true);
-                                   })));
+                                           uint32_t value =
+                                               static_cast<uint32_t>(state.completed.load(memory_order_relaxed)) + 1;
+                                           for (int iteration = 0; iteration < WorkIterations; ++iteration)
+                                           {
+                                               value =
+                                                   (value * 1664525u) ^ static_cast<uint32_t>(iteration + 1013904223u);
+                                           }
+                                           state.checksum.fetch_add(static_cast<int32_t>(value), memory_order_relaxed);
+                                           state.completed.fetch_add(1, memory_order_relaxed);
+                                           return Result(true);
+                                       })));
+        }
+        else
+        {
+            SC_TRY(scheduler.spawn({jobs, batchSize},
+                                   FiberJob::Procedure(
+                                       [&state](FiberJobContext& context)
+                                       {
+                                           const size_t index = static_cast<size_t>(&context.job() - state.jobs);
+                                           uint32_t     value = state.localValues[index] + 1;
+                                           for (int iteration = 0; iteration < WorkIterations; ++iteration)
+                                           {
+                                               value =
+                                                   (value * 1664525u) ^ static_cast<uint32_t>(iteration + 1013904223u);
+                                           }
+                                           state.localValues[index] = value;
+                                           state.localCompletions[index] += 1;
+                                           return Result(true);
+                                       })));
+        }
         state.submitted.fetch_add(static_cast<int32_t>(batchSize), memory_order_relaxed);
         SC_TRY(workerPool.waitIdle());
     }
@@ -579,8 +615,24 @@ static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
     SC_TRY(workerPool.join());
     SC_TRY_MSG(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(TotalJobs),
                "Sustained FiberJob benchmark did not submit every job");
-    SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(TotalJobs),
-               "Sustained FiberJob benchmark did not complete every job");
+
+    size_t completedJobs = static_cast<size_t>(state.completed.load(memory_order_relaxed));
+    size_t checksum      = static_cast<size_t>(state.checksum.load(memory_order_relaxed));
+    if (not sharedAtomicPayload)
+    {
+        completedJobs              = 0;
+        checksum                   = 0;
+        const size_t completeWaves = TotalJobs / BatchCapacity;
+        const size_t remainder     = TotalJobs % BatchCapacity;
+        for (size_t index = 0; index < BatchCapacity; ++index)
+        {
+            const size_t expected = completeWaves + (index < remainder ? 1 : 0);
+            SC_TRY_MSG(localCompletions[index] == expected, "Sustained FiberJob independent completion count mismatch");
+            completedJobs += localCompletions[index];
+            checksum += localValues[index];
+        }
+    }
+    SC_TRY_MSG(completedJobs == TotalJobs, "Sustained FiberJob benchmark did not complete every job");
 
     size_t executedJobs = 0;
     size_t stolenJobs   = 0;
@@ -600,16 +652,22 @@ static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
     const Time::HighResolutionCounter elapsed       = finish.subtractExact(start);
     const int64_t                     elapsedNs     = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
     const size_t                      jobsPerSecond = static_cast<size_t>(TotalJobs * 1000000000ull / elapsedNs);
-    console.print("FibersBenchmark sustained stackless jobs\n");
+    console.print("FibersBenchmark sustained stackless jobs payload={}\n",
+                  sharedAtomicPayload ? "shared-atomic" : "independent-record");
     console.print(
         "  workers={} jobs={} batchCapacity={} workIterations={} timing=persistent-batch-publish-through-idle\n",
         numWorkers, TotalJobs, BatchCapacity, static_cast<size_t>(WorkIterations));
     console.print("  elapsedNs={} jobsPerSec={} checksum={} executedJobs={} stolenJobs={}\n",
-                  static_cast<size_t>(elapsedNs), jobsPerSecond,
-                  static_cast<size_t>(state.checksum.load(memory_order_relaxed)), executedJobs, stolenJobs);
+                  static_cast<size_t>(elapsedNs), jobsPerSecond, checksum, executedJobs, stolenJobs);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures);
     return Result(true);
+}
+
+static Result runSustainedFiberJobBenchmark(Console& console, size_t numWorkers)
+{
+    SC_TRY(runSustainedFiberJobBenchmarkCase(console, numWorkers, true));
+    return runSustainedFiberJobBenchmarkCase(console, numWorkers, false);
 }
 
 static Result runForcedStealingBenchmark(Console& console)
