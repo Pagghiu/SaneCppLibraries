@@ -119,21 +119,23 @@ from the opposite end. Once worker-local work exists, callers must continue with
 reports that it cannot drain local deques. The bounded external queue is serialized independently, so caller-managed
 threads may invoke worker `runOne()` concurrently and execute jobs in parallel.
 
-External producers that already own contiguous stable records can publish them transactionally with
-`FiberJobScheduler::spawn(Span<FiberJob>, Procedure)`. The scheduler validates the entire span and bounded queue before
-changing any job, copies the fixed-size procedure into each record under one queue lock, updates accounting once, and
-wakes the worker pool as a batch. Empty spans, active records, invalid pooled records, or insufficient queue capacity
-return an error without partially publishing the span. Scalar `spawn()` remains the owner-local fast path.
+Callers that own contiguous stable records can publish them transactionally with
+`FiberJobScheduler::spawn(Span<FiberJob>, Procedure)`. An external producer validates the entire span and bounded queue,
+copies the fixed-size procedure into each record under one queue lock, updates accounting once, and wakes the pool as a
+batch. A running job instead places the complete batch on its owner deque when it fits, with one accounting update and
+one deque-bottom publication; peers can then steal from the opposite end. If the complete batch does not fit locally,
+the scheduler uses the bounded external transaction rather than splitting the call. Empty spans, active records,
+invalid pooled records, or insufficient capacity return an error without partial publication.
 
 `FiberJobWorkerPool` adds library-owned OS threads without depending on `Threading`. Worker records and thread records
 remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. By default,
 `join()` drains one accepted wave. Set `keepAliveWhenIdle` to keep the same threads and deques parked between waves;
 `waitIdle()` then marks each wave boundary, and `requestStop()` is required before the final `join()`. Stop wakes every
 parked worker and makes cancellation observable through `FiberJobContext`. Multi-worker pools transfer claimed batches
-to cache-line-isolated worker active counters, so completion does
-not contend on one scheduler-wide counter. `activeJobCount()` is exact at stable observation points and can only
-conservatively overcount during a concurrent ownership transfer; it never reports a false zero. No stack is reserved
-for a job.
+to cache-line-isolated worker ready and active counters, so local execution and completion do not contend on
+scheduler-wide counters. `readyJobCount()` and `activeJobCount()` are exact at stable observation points and can only
+conservatively overcount during a concurrent ownership transfer; neither reports a false zero. No stack is reserved for
+a job.
 
 ```cpp
 FiberJobWorkerPoolOptions options;
