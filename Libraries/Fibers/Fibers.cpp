@@ -2195,6 +2195,10 @@ Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWork
     threads           = threadStorage;
     idleSpinAttempts  = options.idleSpinAttempts;
     keepAliveWhenIdle = options.keepAliveWhenIdle;
+    for (FiberJobWorker& worker : workers)
+    {
+        worker.distributedCounts = workers.sizeInElements() > 1;
+    }
     wakeEvent.get().resetDiagnostics();
     fiberAtomicStore(stopRequested, 0);
     fiberAtomicStore(running, 1);
@@ -3303,6 +3307,7 @@ void FiberJobScheduler::releaseWorkerDeques(Span<FiberJobWorker> workers)
         worker.localDequeAllocator = nullptr;
         worker.localQueueScheduler = nullptr;
         worker.localDequeCapacity  = 0;
+        worker.distributedCounts   = false;
         fiberAtomicStoreSize(worker.localDequeTop, 0);
         fiberAtomicStoreSize(worker.localDequeBottom, 0);
     }
@@ -3877,18 +3882,7 @@ bool FiberJobScheduler::isWorkerStopRequested() const
 
 bool FiberJobScheduler::usesDistributedAccounting(const FiberJobWorker& worker) const
 {
-    if (workerPool == nullptr or workerPool->workers.sizeInElements() <= 1)
-    {
-        return false;
-    }
-    for (const FiberJobWorker& poolWorker : workerPool->workers)
-    {
-        if (&poolWorker == &worker)
-        {
-            return true;
-        }
-    }
-    return false;
+    return worker.distributedCounts and worker.localQueueScheduler == this;
 }
 
 struct FiberJobClassInternal

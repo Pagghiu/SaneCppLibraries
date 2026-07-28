@@ -751,6 +751,7 @@ struct SC_FIBERS_EXPORT FiberJobWorker
 
   private:
     friend struct FiberJobScheduler;
+    friend struct FiberJobWorkerPool;
 
     Result begin(FiberJobScheduler& scheduler);
     void   end();
@@ -775,6 +776,7 @@ struct SC_FIBERS_EXPORT FiberJobWorker
     size_t stolenJobs         = 0;
     size_t failedSteals       = 0;
     bool   workerActive       = false;
+    bool   distributedCounts  = false;
 
     alignas(128) volatile size_t ownedReadyJobs  = 0;
     alignas(128) volatile size_t ownedActiveJobs = 0;
