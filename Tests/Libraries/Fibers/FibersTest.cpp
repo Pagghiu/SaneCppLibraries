@@ -955,17 +955,13 @@ struct SC::FibersTest : public SC::TestCase
             Result spawnChildren()
             {
                 sawOwner = scheduler->currentJob() == parent and owner->runningJob() == parent and owner->isActive();
-                for (size_t index = 0; index < 3; ++index)
-                {
-                    State* state = this;
-                    SC_TRY(scheduler->spawn(children[index], FiberJob::Procedure(
-                                                                 [state](FiberJobContext&)
-                                                                 {
-                                                                     state->completed += 1;
-                                                                     return Result(true);
-                                                                 })));
-                }
-                return Result(true);
+                State* state = this;
+                return scheduler->spawn({children, 3}, FiberJob::Procedure(
+                                                           [state](FiberJobContext&)
+                                                           {
+                                                               state->completed += 1;
+                                                               return Result(true);
+                                                           }));
             }
         };
 

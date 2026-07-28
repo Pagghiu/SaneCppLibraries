@@ -3534,6 +3534,59 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
         return Result::Error("FiberJob procedure is not valid");
     }
 
+    FiberJobWorker* worker = currentJobWorkerFor(*this);
+    if (worker != nullptr and worker->localDeque != nullptr)
+    {
+        const size_t top    = fiberAtomicLoadSize(worker->localDequeTop);
+        const size_t bottom = fiberAtomicLoadSize(worker->localDequeBottom);
+        if (bottom - top <= worker->localDequeCapacity and
+            jobs.sizeInElements() <= worker->localDequeCapacity - (bottom - top))
+        {
+            for (FiberJob& job : jobs)
+            {
+                if (job.isActive())
+                {
+                    return Result::Error("FiberJob batch contains an active job");
+                }
+                if (job.ownerPool != nullptr and (not job.poolRetained or job.status() != FiberJobStatus::Invalid))
+                {
+                    return Result::Error("FiberJob batch contains a job not newly acquired from its pool");
+                }
+            }
+
+            const bool distributedAccounting = usesDistributedAccounting(*worker);
+            size_t     offset                = 0;
+            for (FiberJob& job : jobs)
+            {
+                initializeJobForSpawn(job, procedure, token);
+                job.accountingWorker = distributedAccounting ? worker : nullptr;
+                worker->localDeque[(bottom + offset) % worker->localDequeCapacity] = &job;
+                offset += 1;
+            }
+            if (distributedAccounting)
+            {
+                fiberAtomicFetchAddSize(worker->ownedReadyJobs, jobs.sizeInElements());
+                fiberAtomicFetchAddSize(worker->ownedActiveJobs, jobs.sizeInElements());
+            }
+            else
+            {
+                fiberAtomicFetchAddSize(readyJobs, jobs.sizeInElements());
+                fiberAtomicFetchAddSize(activeJobs, jobs.sizeInElements());
+            }
+            fiberAtomicStoreSize(worker->localDequeBottom, bottom + jobs.sizeInElements());
+            const size_t workerReady = bottom + jobs.sizeInElements() - top;
+            if (workerReady > worker->localReadyPeakJobs)
+            {
+                worker->localReadyPeakJobs = workerReady;
+            }
+            if (workerPool != nullptr)
+            {
+                workerPool->wakeAllWorkers();
+            }
+            return Result(true);
+        }
+    }
+
     {
         QueueLockGuard guard(*this);
         if (jobs.sizeInElements() > queueStorage.sizeInElements() - queueCount)
