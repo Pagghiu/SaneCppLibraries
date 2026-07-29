@@ -1294,6 +1294,10 @@ struct FiberWorkerPoolWakeEvent
     void notifyAll()
     {
         fiberAtomicFetchAddUInt32(generation, 1);
+        if (fiberAtomicLoadUInt32(parked) == 0)
+        {
+            return;
+        }
         ::EnterCriticalSection(&mutex);
         pendingSignals = fiberAtomicLoadUInt32(parked);
         ::WakeAllConditionVariable(&condition);
@@ -1363,6 +1367,10 @@ struct FiberWorkerPoolWakeEvent
     void notifyAll()
     {
         fiberAtomicFetchAddUInt32(generation, 1);
+        if (fiberAtomicLoadUInt32(parked) == 0)
+        {
+            return;
+        }
         ::pthread_mutex_lock(&mutex);
         pendingSignals = fiberAtomicLoadUInt32(parked);
         ::pthread_cond_broadcast(&condition);
@@ -3581,7 +3589,7 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
             }
             if (workerPool != nullptr)
             {
-                workerPool->wakeAllWorkers();
+                workerPool->wakeOneWorker();
             }
             return Result(true);
         }

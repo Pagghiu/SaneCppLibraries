@@ -123,9 +123,10 @@ Callers that own contiguous stable records can publish them transactionally with
 `FiberJobScheduler::spawn(Span<FiberJob>, Procedure)`. An external producer validates the entire span and bounded queue,
 copies the fixed-size procedure into each record under one queue lock, updates accounting once, and wakes the pool as a
 batch. A running job instead places the complete batch on its owner deque when it fits, with one accounting update and
-one deque-bottom publication; peers can then steal from the opposite end. If the complete batch does not fit locally,
-the scheduler uses the bounded external transaction rather than splitting the call. Empty spans, active records,
-invalid pooled records, or insufficient capacity return an error without partial publication.
+one deque-bottom publication, then wakes one parked peer to steal from the opposite end. Later publications recruit
+more peers without broadcasting at every recursive fan-out node. If the complete batch does not fit locally, the
+scheduler uses the bounded external transaction rather than splitting the call. Empty spans, active records, invalid
+pooled records, or insufficient capacity return an error without partial publication.
 
 `FiberJobWorkerPool` adds library-owned OS threads without depending on `Threading`. Worker records and thread records
 remain caller-owned, while every local deque comes from the explicit `FiberAllocator` in the options. By default,

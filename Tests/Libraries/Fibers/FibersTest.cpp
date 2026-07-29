@@ -1214,6 +1214,68 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            static constexpr size_t BatchWorkers  = 2;
+            static constexpr size_t BatchChildren = 8;
+
+            struct BatchState
+            {
+                FiberJobScheduler* scheduler = nullptr;
+                FiberJob*          children  = nullptr;
+                Atomic<int32_t>    started;
+                Atomic<int32_t>    completed;
+
+                Result spawnChildren()
+                {
+                    BatchState* state = this;
+                    return scheduler->spawn({children, BatchChildren},
+                                            FiberJob::Procedure(
+                                                [state](FiberJobContext&)
+                                                {
+                                                    const int32_t ticket = state->started.fetch_add(1);
+                                                    if (ticket == 0)
+                                                    {
+                                                        while (state->started.load() <
+                                                               static_cast<int32_t>(BatchWorkers))
+                                                        {}
+                                                    }
+                                                    state->completed.fetch_add(1);
+                                                    return Result(true);
+                                                }));
+                }
+            };
+
+            FiberJob                  jobs[BatchChildren + 1];
+            FiberJob*                 readyStorage[1] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[BatchWorkers];
+            FiberJobWorkerThread      threads[BatchWorkers];
+            FiberJobWorkerPool        workerPool;
+            FiberJobWorkerPoolOptions options;
+            char                      allocatorStorage[2048] = {};
+            FiberAllocator            allocator;
+            BatchState                state;
+            state.scheduler                = &scheduler;
+            state.children                 = &jobs[1];
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = BatchChildren;
+            options.idleSpinAttempts       = 0;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            BatchState* statePointer = &state;
+            SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
+                                                                        { return statePointer->spawnChildren(); })));
+            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(BatchChildren));
+            SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(BatchChildren));
+            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
+
+        {
             static constexpr size_t CancelWorkers = 2;
             static constexpr size_t CancelJobs    = 64;
 
