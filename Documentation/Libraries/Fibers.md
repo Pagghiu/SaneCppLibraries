@@ -439,7 +439,8 @@ diagnostics types.
   stackful scheduler and stackless jobs with Taskflow's pinned upstream Skynet backend. The stackful depth limit is
   explicit because each live `FiberTask` owns a fixed stack; the `FiberJob` backend uses distinct stable continuation
   records and supports the canonical million-leaf workload without per-job stacks. Its persistent worker pool is reused
-  across warm-up and measured waves at each depth.
+  across warm-up and measured waves at each depth. `--job-idle-spins <COUNT>` isolates the bounded worker spin policy
+  when profiling parking and wake overhead; its default matches `FiberJobWorkerPoolOptions`.
 - `Tests/Libraries/Fibers/FibersTest.cpp` is the best source of focused examples for cancellation, primitives,
   task pools, worker pools, work stealing, diagnostics, virtual stacks, and allocator-backed storage.
 

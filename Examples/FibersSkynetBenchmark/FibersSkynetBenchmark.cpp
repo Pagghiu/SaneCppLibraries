@@ -388,7 +388,7 @@ struct FiberJobsSkynetRuntime
     FiberAllocator      allocator;
     FiberJobSkynetState state;
 
-    Result create(uint32_t workersCount, uint32_t depth)
+    Result create(uint32_t workersCount, uint32_t depth, size_t idleSpinAttempts)
     {
         numNodes   = nodeCountForDepth(depth);
         numWorkers = workersCount;
@@ -416,6 +416,7 @@ struct FiberJobsSkynetRuntime
         FiberJobWorkerPoolOptions options;
         options.dequeAllocator         = &allocator;
         options.dequeCapacityPerWorker = DequeCapacityPerWorker;
+        options.idleSpinAttempts       = idleSpinAttempts;
         options.keepAliveWhenIdle      = true;
 
         FiberAllocatorVirtualOptions allocatorOptions;
@@ -514,10 +515,10 @@ struct FiberJobsSkynetRuntime
 };
 
 static Result measureFiberJobsSkynetSamples(Console& console, uint32_t numWorkers, uint32_t depth, int32_t rounds,
-                                            uint64_t leaves, uint64_t expected)
+                                            uint64_t leaves, uint64_t expected, size_t idleSpinAttempts)
 {
     FiberJobsSkynetRuntime runtime;
-    SC_TRY(runtime.create(numWorkers, depth));
+    SC_TRY(runtime.create(numWorkers, depth, idleSpinAttempts));
 
     uint64_t measuredResult = 0;
     int64_t  warmupUs       = 0;
@@ -553,12 +554,13 @@ static Result measureFiberJobsSkynetSamples(Console& console, uint32_t numWorker
 
 static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
 {
-    int32_t    workers  = 4;
-    int32_t    rounds   = 3;
-    int32_t    maxDepth = 4;
-    StringView backend  = "all";
+    int32_t    workers             = 4;
+    int32_t    rounds              = 3;
+    int32_t    maxDepth            = 4;
+    int32_t    jobIdleSpinAttempts = 32;
+    StringView backend             = "all";
 
-    CommandLineOption options[4];
+    CommandLineOption options[5];
     options[0].longName  = "workers";
     options[0].valueName = "COUNT";
     options[0].help      = "Worker threads used by both backends";
@@ -578,6 +580,11 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
     options[3].valueName = "NAME";
     options[3].help      = "Backend to run: all, fibers, jobs, or taskflow";
     options[3].value     = CommandLineValue::stringView(backend);
+
+    options[4].longName  = "job-idle-spins";
+    options[4].valueName = "COUNT";
+    options[4].help      = "FiberJob CPU-relax attempts before parking an idle worker";
+    options[4].value     = CommandLineValue::int32(jobIdleSpinAttempts);
 
     CommandLineSpec spec;
     spec.programName = "FibersSkynetBenchmark";
@@ -606,13 +613,15 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
 
     SC_TRY_MSG(workers > 0 and rounds > 0 and rounds <= 15 and maxDepth > 0 and maxDepth <= 6,
                "workers must be positive; rounds and max-depth must be between 1 and 15 and 1 and 6 respectively");
+    SC_TRY_MSG(jobIdleSpinAttempts >= 0, "job-idle-spins must not be negative");
     SC_TRY_MSG(backend == "all" or backend == "fibers" or backend == "jobs" or backend == "taskflow",
                "backend must be all, fibers, jobs, or taskflow");
     SC_TRY_MSG((backend != "all" and backend != "fibers") or maxDepth <= 4,
                "all and fibers backends require max-depth between 1 and 4");
 
-    console.print("Skynet packageRevision=ec97c0095bd10907584a3b408e181410796b48fe workers={} rounds={}\n",
-                  static_cast<size_t>(workers), static_cast<size_t>(rounds));
+    console.print(
+        "Skynet packageRevision=ec97c0095bd10907584a3b408e181410796b48fe workers={} rounds={} jobIdleSpins={}\n",
+        static_cast<size_t>(workers), static_cast<size_t>(rounds), static_cast<size_t>(jobIdleSpinAttempts));
     console.print(
         "allocation: Fibers receives bounded task, 16 KiB virtual-stack, deque, and injection capacity; FiberJob "
         "receives stable node, initial/continuation-job, ready-pointer, worker, thread, and deque capacity; all SC "
@@ -655,7 +664,7 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
         if (backend == "all" or backend == "jobs")
         {
             SC_TRY(measureFiberJobsSkynetSamples(console, static_cast<uint32_t>(workers), static_cast<uint32_t>(depth),
-                                                 rounds, leaves, expected));
+                                                 rounds, leaves, expected, static_cast<size_t>(jobIdleSpinAttempts)));
         }
 
         if (backend == "all" or backend == "taskflow")
