@@ -514,25 +514,34 @@ struct FiberJobsSkynetRuntime
     }
 };
 
-static Result measureFiberJobsSkynetSamples(Console& console, uint32_t numWorkers, uint32_t depth, int32_t rounds,
-                                            uint64_t leaves, uint64_t expected, size_t idleSpinAttempts)
+struct FiberJobsSkynetSampleOptions
+{
+    uint32_t numWorkers       = 0;
+    uint32_t depth            = 0;
+    int32_t  rounds           = 0;
+    uint64_t leaves           = 0;
+    uint64_t expected         = 0;
+    size_t   idleSpinAttempts = 0;
+};
+
+static Result measureFiberJobsSkynetSamples(Console& console, const FiberJobsSkynetSampleOptions& options)
 {
     FiberJobsSkynetRuntime runtime;
-    SC_TRY(runtime.create(numWorkers, depth, idleSpinAttempts));
+    SC_TRY(runtime.create(options.numWorkers, options.depth, options.idleSpinAttempts));
 
     uint64_t measuredResult = 0;
     int64_t  warmupUs       = 0;
     Result   result         = runtime.measure(measuredResult, warmupUs);
-    if (result and measuredResult != expected)
+    if (result and measuredResult != options.expected)
     {
         result = Result::Error("FiberJob Skynet warm-up sum mismatch");
     }
 
     int64_t elapsedSamples[15] = {};
-    for (int32_t round = 0; result and round < rounds; ++round)
+    for (int32_t round = 0; result and round < options.rounds; ++round)
     {
         result = runtime.measure(measuredResult, elapsedSamples[round]);
-        if (result and measuredResult != expected)
+        if (result and measuredResult != options.expected)
         {
             result = Result::Error("FiberJob Skynet sum mismatch");
         }
@@ -547,8 +556,8 @@ static Result measureFiberJobsSkynetSamples(Console& console, uint32_t numWorker
 
     SmallString<32> resultText(StringEncoding::Ascii);
     SC_TRY(StringBuilder::format(resultText, "{}", measuredResult));
-    printSkynetSamples(console, "jobs", depth, leaves, expected, resultText.view(),
-                       {elapsedSamples, static_cast<size_t>(rounds)});
+    printSkynetSamples(console, "jobs", options.depth, options.leaves, options.expected, resultText.view(),
+                       {elapsedSamples, static_cast<size_t>(options.rounds)});
     return Result(true);
 }
 
@@ -663,8 +672,14 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
 
         if (backend == "all" or backend == "jobs")
         {
-            SC_TRY(measureFiberJobsSkynetSamples(console, static_cast<uint32_t>(workers), static_cast<uint32_t>(depth),
-                                                 rounds, leaves, expected, static_cast<size_t>(jobIdleSpinAttempts)));
+            FiberJobsSkynetSampleOptions sampleOptions;
+            sampleOptions.numWorkers       = static_cast<uint32_t>(workers);
+            sampleOptions.depth            = static_cast<uint32_t>(depth);
+            sampleOptions.rounds           = rounds;
+            sampleOptions.leaves           = leaves;
+            sampleOptions.expected         = expected;
+            sampleOptions.idleSpinAttempts = static_cast<size_t>(jobIdleSpinAttempts);
+            SC_TRY(measureFiberJobsSkynetSamples(console, sampleOptions));
         }
 
         if (backend == "all" or backend == "taskflow")

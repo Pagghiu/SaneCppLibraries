@@ -1223,9 +1223,13 @@ struct SC::FibersTest : public SC::TestCase
                 FiberJob*          children  = nullptr;
                 Atomic<int32_t>    started;
                 Atomic<int32_t>    completed;
+                Atomic<bool>       parentEntered;
+                Atomic<bool>       publishBatch;
 
                 Result spawnChildren()
                 {
+                    parentEntered.store(true);
+                    while (not publishBatch.load()) {}
                     BatchState* state = this;
                     return scheduler->spawn({children, BatchChildren},
                                             FiberJob::Procedure(
@@ -1266,6 +1270,9 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
                                                                         { return statePointer->spawnChildren(); })));
             SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+            while (not state.parentEntered.load()) {}
+            while (workerPool.parkedWorkerCount() != 1) {}
+            state.publishBatch.store(true);
             SC_TEST_EXPECT(workerPool.join());
             SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(BatchChildren));
             SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(BatchChildren));
