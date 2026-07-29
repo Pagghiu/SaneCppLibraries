@@ -31,7 +31,7 @@ cooperative synchronization primitives, cancellation wakeups, explicit fiber all
 no-allocation tracing hooks.
 
 `Fibers` does not own async I/O, descriptor readiness, coroutine frames, protocol buffering, stream composition, hidden
-thread pools, or unbounded heap-backed queues. I/O integration belongs in `FibersAsync`, and coroutine integration
+thread pools, or unbounded heap-backed queues. I/O integration belongs in `AsyncFibers`, and coroutine integration
 belongs in a later explicit adapter only if a real need appears.
 
 Logical fiber task state also does not belong in C++ `thread_local` variables or platform TLS. Fibers can resume on a

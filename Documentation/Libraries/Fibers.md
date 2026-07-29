@@ -96,7 +96,7 @@ SC_TRY(jobScheduler.close());
 The queue never allocates or grows. `spawn()` reports capacity exhaustion, and a running job may submit children only
 while a slot is available. `FiberJobContext` intentionally has no `yield()` or fiber synchronization API. Parallel job
 workers execute and steal accepted jobs without reserving per-job stacks. Recursive help-while-full fan-out remains
-future Draft work; use `FiberTask` whenever the callback must suspend or call `FibersAsync`.
+future Draft work; use `FiberTask` whenever the callback must suspend or call `AsyncFibers`.
 
 `FiberJobPool` provides O(1) acquisition from a fixed `Span<FiberJob>`. A completed job remains retained until the
 caller has inspected `result()` and calls `release()`. This makes result lifetime and backpressure explicit: failed
@@ -408,7 +408,7 @@ statistics.
 wrapper over `Async`. `Fibers` is different: it is stackful, does not require C++20 coroutines, and can suspend through
 ordinary nested function calls because each fiber has an explicit stack.
 
-I/O integration is intentionally not part of `Fibers`; it lives in [FibersAsync](@ref library_fibers_async), which
+I/O integration is intentionally not part of `Fibers`; it lives in [AsyncFibers](@ref library_async_fibers), which
 depends on both `Fibers` and `Async`.
 
 [Threading](@ref library_threading) is the lower-level choice when work naturally maps to OS threads or must block in
@@ -426,7 +426,7 @@ diagnostics types.
 
 # Further Examples
 
-- `Examples/FibersDemo` shows a tiny CPU fiber workload, `FibersAsync` sleeps, and worker-pool I/O.
+- `Examples/FibersDemo` shows a tiny CPU fiber workload, `AsyncFibers` sleeps, and worker-pool I/O.
 - `Examples/FibersBenchmark` contains explicit benchmark-style workloads for yield/resume, sustained micro-tasking,
   raw stackless dispatch, and pooled stackless acquire/run/release overhead. Its
   `--job-worker-matrix --job-rounds <COUNT>` mode runs one warm-up and bounded repeated samples at unique

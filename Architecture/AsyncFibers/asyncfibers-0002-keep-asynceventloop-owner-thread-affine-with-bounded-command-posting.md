@@ -1,4 +1,4 @@
-# FIBERSASYNC-0002 - Keep AsyncEventLoop Owner-Thread Affine With Bounded Command Posting
+# ASYNCFIBERS-0002 - Keep AsyncEventLoop Owner-Thread Affine With Bounded Command Posting
 
 Status: Accepted
 Date: 2026-07-07
@@ -11,22 +11,22 @@ Unbounded cross-thread queues would violate SC allocation rules.
 
 ## Decision
 
-`FiberAsyncIO` keeps one owner thread for the wrapped `AsyncEventLoop`. Operations requested from other threads are
+`AsyncFiberIO` keeps one owner thread for the wrapped `AsyncEventLoop`. Operations requested from other threads are
 posted through bounded caller-provided command storage and executed by the owner thread. Worker fibers suspend
 cooperatively until the owner-thread async request completes, fails, or is canceled.
 
-`FiberAsyncIO` borrows the scheduler, event loop, and command storage. It is non-copyable and non-movable, and it must
+`AsyncFiberIO` borrows the scheduler, event loop, and command storage. It is non-copyable and non-movable, and it must
 not be destroyed while an operation or queued owner-thread command is pending.
 
 ## Consequences
 
-`FibersAsync` can support fiber migration across worker threads while preserving `Async`'s thread-affinity assumptions.
+`AsyncFibers` can support fiber migration across worker threads while preserving `Async`'s thread-affinity assumptions.
 Callers must size command storage for cross-thread starts/stops, and command queue exhaustion is explicit backpressure
 rather than hidden allocation.
 
 ## Confirmation
 
-A change preserves this decision when `FiberAsyncIO` can identify the owner thread, cross-thread starts/stops go through
+A change preserves this decision when `AsyncFiberIO` can identify the owner thread, cross-thread starts/stops go through
 bounded command posting, command queue capacity is visible through `Result` failures for real exhaustion, and tests cover
 worker-fiber I/O submission from non-owner threads. Exhaustion must leave the queue reusable, and destruction must
 diagnose pending operations or commands rather than silently invalidating borrowed state.
@@ -35,4 +35,4 @@ diagnose pending operations or commands rather than silently invalidating borrow
 
 - [ASYNC-0002 - Split event-loop running into submit poll and dispatch phases](../Async/async-0002-split-event-loop-running-into-submit-poll-and-dispatch-phases.md)
 - [FIBERS-0004 - Use bounded worker deques with intrusive global spill for work stealing](../Fibers/fibers-0004-use-bounded-worker-deques-with-intrusive-global-spill-for-work-stealing.md)
-- [FibersAsync architecture](fibersasync-architecture.md)
+- [AsyncFibers architecture](asyncfibers-architecture.md)

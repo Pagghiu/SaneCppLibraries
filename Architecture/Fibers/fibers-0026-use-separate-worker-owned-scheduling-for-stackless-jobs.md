@@ -35,7 +35,7 @@ caller-provided worker/thread storage plus queue storage obtained explicitly fro
   retention can make record capacity unavailable until caller-controlled `release()` or group `reset()`.
 - Queue capacity and record capacity remain separately observable in diagnostics. Neither may grow implicitly.
 - A queued job may migrate through stealing. A running job stays on its current OS thread until its callback returns.
-  There is no suspension, preemption, fiber primitive wait, or `FibersAsync` operation in `FiberJobContext`.
+  There is no suspension, preemption, fiber primitive wait, or `AsyncFibers` operation in `FiberJobContext`.
 - Pending cancellation claims a job before execution and stores cancellation in its normal `Result`. Running
   cancellation is cooperative and observable through the context. Completion publishes the final result exactly once
   before notifying a group or future continuation.

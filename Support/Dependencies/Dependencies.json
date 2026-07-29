@@ -19,6 +19,25 @@
             "Threading"
         ]
     },
+    "AsyncFibers": {
+        "direct_dependencies": [
+            "Async",
+            "Fibers",
+            "Threading"
+        ],
+        "minimal_dependencies": [
+            "Async",
+            "Fibers"
+        ],
+        "all_dependencies": [
+            "Async",
+            "Fibers",
+            "File",
+            "FileSystem",
+            "Socket",
+            "Threading"
+        ]
+    },
     "AsyncStreams": {
         "direct_dependencies": [],
         "minimal_dependencies": [],
@@ -70,25 +89,6 @@
         "direct_dependencies": [],
         "minimal_dependencies": [],
         "all_dependencies": []
-    },
-    "FibersAsync": {
-        "direct_dependencies": [
-            "Async",
-            "Fibers",
-            "Threading"
-        ],
-        "minimal_dependencies": [
-            "Async",
-            "Fibers"
-        ],
-        "all_dependencies": [
-            "Async",
-            "Fibers",
-            "File",
-            "FileSystem",
-            "Socket",
-            "Threading"
-        ]
     },
     "File": {
         "direct_dependencies": [],

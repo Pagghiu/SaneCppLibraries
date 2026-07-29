@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/FibersAsync/FibersAsync.h"
+#include "Libraries/AsyncFibers/AsyncFibers.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
@@ -25,7 +25,7 @@
 
 namespace SC
 {
-struct FibersAsyncTest;
+struct AsyncFibersTest;
 }
 
 namespace
@@ -49,14 +49,14 @@ static bool isDebuggerAttached()
 #endif
 } // namespace
 
-struct SC::FibersAsyncTest : public SC::TestCase
+struct SC::AsyncFibersTest : public SC::TestCase
 {
-    FibersAsyncTest(SC::TestReport& report) : TestCase(report, "FibersAsyncTest")
+    AsyncFibersTest(SC::TestReport& report) : TestCase(report, "AsyncFibersTest")
     {
 #if SC_COMPILER_FILC
         if (not report.quietMode)
         {
-            report.console.printLine("FibersAsyncTest - Skipping under Fil-C: manual stack switching is unsupported");
+            report.console.printLine("AsyncFibersTest - Skipping under Fil-C: manual stack switching is unsupported");
         }
         return;
 #else
@@ -234,7 +234,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(serverSocket.close());
     }
 
-    void cancelSubmittedOperationIfPending(FiberAsyncIO& io, FiberTask& task, bool& completedWithError)
+    void cancelSubmittedOperationIfPending(AsyncFiberIO& io, FiberTask& task, bool& completedWithError)
     {
         SC_TEST_EXPECT(io.runOnce());
         SC_TEST_EXPECT(io.runNoWait());
@@ -272,7 +272,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         FileSystem fs;
         if (fs.init("/") and fs.exists("/proc/sys/fs/binfmt_misc/RosettaLinux"))
         {
-            report.console.printLine("FibersAsyncTest - Skipping AsyncProcessExit under Linux x86_64 Rosetta");
+            report.console.printLine("AsyncFibersTest - Skipping AsyncProcessExit under Linux x86_64 Rosetta");
             return true;
         }
 #endif
@@ -283,7 +283,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io        = nullptr;
+            AsyncFiberIO* io        = nullptr;
             int           completed = 0;
         };
 
@@ -291,7 +291,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      firstTask;
         FiberTask      secondTask;
 
@@ -337,7 +337,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io              = nullptr;
+            AsyncFiberIO* io              = nullptr;
             int           idleRan         = 0;
             int           completeRan     = 0;
             bool          ownerIdleCalled = false;
@@ -347,9 +347,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
 
-        FiberAsyncSocketSendResult emptySendResult;
+        AsyncFiberSocketSendResult emptySendResult;
         emptySendResult.numBytes = 42;
         SocketDescriptor invalidSocket;
         SC_TEST_EXPECT(not io.sleep(TimeMs{0}));
@@ -404,7 +404,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io                  = nullptr;
+            AsyncFiberIO* io                  = nullptr;
             int           cpuSteps            = 0;
             int           sleepCompletedAtCpu = -1;
             bool          cpuCompleted        = false;
@@ -414,7 +414,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      cpuTask;
         FiberTask      sleepTask;
 
@@ -461,7 +461,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io       = nullptr;
+            AsyncFiberIO* io       = nullptr;
             bool          canceled = false;
         };
 
@@ -469,7 +469,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
 
         char       stackMemory[64 * 1024] = {};
@@ -503,7 +503,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io                = nullptr;
+            AsyncFiberIO* io                = nullptr;
             int           completed         = 0;
             int           canceled          = 0;
             int           immediateCanceled = 0;
@@ -513,7 +513,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
 
         State state;
         state.io = &io;
@@ -585,7 +585,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             FiberScheduler* scheduler = nullptr;
-            FiberAsyncIO*   io        = nullptr;
+            AsyncFiberIO*   io        = nullptr;
 
             Atomic<int32_t> workerRuns = 0;
 
@@ -603,8 +603,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
         FiberStack        stack({stackMemory, sizeof(stackMemory)});
@@ -670,7 +670,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             FiberScheduler* scheduler = nullptr;
-            FiberAsyncIO*   io        = nullptr;
+            AsyncFiberIO*   io        = nullptr;
 
             EventObject operationStarted;
             EventObject resumeWorker;
@@ -684,8 +684,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[2];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[2];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
         FiberStack        stack({stackMemory, sizeof(stackMemory)});
@@ -742,7 +742,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             Atomic<bool> entered        = false;
             Atomic<bool> blockerEntered = false;
@@ -760,8 +760,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         FiberTask         blockerTask;
         static char       stackMemory[64 * 1024]        = {};
@@ -845,7 +845,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             Atomic<bool> entered = false;
 
@@ -861,8 +861,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
         FiberStack        stack({stackMemory, sizeof(stackMemory)});
@@ -914,7 +914,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct TaskState
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             bool canceled = false;
 
@@ -933,8 +933,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[NumTasks * 2];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[NumTasks * 2];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         tasks[NumTasks];
         static char       stackMemory[NumTasks][64 * 1024] = {};
         FiberWorker       workers[NumWorkers];
@@ -996,7 +996,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct TaskState
         {
-            FiberAsyncIO* io       = nullptr;
+            AsyncFiberIO* io       = nullptr;
             TimeMs        duration = TimeMs{0};
 
             bool completed = false;
@@ -1015,8 +1015,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[NumTasks];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[NumTasks];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         tasks[NumTasks];
         static char       stackMemory[NumTasks][64 * 1024] = {};
         FiberWorker       workers[NumWorkers];
@@ -1101,7 +1101,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct TaskState
         {
-            FiberAsyncIO* io       = nullptr;
+            AsyncFiberIO* io       = nullptr;
             TimeMs        duration = TimeMs{0};
 
             Atomic<bool> completed = false;
@@ -1133,8 +1133,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
 
             FiberScheduler    scheduler;
-            FiberAsyncCommand commandStorage[NumTasks * 4];
-            FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+            AsyncFiberCommand commandStorage[NumTasks * 4];
+            AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
             FiberTask         tasks[NumTasks];
             FiberWorker       workers[NumWorkers];
             FiberWorkerThread threads[NumWorkers];
@@ -1236,7 +1236,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             FiberScheduler* scheduler = nullptr;
-            FiberAsyncIO*   io        = nullptr;
+            AsyncFiberIO*   io        = nullptr;
 
             Atomic<int32_t> attempted  = 0;
             Atomic<int32_t> workerRuns = 0;
@@ -1253,8 +1253,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[1];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[1];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         firstTask;
         FiberTask         secondTask;
         static char       firstStackMemory[64 * 1024]  = {};
@@ -1335,7 +1335,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*     io             = nullptr;
+            AsyncFiberIO*     io             = nullptr;
             SocketDescriptor* serverSocket   = nullptr;
             SocketDescriptor* acceptedClient = nullptr;
         };
@@ -1356,7 +1356,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
 
         char       stackMemory[64 * 1024] = {};
@@ -1394,7 +1394,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*     io             = nullptr;
+            AsyncFiberIO*     io             = nullptr;
             SocketDescriptor* serverSocket   = nullptr;
             SocketDescriptor* acceptedClient = nullptr;
             SocketDescriptor* client         = nullptr;
@@ -1419,7 +1419,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      acceptTask;
         FiberTask      connectTask;
 
@@ -1461,7 +1461,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*     io         = nullptr;
+            AsyncFiberIO*     io         = nullptr;
             SocketDescriptor* sender     = nullptr;
             SocketDescriptor* receiver   = nullptr;
             size_t            dataLength = 0;
@@ -1469,8 +1469,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
             char sendBuffer[5]    = {'P', 'I', 'N', 'G', '!'};
             char receiveBuffer[8] = {};
 
-            FiberAsyncSocketSendResult    sendResult;
-            FiberAsyncSocketReceiveResult receiveResult;
+            AsyncFiberSocketSendResult    sendResult;
+            AsyncFiberSocketReceiveResult receiveResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -1481,7 +1481,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
 
         char       stackMemory[64 * 1024] = {};
@@ -1525,7 +1525,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             FiberScheduler* scheduler = nullptr;
-            FiberAsyncIO*   io        = nullptr;
+            AsyncFiberIO*   io        = nullptr;
 
             SocketDescriptor* serverSocket   = nullptr;
             SocketDescriptor* acceptedClient = nullptr;
@@ -1563,8 +1563,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         acceptTask;
         FiberTask         connectTask;
         static char       acceptStackMemory[64 * 1024]  = {};
@@ -1656,7 +1656,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             FiberScheduler* scheduler = nullptr;
-            FiberAsyncIO*   io        = nullptr;
+            AsyncFiberIO*   io        = nullptr;
 
             SocketDescriptor* sender   = nullptr;
             SocketDescriptor* receiver = nullptr;
@@ -1676,8 +1676,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
             char sendBuffer[5]    = {'P', 'O', 'N', 'G', '?'};
             char receiveBuffer[8] = {};
 
-            FiberAsyncSocketSendResult    sendResult;
-            FiberAsyncSocketReceiveResult receiveResult;
+            AsyncFiberSocketSendResult    sendResult;
+            AsyncFiberSocketReceiveResult receiveResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -1688,8 +1688,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         sendTask;
         FiberTask         receiveTask;
         static char       sendStackMemory[64 * 1024]    = {};
@@ -1790,7 +1790,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             FiberScheduler* scheduler = nullptr;
-            FiberAsyncIO*   io        = nullptr;
+            AsyncFiberIO*   io        = nullptr;
             FiberTask*      blocker   = nullptr;
 
             SocketDescriptor* sender   = nullptr;
@@ -1812,8 +1812,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
             char sendBuffer[5]    = {'P', 'O', 'O', 'L', '!'};
             char receiveBuffer[8] = {};
 
-            FiberAsyncSocketSendResult    sendResult;
-            FiberAsyncSocketReceiveResult receiveResult;
+            AsyncFiberSocketSendResult    sendResult;
+            AsyncFiberSocketReceiveResult receiveResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -1824,8 +1824,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         sendTask;
         FiberTask         receiveTask;
         FiberTask         blockerTask;
@@ -1952,7 +1952,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO*     io       = nullptr;
+            AsyncFiberIO*     io       = nullptr;
             SocketDescriptor* receiver = nullptr;
 
             Atomic<bool> entered = false;
@@ -1961,7 +1961,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             bool                          canceled = false;
             char                          buffer[8];
-            FiberAsyncSocketReceiveResult receiveResult;
+            AsyncFiberSocketReceiveResult receiveResult;
 
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
@@ -1976,8 +1976,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
         FiberStack        stack({stackMemory, sizeof(stackMemory)});
@@ -2033,7 +2033,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*     io             = nullptr;
+                AsyncFiberIO*     io             = nullptr;
                 SocketDescriptor* serverSocket   = nullptr;
                 SocketDescriptor* acceptedClient = nullptr;
                 bool              canceled       = false;
@@ -2055,7 +2055,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             }
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2087,7 +2087,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*     io             = nullptr;
+                AsyncFiberIO*     io             = nullptr;
                 SocketDescriptor* serverSocket   = nullptr;
                 SocketDescriptor* acceptedClient = nullptr;
                 bool              canceled       = false;
@@ -2109,7 +2109,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             }
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2140,11 +2140,11 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*                 io       = nullptr;
+                AsyncFiberIO*                 io       = nullptr;
                 SocketDescriptor*             socket   = nullptr;
                 bool                          canceled = false;
                 char                          buffer[8];
-                FiberAsyncSocketReceiveResult receiveResult;
+                AsyncFiberSocketReceiveResult receiveResult;
             };
 
             AsyncEventLoop eventLoop;
@@ -2155,7 +2155,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2188,11 +2188,11 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*                 io       = nullptr;
+                AsyncFiberIO*                 io       = nullptr;
                 SocketDescriptor*             socket   = nullptr;
                 bool                          canceled = false;
                 char                          buffer[8];
-                FiberAsyncSocketReceiveResult receiveResult;
+                AsyncFiberSocketReceiveResult receiveResult;
             };
 
             AsyncEventLoop eventLoop;
@@ -2203,7 +2203,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2235,11 +2235,11 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*              io        = nullptr;
+                AsyncFiberIO*              io        = nullptr;
                 SocketDescriptor*          socket    = nullptr;
                 bool                       canceled  = false;
                 char                       buffer[5] = {'P', 'I', 'N', 'G', '!'};
-                FiberAsyncSocketSendResult sendResult;
+                AsyncFiberSocketSendResult sendResult;
             };
 
             AsyncEventLoop eventLoop;
@@ -2250,7 +2250,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2286,7 +2286,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*     io                 = nullptr;
+                AsyncFiberIO*     io                 = nullptr;
                 SocketDescriptor* serverSocket       = nullptr;
                 SocketDescriptor* acceptedClient     = nullptr;
                 bool              completedWithError = false;
@@ -2308,7 +2308,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             }
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2335,11 +2335,11 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*                 io                 = nullptr;
+                AsyncFiberIO*                 io                 = nullptr;
                 SocketDescriptor*             socket             = nullptr;
                 bool                          completedWithError = false;
                 char                          buffer[8];
-                FiberAsyncSocketReceiveResult receiveResult;
+                AsyncFiberSocketReceiveResult receiveResult;
             };
 
             AsyncEventLoop eventLoop;
@@ -2350,7 +2350,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2378,11 +2378,11 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             struct State
             {
-                FiberAsyncIO*              io     = nullptr;
+                AsyncFiberIO*              io     = nullptr;
                 SocketDescriptor*          socket = nullptr;
                 Span<const char>           data;
                 bool                       completedWithError = false;
-                FiberAsyncSocketSendResult sendResult;
+                AsyncFiberSocketSendResult sendResult;
             };
 
             static char sendBuffer[16 * 1024 * 1024] = {};
@@ -2395,7 +2395,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            FiberAsyncIO   io(scheduler, eventLoop);
+            AsyncFiberIO   io(scheduler, eventLoop);
             FiberTask      task;
             char           stackMemory[64 * 1024] = {};
             FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -2425,7 +2425,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*     io             = nullptr;
+            AsyncFiberIO*     io             = nullptr;
             SocketDescriptor* serverSocket   = nullptr;
             SocketDescriptor* acceptedClient = nullptr;
             SocketDescriptor* client         = nullptr;
@@ -2435,10 +2435,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
             char serverReceiveBuffer[8] = {};
             char clientReceiveBuffer[8] = {};
 
-            FiberAsyncSocketReceiveResult serverReceiveResult;
-            FiberAsyncSocketReceiveResult clientReceiveResult;
-            FiberAsyncSocketSendResult    serverSendResult;
-            FiberAsyncSocketSendResult    clientSendResult;
+            AsyncFiberSocketReceiveResult serverReceiveResult;
+            AsyncFiberSocketReceiveResult clientReceiveResult;
+            AsyncFiberSocketSendResult    serverSendResult;
+            AsyncFiberSocketSendResult    clientSendResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -2459,7 +2459,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      serverTask;
         FiberTask      clientTask;
         char           serverStackMemory[64 * 1024] = {};
@@ -2524,7 +2524,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*     io           = nullptr;
+            AsyncFiberIO*     io           = nullptr;
             SocketDescriptor* serverSocket = nullptr;
             SocketDescriptor* clientSocket = nullptr;
             SocketIPAddress   clientAddress;
@@ -2532,8 +2532,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
             char sendBuffer[4]    = {'P', 'I', 'N', 'G'};
             char receiveBuffer[8] = {};
 
-            FiberAsyncSocketSendResult        sendResult;
-            FiberAsyncSocketReceiveFromResult receiveResult;
+            AsyncFiberSocketSendResult        sendResult;
+            AsyncFiberSocketReceiveFromResult receiveResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -2552,7 +2552,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(SocketServer(serverSocket).bind(serverAddress));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      receiveTask;
         FiberTask      sendTask;
         char           receiveStackMemory[64 * 1024] = {};
@@ -2603,7 +2603,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             FileDescriptor*   file           = nullptr;
             SocketDescriptor* serverSocket   = nullptr;
@@ -2613,9 +2613,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             char receiveBuffer[64] = {};
 
-            FiberAsyncFileSendOptions     fileSendOptions;
-            FiberAsyncFileSendResult      fileSendResult;
-            FiberAsyncSocketReceiveResult receiveResult;
+            AsyncFiberFileSendOptions     fileSendOptions;
+            AsyncFiberFileSendResult      fileSendResult;
+            AsyncFiberSocketReceiveResult receiveResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -2625,7 +2625,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SmallStringNative<255> directoryPath = StringEncoding::Native;
         SmallStringNative<255> filePath      = StringEncoding::Native;
         SmallStringNative<255> relativePath  = StringEncoding::Native;
-        SC_TEST_EXPECT(StringBuilder::format(directoryName, "FiberAsyncFileSendTest{}", report.mapPort(6061)));
+        SC_TEST_EXPECT(StringBuilder::format(directoryName, "AsyncFiberFileSendTest{}", report.mapPort(6061)));
         SC_TEST_EXPECT(Path::join(directoryPath, {report.applicationRootDirectory.view(), directoryName.view()}));
         SC_TEST_EXPECT(Path::join(filePath, {directoryPath.view(), "sendfile.txt"}));
         SC_TEST_EXPECT(Path::join(relativePath, {directoryName.view(), "sendfile.txt"}));
@@ -2635,7 +2635,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(directoryName.view()));
         SC_TEST_EXPECT(fs.removeFileIfExists(relativePath.view()));
 
-        const char sendData[] = "FiberAsyncFileSend";
+        const char sendData[] = "AsyncFiberFileSend";
         SC_TEST_EXPECT(fs.write(relativePath.view(), {sendData, sizeof(sendData) - 1}));
 
         FileDescriptor file;
@@ -2662,7 +2662,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      serverTask;
         FiberTask      clientTask;
         char           serverStackMemory[64 * 1024] = {};
@@ -2720,14 +2720,14 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             FileDescriptor* file           = nullptr;
             char            writeBuffer[4] = {'t', 'e', 's', 't'};
             char            readBuffer[8]  = {};
 
-            FiberAsyncFileWriteResult writeResult;
-            FiberAsyncFileReadResult  readResult;
+            AsyncFiberFileWriteResult writeResult;
+            AsyncFiberFileReadResult  readResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -2737,7 +2737,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SmallStringNative<255> directoryPath = StringEncoding::Native;
         SmallStringNative<255> filePath      = StringEncoding::Native;
         SmallStringNative<255> relativePath  = StringEncoding::Native;
-        SC_TEST_EXPECT(StringBuilder::format(directoryName, "FibersAsyncTest{}", report.mapPort(6055)));
+        SC_TEST_EXPECT(StringBuilder::format(directoryName, "AsyncFibersTest{}", report.mapPort(6055)));
         SC_TEST_EXPECT(Path::join(directoryPath, {report.applicationRootDirectory.view(), directoryName.view()}));
         SC_TEST_EXPECT(Path::join(filePath, {directoryPath.view(), "test.txt"}));
         SC_TEST_EXPECT(Path::join(relativePath, {directoryName.view(), "test.txt"}));
@@ -2755,7 +2755,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      writeTask;
         FiberTask      readTask;
         char           writeStackMemory[64 * 1024] = {};
@@ -2813,7 +2813,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             FileDescriptor* file            = nullptr;
             char            writeBuffer[4]  = {'t', 'e', 's', 't'};
@@ -2821,10 +2821,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
             char            longBuffer[8]   = {};
             char            offsetBuffer[4] = {};
 
-            FiberAsyncFileWriteResult writeResult;
-            FiberAsyncFileReadResult  exactResult;
-            FiberAsyncFileReadResult  eofResult;
-            FiberAsyncFileReadResult  offsetResult;
+            AsyncFiberFileWriteResult writeResult;
+            AsyncFiberFileReadResult  exactResult;
+            AsyncFiberFileReadResult  eofResult;
+            AsyncFiberFileReadResult  offsetResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -2834,7 +2834,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SmallStringNative<255> directoryPath = StringEncoding::Native;
         SmallStringNative<255> filePath      = StringEncoding::Native;
         SmallStringNative<255> relativePath  = StringEncoding::Native;
-        SC_TEST_EXPECT(StringBuilder::format(directoryName, "FiberAsyncExactTest{}", report.mapPort(6060)));
+        SC_TEST_EXPECT(StringBuilder::format(directoryName, "AsyncFiberExactTest{}", report.mapPort(6060)));
         SC_TEST_EXPECT(Path::join(directoryPath, {report.applicationRootDirectory.view(), directoryName.view()}));
         SC_TEST_EXPECT(Path::join(filePath, {directoryPath.view(), "test.txt"}));
         SC_TEST_EXPECT(Path::join(relativePath, {directoryName.view(), "test.txt"}));
@@ -2852,7 +2852,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      writeTask;
         FiberTask      exactTask;
         FiberTask      eofTask;
@@ -2954,16 +2954,16 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             FileDescriptor* file                 = nullptr;
             char            firstWriteBuffer[4]  = {'t', 'e', 's', 't'};
             char            secondWriteBuffer[4] = {'d', 'a', 't', 'a'};
             char            readBuffer[8]        = {};
 
-            FiberAsyncFileWriteResult firstWriteResult;
-            FiberAsyncFileWriteResult secondWriteResult;
-            FiberAsyncFileReadResult  readResult;
+            AsyncFiberFileWriteResult firstWriteResult;
+            AsyncFiberFileWriteResult secondWriteResult;
+            AsyncFiberFileReadResult  readResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -2973,7 +2973,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SmallStringNative<255> directoryPath = StringEncoding::Native;
         SmallStringNative<255> filePath      = StringEncoding::Native;
         SmallStringNative<255> relativePath  = StringEncoding::Native;
-        SC_TEST_EXPECT(StringBuilder::format(directoryName, "FiberAsyncOffsetTest{}", report.mapPort(6058)));
+        SC_TEST_EXPECT(StringBuilder::format(directoryName, "AsyncFiberOffsetTest{}", report.mapPort(6058)));
         SC_TEST_EXPECT(Path::join(directoryPath, {report.applicationRootDirectory.view(), directoryName.view()}));
         SC_TEST_EXPECT(Path::join(filePath, {directoryPath.view(), "test.txt"}));
         SC_TEST_EXPECT(Path::join(relativePath, {directoryName.view(), "test.txt"}));
@@ -2991,7 +2991,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      firstWriteTask;
         FiberTask      secondWriteTask;
         FiberTask      readTask;
@@ -3058,7 +3058,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*   io   = nullptr;
+            AsyncFiberIO*   io   = nullptr;
             FileDescriptor* file = nullptr;
         };
 
@@ -3072,7 +3072,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(pipe.readPipe));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
         char           stackMemory[64 * 1024] = {};
         FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -3102,7 +3102,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO*   io       = nullptr;
+            AsyncFiberIO*   io       = nullptr;
             FileDescriptor* file     = nullptr;
             bool            canceled = false;
         };
@@ -3117,7 +3117,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(pipe.readPipe));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
         char           stackMemory[64 * 1024] = {};
         FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -3163,13 +3163,13 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             Process* processSuccess = nullptr;
             Process* processFailure = nullptr;
 
-            FiberAsyncProcessExitResult successResult;
-            FiberAsyncProcessExitResult failureResult;
+            AsyncFiberProcessExitResult successResult;
+            AsyncFiberProcessExitResult failureResult;
         };
 
         AsyncEventLoop eventLoop;
@@ -3186,7 +3186,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 #endif
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      successTask;
         FiberTask      failureTask;
         char           successStackMemory[64 * 1024] = {};
@@ -3233,10 +3233,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
 #else
         struct State
         {
-            FiberAsyncIO* io      = nullptr;
+            AsyncFiberIO* io      = nullptr;
             Process*      process = nullptr;
 
-            FiberAsyncProcessExitResult result;
+            AsyncFiberProcessExitResult result;
             bool                        canceled = false;
         };
 
@@ -3244,7 +3244,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(process.launch({"sleep", "0.3"}));
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
         char           stackMemory[64 * 1024] = {};
         FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -3281,7 +3281,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 #if SC_PLATFORM_APPLE
         if (isDebuggerAttached())
         {
-            report.console.printLine("FibersAsyncTest - Skipping signal section while debugger is attached");
+            report.console.printLine("AsyncFibersTest - Skipping signal section while debugger is attached");
             return;
         }
 #endif
@@ -3297,7 +3297,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         process.options.windowsHide                  = false;
         process.options.windowsCreateNewProcessGroup = true;
         StringSpan childArguments[]                  = {
-            report.executableFile.view(), "--quiet", "--test", "FibersAsyncTest", "--test-section",
+            report.executableFile.view(), "--quiet", "--test", "AsyncFibersTest", "--test-section",
             "windows signal child"};
         SC_TEST_EXPECT(
             process.launch(childArguments, Process::StdOut::Ignore(), Process::StdIn(), Process::StdErr::Ignore()));
@@ -3317,16 +3317,16 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
-            FiberAsyncSignalResult result;
+            AsyncFiberSignalResult result;
         };
 
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
         char           stackMemory[64 * 1024] = {};
         FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -3355,17 +3355,17 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io       = nullptr;
+            AsyncFiberIO* io       = nullptr;
             bool          timedOut = false;
 
-            FiberAsyncSignalResult result;
+            AsyncFiberSignalResult result;
         };
 
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
         char           stackMemory[64 * 1024] = {};
         FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -3382,7 +3382,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         timeout.callback = [&state](AsyncLoopTimeout::Result&)
         {
             state.timedOut = true;
-            SC_FIBER_ASYNC_TRUST_RESULT(state.io->cancelAll());
+            SC_ASYNC_FIBERS_TRUST_RESULT(state.io->cancelAll());
         };
         SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{5000}));
         eventLoop.excludeFromActiveCount(timeout);
@@ -3405,17 +3405,17 @@ struct SC::FibersAsyncTest : public SC::TestCase
     {
         struct State
         {
-            FiberAsyncIO* io       = nullptr;
+            AsyncFiberIO* io       = nullptr;
             bool          canceled = false;
 
-            FiberAsyncSignalResult result;
+            AsyncFiberSignalResult result;
         };
 
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        FiberAsyncIO   io(scheduler, eventLoop);
+        AsyncFiberIO   io(scheduler, eventLoop);
         FiberTask      task;
         char           stackMemory[64 * 1024] = {};
         FiberStack     stack({stackMemory, sizeof(stackMemory)});
@@ -3448,7 +3448,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             Atomic<bool> entered = false;
 
@@ -3459,15 +3459,15 @@ struct SC::FibersAsyncTest : public SC::TestCase
             uint64_t startThreadID  = 0;
             uint64_t resumeThreadID = 0;
 
-            FiberAsyncSignalResult result;
+            AsyncFiberSignalResult result;
         };
 
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler    scheduler;
-        FiberAsyncCommand commandStorage[4];
-        FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+        AsyncFiberCommand commandStorage[4];
+        AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
         FiberStack        stack({stackMemory, sizeof(stackMemory)});
@@ -3514,5 +3514,5 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
 namespace SC
 {
-void runFibersAsyncTest(SC::TestReport& report) { FibersAsyncTest test(report); }
+void runAsyncFibersTest(SC::TestReport& report) { AsyncFibersTest test(report); }
 } // namespace SC

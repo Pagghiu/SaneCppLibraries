@@ -36,7 +36,7 @@ Consider another layer when:
 - the project cannot use C++20 coroutines;
 - callbacks already express the workflow clearly—in that case [Async](@ref library_async) is the smaller layer;
 - stackful synchronous-looking code is preferred and fixed task stacks are acceptable—in that case
-  [FibersAsync](@ref library_fibers_async) makes a different tradeoff.
+  [AsyncFibers](@ref library_async_fibers) makes a different tradeoff.
 
 # The Programming Model
 

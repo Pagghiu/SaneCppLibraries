@@ -1,4 +1,4 @@
-# FIBERSASYNC-0001 - Keep FibersAsync As The Bridge From Fibers To Async
+# ASYNCFIBERS-0001 - Keep AsyncFibers As The Bridge From Fibers To Async
 
 Status: Accepted
 Date: 2026-07-07
@@ -11,8 +11,8 @@ platform behavior.
 
 ## Decision
 
-Keep `FibersAsync` as the explicit bridge library that depends on both `Fibers` and `Async`. Core `Fibers` remains free
-of async I/O types, and low-level `Async` remains callback-first. Fiber-friendly I/O helpers live in `FiberAsyncIO`.
+Keep `AsyncFibers` as the explicit bridge library that depends on both `Fibers` and `Async`. Core `Fibers` remains free
+of async I/O types, and low-level `Async` remains callback-first. Fiber-friendly I/O helpers live in `AsyncFiberIO`.
 
 ## Consequences
 
@@ -22,7 +22,7 @@ backends or hiding an implicit combined runtime.
 
 ## Confirmation
 
-A change preserves this decision when `Libraries/Fibers` has no dependency on `Async`, `Libraries/FibersAsync` remains
+A change preserves this decision when `Libraries/Fibers` has no dependency on `Async`, `Libraries/AsyncFibers` remains
 the location for fiber I/O helpers, and new fiber-aware I/O operations are added to the bridge rather than the core
 scheduler.
 
@@ -30,4 +30,4 @@ scheduler.
 
 - [FIBERS-0001 - Keep Fibers independent from Async Await and Threading](../Fibers/fibers-0001-keep-fibers-independent-from-async-await-and-threading.md)
 - [ASYNC-0001 - Keep AsyncRequest objects caller-owned and memory-stable](../Async/async-0001-keep-asyncrequest-objects-caller-owned-and-memory-stable.md)
-- [FibersAsync architecture](fibersasync-architecture.md)
+- [AsyncFibers architecture](asyncfibers-architecture.md)

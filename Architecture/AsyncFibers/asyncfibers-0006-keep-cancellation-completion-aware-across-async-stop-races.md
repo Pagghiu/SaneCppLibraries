@@ -1,17 +1,17 @@
-# FIBERSASYNC-0006 - Keep Cancellation Completion-Aware Across Async Stop Races
+# ASYNCFIBERS-0006 - Keep Cancellation Completion-Aware Across Async Stop Races
 
 Status: Accepted
 Date: 2026-07-07
 
 ## Context
 
-`FiberAsyncIO` operations bridge fiber waits to lower-level `AsyncRequest` start, completion, and stop paths. Cancellation
+`AsyncFiberIO` operations bridge fiber waits to lower-level `AsyncRequest` start, completion, and stop paths. Cancellation
 can race with request start, owner-thread command execution, backend completion, and failed starts. Incorrect accounting
 can leave fibers waiting forever, reuse stack-local command state too early, or complete an operation twice.
 
 ## Decision
 
-`FibersAsync` cancellation is cooperative and completion-aware. Before creating pending-operation state or starting an
+`AsyncFibers` cancellation is cooperative and completion-aware. Before creating pending-operation state or starting an
 `AsyncRequest`, the bridge requires a currently running fiber of its scheduler so all stack-local request and callback
 state can remain alive across suspension. Once an operation starts or a start command is queued, the bridge must balance
 operation counters exactly once, acknowledge cancellation-before-start on the owner thread, and treat backend completion
@@ -34,5 +34,5 @@ are empty.
 ## Related
 
 - [FIBERS-0006 - Keep cancellation cooperative and wake-based](../Fibers/fibers-0006-keep-cancellation-cooperative-and-wake-based.md)
-- [FIBERSASYNC-0002 - Keep AsyncEventLoop owner-thread affine with bounded command posting](fibersasync-0002-keep-asynceventloop-owner-thread-affine-with-bounded-command-posting.md)
-- [FibersAsync architecture](fibersasync-architecture.md)
+- [ASYNCFIBERS-0002 - Keep AsyncEventLoop owner-thread affine with bounded command posting](asyncfibers-0002-keep-asynceventloop-owner-thread-affine-with-bounded-command-posting.md)
+- [AsyncFibers architecture](asyncfibers-architecture.md)

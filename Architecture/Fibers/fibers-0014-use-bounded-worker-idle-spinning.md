@@ -31,7 +31,7 @@ parking latency. It cannot spin indefinitely and does not change task ordering, 
 ownership. Shutdown remains a wake-all operation; normal ready publication remains wake-one.
 
 The policy does not make a performance claim on its own. It must be evaluated using the roadmap's quiet-machine
-benchmark protocol, particularly for periodic external submissions and `FibersAsync` wakeups.
+benchmark protocol, particularly for periodic external submissions and `AsyncFibers` wakeups.
 
 ## Alternatives Considered
 

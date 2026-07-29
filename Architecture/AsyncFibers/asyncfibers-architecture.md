@@ -1,8 +1,8 @@
-# FibersAsync Architecture
+# AsyncFibers Architecture
 
 ## Purpose
 
-`FibersAsync` is the bridge that lets stackful fiber tasks perform `Async` I/O with synchronous-looking code. It should
+`AsyncFibers` is the bridge that lets stackful fiber tasks perform `Async` I/O with synchronous-looking code. It should
 preserve `AsyncEventLoop` ownership, `Fibers` scheduling semantics, no hidden allocation, caller-owned buffers, and
 plain `Result` error propagation.
 
@@ -11,33 +11,33 @@ into one implicit runtime.
 
 ## Architectural Shape
 
-`FiberAsyncIO` wraps an externally owned `FiberScheduler&` and an externally owned `AsyncEventLoop&`. The async event
+`AsyncFiberIO` wraps an externally owned `FiberScheduler&` and an externally owned `AsyncEventLoop&`. The async event
 loop remains thread-affine. Calls from the owner thread may start operations directly; calls from worker fibers on other
 threads post bounded commands to the owner thread and then suspend the fiber on fiber synchronization primitives until
 the async operation completes, fails, or is canceled.
 
 Each operation keeps request state explicit and returns extra values through small result objects, such as
-`FiberAsyncSocketReceiveResult` or `FiberAsyncFileReadResult`. The received or read data remains in caller-provided
+`AsyncFiberSocketReceiveResult` or `AsyncFiberFileReadResult`. The received or read data remains in caller-provided
 buffers.
 
 ## Boundaries
 
-`FibersAsync` owns the bridge between fiber suspension and `AsyncRequest` completion, owner-thread command posting,
+`AsyncFibers` owns the bridge between fiber suspension and `AsyncRequest` completion, owner-thread command posting,
 operation counters, cooperative cancellation plumbing, and fiber-friendly wrappers for selected async operations.
 
-`FibersAsync` does not own the `AsyncEventLoop`, the `FiberScheduler`, sockets, files, buffers, protocols, coroutine
+`AsyncFibers` does not own the `AsyncEventLoop`, the `FiberScheduler`, sockets, files, buffers, protocols, coroutine
 tasks, worker threads, or a backend-selection facade. Those remain in callers, `Async`, `Fibers`, or later explicit
 adapters.
 
 ## Similarities With Other Libraries
 
-Like `Await`, `FibersAsync` wraps an existing `AsyncEventLoop` instead of replacing it. Like `Async`, it preserves
+Like `Await`, `AsyncFibers` wraps an existing `AsyncEventLoop` instead of replacing it. Like `Async`, it preserves
 caller-owned descriptors, buffers, request semantics, and result objects. Like `Fibers`, it suspends cooperatively and
 uses bounded caller-provided storage for cross-thread command posting.
 
 ## Differences From Other Libraries
 
-Unlike `Await`, `FibersAsync` does not allocate coroutine frames and does not require C++20 coroutines. Unlike `Async`, it
+Unlike `Await`, `AsyncFibers` does not allocate coroutine frames and does not require C++20 coroutines. Unlike `Async`, it
 offers synchronous-looking control flow by suspending a fiber instead of returning to a callback. Unlike `Fibers`, it is
 not a general CPU scheduler and intentionally depends on `Async`.
 
@@ -73,10 +73,10 @@ one.
 
 ## Sources
 
-- [FibersAsync documentation](../../Documentation/Libraries/FibersAsync.md)
-- [FibersAsync public interface](../../Libraries/FibersAsync/FibersAsync.h)
-- [FibersAsync implementation](../../Libraries/FibersAsync/FibersAsync.cpp)
-- [FibersAsync tests](../../Tests/Libraries/FibersAsync/FibersAsyncTest.cpp)
+- [AsyncFibers documentation](../../Documentation/Libraries/AsyncFibers.md)
+- [AsyncFibers public interface](../../Libraries/AsyncFibers/AsyncFibers.h)
+- [AsyncFibers implementation](../../Libraries/AsyncFibers/AsyncFibers.cpp)
+- [AsyncFibers tests](../../Tests/Libraries/AsyncFibers/AsyncFibersTest.cpp)
 - [Fibers architecture](../Fibers/fibers-architecture.md)
 - [Async architecture](../Async/async-architecture.md)
 - [Await architecture](../Await/await-architecture.md)
@@ -86,9 +86,9 @@ one.
 
 ## Decision Log
 
-- [FIBERSASYNC-0001 - Keep FibersAsync as the bridge from Fibers to Async](fibersasync-0001-keep-fiberasync-as-the-bridge-from-fibers-to-async.md)
-- [FIBERSASYNC-0002 - Keep AsyncEventLoop owner-thread affine with bounded command posting](fibersasync-0002-keep-asynceventloop-owner-thread-affine-with-bounded-command-posting.md)
-- [FIBERSASYNC-0003 - Return Result and operation-specific caller-owned output objects](fibersasync-0003-return-result-and-operation-specific-caller-owned-output-objects.md)
-- [FIBERSASYNC-0004 - Keep FiberAsyncIO concrete until a second backend exists](fibersasync-0004-keep-fiberasyncio-concrete-until-a-second-backend-exists.md)
-- [FIBERSASYNC-0005 - Defer AwaitTask fiber adapters until both runtimes stabilize](fibersasync-0005-defer-awaittask-fiber-adapters-until-both-runtimes-stabilize.md)
-- [FIBERSASYNC-0006 - Keep cancellation completion-aware across async stop races](fibersasync-0006-keep-cancellation-completion-aware-across-async-stop-races.md)
+- [ASYNCFIBERS-0001 - Keep AsyncFibers as the bridge from Fibers to Async](asyncfibers-0001-keep-asyncfiber-as-the-bridge-from-fibers-to-async.md)
+- [ASYNCFIBERS-0002 - Keep AsyncEventLoop owner-thread affine with bounded command posting](asyncfibers-0002-keep-asynceventloop-owner-thread-affine-with-bounded-command-posting.md)
+- [ASYNCFIBERS-0003 - Return Result and operation-specific caller-owned output objects](asyncfibers-0003-return-result-and-operation-specific-caller-owned-output-objects.md)
+- [ASYNCFIBERS-0004 - Keep AsyncFiberIO concrete until a second backend exists](asyncfibers-0004-keep-asyncfiberio-concrete-until-a-second-backend-exists.md)
+- [ASYNCFIBERS-0005 - Defer AwaitTask fiber adapters until both runtimes stabilize](asyncfibers-0005-defer-awaittask-fiber-adapters-until-both-runtimes-stabilize.md)
+- [ASYNCFIBERS-0006 - Keep cancellation completion-aware across async stop races](asyncfibers-0006-keep-cancellation-completion-aware-across-async-stop-races.md)

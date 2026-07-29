@@ -126,7 +126,7 @@ ordering unless a protocol has been designed and tested with weaker ordering.
 - [Fibers](@ref library_fibers) is a stackful task scheduler with explicit stacks, task groups, and work distribution.
   Choose it when tasks need to suspend through ordinary call stacks or participate in a scheduler rather than merely
   run to completion on a simple FIFO worker pool.
-- [FibersAsync](@ref library_fibers_async) connects fiber suspension to the asynchronous I/O loop.
+- [AsyncFibers](@ref library_async_fibers) connects fiber suspension to the asynchronous I/O loop.
 
 Direct `Threading` primitives remain appropriate at application boundaries, for coarse background ownership, and when
 building a deliberately small synchronization protocol. Moving to a neighboring library trades that directness for a

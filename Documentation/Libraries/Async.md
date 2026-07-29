@@ -32,7 +32,7 @@ Use `Async` when you need:
 
 For sequential stream processing, see [AsyncStreams](@ref library_async_streams). For C++20 `co_await` syntax over a
 subset of these operations, see [Await](@ref library_await). For stackful tasks that suspend on this event loop, see
-[FibersAsync](@ref library_fibers_async).
+[AsyncFibers](@ref library_async_fibers).
 
 # Mental Model: Requests Live Until Completion
 

@@ -28,7 +28,7 @@ optional benchmark project. Updating the upstream revision is an intentional pac
 historical baselines.
 
 The Package catalog gains one Fibers-motivated asset. This is a cross-domain change and requires Package-owner review
-before integration. No dependency is added from `Fibers` or `FibersAsync` to Package or Taskflow.
+before integration. No dependency is added from `Fibers` or `AsyncFibers` to Package or Taskflow.
 
 ## Confirmation
 

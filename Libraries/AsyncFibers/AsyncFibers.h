@@ -3,85 +3,85 @@
 #pragma once
 
 #include "../Common/CompilerMacrosExport.h"
-#ifndef SC_EXPORT_LIBRARY_FIBERS_ASYNC
-#define SC_EXPORT_LIBRARY_FIBERS_ASYNC 0
+#ifndef SC_EXPORT_LIBRARY_ASYNC_FIBERS
+#define SC_EXPORT_LIBRARY_ASYNC_FIBERS 0
 #endif
-#define SC_FIBER_ASYNC_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FIBERS_ASYNC)
+#define SC_ASYNC_FIBERS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_FIBERS)
 
 #include "../Async/Async.h"
 #include "../Common/Assert.h"
 #include "../Fibers/Fibers.h"
 #include "../Threading/Atomic.h"
 
-//! @defgroup group_fibers_async FibersAsync
+//! @defgroup group_async_fibers AsyncFibers
 //! Experimental stackful fiber bridge over AsyncEventLoop.
 
-//! @addtogroup group_fibers_async
+//! @addtogroup group_async_fibers
 //! @{
 namespace SC
 {
-SC_DECLARE_ASSERT_PROVIDER(FiberAsyncAssert, SC_FIBER_ASYNC_EXPORT);
+SC_DECLARE_ASSERT_PROVIDER(AsyncFibersAssert, SC_ASYNC_FIBERS_EXPORT);
 
-#define SC_FIBER_ASYNC_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::FiberAsyncAssert, e)
-#define SC_FIBER_ASYNC_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::FiberAsyncAssert, e)
-#define SC_FIBER_ASYNC_TRUST_RESULT(expression) SC_FIBER_ASYNC_ASSERT_RELEASE(expression)
+#define SC_ASYNC_FIBERS_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::AsyncFibersAssert, e)
+#define SC_ASYNC_FIBERS_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::AsyncFibersAssert, e)
+#define SC_ASYNC_FIBERS_TRUST_RESULT(expression) SC_ASYNC_FIBERS_ASSERT_RELEASE(expression)
 
-struct FiberAsyncIO;
+struct AsyncFiberIO;
 
-struct FiberAsyncCommand
+struct AsyncFiberCommand
 {
     using Procedure = Function<Result()>;
 
     Procedure execute;
 };
 
-struct FiberAsyncSocketSendResult
+struct AsyncFiberSocketSendResult
 {
     size_t numBytes = 0;
 };
 
-struct FiberAsyncSocketReceiveResult
+struct AsyncFiberSocketReceiveResult
 {
     Span<char> data;
     bool       disconnected = false;
 };
 
-struct FiberAsyncSocketReceiveFromResult
+struct AsyncFiberSocketReceiveFromResult
 {
     Span<char>      data;
     SocketIPAddress sourceAddress;
 };
 
-struct FiberAsyncFileReadResult
+struct AsyncFiberFileReadResult
 {
     Span<char> data;
     bool       endOfFile = false;
 };
 
-struct FiberAsyncFileWriteResult
+struct AsyncFiberFileWriteResult
 {
     size_t numBytes = 0;
 };
 
-struct FiberAsyncFileSendOptions
+struct AsyncFiberFileSendOptions
 {
     int64_t offset   = 0;
     size_t  length   = 0;
     size_t  pipeSize = 0;
 };
 
-struct FiberAsyncFileSendResult
+struct AsyncFiberFileSendResult
 {
     size_t bytesTransferred = 0;
     bool   usedZeroCopy     = false;
 };
 
-struct FiberAsyncProcessExitResult
+struct AsyncFiberProcessExitResult
 {
     int exitStatus = -1;
 };
 
-struct FiberAsyncSignalResult
+struct AsyncFiberSignalResult
 {
     int      signalNumber  = 0;
     uint32_t deliveryCount = 0;
@@ -89,16 +89,16 @@ struct FiberAsyncSignalResult
 
 //! Synchronous-looking fiber I/O wrapper around an externally owned AsyncEventLoop.
 //! Operation methods require a currently running fiber of the supplied FiberScheduler.
-struct SC_FIBER_ASYNC_EXPORT FiberAsyncIO
+struct SC_ASYNC_FIBERS_EXPORT AsyncFiberIO
 {
-    FiberAsyncIO(FiberScheduler& fiberScheduler, AsyncEventLoop& asyncEventLoop,
-                 Span<FiberAsyncCommand> commandStorage = {});
-    ~FiberAsyncIO();
+    AsyncFiberIO(FiberScheduler& fiberScheduler, AsyncEventLoop& asyncEventLoop,
+                 Span<AsyncFiberCommand> commandStorage = {});
+    ~AsyncFiberIO();
 
-    FiberAsyncIO(const FiberAsyncIO&)            = delete;
-    FiberAsyncIO& operator=(const FiberAsyncIO&) = delete;
-    FiberAsyncIO(FiberAsyncIO&&)                 = delete;
-    FiberAsyncIO& operator=(FiberAsyncIO&&)      = delete;
+    AsyncFiberIO(const AsyncFiberIO&)            = delete;
+    AsyncFiberIO& operator=(const AsyncFiberIO&) = delete;
+    AsyncFiberIO(AsyncFiberIO&&)                 = delete;
+    AsyncFiberIO& operator=(AsyncFiberIO&&)      = delete;
 
     [[nodiscard]] FiberScheduler&       fiberScheduler();
     [[nodiscard]] const FiberScheduler& fiberScheduler() const;
@@ -122,37 +122,37 @@ struct SC_FIBER_ASYNC_EXPORT FiberAsyncIO
     Result sleep(TimeMs duration);
     Result accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
     Result connect(const SocketDescriptor& socket, SocketIPAddress address);
-    Result send(const SocketDescriptor& socket, Span<const char> data, FiberAsyncSocketSendResult* outResult = nullptr);
-    Result receive(const SocketDescriptor& socket, Span<char> buffer, FiberAsyncSocketReceiveResult& outResult);
+    Result send(const SocketDescriptor& socket, Span<const char> data, AsyncFiberSocketSendResult* outResult = nullptr);
+    Result receive(const SocketDescriptor& socket, Span<char> buffer, AsyncFiberSocketReceiveResult& outResult);
     Result sendAll(const SocketDescriptor& socket, Span<const char> data,
-                   FiberAsyncSocketSendResult* outResult = nullptr);
+                   AsyncFiberSocketSendResult* outResult = nullptr);
     Result sendTo(const SocketDescriptor& socket, SocketIPAddress address, Span<const char> data,
-                  FiberAsyncSocketSendResult* outResult = nullptr);
-    Result receiveFrom(const SocketDescriptor& socket, Span<char> buffer, FiberAsyncSocketReceiveFromResult& outResult);
-    Result fileRead(const FileDescriptor& file, Span<char> buffer, FiberAsyncFileReadResult& outResult);
+                  AsyncFiberSocketSendResult* outResult = nullptr);
+    Result receiveFrom(const SocketDescriptor& socket, Span<char> buffer, AsyncFiberSocketReceiveFromResult& outResult);
+    Result fileRead(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult);
     Result fileReadAt(const FileDescriptor& file, uint64_t offset, Span<char> buffer,
-                      FiberAsyncFileReadResult& outResult);
-    Result fileReadExact(const FileDescriptor& file, Span<char> buffer, FiberAsyncFileReadResult& outResult);
+                      AsyncFiberFileReadResult& outResult);
+    Result fileReadExact(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult);
     Result fileReadExactAt(const FileDescriptor& file, uint64_t offset, Span<char> buffer,
-                           FiberAsyncFileReadResult& outResult);
+                           AsyncFiberFileReadResult& outResult);
     Result filePoll(const FileDescriptor& file);
-    Result fileWrite(const FileDescriptor& file, Span<const char> data, FiberAsyncFileWriteResult* outResult = nullptr);
+    Result fileWrite(const FileDescriptor& file, Span<const char> data, AsyncFiberFileWriteResult* outResult = nullptr);
     Result fileWriteAt(const FileDescriptor& file, uint64_t offset, Span<const char> data,
-                       FiberAsyncFileWriteResult* outResult = nullptr);
+                       AsyncFiberFileWriteResult* outResult = nullptr);
     Result fileWriteAll(const FileDescriptor& file, Span<const char> data,
-                        FiberAsyncFileWriteResult* outResult = nullptr);
+                        AsyncFiberFileWriteResult* outResult = nullptr);
     Result fileWriteAllAt(const FileDescriptor& file, uint64_t offset, Span<const char> data,
-                          FiberAsyncFileWriteResult* outResult = nullptr);
-    Result fileSend(const FileDescriptor& file, const SocketDescriptor& socket, FiberAsyncFileSendOptions options = {},
-                    FiberAsyncFileSendResult* outResult = nullptr);
-    Result processExit(FileDescriptor::Handle process, FiberAsyncProcessExitResult& outResult);
-    Result signal(int signalNumber, FiberAsyncSignalResult& outResult);
+                          AsyncFiberFileWriteResult* outResult = nullptr);
+    Result fileSend(const FileDescriptor& file, const SocketDescriptor& socket, AsyncFiberFileSendOptions options = {},
+                    AsyncFiberFileSendResult* outResult = nullptr);
+    Result processExit(FileDescriptor::Handle process, AsyncFiberProcessExitResult& outResult);
+    Result signal(int signalNumber, AsyncFiberSignalResult& outResult);
 
   private:
     FiberScheduler& scheduler;
     AsyncEventLoop& eventLoop;
 
-    Span<FiberAsyncCommand> commands;
+    Span<AsyncFiberCommand> commands;
     size_t                  commandHead  = 0;
     size_t                  commandCount = 0;
     mutable Atomic<int32_t> commandLock  = 0;
@@ -166,16 +166,16 @@ struct SC_FIBER_ASYNC_EXPORT FiberAsyncIO
     void   operationFinished();
     void   lockCommands() const;
     void   unlockCommands() const;
-    Result enqueueCommand(FiberAsyncCommand& command);
+    Result enqueueCommand(AsyncFiberCommand& command);
     Result drainCommandQueue();
     bool   hasPendingCommands() const;
-    Result fileReadImpl(const FileDescriptor& file, Span<char> buffer, FiberAsyncFileReadResult& outResult,
+    Result fileReadImpl(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult,
                         uint64_t offset, bool useOffset);
-    Result fileReadImpl(const FileDescriptor& file, Span<char> buffer, FiberAsyncFileReadResult& outResult,
+    Result fileReadImpl(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult,
                         uint64_t offset, bool useOffset, AsyncFileRead& request);
-    Result fileReadExactImpl(const FileDescriptor& file, Span<char> buffer, FiberAsyncFileReadResult& outResult,
+    Result fileReadExactImpl(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult,
                              uint64_t offset, bool useOffset);
-    Result fileWriteImpl(const FileDescriptor& file, Span<const char> data, FiberAsyncFileWriteResult* outResult,
+    Result fileWriteImpl(const FileDescriptor& file, Span<const char> data, AsyncFiberFileWriteResult* outResult,
                          uint64_t offset, bool useOffset);
     Result startOperation(FiberCounter& counter, AsyncRequest& request, Result& operationResult,
                           Function<Result(AsyncEventLoop&)>& startProcedure);

@@ -13,7 +13,7 @@ independently consumable.
 
 Keep core `Fibers` independent from `Async`, `Await`, and `Threading`. Small OS-thread and synchronization pieces may be
 implemented locally inside `Fibers` when that avoids a dependency and the duplicated code remains contained. Async I/O
-integration belongs in `FibersAsync`.
+integration belongs in `AsyncFibers`.
 
 ## Consequences
 

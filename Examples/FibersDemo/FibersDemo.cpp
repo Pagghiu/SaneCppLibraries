@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 //---------------------------------------------------------------------------------------------------------------------
 // Description:
-// A tiny Fibers + FibersAsync demo showing the same scheduler model for CPU work and async waits.
+// A tiny Fibers + AsyncFibers demo showing the same scheduler model for CPU work and async waits.
 //---------------------------------------------------------------------------------------------------------------------
 // Instructions:
 // Run `./SC.sh build configure` from repo root, then build/run the `FibersDemo` console executable.
 //---------------------------------------------------------------------------------------------------------------------
+#include "../../Libraries/AsyncFibers/AsyncFibers.h"
 #include "../../Libraries/Fibers/Fibers.h"
-#include "../../Libraries/FibersAsync/FibersAsync.h"
 #include "../../Libraries/Strings/Console.h"
 
 namespace SC
@@ -59,10 +59,10 @@ static Result runCpuFibers(Console& console)
 
 static Result runAsyncFibers(Console& console)
 {
-    //! [FibersAsyncSleepSnippet]
+    //! [AsyncFibersSleepSnippet]
     struct State
     {
-        FiberAsyncIO* io        = nullptr;
+        AsyncFiberIO* io        = nullptr;
         int           completed = 0;
     } state;
 
@@ -76,8 +76,8 @@ static Result runAsyncFibers(Console& console)
     FiberTaskPool  pool(tasks, stackMemory, 64 * 1024);
     FiberTaskGroup group(scheduler);
 
-    FiberAsyncCommand commands[8];
-    FiberAsyncIO      io(scheduler, eventLoop, commands);
+    AsyncFiberCommand commands[8];
+    AsyncFiberIO      io(scheduler, eventLoop, commands);
 
     state.io  = &io;
     auto proc = [&state](FiberScheduler&)
@@ -99,20 +99,20 @@ static Result runAsyncFibers(Console& console)
         return errors[0].result;
     }
 
-    console.print("FibersAsync sleeps completed: {}\n", state.completed);
+    console.print("AsyncFibers sleeps completed: {}\n", state.completed);
     SC_TRY(eventLoop.close());
     return Result(true);
-    //! [FibersAsyncSleepSnippet]
+    //! [AsyncFibersSleepSnippet]
 }
 
 static Result runWorkerPoolAsyncFibers(Console& console)
 {
-    //! [FibersAsyncWorkerPoolSnippet]
+    //! [AsyncFibersWorkerPoolSnippet]
     static constexpr size_t NumWorkers = 2;
 
     struct State
     {
-        FiberAsyncIO* io        = nullptr;
+        AsyncFiberIO* io        = nullptr;
         int           completed = 0;
     } state;
 
@@ -127,8 +127,8 @@ static Result runWorkerPoolAsyncFibers(Console& console)
     FiberWorkerThread threads[NumWorkers];
     FiberWorkerPool   workerPool;
 
-    FiberAsyncCommand commands[8];
-    FiberAsyncIO      io(scheduler, eventLoop, commands);
+    AsyncFiberCommand commands[8];
+    AsyncFiberIO      io(scheduler, eventLoop, commands);
 
     state.io  = &io;
     auto proc = [&state](FiberScheduler&)
@@ -145,10 +145,10 @@ static Result runWorkerPoolAsyncFibers(Console& console)
     SC_TRY(workerPool.join());
     SC_TRY(task.result());
 
-    console.print("Worker-pool FibersAsync sleeps completed: {}\n", state.completed);
+    console.print("Worker-pool AsyncFibers sleeps completed: {}\n", state.completed);
     SC_TRY(eventLoop.close());
     return Result(true);
-    //! [FibersAsyncWorkerPoolSnippet]
+    //! [AsyncFibersWorkerPoolSnippet]
 }
 
 static Result runFibersDemo()

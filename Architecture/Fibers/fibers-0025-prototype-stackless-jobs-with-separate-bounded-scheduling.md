@@ -22,7 +22,7 @@ when its owner calls `runOne()` or `run()` on one thread.
 
 `FiberJob::Procedure` receives a restricted `FiberJobContext` rather than `FiberScheduler`. The context exposes the
 current job, its `FiberJobScheduler`, and cooperative cancellation checks. It does not expose yield, fiber wait
-primitives, or `FibersAsync`. A running job may submit another stable job when queue capacity is available.
+primitives, or `AsyncFibers`. A running job may submit another stable job when queue capacity is available.
 
 Job errors are stored in the completed `FiberJob`; scheduler-driving methods return errors only for scheduler
 operations. Pending cancellation skips the procedure and stores a cancellation error. A running job is never

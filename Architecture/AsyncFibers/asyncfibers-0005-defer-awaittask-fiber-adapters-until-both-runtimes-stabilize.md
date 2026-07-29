@@ -1,4 +1,4 @@
-# FIBERSASYNC-0005 - Defer AwaitTask Fiber Adapters Until Both Runtimes Stabilize
+# ASYNCFIBERS-0005 - Defer AwaitTask Fiber Adapters Until Both Runtimes Stabilize
 
 Status: Accepted
 Date: 2026-07-07
@@ -22,7 +22,7 @@ real usage instead of speculation.
 
 ## Confirmation
 
-A change preserves this decision when `FibersAsync` does not expose `AwaitTask` APIs, `Await` does not depend on
+A change preserves this decision when `AsyncFibers` does not expose `AwaitTask` APIs, `Await` does not depend on
 `Fibers`, and any future bridge proposal documents ownership, cancellation, allocator, and scheduler interaction before
 implementation.
 
@@ -30,4 +30,4 @@ implementation.
 
 - [Await architecture](../Await/await-architecture.md)
 - [Fibers architecture](../Fibers/fibers-architecture.md)
-- [FibersAsync architecture](fibersasync-architecture.md)
+- [AsyncFibers architecture](asyncfibers-architecture.md)

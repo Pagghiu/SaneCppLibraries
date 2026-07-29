@@ -1,4 +1,4 @@
-# FIBERSASYNC-0003 - Return Result And Operation-Specific Caller-Owned Output Objects
+# ASYNCFIBERS-0003 - Return Result And Operation-Specific Caller-Owned Output Objects
 
 Status: Accepted
 Date: 2026-07-07
@@ -11,7 +11,7 @@ uses caller-provided output objects for additional values.
 
 ## Decision
 
-`FiberAsyncIO` methods return plain `Result`. Additional operation data is written into explicit caller-provided result
+`AsyncFiberIO` methods return plain `Result`. Additional operation data is written into explicit caller-provided result
 objects or optional pointer outputs. Buffer data is reported as spans into caller-provided buffers, not newly allocated
 storage.
 
@@ -22,11 +22,11 @@ slightly more verbose than tuple-returning APIs, but ownership and allocation re
 
 ## Confirmation
 
-A change preserves this decision when new `FiberAsyncIO` operations return `Result`, use reference outputs for required
+A change preserves this decision when new `AsyncFiberIO` operations return `Result`, use reference outputs for required
 additional data, use pointer outputs for optional additional data, and do not allocate returned payload buffers.
 
 ## Related
 
 - [SC-0006 - Use explicit result-based error propagation](../Global/sc-0006-use-explicit-result-based-error-propagation.md)
 - [AWAIT-0005 - Keep cancellation cooperative and Result-based](../Await/await-0005-keep-cancellation-cooperative-and-result-based.md)
-- [FibersAsync architecture](fibersasync-architecture.md)
+- [AsyncFibers architecture](asyncfibers-architecture.md)
