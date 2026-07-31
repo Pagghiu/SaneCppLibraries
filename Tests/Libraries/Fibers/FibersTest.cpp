@@ -5014,7 +5014,7 @@ struct SC::FibersTest : public SC::TestCase
         static constexpr size_t NumTasks      = 64;
         static constexpr size_t StackSize     = FiberStackSize::ThirtyTwoKiB;
         static constexpr size_t NumYields     = 8;
-        static constexpr size_t NumRounds     = 3;
+        static constexpr size_t NumRounds     = 16;
         static constexpr size_t DequeCapacity = NumTasks;
 
         struct State

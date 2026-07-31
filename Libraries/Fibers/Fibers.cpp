@@ -8054,7 +8054,9 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     FiberCounter*    completedCounter     = nullptr;
     Span<char>       completedStackMemory;
     bool             completedTask = false;
-    if (task.status() == FiberTaskStatus::Completing)
+    // A published suspension may resume and complete on a peer before this invocation finishes bookkeeping.
+    const bool returnedCompleted = task.status() == FiberTaskStatus::Completing;
+    if (returnedCompleted)
     {
         trace(FiberTraceEventType::TaskCompleted, &task, &worker, task.taskResult ? 1 : 0);
     }
@@ -8064,7 +8066,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
         SC_FIBERS_ASSERT_RELEASE(task.runningWorker == nullptr);
         SC_FIBERS_ASSERT_RELEASE(worker.workerTask == nullptr);
     }
-    else if (task.status() == FiberTaskStatus::Completing and task.activeRegistryWorker != nullptr)
+    else if (returnedCompleted and task.activeRegistryWorker != nullptr)
     {
         worker.completedFibers += 1;
         unlinkWorkerActive(task);
@@ -8113,9 +8115,10 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     }
     else
     {
-        LockGuard guard(*this, LockCategory::Completion);
+        LockGuard          guard(*this, LockCategory::Completion);
+        InjectionLockGuard injectionGuard(*this);
         publishSuspensionUnlocked(task);
-        if (task.status() == FiberTaskStatus::Completing)
+        if (returnedCompleted)
         {
             task.cancellationToken = FiberCancellationToken();
             worker.completedFibers += 1;
