@@ -173,6 +173,6 @@ payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 408		| 1103		| 1511	|
-| Single File | 1384		| 1825		| 3209	|
-| Standalone  | 2587		| 3640		| 6227	|
+| Library     | 409		| 1111		| 1520	|
+| Single File | 1385		| 1833		| 3218	|
+| Standalone  | 2588		| 3648		| 6236	|

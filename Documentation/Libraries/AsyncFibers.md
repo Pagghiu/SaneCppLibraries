@@ -161,11 +161,13 @@ Development notes and design changes are recorded in the project updates:
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/AsyncFibers`.
-Single File counts `SaneCppAsyncFibers.h`.
-Standalone counts `SaneCppAsyncFibersStandalone.h` and intentionally includes dependency payloads.
+Single File counts
+`SaneCppAsyncFibers.h`.
+Standalone counts `SaneCppAsyncFibersStandalone.h` and intentionally includes dependency
+payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 147    | 910    | 1057  |
-| Single File | 510    | 1063   | 1573  |
-| Standalone  | 8416   | 19290  | 27706 |
+| Library     | 153		| 926		| 1079	|
+| Single File | 516		| 1079		| 1595	|
+| Standalone  | 8913		| 22324		| 31237	|

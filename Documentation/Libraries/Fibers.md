@@ -481,5 +481,14 @@ Development notes and design changes are recorded in the project updates:
 - [July 2026 Update](https://pagghiu.github.io/site/blog/2026-07-31-SaneCppLibrariesUpdate.html)
 
 # Statistics
-LOC counts exclude comments. Library counts files physically under `Libraries/Fibers`. Single File and Standalone
-counts are regenerated with the amalgamated library outputs.
+LOC counts exclude comments. Library counts files physically under `Libraries/Fibers`.
+Single File counts
+`SaneCppFibers.h`.
+Standalone counts `SaneCppFibersStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1453		| 7731		| 9184	|
+| Single File | 2207		| 7966		| 10173	|
+| Standalone  | 2207		| 7966		| 10173	|

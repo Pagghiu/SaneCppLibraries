@@ -5,23 +5,23 @@ This is the list of all libraries, whose internal dependencies are documented at
 Library                                     | Description                                   | Header LOC | Source LOC | Standalone LOC
 :-------------------------------------------|:----------------------------------------------|-----------:|-----------:|---------------:
 @subpage library_async                  | @copybrief library_async                  | 1926 | 5842 | 19469
-@subpage library_async_fibers           | @copybrief library_async_fibers           | 0 | 0 | 0
+@subpage library_async_fibers           | @copybrief library_async_fibers           | 153 | 926 | 31237
 @subpage library_async_streams          | @copybrief library_async_streams          | 924 | 1798 | 3755
 @subpage library_await                  | @copybrief library_await                  | 1199 | 3231 | 24431
 @subpage library_containers             | @copybrief library_containers             | 1007 | 3 | 4428
 @subpage library_containers_reflection  | @copybrief library_containers_reflection  | 231 | 0 | 5609
-@subpage library_fibers                 | @copybrief library_fibers                 | 0 | 0 | 0
+@subpage library_fibers                 | @copybrief library_fibers                 | 1453 | 7731 | 10173
 @subpage library_file                   | @copybrief library_file                   | 200 | 1364 | 3018
 @subpage library_file_system            | @copybrief library_file_system            | 188 | 1858 | 3403
 @subpage library_file_system_iterator   | @copybrief library_file_system_iterator   | 92 | 402 | 2098
 @subpage library_file_system_watcher    | @copybrief library_file_system_watcher    | 511 | 1122 | 3145
 @subpage library_foundation             | @copybrief library_foundation             | 27 | 64 | 1813
 @subpage library_hashing                | @copybrief library_hashing                | 95 | 292 | 776
-@subpage library_http                   | @copybrief library_http                   | 1861 | 7587 | 33872
+@subpage library_http                   | @copybrief library_http                   | 1865 | 7659 | 33948
 @subpage library_http_client            | @copybrief library_http_client            | 1188 | 4754 | 6876
 @subpage library_memory                 | @copybrief library_memory                 | 554 | 1053 | 2749
-@subpage library_plugin                 | @copybrief library_plugin                 | 865 | 1322 | 9892
-@subpage library_process                | @copybrief library_process                | 408 | 1103 | 6227
+@subpage library_plugin                 | @copybrief library_plugin                 | 865 | 1322 | 9901
+@subpage library_process                | @copybrief library_process                | 409 | 1111 | 6236
 @subpage library_reflection             | @copybrief library_reflection             | 616 | 0 | 930
 @subpage library_serial_port            | @copybrief library_serial_port            | 55 | 599 | 4532
 @subpage library_serialization_binary   | @copybrief library_serialization_binary   | 593 | 0 | 1943
@@ -35,10 +35,12 @@ Common source fragments                    | Shared source fragments, not a libr
 
 LOC metric                         | Header | Source | Sum
 :-----------------------------------|-------:|-------:|----:
-Library source                      | 15134 | 38827 | 53961
+Library source                      | 16745 | 47564 | 64309
 Common source fragments             | 1676 | 582 | 2258
 
 All LOC counts in the tables above exclude comments.
+
+
 
 
 
