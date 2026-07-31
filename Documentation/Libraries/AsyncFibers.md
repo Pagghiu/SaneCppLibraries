@@ -147,6 +147,12 @@ For the exact operation list and result fields, see [SC::AsyncFiberIO](@ref SC::
 [AsyncFibers module](@ref group_async_fibers). `Examples/FibersDemo` is the smallest end-to-end example;
 `Tests/Libraries/AsyncFibers/AsyncFibersTest.cpp` contains the edge cases.
 
+# Blog
+
+Development notes and design changes are recorded in the project updates:
+
+- [July 2026 Update](https://pagghiu.github.io/site/blog/2026-07-31-SaneCppLibrariesUpdate.html)
+
 # Roadmap
 
 - Add DNS or stream helpers only when concrete consumers establish the right ownership and buffering model.

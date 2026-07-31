@@ -474,6 +474,12 @@ Current support includes:
 - cooperative task cancellation, including waking tasks suspended on counters and primitives;
 - focused `SCTest` coverage for the raw context switch layer, scheduler primitives, worker pools, and storage classes.
 
+# Blog
+
+Development notes and design changes are recorded in the project updates:
+
+- [July 2026 Update](https://pagghiu.github.io/site/blog/2026-07-31-SaneCppLibrariesUpdate.html)
+
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Fibers`. Single File and Standalone
 counts are regenerated with the amalgamated library outputs.
