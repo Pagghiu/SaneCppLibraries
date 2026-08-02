@@ -998,7 +998,17 @@ struct MicroTaskBenchmarkState
     Atomic<int32_t> completed;
     Atomic<int32_t> checksum;
     Atomic<bool>    producerDone;
-    int             workIterations = 0;
+
+    Time::HighResolutionCounter producerStarted;
+    Time::HighResolutionCounter producerFinished;
+    int                         workIterations = 0;
+};
+
+struct MicroTaskPhaseMetrics
+{
+    int64_t producerElapsedNs   = 0;
+    int64_t postProducerDrainNs = 0;
+    bool    hasProducerTiming   = false;
 };
 
 struct MicroTaskExternalProducerState
@@ -1013,6 +1023,9 @@ struct MicroTaskExternalProducerState
     size_t                   numJobs        = 0;
     size_t                   stackSize      = 0;
     Result                   producerResult = Result(true);
+
+    Time::HighResolutionCounter producerStarted;
+    Time::HighResolutionCounter producerFinished;
 };
 
 static Result runCpuPayload(MicroTaskBenchmarkState& state, int workIterations)
@@ -1053,7 +1066,7 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                                     size_t configuredInjectionCapacity, const Time::HighResolutionCounter& elapsed,
                                     const FiberScheduler& scheduler, const FiberWorkerPool& workerPool,
                                     Span<FiberWorker> workers, const FiberAllocatorStatistics& allocatorStatistics,
-                                    const MicroTaskBenchmarkState& state)
+                                    const MicroTaskBenchmarkState& state, const MicroTaskPhaseMetrics& phaseMetrics)
 {
     const int64_t elapsedNs  = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
     const int64_t elapsedMs  = elapsed.toMilliseconds().ms;
@@ -1073,6 +1086,12 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   microTaskProducerModeName(mode), numWorkers, numExternalProducers, numJobs);
     console.print("  workIterations={} elapsedMs={} elapsedNs={}\n", static_cast<size_t>(workIterations),
                   static_cast<size_t>(elapsedMs), static_cast<size_t>(elapsedNs));
+    if (phaseMetrics.hasProducerTiming)
+    {
+        console.print("  producerElapsedNs={} postProducerDrainNs={}\n",
+                      static_cast<size_t>(phaseMetrics.producerElapsedNs),
+                      static_cast<size_t>(phaseMetrics.postProducerDrainNs));
+    }
     console.print("  submitted={} completed={} jobsPerSec={} checksum={}\n",
                   static_cast<size_t>(state.submitted.load(memory_order_relaxed)), static_cast<size_t>(completed),
                   static_cast<size_t>(jobsPerSec), static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
@@ -1161,6 +1180,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
 
     Time::HighResolutionCounter start;
     Time::HighResolutionCounter finish;
+    MicroTaskPhaseMetrics       phaseMetrics;
 
     if (mode == MicroTaskProducerMode::InFiberProducer)
     {
@@ -1177,6 +1197,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
             FiberTask::Procedure(
                 [&state, &taskPool](FiberScheduler& scheduler)
                 {
+                    state.producerStarted.snap();
                     while (state.submitted.load(memory_order_relaxed) < static_cast<int32_t>(NumJobs))
                     {
                         Result spawnResult = spawnMicroTaskJob(taskPool, scheduler, state, state.workIterations);
@@ -1186,6 +1207,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                         }
                         SC_TRY(taskPool.waitForAvailableTask(scheduler));
                     }
+                    state.producerFinished.snap();
                     state.producerDone.store(true, memory_order_release);
                     return Result(true);
                 })));
@@ -1194,6 +1216,9 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
         SC_TRY(workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, workerPoolOptions));
         SC_TRY(workerPool.join());
         finish.snap();
+        phaseMetrics.hasProducerTiming = true;
+        phaseMetrics.producerElapsedNs = state.producerFinished.subtractExact(state.producerStarted).toNanoseconds().ns;
+        phaseMetrics.postProducerDrainNs = finish.subtractExact(state.producerFinished).toNanoseconds().ns;
     }
     else
     {
@@ -1204,14 +1229,20 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
         if (mode == MicroTaskProducerMode::ExternalBeforeWorkers)
         {
             start.snap();
+            state.producerStarted.snap();
             for (size_t idx = 0; idx < NumJobs; ++idx)
             {
                 SC_TRY(spawnMicroTaskJob(taskPool, scheduler, state, workIterations));
             }
+            state.producerFinished.snap();
             state.producerDone.store(true, memory_order_release);
             SC_TRY(workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, workerPoolOptions));
             SC_TRY(workerPool.join());
             finish.snap();
+            phaseMetrics.hasProducerTiming = true;
+            phaseMetrics.producerElapsedNs =
+                state.producerFinished.subtractExact(state.producerStarted).toNanoseconds().ns;
+            phaseMetrics.postProducerDrainNs = finish.subtractExact(state.producerFinished).toNanoseconds().ns;
         }
         else
         {
@@ -1253,6 +1284,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                     [&producerState](Thread&)
                     {
                         producerState.startGate->acquire();
+                        producerState.producerStarted.snap();
                         for (size_t idx = 0; idx < producerState.numJobs; ++idx)
                         {
                             Result result = spawnExternalMicroTaskJob(
@@ -1266,6 +1298,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                                 break;
                             }
                         }
+                        producerState.producerFinished.snap();
                         if (producerState.producersLeft->fetch_sub(1, memory_order_acq_rel) == 1)
                         {
                             producerState.benchmarkState->producerDone.store(true, memory_order_release);
@@ -1312,6 +1345,27 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
             SC_TRY(producerStartResult);
             SC_TRY_MSG(firstJob == NumJobs, "Micro-task producer ranges did not cover all jobs");
             finish.snap();
+
+            if (numStartedProducers > 0)
+            {
+                Time::HighResolutionCounter firstProducerStart = producerStates[0].producerStarted;
+                Time::HighResolutionCounter lastProducerFinish = producerStates[0].producerFinished;
+                for (size_t producerIndex = 1; producerIndex < numStartedProducers; ++producerIndex)
+                {
+                    if (firstProducerStart.isLaterThanOrEqualTo(producerStates[producerIndex].producerStarted))
+                    {
+                        firstProducerStart = producerStates[producerIndex].producerStarted;
+                    }
+                    if (producerStates[producerIndex].producerFinished.isLaterThanOrEqualTo(lastProducerFinish))
+                    {
+                        lastProducerFinish = producerStates[producerIndex].producerFinished;
+                    }
+                }
+                phaseMetrics.hasProducerTiming = true;
+                phaseMetrics.producerElapsedNs =
+                    lastProducerFinish.subtractExact(firstProducerStart).toNanoseconds().ns;
+                phaseMetrics.postProducerDrainNs = finish.subtractExact(lastProducerFinish).toNanoseconds().ns;
+            }
         }
     }
 
@@ -1325,7 +1379,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
 
     return printMicroTaskMetrics(console, mode, numWorkers, numExternalProducers, NumJobs, workIterations,
                                  InjectionCapacity, finish.subtractExact(start), scheduler, workerPool,
-                                 {workers, numWorkers}, allocatorStatistics, state);
+                                 {workers, numWorkers}, allocatorStatistics, state, phaseMetrics);
 }
 
 static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers)
@@ -1436,6 +1490,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
                            FiberTask::Procedure(
                                [&state, &taskPool](FiberScheduler& scheduler)
                                {
+                                   state.producerStarted.snap();
                                    while (state.submitted.load(memory_order_relaxed) < static_cast<int32_t>(NumJobs))
                                    {
                                        Result spawnResult =
@@ -1446,6 +1501,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
                                        }
                                        SC_TRY(taskPool.waitForAvailableTasks(scheduler, AvailabilityBatch));
                                    }
+                                   state.producerFinished.snap();
                                    state.producerDone.store(true, memory_order_release);
                                    return Result(true);
                                })));
@@ -1465,11 +1521,16 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(allocator.close());
 
+    MicroTaskPhaseMetrics phaseMetrics;
+    phaseMetrics.hasProducerTiming   = true;
+    phaseMetrics.producerElapsedNs   = state.producerFinished.subtractExact(state.producerStarted).toNanoseconds().ns;
+    phaseMetrics.postProducerDrainNs = finish.subtractExact(state.producerFinished).toNanoseconds().ns;
+
     console.print("FibersBenchmark sustained micro-tasking\n");
     console.print("  poolCapacity={} dequeCapacityPerWorker={}\n", PoolCapacity, DequeCapacityPerWorker);
     return printMicroTaskMetrics(console, MicroTaskProducerMode::InFiberProducer, numWorkers, 1, NumJobs,
                                  WorkIterations, InjectionCapacity, finish.subtractExact(start), scheduler, workerPool,
-                                 {workers, numWorkers}, allocatorStatistics, state);
+                                 {workers, numWorkers}, allocatorStatistics, state, phaseMetrics);
 }
 
 static Result runCounterCompletionBenchmark(Console& console)
