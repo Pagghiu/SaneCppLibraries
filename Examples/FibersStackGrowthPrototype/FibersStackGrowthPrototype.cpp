@@ -827,8 +827,8 @@ static Result runConcurrentGrowthProbe()
 
     struct Shared
     {
-        Atomic<int32_t> ready;
-        Atomic<bool>    start;
+        Semaphore ready;
+        Semaphore start;
     };
     struct WorkerState
     {
@@ -862,11 +862,8 @@ static Result runConcurrentGrowthProbe()
                 {
                     state->result = state->prototype.prepareContext(StackGrowthPrototype::fiberEntry);
                 }
-                shared.ready.fetch_add(1);
-                while (not shared.start.load())
-                {
-                    Thread::Sleep(1);
-                }
+                shared.ready.release();
+                shared.start.acquire();
                 if (state->result)
                 {
                     state->result = state->prototype.runPrepared();
@@ -887,18 +884,18 @@ static Result runConcurrentGrowthProbe()
             }));
         if (not startResult)
         {
-            shared.start.store(true);
             for (size_t threadIndex = 0; threadIndex < startedThreads; ++threadIndex)
             {
+                shared.start.release();
                 SC_THREADING_ASSERT_RELEASE(threads[threadIndex].join());
             }
             return startResult;
         }
     }
 
-    while (shared.ready.load() != static_cast<int32_t>(NumWorkers))
+    for (size_t threadIndex = 0; threadIndex < NumWorkers; ++threadIndex)
     {
-        Thread::Sleep(1);
+        shared.ready.acquire();
     }
 
     bool allWorkersPrepared  = true;
@@ -918,7 +915,10 @@ static Result runConcurrentGrowthProbe()
         earlyCloseRefused = not processHandlerOwner.closeProcessHandler();
     }
 #endif
-    shared.start.store(true);
+    for (size_t threadIndex = 0; threadIndex < NumWorkers; ++threadIndex)
+    {
+        shared.start.release();
+    }
 
     Result probeResult = Result(true);
     for (size_t threadIndex = 0; threadIndex < NumWorkers; ++threadIndex)
