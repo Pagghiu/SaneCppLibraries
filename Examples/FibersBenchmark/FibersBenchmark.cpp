@@ -1382,7 +1382,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                                  {workers, numWorkers}, allocatorStatistics, state, phaseMetrics);
 }
 
-static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers)
+static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers, size_t selectedWorkers)
 {
     static constexpr size_t MaxBenchmarkCounts = 5;
     static constexpr size_t MaxWorkers         = 16;
@@ -1392,20 +1392,27 @@ static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProduce
     size_t workerCountsStorage[MaxBenchmarkCounts] = {};
     size_t numWorkerCounts                         = 0;
 
-    const size_t requestedCounts[] = {1, 2, 4, 8, availableHardwareWorkers()};
-    for (size_t requestedCount : requestedCounts)
+    if (selectedWorkers > 0)
     {
-        SC_TRY_MSG(requestedCount <= MaxWorkers,
-                   "FibersBenchmark must increase its fixed worker storage for this machine");
-        size_t workerCount = requestedCount;
-        if (workerCount == 0)
+        workerCountsStorage[numWorkerCounts++] = selectedWorkers;
+    }
+    else
+    {
+        const size_t requestedCounts[] = {1, 2, 4, 8, availableHardwareWorkers()};
+        for (size_t requestedCount : requestedCounts)
         {
-            workerCount = 1;
-        }
-        Span<size_t> existingCounts({workerCountsStorage, numWorkerCounts});
-        if (not hasWorkerCount(existingCounts, workerCount))
-        {
-            workerCountsStorage[numWorkerCounts++] = workerCount;
+            SC_TRY_MSG(requestedCount <= MaxWorkers,
+                       "FibersBenchmark must increase its fixed worker storage for this machine");
+            size_t workerCount = requestedCount;
+            if (workerCount == 0)
+            {
+                workerCount = 1;
+            }
+            Span<size_t> existingCounts({workerCountsStorage, numWorkerCounts});
+            if (not hasWorkerCount(existingCounts, workerCount))
+            {
+                workerCountsStorage[numWorkerCounts++] = workerCount;
+            }
         }
     }
 
@@ -1434,7 +1441,7 @@ static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProduce
     return Result(true);
 }
 
-static Result runSustainedMicroTaskBenchmark(Console& console)
+static Result runSustainedMicroTaskBenchmark(Console& console, size_t selectedWorkers)
 {
     static constexpr size_t MaxWorkers             = 16;
     static constexpr size_t NumJobs                = 1000000;
@@ -1445,8 +1452,8 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     static constexpr size_t AvailabilityBatch      = 64;
     static constexpr int    WorkIterations         = 4;
 
-    size_t numWorkers = availableHardwareWorkers();
-    if (numWorkers > 8)
+    size_t numWorkers = selectedWorkers > 0 ? selectedWorkers : availableHardwareWorkers();
+    if (selectedWorkers == 0 and numWorkers > 8)
     {
         numWorkers = 8;
     }
@@ -1645,8 +1652,9 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     int32_t jobRounds           = 5;
     int32_t massSuspensionCount = 0;
     int32_t externalProducers   = 1;
+    int32_t schedulerWorkers    = 0;
 
-    CommandLineOption options[10];
+    CommandLineOption options[11];
     options[0].longName = "scheduler-throughput";
     options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
     options[0].value    = CommandLineValue::boolean(schedulerThroughput);
@@ -1691,12 +1699,17 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     options[9].valueName = "COUNT";
     options[9].value     = CommandLineValue::int32(externalProducers);
 
+    options[10].longName  = "scheduler-workers";
+    options[10].help      = "Run scheduler micro-task workloads at one worker count instead of the default matrix";
+    options[10].valueName = "COUNT";
+    options[10].value     = CommandLineValue::int32(schedulerWorkers);
+
     CommandLineSpec spec;
     spec.programName = "FibersBenchmark";
     spec.summary     = "Measure Fibers scheduler throughput, contention, and live-fiber density.";
     spec.options     = options;
 
-    StringSpan           argumentStorage[10];
+    StringSpan           argumentStorage[16];
     CommandLineArguments arguments;
     SC_TRY(arguments.setFromMainArguments(argc, argv, argumentStorage));
     const CommandLineParseResult parseResult = spec.parse(arguments.values);
@@ -1725,6 +1738,10 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     if (externalProducers <= 0 or externalProducers > 8)
     {
         return Result::Error("External producer count must be between one and eight");
+    }
+    if (schedulerWorkers < 0 or schedulerWorkers > 16)
+    {
+        return Result::Error("Scheduler worker count must be between one and 16");
     }
     if (jobWorkers <= 0 or jobWorkers > 64)
     {
@@ -1768,9 +1785,10 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     {
         SC_TRY(runWorkerPoolBenchmark(console));
         SC_TRY(runForcedStealingBenchmark(console));
-        SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers)));
+        SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers),
+                                      static_cast<size_t>(schedulerWorkers)));
         SC_TRY(runCounterCompletionBenchmark(console));
-        return runSustainedMicroTaskBenchmark(console);
+        return runSustainedMicroTaskBenchmark(console, static_cast<size_t>(schedulerWorkers));
     }
 
     SC_TRY(runWorkerPoolBenchmark(console));
@@ -1778,9 +1796,9 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     SC_TRY(runMassSuspensionBenchmark(console, 10'000));
     SC_TRY(runMassSuspensionBenchmark(console, 100'000));
     SC_TRY(runAsyncFiberHighWaterBenchmark(console));
-    SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers)));
+    SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers), 0));
     SC_TRY(runCounterCompletionBenchmark(console));
-    SC_TRY(runSustainedMicroTaskBenchmark(console));
+    SC_TRY(runSustainedMicroTaskBenchmark(console, 0));
     return Result(true);
 }
 } // namespace SC
