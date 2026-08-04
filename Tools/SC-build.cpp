@@ -789,6 +789,13 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
             configureSaneStrictNoStdCpp(project);
             SC_TRY(addSaneCppLibraries(project, parameters));
         }
+        if (name == "FibersBenchmark")
+        {
+            // This maintainer target must remain symbolized for optimized Instruments captures.
+            Configuration* releaseConfiguration = project.getConfiguration("Release");
+            SC_TRY_MSG(releaseConfiguration != nullptr, "FibersBenchmark Release configuration is missing");
+            releaseConfiguration->link.enableDeadCodeStripping = false;
+        }
         SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
         project.addFiles(entry.path, "**.cpp");
         workspace.projects.push_back(move(project));
