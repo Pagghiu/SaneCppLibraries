@@ -1382,7 +1382,8 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                                  {workers, numWorkers}, allocatorStatistics, state, phaseMetrics);
 }
 
-static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers, size_t selectedWorkers)
+static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers, size_t selectedWorkers,
+                                     StringView selectedWorkload)
 {
     static constexpr size_t MaxBenchmarkCounts = 5;
     static constexpr size_t MaxWorkers         = 16;
@@ -1424,6 +1425,15 @@ static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProduce
 
     for (MicroTaskProducerMode mode : modes)
     {
+        const bool selected =
+            selectedWorkload == "all" or
+            (selectedWorkload == "preloaded" and mode == MicroTaskProducerMode::ExternalBeforeWorkers) or
+            (selectedWorkload == "external" and mode == MicroTaskProducerMode::ExternalWhileWorkersRunning) or
+            (selectedWorkload == "in-fiber" and mode == MicroTaskProducerMode::InFiberProducer);
+        if (not selected)
+        {
+            continue;
+        }
         for (size_t idx = 0; idx < numWorkerCounts; ++idx)
         {
             const size_t producers =
@@ -1432,11 +1442,14 @@ static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProduce
         }
     }
 
-    console.print("FibersBenchmark balanced CPU payload\n");
-    for (size_t idx = 0; idx < numWorkerCounts; ++idx)
+    if (selectedWorkload == "all" or selectedWorkload == "balanced")
     {
-        SC_TRY(runMicroTaskBenchmarkCase(console, MicroTaskProducerMode::ExternalBeforeWorkers,
-                                         workerCountsStorage[idx], 1, CpuWorkIterations));
+        console.print("FibersBenchmark balanced CPU payload\n");
+        for (size_t idx = 0; idx < numWorkerCounts; ++idx)
+        {
+            SC_TRY(runMicroTaskBenchmarkCase(console, MicroTaskProducerMode::ExternalBeforeWorkers,
+                                             workerCountsStorage[idx], 1, CpuWorkIterations));
+        }
     }
     return Result(true);
 }
@@ -1642,19 +1655,21 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     Console::tryAttachingToParentConsole();
     printBenchmarkEnvironment(console);
 
-    bool    schedulerThroughput = false;
-    bool    jobThroughput       = false;
-    bool    jobPoolThroughput   = false;
-    bool    jobWorkerThroughput = false;
-    bool    jobWorkerMatrix     = false;
-    bool    jobWorkerSustained  = false;
-    int32_t jobWorkers          = 4;
-    int32_t jobRounds           = 5;
-    int32_t massSuspensionCount = 0;
-    int32_t externalProducers   = 1;
-    int32_t schedulerWorkers    = 0;
+    bool       schedulerThroughput = false;
+    bool       jobThroughput       = false;
+    bool       jobPoolThroughput   = false;
+    bool       jobWorkerThroughput = false;
+    bool       jobWorkerMatrix     = false;
+    bool       jobWorkerSustained  = false;
+    int32_t    jobWorkers          = 4;
+    int32_t    jobRounds           = 5;
+    int32_t    massSuspensionCount = 0;
+    int32_t    externalProducers   = 1;
+    int32_t    schedulerWorkers    = 0;
+    int32_t    schedulerRounds     = 1;
+    StringView schedulerWorkload   = "all";
 
-    CommandLineOption options[11];
+    CommandLineOption options[13];
     options[0].longName = "scheduler-throughput";
     options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
     options[0].value    = CommandLineValue::boolean(schedulerThroughput);
@@ -1704,6 +1719,17 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     options[10].valueName = "COUNT";
     options[10].value     = CommandLineValue::int32(schedulerWorkers);
 
+    options[11].longName = "scheduler-workload";
+    options[11].help =
+        "Select all, worker-pool, forced-steal, preloaded, external, in-fiber, balanced, counter, or sustained";
+    options[11].valueName = "NAME";
+    options[11].value     = CommandLineValue::stringView(schedulerWorkload);
+
+    options[12].longName  = "scheduler-rounds";
+    options[12].help      = "Repeat the selected scheduler workload for profiling";
+    options[12].valueName = "COUNT";
+    options[12].value     = CommandLineValue::int32(schedulerRounds);
+
     CommandLineSpec spec;
     spec.programName = "FibersBenchmark";
     spec.summary     = "Measure Fibers scheduler throughput, contention, and live-fiber density.";
@@ -1742,6 +1768,16 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     if (schedulerWorkers < 0 or schedulerWorkers > 16)
     {
         return Result::Error("Scheduler worker count must be between one and 16");
+    }
+    if (schedulerRounds <= 0 or schedulerRounds > 1000)
+    {
+        return Result::Error("Scheduler rounds must be between one and 1000");
+    }
+    if (schedulerWorkload != "all" and schedulerWorkload != "worker-pool" and schedulerWorkload != "forced-steal" and
+        schedulerWorkload != "preloaded" and schedulerWorkload != "external" and schedulerWorkload != "in-fiber" and
+        schedulerWorkload != "balanced" and schedulerWorkload != "counter" and schedulerWorkload != "sustained")
+    {
+        return Result::Error("Unknown scheduler workload");
     }
     if (jobWorkers <= 0 or jobWorkers > 64)
     {
@@ -1783,12 +1819,32 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     }
     if (schedulerThroughput)
     {
-        SC_TRY(runWorkerPoolBenchmark(console));
-        SC_TRY(runForcedStealingBenchmark(console));
-        SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers),
-                                      static_cast<size_t>(schedulerWorkers)));
-        SC_TRY(runCounterCompletionBenchmark(console));
-        return runSustainedMicroTaskBenchmark(console, static_cast<size_t>(schedulerWorkers));
+        for (int32_t round = 0; round < schedulerRounds; ++round)
+        {
+            if (schedulerWorkload == "all" or schedulerWorkload == "worker-pool")
+            {
+                SC_TRY(runWorkerPoolBenchmark(console));
+            }
+            if (schedulerWorkload == "all" or schedulerWorkload == "forced-steal")
+            {
+                SC_TRY(runForcedStealingBenchmark(console));
+            }
+            if (schedulerWorkload == "all" or schedulerWorkload == "preloaded" or schedulerWorkload == "external" or
+                schedulerWorkload == "in-fiber" or schedulerWorkload == "balanced")
+            {
+                SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers),
+                                              static_cast<size_t>(schedulerWorkers), schedulerWorkload));
+            }
+            if (schedulerWorkload == "all" or schedulerWorkload == "counter")
+            {
+                SC_TRY(runCounterCompletionBenchmark(console));
+            }
+            if (schedulerWorkload == "all" or schedulerWorkload == "sustained")
+            {
+                SC_TRY(runSustainedMicroTaskBenchmark(console, static_cast<size_t>(schedulerWorkers)));
+            }
+        }
+        return Result(true);
     }
 
     SC_TRY(runWorkerPoolBenchmark(console));
@@ -1796,7 +1852,7 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     SC_TRY(runMassSuspensionBenchmark(console, 10'000));
     SC_TRY(runMassSuspensionBenchmark(console, 100'000));
     SC_TRY(runAsyncFiberHighWaterBenchmark(console));
-    SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers), 0));
+    SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers), 0, "all"));
     SC_TRY(runCounterCompletionBenchmark(console));
     SC_TRY(runSustainedMicroTaskBenchmark(console, 0));
     return Result(true);
