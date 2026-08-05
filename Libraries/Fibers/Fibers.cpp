@@ -6384,12 +6384,10 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
             return initializeResult;
         }
 
-        {
-            InjectionLockGuard guard(*this);
-            fiberAtomicFetchAddSize(activeFibers, 1);
-            fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
-            linkActiveUnlocked(task);
-        }
+        SC_FIBERS_ASSERT_RELEASE(workerPool != nullptr and not workerPool->workers.empty());
+        FiberWorker& registryWorker = workerPool->workers[injectionPosition % workerPool->workers.sizeInElements()];
+        fiberAtomicFetchAddSize(activeFibers, 1);
+        linkWorkerActiveForSpawn(task, registryWorker);
         fiberAtomicFetchSubSize(injectionPublishing, 1);
         publishInjection(injectionPosition, &task);
         return Result(true);
@@ -6541,7 +6539,8 @@ bool FiberScheduler::canPublishOwnerSpawn(FiberWorker& worker, const FiberTaskSp
 
 bool FiberScheduler::canPublishInjectionSpawn(const FiberTaskSpawnOptions& options) const
 {
-    return injectionQueue != nullptr and options.counter == nullptr and options.originGroup == nullptr;
+    return injectionQueue != nullptr and workerPool != nullptr and options.counter == nullptr and
+           options.originGroup == nullptr;
 }
 
 void FiberScheduler::linkWorkerActiveForSpawn(FiberTask& task, FiberWorker& worker)

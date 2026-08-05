@@ -227,8 +227,10 @@ because the queue is full: its wakeup uses the scheduler's intrusive spill path,
 existing work continues to make progress. `FiberSchedulerDiagnostics` exposes the configured capacity, current and
 peak occupancy, in-progress publications, spill count, and injection-control contention separately from scheduler
 coordination; peak and spill values remain available after `join()`. Ordinary counter-free external spawns publish
-through a slot-sequenced bounded queue, so producers and workers do not serialize on queue indices. Injection control
-remains only around the pre-claim cancellation registry. Fixed allocator budgets should include
+through a slot-sequenced bounded queue, so producers and workers do not serialize on queue indices. Before publication,
+each ordinary task receives a stable worker-registry home distributed by its injection position. Claiming or migrating
+the task does not transfer that control-plane ownership. Injection control remains for coordinated fallback submissions
+that use the global pre-claim registry. Fixed allocator budgets should include
 `injectionCapacity * FiberInjectionSlotStorageSize` bytes in addition to worker deque storage and allocator alignment.
 
 `FiberTaskPool::waitForAvailableTask()` provides one-slot backpressure. Producers that refill in batches can instead
@@ -239,9 +241,9 @@ request to bypass it. Cancellation removes a waiting fiber through the same coop
 
 Configured pools with peer workers transfer a bounded injection backlog into local stealable deques in larger batches
 than the latency-sensitive spill path. Workers claim these slot-sequenced batches without taking the scheduler-global
-ready lock; per-task injection control still transfers cancellation-registry ownership safely. The intrusive spill path
-retains scheduler coordination. `injectionClaimBatchPeak` exposes the observed transfer size for tuning and regression
-analysis.
+ready lock. Ordinary externally submitted tasks already have stable cancellation-registry ownership, so claiming them
+does not take injection control. The intrusive spill and coordinated fallback paths retain scheduler coordination.
+`injectionClaimBatchPeak` exposes the observed transfer size for tuning and regression analysis.
 
 # Choosing Task and Stack Storage
 

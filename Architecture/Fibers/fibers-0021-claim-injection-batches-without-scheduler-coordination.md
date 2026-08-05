@@ -20,6 +20,9 @@ injection control. Retained tasks are published to the owner's deque in reverse 
 preserve FIFO injection order. The intrusive global spill list remains protected by the scheduler lock and is used as
 the fallback when no injection task can be claimed.
 
+FIBERS-0032 supersedes this transfer for ordinary counter-free, non-group external submissions by assigning a stable
+worker-registry home before queue publication. Coordinated fallback submissions retain the transfer described here.
+
 `injectionClaimBatchPeak` is updated atomically because several workers can now claim batches concurrently. Empty
 manual worker polls do not probe steal victims when the scheduler's total ready count is zero.
 

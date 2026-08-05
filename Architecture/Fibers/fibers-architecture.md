@@ -79,8 +79,8 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - Preserve the two-phase suspension model so a fiber is not made ready again until after it switches to the worker root.
 - Keep logical task state out of OS-thread-local storage because fibers may migrate between worker threads.
 - Keep diagnostics and tracing allocation-free and cheap enough to leave compiled into normal builds.
-- Isolate bounded external injection and its pre-claim active registry from scheduler-global coordination; retain exact
-  capacity and cancellation behavior while measuring the path independently.
+- Assign ordinary bounded external submissions a stable distributed worker-registry home before queue publication;
+  retain the global pre-claim registry for coordinated fallback submissions.
 
 ## Explicitly Excluded Targets
 
@@ -136,3 +136,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0029 - Publish contiguous job batches transactionally](fibers-0029-publish-contiguous-job-batches-transactionally.md)
 - [FIBERS-0030 - Distribute stackless ready-job accounting](fibers-0030-distribute-stackless-ready-job-accounting.md)
 - [FIBERS-0031 - Publish local job batches with one deque release](fibers-0031-publish-local-job-batches-with-one-deque-release.md)
+- [FIBERS-0032 - Assign injected fibers a home registry before publication](fibers-0032-assign-injected-fibers-a-home-registry-before-publication.md)
