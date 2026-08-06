@@ -22,6 +22,8 @@ the fallback when no injection task can be claimed.
 
 FIBERS-0032 supersedes this transfer for ordinary counter-free, non-group external submissions by assigning a stable
 worker-registry home before queue publication. Coordinated fallback submissions retain the transfer described here.
+FIBERS-0033 further supersedes repeated scalar head claims and ready-counter updates within a configured worker's
+bounded batch with one contiguous reservation and batched accounting.
 
 `injectionClaimBatchPeak` is updated atomically because several workers can now claim batches concurrently. Empty
 manual worker polls do not probe steal victims when the scheduler's total ready count is zero.

@@ -242,7 +242,9 @@ request to bypass it. Cancellation removes a waiting fiber through the same coop
 Configured pools with peer workers transfer a bounded injection backlog into local stealable deques in larger batches
 than the latency-sensitive spill path. Workers claim these slot-sequenced batches without taking the scheduler-global
 ready lock. Ordinary externally submitted tasks already have stable cancellation-registry ownership, so claiming them
-does not take injection control. The intrusive spill and coordinated fallback paths retain scheduler coordination.
+does not take injection control. A worker reserves the published contiguous prefix of each bounded batch with one head
+transition and updates ready accounting once for the batch; claimed capacity is released to producers only after that
+accounting is visible. The intrusive spill and coordinated fallback paths retain scheduler coordination.
 `injectionClaimBatchPeak` exposes the observed transfer size for tuning and regression analysis.
 
 # Choosing Task and Stack Storage

@@ -137,3 +137,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0030 - Distribute stackless ready-job accounting](fibers-0030-distribute-stackless-ready-job-accounting.md)
 - [FIBERS-0031 - Publish local job batches with one deque release](fibers-0031-publish-local-job-batches-with-one-deque-release.md)
 - [FIBERS-0032 - Assign injected fibers a home registry before publication](fibers-0032-assign-injected-fibers-a-home-registry-before-publication.md)
+- [FIBERS-0033 - Claim contiguous injection batches transactionally](fibers-0033-claim-contiguous-injection-batches-transactionally.md)

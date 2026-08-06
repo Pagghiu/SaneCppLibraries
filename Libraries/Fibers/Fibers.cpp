@@ -7549,6 +7549,78 @@ FiberTask* FiberScheduler::popInjection()
     }
 }
 
+size_t FiberScheduler::popInjectionTasks(Span<FiberTask*> tasks)
+{
+    if (injectionQueue == nullptr or tasks.empty())
+    {
+        return 0;
+    }
+
+    size_t position = fiberAtomicLoadSize(injectionHead);
+    for (;;)
+    {
+        size_t numClaimedSlots = 0;
+        while (numClaimedSlots < tasks.sizeInElements())
+        {
+            const size_t   slotPosition = position + numClaimedSlots;
+            InjectionSlot& slot         = injectionQueue[slotPosition % injectionCapacity];
+            const size_t   sequence     = fiberAtomicLoadSize(slot.sequence);
+            if (static_cast<intptr_t>(sequence - (slotPosition + 1)) != 0)
+            {
+                break;
+            }
+            numClaimedSlots += 1;
+        }
+        if (numClaimedSlots == 0)
+        {
+            return 0;
+        }
+
+        size_t expected = position;
+        if (not fiberAtomicCompareExchangeSize(injectionHead, expected, position + numClaimedSlots))
+        {
+            position = expected;
+            continue;
+        }
+
+        size_t numTasks = 0;
+        for (size_t claimedIndex = 0; claimedIndex < numClaimedSlots; ++claimedIndex)
+        {
+            const size_t   slotPosition = position + claimedIndex;
+            InjectionSlot& slot         = injectionQueue[slotPosition % injectionCapacity];
+            FiberTask*     task         = slot.task;
+            slot.task                   = nullptr;
+            if (task != nullptr)
+            {
+                tasks[numTasks++] = task;
+            }
+        }
+
+        if (numTasks != 0)
+        {
+            const size_t previousInjectionReady = fiberAtomicFetchSubSize(injectionReady, numTasks);
+            SC_FIBERS_ASSERT_RELEASE(previousInjectionReady >= numTasks);
+            const size_t previousReady = fiberAtomicFetchSubSize(readyFibers, numTasks);
+            SC_FIBERS_ASSERT_RELEASE(previousReady >= numTasks);
+            const size_t previousGlobalReady = fiberAtomicFetchSubSize(globalReadyFibers, numTasks);
+            SC_FIBERS_ASSERT_RELEASE(previousGlobalReady >= numTasks);
+        }
+
+        for (size_t claimedIndex = 0; claimedIndex < numClaimedSlots; ++claimedIndex)
+        {
+            const size_t slotPosition = position + claimedIndex;
+            fiberAtomicStoreSize(injectionQueue[slotPosition % injectionCapacity].sequence,
+                                 slotPosition + injectionCapacity);
+        }
+        if (numTasks != 0)
+        {
+            discardInjectionTombstones();
+            return numTasks;
+        }
+        position += numClaimedSlots;
+    }
+}
+
 void FiberScheduler::pushReadyUnlocked(FiberTask& task)
 {
     if (injectionQueue != nullptr)
@@ -7731,45 +7803,35 @@ FiberTask* FiberScheduler::popInjectionBatch(FiberWorker& worker)
     static constexpr size_t SingleWorkerCapacity   = 4;
 
     SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
-    FiberTask* task = popInjection();
-    if (task == nullptr)
-    {
-        return nullptr;
-    }
-
     const size_t top          = fiberAtomicLoadSize(worker.localDequeTop);
     const size_t bottom       = fiberAtomicLoadSize(worker.localDequeBottom);
     const size_t dequeEntries = bottom >= top ? bottom - top : 0;
     SC_FIBERS_ASSERT_RELEASE(dequeEntries <= worker.localDequeCapacity);
-    size_t       availableEntries = worker.localDequeCapacity - dequeEntries;
-    const bool   hasPeerWorkers   = workerPool != nullptr and workerPool->workers.sizeInElements() > 1;
-    const size_t batchCapacity    = hasPeerWorkers ? InjectionBatchCapacity : SingleWorkerCapacity;
-    if (availableEntries > batchCapacity - 1)
+    size_t       claimCapacity  = 1 + worker.localDequeCapacity - dequeEntries;
+    const bool   hasPeerWorkers = workerPool != nullptr and workerPool->workers.sizeInElements() > 1;
+    const size_t batchCapacity  = hasPeerWorkers ? InjectionBatchCapacity : SingleWorkerCapacity;
+    if (claimCapacity > batchCapacity)
     {
-        availableEntries = batchCapacity - 1;
+        claimCapacity = batchCapacity;
     }
 
-    FiberTask* retainedTasks[InjectionBatchCapacity - 1] = {};
-    size_t     numRetainedTasks                          = 0;
-    while (numRetainedTasks < availableEntries)
+    FiberTask*   claimedTasks[InjectionBatchCapacity] = {};
+    const size_t numClaimedTasks                      = popInjectionTasks({claimedTasks, claimCapacity});
+    if (numClaimedTasks == 0)
     {
-        FiberTask* retainedTask = popInjection();
-        if (retainedTask == nullptr)
-        {
-            break;
-        }
-        retainedTasks[numRetainedTasks++] = retainedTask;
+        return nullptr;
     }
 
-    const size_t claimed = numRetainedTasks + 1;
+    const size_t claimed = numClaimedTasks;
     size_t       peak    = fiberAtomicLoadSize(injectionClaimBatchPeak);
     while (claimed > peak and not fiberAtomicCompareExchangeSize(injectionClaimBatchPeak, peak, claimed)) {}
 
+    FiberTask* task = claimedTasks[0];
     moveActiveToWorkerUnlocked(*task, worker);
     // Reverse insertion preserves FIFO injection order when the owner later pops its LIFO deque.
-    for (size_t retainedIndex = numRetainedTasks; retainedIndex > 0; --retainedIndex)
+    for (size_t retainedIndex = numClaimedTasks; retainedIndex > 1; --retainedIndex)
     {
-        FiberTask& retainedTask = *retainedTasks[retainedIndex - 1];
+        FiberTask& retainedTask = *claimedTasks[retainedIndex - 1];
         moveActiveToWorkerUnlocked(retainedTask, worker);
         SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReadyDeque(worker, retainedTask));
     }

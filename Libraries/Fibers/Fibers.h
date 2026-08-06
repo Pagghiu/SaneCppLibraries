@@ -1684,6 +1684,7 @@ struct SC_FIBERS_EXPORT FiberScheduler
     void                     discardInjectionTombstones();
     [[nodiscard]] bool       tryPushInjectionUnlocked(FiberTask& task);
     [[nodiscard]] FiberTask* popInjection();
+    [[nodiscard]] size_t     popInjectionTasks(Span<FiberTask*> tasks);
     void                     notifyReadyWorkUnlocked();
     void                     pushReadyUnlocked(FiberTask& task);
     void                     pushReadyUnlocked(FiberTask& task, FiberWorker* preferredWorker);
