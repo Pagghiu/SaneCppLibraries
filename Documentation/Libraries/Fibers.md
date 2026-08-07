@@ -331,6 +331,14 @@ teardown, and replacement of a registered POSIX alternate signal stack. Creation
 or an attached debugger because those tools also own fault handling. Full stack commitment remains the compatible
 default, including under those tools.
 
+`FiberWorkerPool` can register and close all of its worker threads through `FiberWorkerPoolOptions`. Set
+`stackGrowthRuntime` to the open process owner. On POSIX, also provide one flat
+`stackGrowthSignalStackStorage` span containing at least `workerCount * FiberStackGrowthSignalStackSize` bytes; the
+pool partitions it into stable per-worker spans without allocating. Startup rejects the complete configuration before
+launching a worker if the budget is insufficient, and partial OS-thread startup rollback closes every registration
+that was already created. `join()` leaves the runtime with zero registered threads, so the same worker/thread/storage
+objects can start another wave immediately or the runtime can close.
+
 # Waiting, Coordination, and Cancellation
 
 Fiber primitives suspend the current fiber instead of blocking the OS thread:

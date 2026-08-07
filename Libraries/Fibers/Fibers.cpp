@@ -2083,7 +2083,15 @@ Result FiberWorkerThread::runThreadEntry()
         return Result::Error("FiberWorkerThread has no pool");
     }
     SC_TRY(applyThreadPolicy());
-    return pool->workerMain(workerIndex);
+    if (stackGrowthRuntime == nullptr)
+    {
+        return pool->workerMain(workerIndex);
+    }
+
+    SC_TRY(stackGrowthThread.create(*stackGrowthRuntime, stackGrowthSignalStackStorage));
+    Result workerResult = pool->workerMain(workerIndex);
+    Result closeResult  = stackGrowthThread.close();
+    return workerResult ? closeResult : workerResult;
 }
 
 struct FiberJobWorkerPoolThreadEntry
@@ -2264,6 +2272,25 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
     {
         return Result::Error("FiberWorkerPool affinity mask count must match worker count");
     }
+    if (options.stackGrowthRuntime == nullptr and not options.stackGrowthSignalStackStorage.empty())
+    {
+        return Result::Error("FiberWorkerPool stack growth signal storage requires a runtime");
+    }
+    if (options.stackGrowthRuntime != nullptr)
+    {
+        if (not options.stackGrowthRuntime->isOpen())
+        {
+            return Result::Error("FiberWorkerPool stack growth runtime is not open");
+        }
+#if !SC_PLATFORM_WINDOWS
+        const size_t signalStackCount =
+            options.stackGrowthSignalStackStorage.sizeInBytes() / FiberStackGrowthSignalStackSize;
+        if (signalStackCount < workerStorage.sizeInElements())
+        {
+            return Result::Error("FiberWorkerPool stack growth signal storage is too small");
+        }
+#endif
+    }
 #if SC_PLATFORM_APPLE
     if (not options.affinityMasks.empty())
     {
@@ -2334,6 +2361,7 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
         scheduler.workerPool = this;
     }
 
+    Span<char> stackGrowthSignalStackStorage = options.stackGrowthSignalStackStorage;
     for (size_t idx = 0; idx < threads.sizeInElements(); ++idx)
     {
         FiberWorker& worker = workers[idx];
@@ -2350,10 +2378,20 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
 
         FiberWorkerThread& thread = threads[idx];
         SC_FIBERS_ASSERT_RELEASE(not thread.started);
-        thread.pool         = this;
-        thread.workerIndex  = idx;
-        thread.affinityMask = options.affinityMasks.empty() ? 0 : options.affinityMasks[idx];
-        thread.priority     = static_cast<uint8_t>(options.threadPriority);
+        thread.pool               = this;
+        thread.workerIndex        = idx;
+        thread.affinityMask       = options.affinityMasks.empty() ? 0 : options.affinityMasks[idx];
+        thread.priority           = static_cast<uint8_t>(options.threadPriority);
+        thread.stackGrowthRuntime = options.stackGrowthRuntime;
+#if SC_PLATFORM_WINDOWS
+        thread.stackGrowthSignalStackStorage = {};
+#else
+        thread.stackGrowthSignalStackStorage =
+            options.stackGrowthRuntime == nullptr
+                ? Span<char>{}
+                : Span<char>{stackGrowthSignalStackStorage.data() + idx * FiberStackGrowthSignalStackSize,
+                             FiberStackGrowthSignalStackSize};
+#endif
     }
 
     {
@@ -2396,10 +2434,12 @@ Result FiberWorkerPool::join()
             firstError = result;
             hasError   = true;
         }
-        thread.pool         = nullptr;
-        thread.workerIndex  = 0;
-        thread.affinityMask = 0;
-        thread.priority     = 0;
+        thread.pool                          = nullptr;
+        thread.workerIndex                   = 0;
+        thread.affinityMask                  = 0;
+        thread.priority                      = 0;
+        thread.stackGrowthRuntime            = nullptr;
+        thread.stackGrowthSignalStackStorage = {};
     }
 
     for (FiberWorker& worker : workers)

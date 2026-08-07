@@ -511,6 +511,10 @@ struct SC_FIBERS_EXPORT FiberWorkerThread
     Result           threadResult = Result(true);
     bool             started      = false;
 
+    FiberStackGrowthRuntime* stackGrowthRuntime = nullptr;
+    FiberStackGrowthThread   stackGrowthThread;
+    Span<char>               stackGrowthSignalStackStorage;
+
     Result startThread();
     Result joinThread();
     Result runThreadEntry();
@@ -534,6 +538,10 @@ struct SC_FIBERS_EXPORT FiberWorkerPoolOptions
     size_t                    idleSpinAttempts       = 32;
     Span<const uint64_t>      affinityMasks;
     FiberWorkerThreadPriority threadPriority = FiberWorkerThreadPriority::Default;
+    //! Optional process owner enabling future incremental stacks on every worker.
+    FiberStackGrowthRuntime* stackGrowthRuntime = nullptr;
+    //! POSIX requires at least workerCount * FiberStackGrowthSignalStackSize bytes; Windows ignores this span.
+    Span<char> stackGrowthSignalStackStorage;
 };
 
 struct SC_FIBERS_EXPORT FiberWorkerDiagnostics

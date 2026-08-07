@@ -4380,6 +4380,41 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(not workerPool.isRunning());
             SC_TEST_EXPECT(allocator.close());
 
+            if (FiberStackGrowthRuntime::isSupported())
+            {
+                FiberStackGrowthRuntime growthRuntime;
+                SC_TEST_EXPECT(growthRuntime.create());
+
+                FiberWorkerPoolOptions growthOptions;
+                growthOptions.stackGrowthRuntime = &growthRuntime;
+#if !SC_PLATFORM_WINDOWS
+                char growthSignalStacks[NumWorkers * FiberStackGrowthSignalStackSize] = {};
+                growthOptions.stackGrowthSignalStackStorage                           = growthSignalStacks;
+
+                FiberWorkerPoolOptions insufficientGrowthOptions        = growthOptions;
+                insufficientGrowthOptions.stackGrowthSignalStackStorage = {growthSignalStacks,
+                                                                           sizeof(growthSignalStacks) - 1};
+                SC_TEST_EXPECT(not workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers},
+                                                    insufficientGrowthOptions));
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+                for (FiberWorkerThread& thread : threads)
+                {
+                    SC_TEST_EXPECT(not thread.wasStarted());
+                }
+#endif
+
+                SC_TEST_EXPECT(
+                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, growthOptions));
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+                SC_TEST_EXPECT(
+                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, growthOptions));
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+                SC_TEST_EXPECT(growthRuntime.close());
+            }
+
             uint64_t               mismatchedAffinityMasks[1] = {1};
             FiberWorkerPoolOptions badAffinityOptions;
             FiberWorkerThread      affinityThreads[NumWorkers];
