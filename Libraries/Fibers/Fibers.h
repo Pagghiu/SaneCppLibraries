@@ -219,34 +219,48 @@ struct SC_FIBERS_EXPORT FiberVirtualStackOptions
 
 struct FiberStackClassDefinition
 {
-    static constexpr int    Windows   = 176;
-    static constexpr int    Apple     = 176;
-    static constexpr int    Linux     = 176;
-    static constexpr int    Default   = 176;
+    static constexpr int    Windows   = 224;
+    static constexpr int    Apple     = 224;
+    static constexpr int    Linux     = 224;
+    static constexpr int    Default   = 224;
     static constexpr size_t Alignment = alignof(void*);
 
     using Object = FiberStackClassInternal;
 };
 using FiberStackClassOpaque = OpaqueObject<FiberStackClassDefinition>;
 
+enum class FiberStackCommitMode : uint8_t
+{
+    Full,
+    Incremental,
+};
+
 struct SC_FIBERS_EXPORT FiberStackClassOptions
 {
     size_t stackSizeInBytes = FiberStackSize::SixtyFourKiB;
     size_t maxStacks        = 0;
     bool   guardPage        = true;
+
+    FiberStackCommitMode commitMode = FiberStackCommitMode::Full;
+    size_t initialCommitSizeInBytes = 0;
+    size_t growthCommitSizeInBytes  = 0;
 };
 
 struct SC_FIBERS_EXPORT FiberStackClassDiagnostics
 {
-    size_t capacity           = 0;
-    size_t activeStacks       = 0;
-    size_t peakActiveStacks   = 0;
-    size_t stackSizeInBytes   = 0;
-    size_t guardSizeInBytes   = 0;
-    size_t reservedSizeBytes  = 0;
-    size_t committedSizeBytes = 0;
-    size_t peakCommittedBytes = 0;
-    size_t highWaterUsedBytes = 0;
+    size_t capacity                 = 0;
+    size_t activeStacks             = 0;
+    size_t peakActiveStacks         = 0;
+    size_t stackSizeInBytes         = 0;
+    size_t guardSizeInBytes         = 0;
+    size_t reservedSizeBytes        = 0;
+    size_t committedSizeBytes       = 0;
+    size_t peakCommittedBytes       = 0;
+    size_t highWaterUsedBytes       = 0;
+    size_t initialCommitSizeInBytes = 0;
+    size_t growthCommitSizeInBytes  = 0;
+
+    FiberStackCommitMode commitMode = FiberStackCommitMode::Full;
 };
 
 //! Virtual-memory-backed fixed-size stack slots with caller-controlled capacity.

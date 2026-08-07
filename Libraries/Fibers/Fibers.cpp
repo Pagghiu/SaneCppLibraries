@@ -1023,8 +1023,9 @@ struct FiberAvailabilityQueue
 struct FiberStackClassInternal
 {
     FiberVirtualMemory virtualMemory;
-    uint8_t*           stackStates   = nullptr;
-    size_t*            freeStackNext = nullptr;
+    uint8_t*           stackStates         = nullptr;
+    size_t*            freeStackNext       = nullptr;
+    size_t*            stackCommittedSizes = nullptr;
 
     FiberAvailabilityQueue availabilityQueue;
     FiberTaskPool*         boundPool = nullptr;
@@ -1040,7 +1041,11 @@ struct FiberStackClassInternal
     size_t committedStackBytes = 0;
     size_t peakCommittedBytes  = 0;
     size_t peakHighWaterBytes  = 0;
-    bool   highWaterAvailable  = false;
+    size_t initialCommitBytes  = 0;
+    size_t growthCommitBytes   = 0;
+
+    FiberStackCommitMode commitMode         = FiberStackCommitMode::Full;
+    bool                 highWaterAvailable = false;
 
     ~FiberStackClassInternal() { release(); }
 
@@ -1059,9 +1064,48 @@ struct FiberStackClassInternal
             return Result::Error("FiberStackClass max stacks is zero");
         }
 
-        const size_t freeStackOffset = alignSize(options.maxStacks, alignof(size_t));
-        metadataBytes   = FiberVirtualMemory::roundUpToPageSize(freeStackOffset + options.maxStacks * sizeof(size_t));
-        stackBytes      = FiberVirtualMemory::roundUpToPageSize(options.stackSizeInBytes);
+        stackBytes = FiberVirtualMemory::roundUpToPageSize(options.stackSizeInBytes);
+        if (options.commitMode == FiberStackCommitMode::Incremental)
+        {
+            if (not FiberStackGrowthRuntime::isSupported())
+            {
+                resetMetadata();
+                return Result::Error("Incremental FiberStackClass is unavailable under the active tooling");
+            }
+            if (options.initialCommitSizeInBytes == 0 or options.growthCommitSizeInBytes == 0)
+            {
+                resetMetadata();
+                return Result::Error("Incremental FiberStackClass commit sizes must be non-zero");
+            }
+            initialCommitBytes = FiberVirtualMemory::roundUpToPageSize(options.initialCommitSizeInBytes);
+            growthCommitBytes  = FiberVirtualMemory::roundUpToPageSize(options.growthCommitSizeInBytes);
+            if (initialCommitBytes > stackBytes or growthCommitBytes > stackBytes)
+            {
+                resetMetadata();
+                return Result::Error("Incremental FiberStackClass commit sizes exceed the stack size");
+            }
+        }
+        else if (options.commitMode == FiberStackCommitMode::Full)
+        {
+            if (options.initialCommitSizeInBytes != 0 or options.growthCommitSizeInBytes != 0)
+            {
+                resetMetadata();
+                return Result::Error("Full FiberStackClass does not accept incremental commit sizes");
+            }
+            initialCommitBytes = stackBytes;
+            growthCommitBytes  = stackBytes;
+        }
+        else
+        {
+            resetMetadata();
+            return Result::Error("FiberStackClass commit mode is invalid");
+        }
+        commitMode = options.commitMode;
+
+        const size_t freeStackOffset      = alignSize(options.maxStacks, alignof(size_t));
+        const size_t committedStackOffset = freeStackOffset + options.maxStacks * sizeof(size_t);
+        metadataBytes =
+            FiberVirtualMemory::roundUpToPageSize(committedStackOffset + options.maxStacks * sizeof(size_t));
         guardBytes      = options.guardPage ? FiberVirtualMemory::getPageSize() : 0;
         slotStrideBytes = guardBytes + stackBytes;
         maxStacks       = options.maxStacks;
@@ -1082,11 +1126,14 @@ struct FiberStackClassInternal
 
         stackStates   = static_cast<uint8_t*>(virtualMemory.data());
         freeStackNext = reinterpret_cast<size_t*>(static_cast<char*>(virtualMemory.data()) + freeStackOffset);
+        stackCommittedSizes =
+            reinterpret_cast<size_t*>(static_cast<char*>(virtualMemory.data()) + committedStackOffset);
         nextFreeStack = 0;
         for (size_t idx = 0; idx < maxStacks; ++idx)
         {
-            stackStates[idx]   = 0;
-            freeStackNext[idx] = idx + 1 < maxStacks ? idx + 1 : maxStacks;
+            stackStates[idx]         = 0;
+            freeStackNext[idx]       = idx + 1 < maxStacks ? idx + 1 : maxStacks;
+            stackCommittedSizes[idx] = 0;
         }
         return Result(true);
     }
@@ -1105,9 +1152,11 @@ struct FiberStackClassInternal
             return Result::Error("FiberStackClass has no available stack");
         }
 
-        const size_t index  = nextFreeStack;
-        nextFreeStack       = freeStackNext[index];
-        Result commitResult = fiberCommitReadWrite(slotMemory(index).data(), stackBytes);
+        const size_t index     = nextFreeStack;
+        nextFreeStack          = freeStackNext[index];
+        Span<char> stackMemory = slotMemory(index);
+        Result     commitResult =
+            fiberCommitReadWrite(stackMemory.data() + stackBytes - initialCommitBytes, initialCommitBytes);
         if (not commitResult)
         {
             freeStackNext[index] = nextFreeStack;
@@ -1115,18 +1164,19 @@ struct FiberStackClassInternal
             fiberSchedulerUnlock(availabilityQueue.lock);
             return commitResult;
         }
-        stackStates[index] = 1;
+        stackStates[index]         = 1;
+        stackCommittedSizes[index] = initialCommitBytes;
         activeStacks += 1;
-        committedStackBytes += stackBytes;
+        committedStackBytes += initialCommitBytes;
         if (activeStacks > peakActiveStacks)
         {
             peakActiveStacks = activeStacks;
         }
         updatePeakCommittedBytes();
-        outStack = FiberStack(slotMemory(index));
+        outStack = FiberStack(stackMemory);
         if (highWaterAvailable)
         {
-            outStack.fillHighWaterMark();
+            committedMemory(index).fillHighWaterMark();
         }
         fiberSchedulerUnlock(availabilityQueue.lock);
         return Result(true);
@@ -1149,9 +1199,11 @@ struct FiberStackClassInternal
         stackStates[index] = 0;
         if (highWaterAvailable)
         {
-            updatePeakHighWater(FiberStack(slotMemory(index)).highWaterUsedBytes());
+            updatePeakHighWater(committedMemory(index).highWaterUsedBytes());
         }
-        Result decommitResult = fiberDecommitNoAccess(slotMemory(index).data(), stackBytes);
+        const size_t committedBytes = stackCommittedSizes[index];
+        Result       decommitResult =
+            fiberDecommitNoAccess(slotMemory(index).data() + stackBytes - committedBytes, committedBytes);
         if (not decommitResult)
         {
             stackStates[index] = 1;
@@ -1160,11 +1212,12 @@ struct FiberStackClassInternal
         }
         SC_FIBERS_ASSERT_RELEASE(activeStacks > 0);
         activeStacks -= 1;
-        SC_FIBERS_ASSERT_RELEASE(committedStackBytes >= stackBytes);
-        committedStackBytes -= stackBytes;
-        freeStackNext[index] = nextFreeStack;
-        nextFreeStack        = index;
-        stack                = FiberStack({});
+        SC_FIBERS_ASSERT_RELEASE(committedStackBytes >= committedBytes);
+        committedStackBytes -= committedBytes;
+        stackCommittedSizes[index] = 0;
+        freeStackNext[index]       = nextFreeStack;
+        nextFreeStack              = index;
+        stack                      = FiberStack({});
         fiberSchedulerUnlock(availabilityQueue.lock);
         return availabilityQueue.notifyOneIfAvailable(hasAvailableSlot, this);
     }
@@ -1225,15 +1278,18 @@ struct FiberStackClassInternal
     void diagnostics(FiberStackClassDiagnostics& outDiagnostics) const
     {
         fiberSchedulerLock(availabilityQueue.lock);
-        outDiagnostics.capacity           = maxStacks;
-        outDiagnostics.activeStacks       = activeStacks;
-        outDiagnostics.peakActiveStacks   = peakActiveStacks;
-        outDiagnostics.stackSizeInBytes   = stackBytes;
-        outDiagnostics.guardSizeInBytes   = guardBytes;
-        outDiagnostics.reservedSizeBytes  = virtualMemory.capacity();
-        outDiagnostics.committedSizeBytes = metadataBytes + committedStackBytes;
-        outDiagnostics.peakCommittedBytes = peakCommittedBytes;
-        outDiagnostics.highWaterUsedBytes = highWaterAvailable ? highWaterUsedBytes() : 0;
+        outDiagnostics.capacity                 = maxStacks;
+        outDiagnostics.activeStacks             = activeStacks;
+        outDiagnostics.peakActiveStacks         = peakActiveStacks;
+        outDiagnostics.stackSizeInBytes         = stackBytes;
+        outDiagnostics.guardSizeInBytes         = guardBytes;
+        outDiagnostics.reservedSizeBytes        = virtualMemory.capacity();
+        outDiagnostics.committedSizeBytes       = metadataBytes + committedStackBytes;
+        outDiagnostics.peakCommittedBytes       = peakCommittedBytes;
+        outDiagnostics.highWaterUsedBytes       = highWaterAvailable ? highWaterUsedBytes() : 0;
+        outDiagnostics.commitMode               = commitMode;
+        outDiagnostics.initialCommitSizeInBytes = initialCommitBytes;
+        outDiagnostics.growthCommitSizeInBytes  = growthCommitBytes;
         fiberSchedulerUnlock(availabilityQueue.lock);
     }
 
@@ -1248,6 +1304,13 @@ struct FiberStackClassInternal
     bool owns(const FiberStack& stack) const { return indexOf(stack) < maxStacks; }
 
     Span<char> slotMemory(size_t index) const { return {static_cast<char*>(slotBase(index)) + guardBytes, stackBytes}; }
+
+    FiberStack committedMemory(size_t index) const
+    {
+        Span<char>   memory         = slotMemory(index);
+        const size_t committedBytes = stackCommittedSizes[index];
+        return FiberStack({memory.data() + stackBytes - committedBytes, committedBytes});
+    }
 
     void* slotBase(size_t index) const
     {
@@ -1288,7 +1351,7 @@ struct FiberStackClassInternal
             {
                 continue;
             }
-            const size_t usedBytes = FiberStack(slotMemory(idx)).highWaterUsedBytes();
+            const size_t usedBytes = committedMemory(idx).highWaterUsedBytes();
             if (usedBytes > highWater)
             {
                 highWater = usedBytes;
@@ -1322,6 +1385,7 @@ struct FiberStackClassInternal
     {
         stackStates         = nullptr;
         freeStackNext       = nullptr;
+        stackCommittedSizes = nullptr;
         metadataBytes       = 0;
         stackBytes          = 0;
         guardBytes          = 0;
@@ -1333,6 +1397,9 @@ struct FiberStackClassInternal
         committedStackBytes = 0;
         peakCommittedBytes  = 0;
         peakHighWaterBytes  = 0;
+        initialCommitBytes  = 0;
+        growthCommitBytes   = 0;
+        commitMode          = FiberStackCommitMode::Full;
         highWaterAvailable  = false;
         boundPool           = nullptr;
     }

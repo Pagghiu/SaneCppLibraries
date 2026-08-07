@@ -7732,6 +7732,54 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(stackClass.release(reusedStack));
         stackClass.release();
         SC_TEST_EXPECT(not stackClass.isReserved());
+
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+        FiberStackClassOptions incrementalOptions;
+        incrementalOptions.stackSizeInBytes         = FiberStackSize::ThirtyTwoKiB;
+        incrementalOptions.maxStacks                = 2;
+        incrementalOptions.guardPage                = true;
+        incrementalOptions.commitMode               = FiberStackCommitMode::Incremental;
+        incrementalOptions.initialCommitSizeInBytes = FiberStackSize::FourKiB;
+        incrementalOptions.growthCommitSizeInBytes  = FiberStackSize::FourKiB;
+
+        FiberStackClass        incrementalClass;
+        FiberStackClassOptions invalidIncrementalOptions   = incrementalOptions;
+        invalidIncrementalOptions.initialCommitSizeInBytes = 0;
+        SC_TEST_EXPECT(not incrementalClass.reserve(invalidIncrementalOptions));
+        invalidIncrementalOptions                         = incrementalOptions;
+        invalidIncrementalOptions.growthCommitSizeInBytes = incrementalOptions.stackSizeInBytes * 2;
+        SC_TEST_EXPECT(not incrementalClass.reserve(invalidIncrementalOptions));
+        SC_TEST_EXPECT(incrementalClass.reserve(incrementalOptions));
+
+        incrementalClass.diagnostics(diagnostics);
+        const size_t incrementalMetadataBytes = diagnostics.committedSizeBytes;
+        SC_TEST_EXPECT(diagnostics.commitMode == FiberStackCommitMode::Incremental);
+        SC_TEST_EXPECT(diagnostics.initialCommitSizeInBytes >= FiberStackSize::FourKiB);
+        SC_TEST_EXPECT(diagnostics.initialCommitSizeInBytes <= diagnostics.stackSizeInBytes);
+        SC_TEST_EXPECT(diagnostics.growthCommitSizeInBytes >= FiberStackSize::FourKiB);
+        SC_TEST_EXPECT(diagnostics.growthCommitSizeInBytes <= diagnostics.stackSizeInBytes);
+
+        FiberStack incrementalFirst({});
+        FiberStack incrementalSecond({});
+        SC_TEST_EXPECT(incrementalClass.acquire(incrementalFirst));
+        incrementalClass.diagnostics(diagnostics);
+        SC_TEST_EXPECT(diagnostics.committedSizeBytes ==
+                       incrementalMetadataBytes + diagnostics.initialCommitSizeInBytes);
+        SC_TEST_EXPECT(incrementalClass.acquire(incrementalSecond));
+        incrementalClass.diagnostics(diagnostics);
+        SC_TEST_EXPECT(diagnostics.committedSizeBytes ==
+                       incrementalMetadataBytes + 2 * diagnostics.initialCommitSizeInBytes);
+        SC_TEST_EXPECT(incrementalClass.release(incrementalFirst));
+        SC_TEST_EXPECT(incrementalClass.release(incrementalSecond));
+        incrementalClass.diagnostics(diagnostics);
+        SC_TEST_EXPECT(diagnostics.committedSizeBytes == incrementalMetadataBytes);
+        SC_TEST_EXPECT(diagnostics.peakCommittedBytes ==
+                       incrementalMetadataBytes + 2 * diagnostics.initialCommitSizeInBytes);
+        incrementalClass.release();
     }
 
     void fiberEvent()

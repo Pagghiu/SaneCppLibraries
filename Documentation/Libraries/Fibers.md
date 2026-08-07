@@ -298,9 +298,16 @@ reducing a production stack class, and retain enough margin for platform and bui
 
 # Incremental Stack Lifecycle
 
-Incrementally committed stack classes are not active yet: current `FiberStackClass` slots still commit their complete
-usable stack. The draft API already exposes the explicit lifecycle that future incremental classes will require, so
-applications do not acquire hidden process or thread state as a side effect of creating a stack.
+Full commitment remains the `FiberStackClass` default. Opt-in `FiberStackCommitMode::Incremental` classes take explicit
+non-zero `initialCommitSizeInBytes` and `growthCommitSizeInBytes`; both are page-rounded, bounded by the usable stack,
+and exposed through `FiberStackClassDiagnostics`. Acquisition commits only the initial high end of the downward-growing
+stack, release decommits its actual committed interval, and committed-byte diagnostics include metadata plus active
+slot commitment rather than virtual reservation.
+
+@warning
+Scheduler fault publication for incremental slots is the next Draft integration slice. Until that lands, incremental
+classes are available for reservation, acquisition, release, capacity, and diagnostic validation but must not be used
+to execute a `FiberTask`. Full-commit classes remain production-compatible throughout this staged implementation.
 
 One `FiberStackGrowthRuntime` owns the process-wide fault-handler integration. Every OS thread that may execute an
 incremental stack will register one thread-affine `FiberStackGrowthThread`. On POSIX, registration requires at least
