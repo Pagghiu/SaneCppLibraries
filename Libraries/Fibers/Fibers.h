@@ -66,6 +66,10 @@ struct FiberStackClass;
 struct FiberStackClassDiagnostics;
 struct FiberStackClassInternal;
 struct FiberStackClassOptions;
+struct FiberStackGrowthRuntime;
+struct FiberStackGrowthRuntimeInternal;
+struct FiberStackGrowthThread;
+struct FiberStackGrowthThreadInternal;
 struct FiberSchedulerDiagnostics;
 struct FiberTraceEvent;
 struct FiberTraceHooks;
@@ -89,6 +93,8 @@ static constexpr int FiberContextStorageSize = 128;
 static constexpr int FiberContextStorageAlignment = 16;
 static constexpr int FiberStackAlignment          = 16;
 static constexpr int FiberStackMinimumSize        = 4096;
+//! Recommended caller-owned alternate signal-stack capacity for one incremental-stack worker thread.
+static constexpr int FiberStackGrowthSignalStackSize = 128 * 1024;
 //! Fixed allocator cost of each configured bounded injection slot.
 static constexpr int FiberInjectionSlotStorageSize = sizeof(void*) + sizeof(size_t);
 
@@ -100,6 +106,72 @@ struct SC_FIBERS_EXPORT FiberStackSize
     static constexpr size_t EightKiB     = 8 * 1024;
     static constexpr size_t ThirtyTwoKiB = 32 * 1024;
     static constexpr size_t SixtyFourKiB = 64 * 1024;
+};
+
+struct FiberStackGrowthRuntimeDefinition
+{
+    static constexpr int    Windows   = 64;
+    static constexpr int    Apple     = 128;
+    static constexpr int    Linux     = 384;
+    static constexpr int    Default   = Linux;
+    static constexpr size_t Alignment = alignof(void*);
+
+    using Object = FiberStackGrowthRuntimeInternal;
+};
+using FiberStackGrowthRuntimeOpaque = OpaqueObject<FiberStackGrowthRuntimeDefinition>;
+
+//! Explicit owner of process integration required by incrementally committed fiber stacks.
+struct SC_FIBERS_EXPORT FiberStackGrowthRuntime
+{
+    FiberStackGrowthRuntime();
+    ~FiberStackGrowthRuntime();
+
+    FiberStackGrowthRuntime(const FiberStackGrowthRuntime&)            = delete;
+    FiberStackGrowthRuntime& operator=(const FiberStackGrowthRuntime&) = delete;
+
+    [[nodiscard]] Result create();
+    [[nodiscard]] Result close();
+
+    [[nodiscard]] static bool isSupported();
+    [[nodiscard]] bool        isOpen() const;
+    [[nodiscard]] size_t      registeredThreadCount() const;
+
+  private:
+    friend struct FiberStackGrowthThread;
+    friend struct FiberStackGrowthThreadInternal;
+
+    FiberStackGrowthRuntimeOpaque internal;
+};
+
+struct FiberStackGrowthThreadDefinition
+{
+    static constexpr int    Windows   = 64;
+    static constexpr int    Apple     = 128;
+    static constexpr int    Linux     = 128;
+    static constexpr int    Default   = Linux;
+    static constexpr size_t Alignment = alignof(void*);
+
+    using Object = FiberStackGrowthThreadInternal;
+};
+using FiberStackGrowthThreadOpaque = OpaqueObject<FiberStackGrowthThreadDefinition>;
+
+//! Thread-affine registration for one thread that may execute incrementally committed fiber stacks.
+struct SC_FIBERS_EXPORT FiberStackGrowthThread
+{
+    FiberStackGrowthThread();
+    ~FiberStackGrowthThread();
+
+    FiberStackGrowthThread(const FiberStackGrowthThread&)            = delete;
+    FiberStackGrowthThread& operator=(const FiberStackGrowthThread&) = delete;
+
+    //! POSIX requires caller-owned alternate signal-stack storage; Windows accepts an empty span.
+    [[nodiscard]] Result create(FiberStackGrowthRuntime& runtime, Span<char> signalStackStorage);
+    [[nodiscard]] Result close();
+
+    [[nodiscard]] bool isOpen() const;
+
+  private:
+    FiberStackGrowthThreadOpaque internal;
 };
 
 //! Caller-owned stack storage used by fiber contexts.

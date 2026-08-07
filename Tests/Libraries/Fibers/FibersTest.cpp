@@ -298,6 +298,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             virtualStack();
         }
+        if (test_section("stack growth lifecycle"))
+        {
+            stackGrowthLifecycle();
+        }
         if (test_section("stack class"))
         {
             stackClass();
@@ -7515,6 +7519,59 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(poolStackUsed > 0);
         SC_TEST_EXPECT(poolStackFree < pool.stackSizeInBytes());
         SC_TEST_EXPECT(not pool.stackHighWaterUsedBytes(1, poolStackUsed));
+    }
+
+    void stackGrowthLifecycle()
+    {
+        FiberStackGrowthRuntime runtime;
+        FiberStackGrowthRuntime competingRuntime;
+        FiberStackGrowthThread  growthThread;
+
+        SC_TEST_EXPECT(not runtime.isOpen());
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            SC_TEST_EXPECT(not runtime.create());
+            return;
+        }
+        SC_TEST_EXPECT(runtime.create());
+        SC_TEST_EXPECT(runtime.isOpen());
+        SC_TEST_EXPECT(runtime.registeredThreadCount() == 0);
+        SC_TEST_EXPECT(not competingRuntime.create());
+
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(growthThread.create(runtime, {}));
+#else
+        char signalStack[FiberStackGrowthSignalStackSize] = {};
+        char insufficientSignalStack[4096]                = {};
+        SC_TEST_EXPECT(not growthThread.create(runtime, insufficientSignalStack));
+        SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
+#endif
+        SC_TEST_EXPECT(growthThread.isOpen());
+        SC_TEST_EXPECT(runtime.registeredThreadCount() == 1);
+        SC_TEST_EXPECT(not runtime.close());
+
+        Atomic<bool> foreignCloseRejected;
+        Thread       foreignThread;
+        SC_TEST_EXPECT(foreignThread.start([&growthThread, &foreignCloseRejected](Thread&)
+                                           { foreignCloseRejected.store(not growthThread.close()); }));
+        SC_TEST_EXPECT(foreignThread.join());
+        SC_TEST_EXPECT(foreignCloseRejected.load());
+        SC_TEST_EXPECT(growthThread.isOpen());
+
+        SC_TEST_EXPECT(growthThread.close());
+        SC_TEST_EXPECT(not growthThread.isOpen());
+        SC_TEST_EXPECT(runtime.registeredThreadCount() == 0);
+        SC_TEST_EXPECT(runtime.close());
+        SC_TEST_EXPECT(not runtime.isOpen());
+
+        SC_TEST_EXPECT(runtime.create());
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(growthThread.create(runtime, {}));
+#else
+        SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
+#endif
+        SC_TEST_EXPECT(growthThread.close());
+        SC_TEST_EXPECT(runtime.close());
     }
 
     void virtualStack()

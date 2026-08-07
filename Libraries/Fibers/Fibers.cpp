@@ -7,6 +7,7 @@
 
 #include "Internal/FiberContext.h"
 #include <stdlib.h>
+#include <string.h>
 
 #if SC_PLATFORM_WINDOWS
 #include <windows.h>
@@ -19,10 +20,15 @@ extern "C"
 #endif
 #else
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #if SC_PLATFORM_LINUX
 #include <sched.h>
+#elif SC_PLATFORM_APPLE
+#include <sys/proc.h>
+#include <sys/sysctl.h>
 #endif
+#include <signal.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
@@ -311,6 +317,380 @@ static Result fiberDecommitNoAccess(void* memory, size_t size)
 }
 
 } // namespace
+
+struct FiberStackGrowthRuntimeInternal;
+struct FiberStackGrowthThreadInternal;
+
+static volatile int32_t                             fiberStackGrowthLifecycleLock = 0;
+static FiberStackGrowthRuntimeInternal*             fiberStackGrowthRuntime       = nullptr;
+static thread_local FiberStackGrowthThreadInternal* fiberStackGrowthThread        = nullptr;
+
+static FiberStackGrowthRuntimeInternal* fiberStackGrowthRuntimeLoad()
+{
+#if SC_PLATFORM_WINDOWS
+    return fiberStackGrowthRuntime;
+#else
+    return __atomic_load_n(&fiberStackGrowthRuntime, __ATOMIC_ACQUIRE);
+#endif
+}
+
+static void fiberStackGrowthRuntimeStore(FiberStackGrowthRuntimeInternal* runtime)
+{
+#if SC_PLATFORM_WINDOWS
+    fiberStackGrowthRuntime = runtime;
+#else
+    __atomic_store_n(&fiberStackGrowthRuntime, runtime, __ATOMIC_RELEASE);
+#endif
+}
+
+static void fiberStackGrowthLock()
+{
+#if SC_PLATFORM_WINDOWS
+    while (InterlockedCompareExchange(reinterpret_cast<volatile long*>(&fiberStackGrowthLifecycleLock), 1, 0) != 0) {}
+#else
+    int32_t expected = 0;
+    while (not __atomic_compare_exchange_n(&fiberStackGrowthLifecycleLock, &expected, 1, false, __ATOMIC_ACQUIRE,
+                                           __ATOMIC_RELAXED))
+    {
+        expected = 0;
+    }
+#endif
+}
+
+static void fiberStackGrowthUnlock()
+{
+#if SC_PLATFORM_WINDOWS
+    InterlockedExchange(reinterpret_cast<volatile long*>(&fiberStackGrowthLifecycleLock), 0);
+#else
+    __atomic_store_n(&fiberStackGrowthLifecycleLock, 0, __ATOMIC_RELEASE);
+#endif
+}
+
+#if !SC_FIBERS_HAS_ADDRESS_SANITIZER
+static bool fiberStackGrowthDebuggerAttached()
+{
+#if SC_PLATFORM_WINDOWS
+    return IsDebuggerPresent() != FALSE;
+#elif SC_PLATFORM_APPLE
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+
+    struct kinfo_proc processInformation = {};
+    size_t            informationSize    = sizeof(processInformation);
+    return sysctl(mib, 4, &processInformation, &informationSize, nullptr, 0) == 0 and
+           (processInformation.kp_proc.p_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_LINUX
+    const int statusFile = open("/proc/self/status", O_RDONLY);
+    if (statusFile < 0)
+    {
+        return false;
+    }
+
+    char          status[4096];
+    const ssize_t statusLength = read(statusFile, status, sizeof(status));
+    close(statusFile);
+    if (statusLength <= 0)
+    {
+        return false;
+    }
+
+    static constexpr char TracerPrefix[] = "TracerPid:";
+    for (size_t index = 0; index + sizeof(TracerPrefix) - 1 < static_cast<size_t>(statusLength); ++index)
+    {
+        if (memcmp(status + index, TracerPrefix, sizeof(TracerPrefix) - 1) != 0)
+        {
+            continue;
+        }
+        index += sizeof(TracerPrefix) - 1;
+        while (index < static_cast<size_t>(statusLength) and (status[index] == ' ' or status[index] == '\t'))
+        {
+            index += 1;
+        }
+        return index < static_cast<size_t>(statusLength) and status[index] >= '1' and status[index] <= '9';
+    }
+    return false;
+#else
+    return false;
+#endif
+}
+#endif
+
+#if !SC_PLATFORM_WINDOWS
+static void fiberStackGrowthSignalHandler(int signal, siginfo_t*, void*);
+
+static bool fiberStackGrowthSignalMatches(const struct sigaction& action)
+{
+    return (action.sa_flags & SA_SIGINFO) != 0 and action.sa_sigaction == fiberStackGrowthSignalHandler;
+}
+#endif
+
+struct FiberStackGrowthRuntimeInternal
+{
+#if !SC_PLATFORM_WINDOWS
+    struct sigaction previousSegmentationAction = {};
+    struct sigaction previousBusAction          = {};
+#endif
+    size_t registeredThreads = 0;
+    bool   open              = false;
+
+    ~FiberStackGrowthRuntimeInternal() { SC_FIBERS_ASSERT_RELEASE(not open); }
+
+    Result create()
+    {
+        if (open)
+        {
+            return Result::Error("FiberStackGrowthRuntime is already open");
+        }
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return Result::Error("Fiber stack growth is unavailable under the active tooling");
+        }
+
+        fiberStackGrowthLock();
+        if (fiberStackGrowthRuntimeLoad() != nullptr)
+        {
+            fiberStackGrowthUnlock();
+            return Result::Error("Another FiberStackGrowthRuntime is already open");
+        }
+        fiberStackGrowthRuntimeStore(this);
+
+#if !SC_PLATFORM_WINDOWS
+        struct sigaction action = {};
+        action.sa_sigaction     = fiberStackGrowthSignalHandler;
+        action.sa_flags         = SA_SIGINFO | SA_ONSTACK;
+        sigemptyset(&action.sa_mask);
+        if (sigaction(SIGSEGV, &action, &previousSegmentationAction) != 0)
+        {
+            fiberStackGrowthRuntimeStore(nullptr);
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthRuntime could not install SIGSEGV handling");
+        }
+        if (sigaction(SIGBUS, &action, &previousBusAction) != 0)
+        {
+            SC_FIBERS_ASSERT_RELEASE(sigaction(SIGSEGV, &previousSegmentationAction, nullptr) == 0);
+            fiberStackGrowthRuntimeStore(nullptr);
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthRuntime could not install SIGBUS handling");
+        }
+#endif
+        registeredThreads = 0;
+        open              = true;
+        fiberStackGrowthUnlock();
+        return Result(true);
+    }
+
+    Result close()
+    {
+        if (not open)
+        {
+            return Result(true);
+        }
+
+        fiberStackGrowthLock();
+        if (registeredThreads != 0)
+        {
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthRuntime still has registered threads");
+        }
+#if !SC_PLATFORM_WINDOWS
+        struct sigaction currentSegmentationAction = {};
+        struct sigaction currentBusAction          = {};
+        if (sigaction(SIGSEGV, nullptr, &currentSegmentationAction) != 0 or
+            sigaction(SIGBUS, nullptr, &currentBusAction) != 0 or
+            not fiberStackGrowthSignalMatches(currentSegmentationAction) or
+            not fiberStackGrowthSignalMatches(currentBusAction))
+        {
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthRuntime no longer owns the process signal handlers");
+        }
+        if (sigaction(SIGBUS, &previousBusAction, nullptr) != 0 or
+            sigaction(SIGSEGV, &previousSegmentationAction, nullptr) != 0)
+        {
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthRuntime could not restore process signal handlers");
+        }
+#endif
+        SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthRuntimeLoad() == this);
+        fiberStackGrowthRuntimeStore(nullptr);
+        open = false;
+        fiberStackGrowthUnlock();
+        return Result(true);
+    }
+};
+
+struct FiberStackGrowthThreadInternal
+{
+    FiberStackGrowthRuntimeInternal* runtime = nullptr;
+#if SC_PLATFORM_WINDOWS
+    DWORD ownerThread = 0;
+#else
+    pthread_t ownerThread         = {};
+    stack_t   previousSignalStack = {};
+    void*     signalStackMemory   = nullptr;
+    size_t    signalStackSize     = 0;
+#endif
+    bool open = false;
+
+    ~FiberStackGrowthThreadInternal() { SC_FIBERS_ASSERT_RELEASE(not open); }
+
+    Result create(FiberStackGrowthRuntimeInternal& newRuntime, Span<char> signalStackStorage)
+    {
+        if (open)
+        {
+            return Result::Error("FiberStackGrowthThread is already open");
+        }
+        if (fiberStackGrowthThread != nullptr)
+        {
+            return Result::Error("This thread already has a FiberStackGrowthThread");
+        }
+#if !SC_PLATFORM_WINDOWS
+        if (signalStackStorage.sizeInBytes() < FiberStackGrowthSignalStackSize)
+        {
+            return Result::Error("FiberStackGrowthThread signal stack storage is too small");
+        }
+#else
+        (void)signalStackStorage;
+#endif
+
+        fiberStackGrowthLock();
+        if (not newRuntime.open or fiberStackGrowthRuntimeLoad() != &newRuntime)
+        {
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthRuntime is closing");
+        }
+        newRuntime.registeredThreads += 1;
+        fiberStackGrowthUnlock();
+
+#if SC_PLATFORM_WINDOWS
+        ownerThread = GetCurrentThreadId();
+#else
+        stack_t signalStack = {};
+        signalStack.ss_sp   = signalStackStorage.data();
+        signalStack.ss_size = signalStackStorage.sizeInBytes();
+        if (sigaltstack(&signalStack, &previousSignalStack) != 0)
+        {
+            fiberStackGrowthLock();
+            SC_FIBERS_ASSERT_RELEASE(newRuntime.registeredThreads > 0);
+            newRuntime.registeredThreads -= 1;
+            fiberStackGrowthUnlock();
+            return Result::Error("FiberStackGrowthThread could not install its signal stack");
+        }
+        ownerThread       = pthread_self();
+        signalStackMemory = signalStack.ss_sp;
+        signalStackSize   = signalStack.ss_size;
+#endif
+        runtime                = &newRuntime;
+        open                   = true;
+        fiberStackGrowthThread = this;
+        return Result(true);
+    }
+
+    Result close()
+    {
+        if (not open)
+        {
+            return Result(true);
+        }
+#if SC_PLATFORM_WINDOWS
+        if (ownerThread != GetCurrentThreadId())
+        {
+            return Result::Error("FiberStackGrowthThread must close on its owning thread");
+        }
+#else
+        if (not pthread_equal(ownerThread, pthread_self()))
+        {
+            return Result::Error("FiberStackGrowthThread must close on its owning thread");
+        }
+        stack_t currentSignalStack = {};
+        if (sigaltstack(nullptr, &currentSignalStack) != 0 or currentSignalStack.ss_sp != signalStackMemory or
+            currentSignalStack.ss_size != signalStackSize)
+        {
+            return Result::Error("FiberStackGrowthThread no longer owns this thread's signal stack");
+        }
+        stack_t signalStackToRestore = previousSignalStack;
+        if ((signalStackToRestore.ss_flags & SS_DISABLE) != 0)
+        {
+            signalStackToRestore.ss_size = FiberStackGrowthSignalStackSize;
+        }
+        if (sigaltstack(&signalStackToRestore, nullptr) != 0)
+        {
+            return Result::Error("FiberStackGrowthThread could not restore its previous signal stack");
+        }
+#endif
+        SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthThread == this);
+        fiberStackGrowthThread = nullptr;
+
+        fiberStackGrowthLock();
+        SC_FIBERS_ASSERT_RELEASE(runtime != nullptr and runtime->registeredThreads > 0);
+        runtime->registeredThreads -= 1;
+        fiberStackGrowthUnlock();
+
+        runtime = nullptr;
+        open    = false;
+#if SC_PLATFORM_WINDOWS
+        ownerThread = 0;
+#else
+        ownerThread         = {};
+        previousSignalStack = {};
+        signalStackMemory   = nullptr;
+        signalStackSize     = 0;
+#endif
+        return Result(true);
+    }
+};
+
+#if !SC_PLATFORM_WINDOWS
+static void fiberStackGrowthSignalHandler(int signal, siginfo_t*, void*)
+{
+    FiberStackGrowthRuntimeInternal* runtime = fiberStackGrowthRuntimeLoad();
+    if (runtime == nullptr)
+    {
+        _exit(128 + signal);
+    }
+
+    const struct sigaction& previous =
+        signal == SIGBUS ? runtime->previousBusAction : runtime->previousSegmentationAction;
+    struct sigaction forwarded = previous;
+    if (forwarded.sa_handler == SIG_IGN)
+    {
+        forwarded            = {};
+        forwarded.sa_handler = SIG_DFL;
+        sigemptyset(&forwarded.sa_mask);
+    }
+    if (sigaction(signal, &forwarded, nullptr) != 0)
+    {
+        _exit(128 + signal);
+    }
+}
+#endif
+
+static_assert(sizeof(FiberStackGrowthRuntimeInternal) <= FiberStackGrowthRuntimeDefinition::Default,
+              "Increase FiberStackGrowthRuntimeDefinition opaque storage size");
+static_assert(sizeof(FiberStackGrowthThreadInternal) <= FiberStackGrowthThreadDefinition::Default,
+              "Increase FiberStackGrowthThreadDefinition opaque storage size");
+
+template <>
+void FiberStackGrowthRuntimeOpaque::construct(Handle& buffer)
+{
+    placementNew(buffer.reinterpret_as<Object>());
+}
+
+template <>
+void FiberStackGrowthRuntimeOpaque::destruct(Object& obj)
+{
+    obj.~Object();
+}
+
+template <>
+void FiberStackGrowthThreadOpaque::construct(Handle& buffer)
+{
+    placementNew(buffer.reinterpret_as<Object>());
+}
+
+template <>
+void FiberStackGrowthThreadOpaque::destruct(Object& obj)
+{
+    obj.~Object();
+}
 
 struct FiberVirtualStackInternal
 {
@@ -2431,6 +2811,46 @@ size_t FiberStack::highWaterUnusedBytes() const
     const size_t usedSize   = highWaterUsedBytes();
     return usedSize <= usableSize ? usableSize - usedSize : 0;
 }
+
+FiberStackGrowthRuntime::FiberStackGrowthRuntime() = default;
+
+FiberStackGrowthRuntime::~FiberStackGrowthRuntime() = default;
+
+Result FiberStackGrowthRuntime::create() { return internal.get().create(); }
+
+Result FiberStackGrowthRuntime::close() { return internal.get().close(); }
+
+bool FiberStackGrowthRuntime::isSupported()
+{
+#if SC_FIBERS_HAS_ADDRESS_SANITIZER
+    return false;
+#else
+    return not fiberStackGrowthDebuggerAttached();
+#endif
+}
+
+bool FiberStackGrowthRuntime::isOpen() const { return internal.get().open; }
+
+size_t FiberStackGrowthRuntime::registeredThreadCount() const
+{
+    fiberStackGrowthLock();
+    const size_t count = internal.get().registeredThreads;
+    fiberStackGrowthUnlock();
+    return count;
+}
+
+FiberStackGrowthThread::FiberStackGrowthThread() = default;
+
+FiberStackGrowthThread::~FiberStackGrowthThread() = default;
+
+Result FiberStackGrowthThread::create(FiberStackGrowthRuntime& runtime, Span<char> signalStackStorage)
+{
+    return internal.get().create(runtime.internal.get(), signalStackStorage);
+}
+
+Result FiberStackGrowthThread::close() { return internal.get().close(); }
+
+bool FiberStackGrowthThread::isOpen() const { return internal.get().open; }
 
 FiberVirtualStack::FiberVirtualStack() = default;
 

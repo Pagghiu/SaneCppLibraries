@@ -296,6 +296,41 @@ workloads, while 64 KiB remains the conservative default. Stack requirements inc
 temporaries, and any library work below a suspension point. Measure high-water use with `fillHighWaterMarks()` before
 reducing a production stack class, and retain enough margin for platform and build-mode variation.
 
+# Incremental Stack Lifecycle
+
+Incrementally committed stack classes are not active yet: current `FiberStackClass` slots still commit their complete
+usable stack. The draft API already exposes the explicit lifecycle that future incremental classes will require, so
+applications do not acquire hidden process or thread state as a side effect of creating a stack.
+
+One `FiberStackGrowthRuntime` owns the process-wide fault-handler integration. Every OS thread that may execute an
+incremental stack will register one thread-affine `FiberStackGrowthThread`. On POSIX, registration requires at least
+`FiberStackGrowthSignalStackSize` bytes of caller-owned alternate signal-stack storage; Windows accepts an empty span.
+The thread registration and its storage must remain alive until `close()` runs on that same OS thread.
+
+```cpp
+FiberStackGrowthRuntime growthRuntime;
+FiberStackGrowthThread  growthThread;
+
+SC_TRY(growthRuntime.create());
+
+#if SC_PLATFORM_WINDOWS
+SC_TRY(growthThread.create(growthRuntime, {}));
+#else
+char signalStack[FiberStackGrowthSignalStackSize] = {};
+SC_TRY(growthThread.create(growthRuntime, signalStack));
+#endif
+
+// Future incremental-stack work executes here.
+
+SC_TRY(growthThread.close());
+SC_TRY(growthRuntime.close());
+```
+
+The runtime rejects shutdown while threads remain registered, competing process owners, foreign-thread registration
+teardown, and replacement of a registered POSIX alternate signal stack. Creation is unavailable under AddressSanitizer
+or an attached debugger because those tools also own fault handling. Full stack commitment remains the compatible
+default, including under those tools.
+
 # Waiting, Coordination, and Cancellation
 
 Fiber primitives suspend the current fiber instead of blocking the OS thread:
