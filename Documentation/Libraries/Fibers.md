@@ -298,16 +298,28 @@ reducing a production stack class, and retain enough margin for platform and bui
 
 # Incremental Stack Lifecycle
 
+Incremental execution remains a Draft capability while its production scheduler and fault matrix is completed on every
+supported CPU/OS path. Keep full commitment in portable production configurations until that qualification is removed.
+
 Full commitment remains the `FiberStackClass` default. Opt-in `FiberStackCommitMode::Incremental` classes take explicit
 non-zero `initialCommitSizeInBytes` and `growthCommitSizeInBytes`; both are page-rounded, bounded by the usable stack,
 and exposed through `FiberStackClassDiagnostics`. Acquisition commits only the initial high end of the downward-growing
 stack, release decommits its actual committed interval, and committed-byte diagnostics include metadata plus active
 slot commitment rather than virtual reservation.
 
-@warning
-Scheduler fault publication for incremental slots is the next Draft integration slice. Until that lands, incremental
-classes are available for reservation, acquisition, release, capacity, and diagnostic validation but must not be used
-to execute a `FiberTask`. Full-commit classes remain production-compatible throughout this staged implementation.
+The scheduler publishes the active incremental slot in thread-local execution state immediately before entering it and
+clears that state immediately after returning to the worker root. A valid fault commits one bounded growth increment;
+yielding and migration republish the same slot on the resuming OS thread. Completion and cancellation release the
+slot's actual committed interval before it becomes reusable. On Windows, the first dispatch may commit one growth
+increment while preparing the native guard page, so diagnostics rather than the requested initial size remain the
+source of truth for physical commitment.
+
+High-water diagnostics remain exact for fully committed classes. They are conservative after an incremental stack has
+grown because a fault handler cannot safely overwrite the interrupted stack frame with high-water marks.
+
+The POSIX growth handler relies on the validated macOS and Linux signal-context behavior of page protection changes
+and lock-free native accounting. Incremental execution is therefore supported only on the CPU/OS paths explicitly
+qualified by the library rather than being implied by generic POSIX availability.
 
 One `FiberStackGrowthRuntime` owns the process-wide fault-handler integration. Every OS thread that may execute an
 incremental stack will register one thread-affine `FiberStackGrowthThread`. On POSIX, registration requires at least
@@ -327,7 +339,7 @@ char signalStack[FiberStackGrowthSignalStackSize] = {};
 SC_TRY(growthThread.create(growthRuntime, signalStack));
 #endif
 
-// Future incremental-stack work executes here.
+// Class-backed incremental tasks may execute while this registration is alive.
 
 SC_TRY(growthThread.close());
 SC_TRY(growthRuntime.close());
@@ -336,7 +348,11 @@ SC_TRY(growthRuntime.close());
 The runtime rejects shutdown while threads remain registered, competing process owners, foreign-thread registration
 teardown, and replacement of a registered POSIX alternate signal stack. Creation is unavailable under AddressSanitizer
 or an attached debugger because those tools also own fault handling. Full stack commitment remains the compatible
-default, including under those tools.
+default, including under those tools. Dispatching an incremental class without a matching thread registration finishes
+that task with an error before entering its stack.
+
+Close every incremental growth runtime before attaching a debugger to the process. Attaching after incremental
+execution starts is outside the supported tooling contract.
 
 `FiberWorkerPool` can register and close all of its worker threads through `FiberWorkerPoolOptions`. Set
 `stackGrowthRuntime` to the open process owner. On POSIX, also provide one flat

@@ -38,6 +38,9 @@ Add production incremental commitment as an explicit opt-in capability with thre
   the same reservation. The handler commits at most one configured increment and resumes execution. Exhausted
   reservation remains a terminal guard fault; unrelated and nested faults are forwarded to the previously installed
   platform handler.
+- The POSIX path deliberately relies on the validated macOS/Linux signal-context behavior of `mprotect`; it is not a
+  portable claim about every POSIX implementation. Signal-side accounting is compile-time restricted to lock-free
+  native `size_t` atomics so the handler cannot fall back to a runtime lock or allocation.
 - Released slots decommit their usable range and reset their committed boundary before re-entering the free list.
   Diagnostics report metadata commitment plus each active slot's actual commitment, not its reservation.
 

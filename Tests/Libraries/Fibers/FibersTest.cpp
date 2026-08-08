@@ -2,10 +2,22 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Fibers/Fibers.h"
 #include "Libraries/Fibers/Internal/FiberContext.h"
+#include "Libraries/Process/Process.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Atomic.h"
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
+
+#if !SC_PLATFORM_WINDOWS
+#include <signal.h>
+#include <unistd.h>
+#endif
+
+#if SC_PLATFORM_WINDOWS
+#define SC_FIBERS_TEST_NO_INLINE __declspec(noinline)
+#else
+#define SC_FIBERS_TEST_NO_INLINE __attribute__((noinline))
+#endif
 
 namespace SC
 {
@@ -301,6 +313,26 @@ struct SC::FibersTest : public SC::TestCase
         if (test_section("stack growth lifecycle"))
         {
             stackGrowthLifecycle();
+        }
+        if (test_section("incremental stack growth"))
+        {
+            incrementalStackGrowth();
+        }
+        if (test_section("incremental stack faults"))
+        {
+            incrementalStackFaults();
+        }
+        if (test_section("incremental stack terminal child", Execute::OnlyExplicit))
+        {
+            incrementalStackTerminalChild();
+        }
+        if (test_section("incremental stack foreign child", Execute::OnlyExplicit))
+        {
+            incrementalStackForeignChild();
+        }
+        if (test_section("incremental stack restoration child", Execute::OnlyExplicit))
+        {
+            incrementalStackRestorationChild();
         }
         if (test_section("stack class"))
         {
@@ -7607,6 +7639,480 @@ struct SC::FibersTest : public SC::TestCase
 #endif
         SC_TEST_EXPECT(growthThread.close());
         SC_TEST_EXPECT(runtime.close());
+    }
+
+    static SC_FIBERS_TEST_NO_INLINE void consumeIncrementalStack(size_t depth, size_t& checksum)
+    {
+        volatile char stackUse[4096];
+        for (size_t index = 0; index < sizeof(stackUse); ++index)
+        {
+            stackUse[index] = static_cast<char>(depth + index);
+        }
+        checksum += static_cast<unsigned char>(stackUse[depth % sizeof(stackUse)]);
+        if (depth > 0)
+        {
+            consumeIncrementalStack(depth - 1, checksum);
+        }
+        checksum += static_cast<unsigned char>(stackUse[(depth + 1) % sizeof(stackUse)]);
+    }
+
+    void incrementalStackGrowth()
+    {
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+        FiberStackGrowthRuntime runtime;
+        FiberStackGrowthThread  growthThread;
+        SC_TEST_EXPECT(runtime.create());
+
+        char            taskMemory[64 * 1024] = {};
+        FiberAllocator  allocator;
+        FiberTaskClass  taskClass;
+        FiberStackClass stackClass;
+        FiberTaskPool   pool;
+        SC_TEST_EXPECT(allocator.createFixed(taskMemory));
+        SC_TEST_EXPECT(taskClass.create(allocator, {1}));
+
+        FiberStackClassOptions stackOptions;
+        stackOptions.stackSizeInBytes         = 256 * 1024;
+        stackOptions.maxStacks                = 1;
+        stackOptions.guardPage                = true;
+        stackOptions.commitMode               = FiberStackCommitMode::Incremental;
+        stackOptions.initialCommitSizeInBytes = 32 * 1024;
+        stackOptions.growthCommitSizeInBytes  = FiberStackSize::FourKiB;
+        SC_TEST_EXPECT(stackClass.reserve(stackOptions));
+        SC_TEST_EXPECT(pool.create(taskClass, stackClass));
+
+        FiberStackClassDiagnostics before;
+        stackClass.diagnostics(before);
+        const size_t metadataBytes = before.committedSizeBytes;
+
+        FiberScheduler scheduler;
+        {
+            bool           unregisteredTaskRan = false;
+            FiberTaskGroup unregisteredGroup(scheduler);
+            SC_TEST_EXPECT(unregisteredGroup.spawn(pool, FiberTask::Procedure(
+                                                             [&unregisteredTaskRan](FiberScheduler&)
+                                                             {
+                                                                 unregisteredTaskRan = true;
+                                                                 return Result(true);
+                                                             })));
+            Result firstError(true);
+            SC_TEST_EXPECT(not unregisteredGroup.waitAll(&firstError));
+            SC_TEST_EXPECT(not firstError);
+            SC_TEST_EXPECT(not unregisteredTaskRan);
+            SC_TEST_EXPECT(unregisteredGroup.countErrors() == 1);
+            stackClass.diagnostics(before);
+            SC_TEST_EXPECT(before.activeStacks == 0);
+            SC_TEST_EXPECT(before.committedSizeBytes == metadataBytes);
+            SC_TEST_EXPECT(unregisteredGroup.reset());
+            SC_TEST_EXPECT(pool.availableCount() == 1);
+        }
+
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(growthThread.create(runtime, {}));
+#else
+        char signalStack[FiberStackGrowthSignalStackSize] = {};
+        SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
+#endif
+
+        size_t checksum = 0;
+        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
+                                                 [&checksum](FiberScheduler& currentScheduler)
+                                                 {
+                                                     consumeIncrementalStack(24, checksum);
+                                                     SC_TRY(currentScheduler.yield());
+                                                     consumeIncrementalStack(4, checksum);
+                                                     return Result(true);
+                                                 })));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(checksum != 0);
+
+        FiberStackClassDiagnostics after;
+        stackClass.diagnostics(after);
+        SC_TEST_EXPECT(after.activeStacks == 0);
+        SC_TEST_EXPECT(after.committedSizeBytes == metadataBytes);
+        SC_TEST_EXPECT(after.peakCommittedBytes > metadataBytes + after.initialCommitSizeInBytes);
+        const size_t grownBytes = after.peakCommittedBytes - metadataBytes - after.initialCommitSizeInBytes;
+        SC_TEST_EXPECT(grownBytes >= 2 * after.growthCommitSizeInBytes);
+        SC_TEST_EXPECT(grownBytes % after.growthCommitSizeInBytes == 0);
+        SC_TEST_EXPECT(after.peakCommittedBytes <= metadataBytes + after.stackSizeInBytes);
+        SC_TEST_EXPECT(pool.availableCount() == 1);
+        const size_t peakBeforeMigration = after.peakCommittedBytes;
+
+        char           dequeMemory[4096] = {};
+        FiberAllocator dequeAllocator;
+        FiberWorker    workers[2];
+        SC_TEST_EXPECT(dequeAllocator.createFixed(dequeMemory));
+        SC_TEST_EXPECT(scheduler.createWorkerDeques(dequeAllocator, {workers, 2}, 4));
+
+        struct MigrationState
+        {
+            uint64_t firstThread  = 0;
+            uint64_t secondThread = 0;
+            size_t   checksum     = 0;
+        } migration;
+        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
+                                                 [&migration](FiberScheduler& currentScheduler)
+                                                 {
+                                                     migration.firstThread = Thread::CurrentThreadID();
+                                                     consumeIncrementalStack(8, migration.checksum);
+                                                     SC_TRY(currentScheduler.yield());
+                                                     migration.secondThread = Thread::CurrentThreadID();
+                                                     consumeIncrementalStack(40, migration.checksum);
+                                                     return Result(true);
+                                                 })));
+
+        Result workerResults[2] = {Result(true), Result(true)};
+
+        static char workerSignalStacks[2][FiberStackGrowthSignalStackSize] = {};
+
+        EventObject peerReady;
+        EventObject firstYielded;
+        EventObject secondCompleted;
+        struct WorkerRunState
+        {
+            FiberStackGrowthRuntime* runtime    = nullptr;
+            FiberScheduler*          scheduler  = nullptr;
+            FiberWorker*             workers    = nullptr;
+            FiberStackClass*         stackClass = nullptr;
+
+            Result* result         = nullptr;
+            char*   signalStack    = nullptr;
+            size_t* suspendedBytes = nullptr;
+
+            EventObject* peerReady       = nullptr;
+            EventObject* firstYielded    = nullptr;
+            EventObject* secondCompleted = nullptr;
+
+            size_t workerIndex = 0;
+        } workerStates[2];
+        size_t suspendedBytes = 0;
+        Thread workerThreads[2];
+        for (size_t workerIndex = 0; workerIndex < 2; ++workerIndex)
+        {
+            WorkerRunState& state = workerStates[workerIndex];
+            state.runtime         = &runtime;
+            state.scheduler       = &scheduler;
+            state.workers         = workers;
+            state.stackClass      = &stackClass;
+            state.result          = &workerResults[workerIndex];
+            state.signalStack     = workerSignalStacks[workerIndex];
+            state.suspendedBytes  = &suspendedBytes;
+            state.peerReady       = &peerReady;
+            state.firstYielded    = &firstYielded;
+            state.secondCompleted = &secondCompleted;
+            state.workerIndex     = workerIndex;
+            Result startResult    = workerThreads[workerIndex].start(
+                [state = &state](Thread&)
+                {
+                    FiberStackGrowthThread workerGrowthThread;
+#if SC_PLATFORM_WINDOWS
+                    *state->result = workerGrowthThread.create(*state->runtime, {});
+#else
+                    *state->result = workerGrowthThread.create(*state->runtime,
+                                                               {state->signalStack, FiberStackGrowthSignalStackSize});
+#endif
+                    if (state->workerIndex == 0)
+                    {
+                        state->peerReady->wait();
+                        if (*state->result)
+                        {
+                            *state->result = state->scheduler->runNoWait(state->workers[0], {state->workers, 2});
+                        }
+                        if (*state->result)
+                        {
+                            FiberStackClassDiagnostics suspended;
+                            state->stackClass->diagnostics(suspended);
+                            *state->suspendedBytes = suspended.committedSizeBytes;
+                        }
+                        state->firstYielded->signal();
+                        state->secondCompleted->wait();
+                    }
+                    else
+                    {
+                        state->peerReady->signal();
+                        state->firstYielded->wait();
+                        if (*state->result)
+                        {
+                            *state->result = state->scheduler->runNoWait(state->workers[1], {state->workers, 2});
+                        }
+                        state->secondCompleted->signal();
+                    }
+                    Result closeResult = workerGrowthThread.close();
+                    if (*state->result and not closeResult)
+                    {
+                        *state->result = closeResult;
+                    }
+                });
+            SC_TEST_EXPECT(startResult);
+        }
+        for (size_t workerIndex = 0; workerIndex < 2; ++workerIndex)
+        {
+            SC_TEST_EXPECT(workerThreads[workerIndex].join());
+            SC_TEST_EXPECT(workerResults[workerIndex]);
+        }
+        SC_TEST_EXPECT(migration.firstThread != 0);
+        SC_TEST_EXPECT(migration.secondThread != 0);
+        SC_TEST_EXPECT(migration.firstThread != migration.secondThread);
+        SC_TEST_EXPECT(migration.checksum != 0);
+        SC_TEST_EXPECT(suspendedBytes > metadataBytes + after.initialCommitSizeInBytes);
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        stackClass.diagnostics(after);
+        SC_TEST_EXPECT(after.activeStacks == 0);
+        SC_TEST_EXPECT(after.committedSizeBytes == metadataBytes);
+        SC_TEST_EXPECT(after.peakCommittedBytes > peakBeforeMigration);
+        SC_TEST_EXPECT(after.peakCommittedBytes > suspendedBytes);
+        scheduler.releaseWorkerDeques({workers, 2});
+        SC_TEST_EXPECT(dequeAllocator.close());
+
+        FiberTask* cancelTask = nullptr;
+        SC_TEST_EXPECT(pool.spawn(scheduler,
+                                  FiberTask::Procedure(
+                                      [](FiberScheduler& currentScheduler)
+                                      {
+                                          size_t cancellationChecksum = 0;
+                                          consumeIncrementalStack(12, cancellationChecksum);
+                                          for (;;)
+                                          {
+                                              SC_TRY(currentScheduler.yield());
+                                          }
+                                      }),
+                                  &cancelTask));
+        SC_TEST_EXPECT(scheduler.runOnce());
+        SC_TEST_EXPECT(cancelTask != nullptr);
+        FiberStackClassDiagnostics beforeCancellation;
+        stackClass.diagnostics(beforeCancellation);
+        SC_TEST_EXPECT(beforeCancellation.activeStacks == 1);
+        SC_TEST_EXPECT(beforeCancellation.committedSizeBytes >
+                       metadataBytes + beforeCancellation.initialCommitSizeInBytes);
+        SC_TEST_EXPECT(scheduler.requestCancel(*cancelTask));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(pool.availableCount() == 1);
+        stackClass.diagnostics(after);
+        SC_TEST_EXPECT(after.activeStacks == 0);
+        SC_TEST_EXPECT(after.committedSizeBytes == metadataBytes);
+
+        bool reusedSlotRan = false;
+        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
+                                                 [&reusedSlotRan](FiberScheduler&)
+                                                 {
+                                                     reusedSlotRan = true;
+                                                     return Result(true);
+                                                 })));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(reusedSlotRan);
+        SC_TEST_EXPECT(pool.availableCount() == 1);
+
+        struct ShutdownState
+        {
+            Atomic<int32_t> iterations;
+            EventObject     started;
+            bool            canceled = false;
+        } shutdownState;
+        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
+                                                 [&shutdownState](FiberScheduler& currentScheduler)
+                                                 {
+                                                     size_t shutdownChecksum = 0;
+                                                     consumeIncrementalStack(12, shutdownChecksum);
+                                                     for (;;)
+                                                     {
+                                                         Result result = currentScheduler.yield();
+                                                         if (shutdownState.iterations.fetch_add(1) == 3)
+                                                         {
+                                                             shutdownState.started.signal();
+                                                         }
+                                                         if (not result)
+                                                         {
+                                                             shutdownState.canceled = true;
+                                                             return result;
+                                                         }
+                                                     }
+                                                 })));
+
+        FiberWorker            poolWorkers[2];
+        FiberWorkerThread      poolThreads[2];
+        FiberWorkerPool        workerPool;
+        FiberWorkerPoolOptions workerPoolOptions;
+        workerPoolOptions.stackGrowthRuntime = &runtime;
+#if !SC_PLATFORM_WINDOWS
+        workerPoolOptions.stackGrowthSignalStackStorage = {&workerSignalStacks[0][0], sizeof(workerSignalStacks)};
+#endif
+        SC_TEST_EXPECT(workerPool.start(scheduler, poolWorkers, poolThreads, workerPoolOptions));
+        shutdownState.started.wait();
+        SC_TEST_EXPECT(workerPool.shutdown());
+        SC_TEST_EXPECT(shutdownState.canceled);
+        SC_TEST_EXPECT(runtime.registeredThreadCount() == 1);
+        SC_TEST_EXPECT(pool.availableCount() == 1);
+        stackClass.diagnostics(after);
+        SC_TEST_EXPECT(after.activeStacks == 0);
+        SC_TEST_EXPECT(after.committedSizeBytes == metadataBytes);
+
+        SC_TEST_EXPECT(pool.close());
+        SC_TEST_EXPECT(taskClass.close());
+        stackClass.release();
+        SC_TEST_EXPECT(allocator.close());
+        SC_TEST_EXPECT(growthThread.close());
+        SC_TEST_EXPECT(runtime.close());
+    }
+
+#if !SC_PLATFORM_WINDOWS
+    static void incrementalStackForeignHandler(int) { _exit(73); }
+#endif
+
+    void incrementalStackFaults()
+    {
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+        const StringSpan sections[] = {
+            "incremental stack terminal child",
+            "incremental stack foreign child",
+            "incremental stack restoration child",
+        };
+        for (size_t sectionIndex = 0; sectionIndex < sizeof(sections) / sizeof(sections[0]); ++sectionIndex)
+        {
+            Process    process;
+            StringSpan arguments[] = {report.executableFile.view(), "--quiet", "--test", "FibersTest", "--test-section",
+                                      sections[sectionIndex]};
+            SC_TEST_EXPECT(
+                process.launch(arguments, Process::StdOut::Ignore(), Process::StdIn(), Process::StdErr::Ignore()));
+            SC_TEST_EXPECT(process.waitForExitSync());
+            if (sectionIndex == 0)
+            {
+#if SC_PLATFORM_WINDOWS
+                SC_TEST_EXPECT(process.getExitStatus() == static_cast<int32_t>(0xC00000FDu));
+#else
+                const int32_t exitStatus = process.getExitStatus();
+                SC_TEST_EXPECT(exitStatus == SIGSEGV or exitStatus == SIGBUS or exitStatus == 128 + SIGSEGV or
+                               exitStatus == 128 + SIGBUS);
+#endif
+            }
+            else if (sectionIndex == 1)
+            {
+#if SC_PLATFORM_WINDOWS
+                SC_TEST_EXPECT(process.getExitStatus() == static_cast<int32_t>(0xC0000005u));
+#else
+                SC_TEST_EXPECT(process.getExitStatus() == 73);
+#endif
+            }
+            else
+            {
+                SC_TEST_EXPECT(process.getExitStatus() == 0);
+            }
+        }
+    }
+
+    void incrementalStackTerminalChild()
+    {
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+        FiberStackGrowthRuntime runtime;
+        FiberStackGrowthThread  growthThread;
+        SC_TEST_EXPECT(runtime.create());
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(growthThread.create(runtime, {}));
+#else
+        char signalStack[FiberStackGrowthSignalStackSize] = {};
+        SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
+#endif
+
+        char            taskMemory[64 * 1024] = {};
+        FiberAllocator  allocator;
+        FiberTaskClass  taskClass;
+        FiberStackClass stackClass;
+        FiberTaskPool   pool;
+        SC_TEST_EXPECT(allocator.createFixed(taskMemory));
+        SC_TEST_EXPECT(taskClass.create(allocator, {1}));
+
+        FiberStackClassOptions stackOptions;
+        stackOptions.stackSizeInBytes         = 64 * 1024;
+        stackOptions.maxStacks                = 1;
+        stackOptions.guardPage                = true;
+        stackOptions.commitMode               = FiberStackCommitMode::Incremental;
+        stackOptions.initialCommitSizeInBytes = 32 * 1024;
+        stackOptions.growthCommitSizeInBytes  = FiberStackSize::FourKiB;
+        SC_TEST_EXPECT(stackClass.reserve(stackOptions));
+        SC_TEST_EXPECT(pool.create(taskClass, stackClass));
+
+        FiberScheduler scheduler;
+        size_t         checksum = 0;
+        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
+                                                 [&checksum](FiberScheduler&)
+                                                 {
+                                                     consumeIncrementalStack(96, checksum);
+                                                     return Result(true);
+                                                 })));
+        SC_TEST_EXPECT(not scheduler.run());
+    }
+
+    void incrementalStackForeignChild()
+    {
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+#if !SC_PLATFORM_WINDOWS
+        struct sigaction action = {};
+        action.sa_handler       = incrementalStackForeignHandler;
+        sigemptyset(&action.sa_mask);
+        SC_TEST_EXPECT(sigaction(SIGSEGV, &action, nullptr) == 0);
+        SC_TEST_EXPECT(sigaction(SIGBUS, &action, nullptr) == 0);
+#endif
+
+        FiberStackGrowthRuntime runtime;
+        FiberStackGrowthThread  growthThread;
+        SC_TEST_EXPECT(runtime.create());
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(growthThread.create(runtime, {}));
+#else
+        char signalStack[FiberStackGrowthSignalStackSize] = {};
+        SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
+#endif
+        *reinterpret_cast<volatile int*>(static_cast<size_t>(1)) = 1;
+    }
+
+    void incrementalStackRestorationChild()
+    {
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+#if SC_PLATFORM_WINDOWS
+        FiberStackGrowthRuntime runtime;
+        SC_TEST_EXPECT(runtime.create());
+        SC_TEST_EXPECT(runtime.close());
+#else
+        struct sigaction previousSegmentation = {};
+        struct sigaction previousBus          = {};
+        struct sigaction action               = {};
+        action.sa_handler                     = incrementalStackForeignHandler;
+        sigemptyset(&action.sa_mask);
+        SC_TEST_EXPECT(sigaction(SIGSEGV, &action, &previousSegmentation) == 0);
+        SC_TEST_EXPECT(sigaction(SIGBUS, &action, &previousBus) == 0);
+
+        FiberStackGrowthRuntime runtime;
+        SC_TEST_EXPECT(runtime.create());
+        SC_TEST_EXPECT(runtime.close());
+
+        struct sigaction restoredSegmentation = {};
+        struct sigaction restoredBus          = {};
+        SC_TEST_EXPECT(sigaction(SIGSEGV, nullptr, &restoredSegmentation) == 0);
+        SC_TEST_EXPECT(sigaction(SIGBUS, nullptr, &restoredBus) == 0);
+        SC_TEST_EXPECT(restoredSegmentation.sa_handler == incrementalStackForeignHandler);
+        SC_TEST_EXPECT(restoredBus.sa_handler == incrementalStackForeignHandler);
+        SC_TEST_EXPECT(sigaction(SIGBUS, &previousBus, nullptr) == 0);
+        SC_TEST_EXPECT(sigaction(SIGSEGV, &previousSegmentation, nullptr) == 0);
+#endif
     }
 
     void virtualStack()

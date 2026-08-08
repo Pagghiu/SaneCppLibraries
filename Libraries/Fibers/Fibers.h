@@ -241,9 +241,9 @@ struct SC_FIBERS_EXPORT FiberStackClassOptions
     size_t maxStacks        = 0;
     bool   guardPage        = true;
 
-    FiberStackCommitMode commitMode = FiberStackCommitMode::Full;
-    size_t initialCommitSizeInBytes = 0;
-    size_t growthCommitSizeInBytes  = 0;
+    FiberStackCommitMode commitMode               = FiberStackCommitMode::Full;
+    size_t               initialCommitSizeInBytes = 0;
+    size_t               growthCommitSizeInBytes  = 0;
 };
 
 struct SC_FIBERS_EXPORT FiberStackClassDiagnostics
@@ -289,6 +289,7 @@ struct SC_FIBERS_EXPORT FiberStackClass
 
   private:
     friend struct FiberTaskPool;
+    friend struct FiberScheduler;
 
     FiberStackClassOpaque internal;
 };
@@ -552,7 +553,7 @@ struct SC_FIBERS_EXPORT FiberWorkerPoolOptions
     size_t                    idleSpinAttempts       = 32;
     Span<const uint64_t>      affinityMasks;
     FiberWorkerThreadPriority threadPriority = FiberWorkerThreadPriority::Default;
-    //! Optional process owner enabling future incremental stacks on every worker.
+    //! Optional process owner enabling incremental stacks on every worker.
     FiberStackGrowthRuntime* stackGrowthRuntime = nullptr;
     //! POSIX requires at least workerCount * FiberStackGrowthSignalStackSize bytes; Windows ignores this span.
     Span<char> stackGrowthSignalStackStorage;

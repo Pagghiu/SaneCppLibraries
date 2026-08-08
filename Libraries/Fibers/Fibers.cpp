@@ -1,5 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#if defined(__APPLE__) && !defined(_XOPEN_SOURCE)
+#define _XOPEN_SOURCE 700
+#define _DARWIN_C_SOURCE
+#elif defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
 #include "Fibers.h"
 
 #define SC_ASSERT_PROVIDER FibersAssert
@@ -30,6 +37,7 @@ extern "C"
 #endif
 #include <signal.h>
 #include <sys/mman.h>
+#include <ucontext.h>
 #include <unistd.h>
 #endif
 
@@ -321,9 +329,27 @@ static Result fiberDecommitNoAccess(void* memory, size_t size)
 struct FiberStackGrowthRuntimeInternal;
 struct FiberStackGrowthThreadInternal;
 
+struct FiberStackGrowthActiveStack
+{
+    char*            stackBegin          = nullptr;
+    char*            stackEnd            = nullptr;
+    volatile size_t* committedBytes      = nullptr;
+    volatile size_t* classCommittedBytes = nullptr;
+    volatile size_t* classPeakBytes      = nullptr;
+    size_t           metadataBytes       = 0;
+    size_t           growthBytes         = 0;
+#if SC_PLATFORM_WINDOWS
+    void* previousStackBase  = nullptr;
+    void* previousStackLimit = nullptr;
+#else
+    volatile sig_atomic_t handlingFault = 0;
+#endif
+};
+
 static volatile int32_t                             fiberStackGrowthLifecycleLock = 0;
 static FiberStackGrowthRuntimeInternal*             fiberStackGrowthRuntime       = nullptr;
 static thread_local FiberStackGrowthThreadInternal* fiberStackGrowthThread        = nullptr;
+static thread_local FiberStackGrowthActiveStack     fiberStackGrowthActiveStack;
 
 static FiberStackGrowthRuntimeInternal* fiberStackGrowthRuntimeLoad()
 {
@@ -415,7 +441,7 @@ static bool fiberStackGrowthDebuggerAttached()
 #endif
 
 #if !SC_PLATFORM_WINDOWS
-static void fiberStackGrowthSignalHandler(int signal, siginfo_t*, void*);
+static void fiberStackGrowthSignalHandler(int signal, siginfo_t* info, void* rawContext);
 
 static bool fiberStackGrowthSignalMatches(const struct sigaction& action)
 {
@@ -639,8 +665,84 @@ struct FiberStackGrowthThreadInternal
 };
 
 #if !SC_PLATFORM_WINDOWS
-static void fiberStackGrowthSignalHandler(int signal, siginfo_t*, void*)
+static_assert(__atomic_always_lock_free(sizeof(size_t), nullptr),
+              "Incremental stack accounting must remain lock-free inside the POSIX signal handler");
+
+static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
 {
+    ucontext_t& context = *static_cast<ucontext_t*>(rawContext);
+#if SC_PLATFORM_APPLE && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(context.uc_mcontext->__ss.__sp);
+#elif SC_PLATFORM_APPLE && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
+    return reinterpret_cast<void*>(context.uc_mcontext->__ss.__rsp);
+#elif SC_PLATFORM_LINUX && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(context.uc_mcontext.sp);
+#elif SC_PLATFORM_LINUX && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
+    return reinterpret_cast<void*>(context.uc_mcontext.gregs[REG_RSP]);
+#else
+    return nullptr;
+#endif
+}
+
+static bool fiberStackGrowthTryGrow(void* faultAddress, void* stackPointer)
+{
+    FiberStackGrowthActiveStack& active = fiberStackGrowthActiveStack;
+    if (active.stackBegin == nullptr or active.stackEnd == nullptr or active.committedBytes == nullptr or
+        active.classCommittedBytes == nullptr or active.classPeakBytes == nullptr)
+    {
+        return false;
+    }
+
+    const size_t committedBytes = __atomic_load_n(active.committedBytes, __ATOMIC_ACQUIRE);
+    const size_t stackBytes     = static_cast<size_t>(active.stackEnd - active.stackBegin);
+    if (committedBytes >= stackBytes)
+    {
+        return false;
+    }
+    const size_t nextCommittedBytes =
+        committedBytes + active.growthBytes < stackBytes ? committedBytes + active.growthBytes : stackBytes;
+    char* committedBegin     = active.stackEnd - committedBytes;
+    char* nextCommittedBegin = active.stackEnd - nextCommittedBytes;
+
+    const size_t fault = reinterpret_cast<size_t>(faultAddress);
+    const size_t stack = reinterpret_cast<size_t>(stackPointer);
+    if (stack < reinterpret_cast<size_t>(active.stackBegin) or stack >= reinterpret_cast<size_t>(active.stackEnd) or
+        fault < reinterpret_cast<size_t>(nextCommittedBegin) or fault >= reinterpret_cast<size_t>(committedBegin))
+    {
+        return false;
+    }
+
+    const size_t growthBytes = nextCommittedBytes - committedBytes;
+    if (mprotect(nextCommittedBegin, growthBytes, PROT_READ | PROT_WRITE) != 0)
+    {
+        return false;
+    }
+
+    __atomic_store_n(active.committedBytes, nextCommittedBytes, __ATOMIC_RELEASE);
+    const size_t previousClassBytes = __atomic_fetch_add(active.classCommittedBytes, growthBytes, __ATOMIC_ACQ_REL);
+    const size_t currentPeak        = active.metadataBytes + previousClassBytes + growthBytes;
+    size_t       peak               = __atomic_load_n(active.classPeakBytes, __ATOMIC_ACQUIRE);
+    while (currentPeak > peak and not __atomic_compare_exchange_n(active.classPeakBytes, &peak, currentPeak, false,
+                                                                  __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+    {}
+    return true;
+}
+
+static void fiberStackGrowthSignalHandler(int signal, siginfo_t* info, void* rawContext)
+{
+    FiberStackGrowthActiveStack& active = fiberStackGrowthActiveStack;
+    if ((signal == SIGSEGV or signal == SIGBUS) and fiberStackGrowthThread != nullptr and info != nullptr and
+        active.handlingFault == 0)
+    {
+        active.handlingFault = 1;
+        const bool grown = fiberStackGrowthTryGrow(info->si_addr, fiberStackGrowthInterruptedStackPointer(rawContext));
+        active.handlingFault = 0;
+        if (grown)
+        {
+            return;
+        }
+    }
+
     FiberStackGrowthRuntimeInternal* runtime = fiberStackGrowthRuntimeLoad();
     if (runtime == nullptr)
     {
@@ -1020,10 +1122,89 @@ struct FiberAvailabilityQueue
     bool hasWaitersUnlocked() const { return head != nullptr; }
 };
 
+static size_t fiberStackCommitLoad(const volatile size_t& value)
+{
+#if SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT
+    return static_cast<size_t>(InterlockedCompareExchange64(
+        reinterpret_cast<volatile long long*>(const_cast<volatile size_t*>(&value)), 0, 0));
+#elif SC_PLATFORM_WINDOWS
+    return static_cast<size_t>(
+        InterlockedCompareExchange(reinterpret_cast<volatile long*>(const_cast<volatile size_t*>(&value)), 0, 0));
+#else
+    return __atomic_load_n(&value, __ATOMIC_ACQUIRE);
+#endif
+}
+
+static void fiberStackCommitStore(volatile size_t& value, size_t newValue)
+{
+#if SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT
+    InterlockedExchange64(reinterpret_cast<volatile long long*>(&value), static_cast<long long>(newValue));
+#elif SC_PLATFORM_WINDOWS
+    InterlockedExchange(reinterpret_cast<volatile long*>(&value), static_cast<long>(newValue));
+#else
+    __atomic_store_n(&value, newValue, __ATOMIC_RELEASE);
+#endif
+}
+
+static size_t fiberStackCommitFetchAdd(volatile size_t& value, size_t amount)
+{
+#if SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT
+    return static_cast<size_t>(
+        InterlockedExchangeAdd64(reinterpret_cast<volatile long long*>(&value), static_cast<long long>(amount)));
+#elif SC_PLATFORM_WINDOWS
+    return static_cast<size_t>(
+        InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&value), static_cast<long>(amount)));
+#else
+    return __atomic_fetch_add(&value, amount, __ATOMIC_ACQ_REL);
+#endif
+}
+
+static size_t fiberStackCommitFetchSub(volatile size_t& value, size_t amount)
+{
+#if SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT
+    return static_cast<size_t>(
+        InterlockedExchangeAdd64(reinterpret_cast<volatile long long*>(&value), -static_cast<long long>(amount)));
+#elif SC_PLATFORM_WINDOWS
+    return static_cast<size_t>(
+        InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&value), -static_cast<long>(amount)));
+#else
+    return __atomic_fetch_sub(&value, amount, __ATOMIC_ACQ_REL);
+#endif
+}
+
+static bool fiberStackCommitCompareExchange(volatile size_t& value, size_t& expected, size_t desired)
+{
+#if SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT
+    const size_t observed = static_cast<size_t>(
+        InterlockedCompareExchange64(reinterpret_cast<volatile long long*>(&value), static_cast<long long>(desired),
+                                     static_cast<long long>(expected)));
+#elif SC_PLATFORM_WINDOWS
+    const size_t observed = static_cast<size_t>(InterlockedCompareExchange(
+        reinterpret_cast<volatile long*>(&value), static_cast<long>(desired), static_cast<long>(expected)));
+#else
+    return __atomic_compare_exchange_n(&value, &expected, desired, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+#endif
+#if SC_PLATFORM_WINDOWS
+    if (observed == expected)
+    {
+        return true;
+    }
+    expected = observed;
+    return false;
+#endif
+}
+
 struct FiberStackClassInternal
 {
+    enum class StackState : uint8_t
+    {
+        Free,
+        Acquired,
+        GrowthPrepared,
+    };
+
     FiberVirtualMemory virtualMemory;
-    uint8_t*           stackStates         = nullptr;
+    StackState*        stackStates         = nullptr;
     size_t*            freeStackNext       = nullptr;
     size_t*            stackCommittedSizes = nullptr;
 
@@ -1124,14 +1305,14 @@ struct FiberStackClassInternal
         }
         peakCommittedBytes = metadataBytes;
 
-        stackStates   = static_cast<uint8_t*>(virtualMemory.data());
+        stackStates   = static_cast<StackState*>(virtualMemory.data());
         freeStackNext = reinterpret_cast<size_t*>(static_cast<char*>(virtualMemory.data()) + freeStackOffset);
         stackCommittedSizes =
             reinterpret_cast<size_t*>(static_cast<char*>(virtualMemory.data()) + committedStackOffset);
         nextFreeStack = 0;
         for (size_t idx = 0; idx < maxStacks; ++idx)
         {
-            stackStates[idx]         = 0;
+            stackStates[idx]         = StackState::Free;
             freeStackNext[idx]       = idx + 1 < maxStacks ? idx + 1 : maxStacks;
             stackCommittedSizes[idx] = 0;
         }
@@ -1164,10 +1345,10 @@ struct FiberStackClassInternal
             fiberSchedulerUnlock(availabilityQueue.lock);
             return commitResult;
         }
-        stackStates[index]         = 1;
-        stackCommittedSizes[index] = initialCommitBytes;
+        stackStates[index] = StackState::Acquired;
+        fiberStackCommitStore(stackCommittedSizes[index], initialCommitBytes);
         activeStacks += 1;
-        committedStackBytes += initialCommitBytes;
+        fiberStackCommitFetchAdd(committedStackBytes, initialCommitBytes);
         if (activeStacks > peakActiveStacks)
         {
             peakActiveStacks = activeStacks;
@@ -1191,33 +1372,34 @@ struct FiberStackClassInternal
             fiberSchedulerUnlock(availabilityQueue.lock);
             return Result::Error("FiberStackClass does not own stack");
         }
-        if (stackStates[index] == 0)
+        if (stackStates[index] == StackState::Free)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
             return Result::Error("FiberStackClass stack is not active");
         }
-        stackStates[index] = 0;
+        const StackState previousState = stackStates[index];
+        stackStates[index]             = StackState::Free;
         if (highWaterAvailable)
         {
             updatePeakHighWater(committedMemory(index).highWaterUsedBytes());
         }
-        const size_t committedBytes = stackCommittedSizes[index];
+        const size_t committedBytes = fiberStackCommitLoad(stackCommittedSizes[index]);
         Result       decommitResult =
             fiberDecommitNoAccess(slotMemory(index).data() + stackBytes - committedBytes, committedBytes);
         if (not decommitResult)
         {
-            stackStates[index] = 1;
+            stackStates[index] = previousState;
             fiberSchedulerUnlock(availabilityQueue.lock);
             return decommitResult;
         }
         SC_FIBERS_ASSERT_RELEASE(activeStacks > 0);
         activeStacks -= 1;
-        SC_FIBERS_ASSERT_RELEASE(committedStackBytes >= committedBytes);
-        committedStackBytes -= committedBytes;
-        stackCommittedSizes[index] = 0;
-        freeStackNext[index]       = nextFreeStack;
-        nextFreeStack              = index;
-        stack                      = FiberStack({});
+        const size_t previousCommittedBytes = fiberStackCommitFetchSub(committedStackBytes, committedBytes);
+        SC_FIBERS_ASSERT_RELEASE(previousCommittedBytes >= committedBytes);
+        fiberStackCommitStore(stackCommittedSizes[index], 0);
+        freeStackNext[index] = nextFreeStack;
+        nextFreeStack        = index;
+        stack                = FiberStack({});
         fiberSchedulerUnlock(availabilityQueue.lock);
         return availabilityQueue.notifyOneIfAvailable(hasAvailableSlot, this);
     }
@@ -1284,8 +1466,8 @@ struct FiberStackClassInternal
         outDiagnostics.stackSizeInBytes         = stackBytes;
         outDiagnostics.guardSizeInBytes         = guardBytes;
         outDiagnostics.reservedSizeBytes        = virtualMemory.capacity();
-        outDiagnostics.committedSizeBytes       = metadataBytes + committedStackBytes;
-        outDiagnostics.peakCommittedBytes       = peakCommittedBytes;
+        outDiagnostics.committedSizeBytes       = metadataBytes + fiberStackCommitLoad(committedStackBytes);
+        outDiagnostics.peakCommittedBytes       = fiberStackCommitLoad(peakCommittedBytes);
         outDiagnostics.highWaterUsedBytes       = highWaterAvailable ? highWaterUsedBytes() : 0;
         outDiagnostics.commitMode               = commitMode;
         outDiagnostics.initialCommitSizeInBytes = initialCommitBytes;
@@ -1308,8 +1490,108 @@ struct FiberStackClassInternal
     FiberStack committedMemory(size_t index) const
     {
         Span<char>   memory         = slotMemory(index);
-        const size_t committedBytes = stackCommittedSizes[index];
+        const size_t committedBytes = fiberStackCommitLoad(stackCommittedSizes[index]);
         return FiberStack({memory.data() + stackBytes - committedBytes, committedBytes});
+    }
+
+    Result publishExecution(Span<char> memory, bool& outPublished)
+    {
+        outPublished = false;
+        if (commitMode != FiberStackCommitMode::Incremental)
+        {
+            return Result(true);
+        }
+
+        if (fiberStackGrowthThread == nullptr or fiberStackGrowthThread->runtime != fiberStackGrowthRuntimeLoad())
+        {
+            return Result::Error("Incremental fiber stack execution requires a registered growth thread");
+        }
+        SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthActiveStack.stackBegin == nullptr);
+        FiberStack   stack(memory);
+        const size_t index = indexOf(stack);
+#if SC_PLATFORM_WINDOWS
+        fiberSchedulerLock(availabilityQueue.lock);
+        SC_FIBERS_ASSERT_RELEASE(index < maxStacks and stackStates[index] != StackState::Free);
+        if (stackStates[index] == StackState::Acquired)
+        {
+            const size_t committedBytes = fiberStackCommitLoad(stackCommittedSizes[index]);
+            const size_t nextCommittedBytes =
+                committedBytes + growthCommitBytes < stackBytes ? committedBytes + growthCommitBytes : stackBytes;
+            if (nextCommittedBytes > committedBytes)
+            {
+                char*        committedBegin     = memory.data() + stackBytes - committedBytes;
+                char*        nextCommittedBegin = memory.data() + stackBytes - nextCommittedBytes;
+                const size_t growthBytes        = nextCommittedBytes - committedBytes;
+                if (VirtualAlloc(nextCommittedBegin, growthBytes, MEM_COMMIT, PAGE_READWRITE) == nullptr)
+                {
+                    fiberSchedulerUnlock(availabilityQueue.lock);
+                    return Result::Error("Failed to prepare incremental fiber stack growth pages");
+                }
+                DWORD previousProtection = 0;
+                if (VirtualProtect(committedBegin - FiberVirtualMemory::getPageSize(),
+                                   FiberVirtualMemory::getPageSize(), PAGE_READWRITE | PAGE_GUARD,
+                                   &previousProtection) == FALSE)
+                {
+                    SC_FIBERS_ASSERT_RELEASE(VirtualFree(nextCommittedBegin, growthBytes, MEM_DECOMMIT) != FALSE);
+                    fiberSchedulerUnlock(availabilityQueue.lock);
+                    return Result::Error("Failed to prepare incremental fiber stack guard page");
+                }
+                fiberStackCommitStore(stackCommittedSizes[index], nextCommittedBytes);
+                fiberStackCommitFetchAdd(committedStackBytes, growthBytes);
+                updatePeakCommittedBytes();
+            }
+            stackStates[index] = StackState::GrowthPrepared;
+        }
+        fiberSchedulerUnlock(availabilityQueue.lock);
+#else
+        SC_FIBERS_ASSERT_RELEASE(index < maxStacks and stackStates[index] != StackState::Free);
+#endif
+
+        FiberStackGrowthActiveStack active;
+        active.stackBegin          = memory.data();
+        active.stackEnd            = memory.data() + memory.sizeInBytes();
+        active.committedBytes      = &stackCommittedSizes[index];
+        active.classCommittedBytes = &committedStackBytes;
+        active.classPeakBytes      = &peakCommittedBytes;
+        active.metadataBytes       = metadataBytes;
+        active.growthBytes         = growthCommitBytes;
+#if SC_PLATFORM_WINDOWS
+        NT_TIB& threadStack       = *reinterpret_cast<NT_TIB*>(NtCurrentTeb());
+        active.previousStackBase  = threadStack.StackBase;
+        active.previousStackLimit = threadStack.StackLimit;
+        threadStack.StackBase     = active.stackEnd;
+        threadStack.StackLimit    = active.stackEnd - fiberStackCommitLoad(*active.committedBytes);
+#endif
+        fiberStackGrowthActiveStack = active;
+        outPublished                = true;
+        return Result(true);
+    }
+
+    void clearExecution()
+    {
+#if SC_PLATFORM_WINDOWS
+        FiberStackGrowthActiveStack& active          = fiberStackGrowthActiveStack;
+        NT_TIB&                      threadStack     = *reinterpret_cast<NT_TIB*>(NtCurrentTeb());
+        char*                        finalStackLimit = static_cast<char*>(threadStack.StackLimit);
+        const size_t                 committedBytes  = fiberStackCommitLoad(*active.committedBytes);
+        char*                        committedBegin  = active.stackEnd - committedBytes;
+        if (finalStackLimit < committedBegin and finalStackLimit >= active.stackBegin)
+        {
+            const size_t growthBytes = static_cast<size_t>(committedBegin - finalStackLimit);
+            fiberStackCommitStore(*active.committedBytes, committedBytes + growthBytes);
+            const size_t previousClassBytes = fiberStackCommitFetchAdd(*active.classCommittedBytes, growthBytes);
+            const size_t currentPeak        = active.metadataBytes + previousClassBytes + growthBytes;
+            size_t       peak               = fiberStackCommitLoad(*active.classPeakBytes);
+            while (currentPeak > peak and
+                   not fiberStackCommitCompareExchange(*active.classPeakBytes, peak, currentPeak))
+            {}
+        }
+        threadStack.StackBase  = active.previousStackBase;
+        threadStack.StackLimit = active.previousStackLimit;
+#else
+        SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthActiveStack.handlingFault == 0);
+#endif
+        fiberStackGrowthActiveStack = {};
     }
 
     void* slotBase(size_t index) const
@@ -1347,7 +1629,7 @@ struct FiberStackClassInternal
         size_t highWater = peakHighWaterBytes;
         for (size_t idx = 0; idx < maxStacks; ++idx)
         {
-            if (stackStates[idx] == 0)
+            if (stackStates[idx] == StackState::Free)
             {
                 continue;
             }
@@ -1362,11 +1644,11 @@ struct FiberStackClassInternal
 
     void updatePeakCommittedBytes()
     {
-        const size_t currentCommittedBytes = metadataBytes + committedStackBytes;
-        if (currentCommittedBytes > peakCommittedBytes)
-        {
-            peakCommittedBytes = currentCommittedBytes;
-        }
+        const size_t currentCommittedBytes = metadataBytes + fiberStackCommitLoad(committedStackBytes);
+        size_t       peak                  = fiberStackCommitLoad(peakCommittedBytes);
+        while (currentCommittedBytes > peak and
+               not fiberStackCommitCompareExchange(peakCommittedBytes, peak, currentCommittedBytes))
+        {}
     }
 
     void updatePeakHighWater(size_t usedBytes)
@@ -8633,7 +8915,26 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     task.runningWorker = &worker;
     fiberAtomicFetchAddSize(worker.executedFibers, 1);
     trace(FiberTraceEventType::TaskStarted, &task, &worker);
-    FiberContextOperations::switchTo(worker.rootContext(), task.context());
+    FiberStackClass* executingStackClass       = task.originStackClass;
+    bool             incrementalStackPublished = false;
+    Result           stackPublicationResult(true);
+    if (executingStackClass != nullptr)
+    {
+        stackPublicationResult =
+            executingStackClass->internal.get().publishExecution(task.originStackMemory, incrementalStackPublished);
+    }
+    if (stackPublicationResult)
+    {
+        FiberContextOperations::switchTo(worker.rootContext(), task.context());
+    }
+    else
+    {
+        finishCurrentTask(task, stackPublicationResult);
+    }
+    if (incrementalStackPublished)
+    {
+        executingStackClass->internal.get().clearExecution();
+    }
     FiberWorker*     preferredReadyWorker = nullptr;
     FiberTaskPool*   completedOriginPool  = nullptr;
     FiberTaskClass*  completedTaskClass   = nullptr;
