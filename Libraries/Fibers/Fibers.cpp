@@ -1381,7 +1381,7 @@ struct FiberStackClassInternal
         stackStates[index]             = StackState::Free;
         if (highWaterAvailable)
         {
-            updatePeakHighWater(committedMemory(index).highWaterUsedBytes());
+            updatePeakHighWater(stackHighWaterUsedBytes(index));
         }
         const size_t committedBytes = fiberStackCommitLoad(stackCommittedSizes[index]);
         Result       decommitResult =
@@ -1492,6 +1492,17 @@ struct FiberStackClassInternal
         Span<char>   memory         = slotMemory(index);
         const size_t committedBytes = fiberStackCommitLoad(stackCommittedSizes[index]);
         return FiberStack({memory.data() + stackBytes - committedBytes, committedBytes});
+    }
+
+    size_t stackHighWaterUsedBytes(size_t index) const
+    {
+        const size_t committedBytes = fiberStackCommitLoad(stackCommittedSizes[index]);
+        if (commitMode == FiberStackCommitMode::Incremental and committedBytes > initialCommitBytes)
+        {
+            return committedBytes;
+        }
+        Span<char> memory = slotMemory(index);
+        return FiberStack({memory.data() + stackBytes - committedBytes, committedBytes}).highWaterUsedBytes();
     }
 
     Result publishExecution(Span<char> memory, bool& outPublished)
@@ -1633,7 +1644,7 @@ struct FiberStackClassInternal
             {
                 continue;
             }
-            const size_t usedBytes = committedMemory(idx).highWaterUsedBytes();
+            const size_t usedBytes = stackHighWaterUsedBytes(idx);
             if (usedBytes > highWater)
             {
                 highWater = usedBytes;

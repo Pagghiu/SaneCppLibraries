@@ -7683,6 +7683,7 @@ struct SC::FibersTest : public SC::TestCase
         stackOptions.initialCommitSizeInBytes = 32 * 1024;
         stackOptions.growthCommitSizeInBytes  = FiberStackSize::FourKiB;
         SC_TEST_EXPECT(stackClass.reserve(stackOptions));
+        stackClass.fillHighWaterMarks();
         SC_TEST_EXPECT(pool.create(taskClass, stackClass));
 
         FiberStackClassDiagnostics before;
@@ -7739,6 +7740,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(grownBytes >= 2 * after.growthCommitSizeInBytes);
         SC_TEST_EXPECT(grownBytes % after.growthCommitSizeInBytes == 0);
         SC_TEST_EXPECT(after.peakCommittedBytes <= metadataBytes + after.stackSizeInBytes);
+        SC_TEST_EXPECT(after.highWaterUsedBytes > after.initialCommitSizeInBytes);
+        SC_TEST_EXPECT(after.highWaterUsedBytes <= after.stackSizeInBytes);
         SC_TEST_EXPECT(pool.availableCount() == 1);
         const size_t peakBeforeMigration = after.peakCommittedBytes;
 

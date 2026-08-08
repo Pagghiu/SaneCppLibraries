@@ -314,8 +314,9 @@ slot's actual committed interval before it becomes reusable. On Windows, the fir
 increment while preparing the native guard page, so diagnostics rather than the requested initial size remain the
 source of truth for physical commitment.
 
-High-water diagnostics remain exact for fully committed classes. They are conservative after an incremental stack has
-grown because a fault handler cannot safely overwrite the interrupted stack frame with high-water marks.
+High-water diagnostics remain exact for fully committed classes. For an incremental stack they scan the initial
+interval until growth occurs, then conservatively report its committed boundary; diagnostics never read a live guard
+or uncommitted page and may therefore overestimate actual use within the committed interval.
 
 The POSIX growth handler relies on the validated macOS and Linux signal-context behavior of page protection changes
 and lock-free native accounting. Incremental execution is therefore supported only on the CPU/OS paths explicitly
