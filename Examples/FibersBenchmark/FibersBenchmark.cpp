@@ -817,10 +817,26 @@ static Result runForcedStealingBenchmark(Console& console)
     return Result(true);
 }
 
-[[nodiscard]] static Result runMassSuspensionBenchmark(Console& console, size_t numFibers)
+[[nodiscard]] static Result runMassSuspensionBenchmark(Console& console, size_t numFibers,
+                                                       FiberStackCommitMode commitMode)
 {
-    static constexpr size_t StackSize     = 8 * 1024;
+    static constexpr size_t StackSize     = FiberStackSize::ThirtyTwoKiB;
     const size_t            allocatorSize = numFibers * sizeof(FiberTask) * 2 + 4 * 1024 * 1024;
+
+    FiberStackGrowthRuntime growthRuntime;
+    FiberStackGrowthThread  growthThread;
+    if (commitMode == FiberStackCommitMode::Incremental)
+    {
+        SC_TRY_MSG(FiberStackGrowthRuntime::isSupported(),
+                   "Incremental mass suspension is unavailable under the active tooling");
+        SC_TRY(growthRuntime.create());
+#if SC_PLATFORM_WINDOWS
+        SC_TRY(growthThread.create(growthRuntime, {}));
+#else
+        static char signalStack[FiberStackGrowthSignalStackSize] = {};
+        SC_TRY(growthThread.create(growthRuntime, signalStack));
+#endif
+    }
 
     FiberAllocator               allocator;
     FiberAllocatorVirtualOptions allocatorOptions;
@@ -838,7 +854,16 @@ static Result runForcedStealingBenchmark(Console& console)
     stackOptions.stackSizeInBytes = StackSize;
     stackOptions.maxStacks        = numFibers;
     stackOptions.guardPage        = true;
+    stackOptions.commitMode       = commitMode;
+    if (commitMode == FiberStackCommitMode::Incremental)
+    {
+        stackOptions.initialCommitSizeInBytes = FiberStackSize::FourKiB;
+        stackOptions.growthCommitSizeInBytes  = FiberStackSize::FourKiB;
+    }
     SC_TRY(stackClass.reserve(stackOptions));
+
+    FiberStackClassDiagnostics emptyDiagnostics;
+    stackClass.diagnostics(emptyDiagnostics);
 
     FiberTaskPool taskPool;
     SC_TRY(taskPool.create(taskClass, stackClass));
@@ -875,30 +900,44 @@ static Result runForcedStealingBenchmark(Console& console)
     SC_TRY_MSG(suspendedDiagnostics.stackClass.activeStacks == numFibers,
                "Mass-suspension benchmark stack class did not retain every stack");
 
-    Time::HighResolutionCounter resumeStart;
-    resumeStart.snap();
+    Time::HighResolutionCounter wakeStart;
+    wakeStart.snap();
     SC_TRY(scheduler.done(gate));
+    Time::HighResolutionCounter wakeFinish;
+    wakeFinish.snap();
+
+    Time::HighResolutionCounter completionStart;
+    completionStart.snap();
     SC_TRY(scheduler.run());
-    Time::HighResolutionCounter resumeFinish;
-    resumeFinish.snap();
+    Time::HighResolutionCounter completionFinish;
+    completionFinish.snap();
 
     FiberTaskPoolDiagnostics completedDiagnostics;
     taskPool.diagnostics(completedDiagnostics);
     SC_TRY_MSG(not scheduler.hasActiveFibers(), "Mass-suspension benchmark left active fibers");
     SC_TRY_MSG(taskPool.availableCount() == numFibers, "Mass-suspension benchmark did not recycle every slot");
 
-    const Time::HighResolutionCounter spawnElapsed   = spawnFinish.subtractExact(spawnStart);
-    const Time::HighResolutionCounter suspendElapsed = suspendFinish.subtractExact(suspendStart);
-    const Time::HighResolutionCounter resumeElapsed  = resumeFinish.subtractExact(resumeStart);
+    const Time::HighResolutionCounter spawnElapsed      = spawnFinish.subtractExact(spawnStart);
+    const Time::HighResolutionCounter suspendElapsed    = suspendFinish.subtractExact(suspendStart);
+    const Time::HighResolutionCounter wakeElapsed       = wakeFinish.subtractExact(wakeStart);
+    const Time::HighResolutionCounter completionElapsed = completionFinish.subtractExact(completionStart);
     console.print("FibersBenchmark mass suspension milestone\n");
-    console.print("  fibers={} stackSize={} guardSize={}\n", numFibers, StackSize,
+    console.print("  commitMode={} fibers={} stackSize={} guardSize={}\n",
+                  commitMode == FiberStackCommitMode::Incremental ? "incremental" : "full", numFibers, StackSize,
                   suspendedDiagnostics.stackClass.guardSizeInBytes);
-    console.print("  spawnAndSlotAcquireElapsedMs={} suspendElapsedMs={} resumeElapsedMs={}\n",
+    console.print("  spawnAndSlotAcquireElapsedMs={} suspendElapsedMs={} wakeElapsedMs={} "
+                  "completionAndSlotReleaseElapsedMs={}\n",
                   static_cast<size_t>(spawnElapsed.toMilliseconds().ms),
                   static_cast<size_t>(suspendElapsed.toMilliseconds().ms),
-                  static_cast<size_t>(resumeElapsed.toMilliseconds().ms));
-    console.print("  reservedBytes={} committedBytes={} peakCommittedBytes={}\n",
-                  suspendedDiagnostics.stackClass.reservedSizeBytes, suspendedDiagnostics.stackClass.committedSizeBytes,
+                  static_cast<size_t>(wakeElapsed.toMilliseconds().ms),
+                  static_cast<size_t>(completionElapsed.toMilliseconds().ms));
+    console.print("  reservedBytes={} metadataCommittedBytes={} initialCommitBytes={} growthCommitBytes={}\n",
+                  suspendedDiagnostics.stackClass.reservedSizeBytes, emptyDiagnostics.committedSizeBytes,
+                  suspendedDiagnostics.stackClass.initialCommitSizeInBytes,
+                  suspendedDiagnostics.stackClass.growthCommitSizeInBytes);
+    console.print("  suspendedCommittedBytes={} suspendedSlotCommittedBytes={} peakCommittedBytes={}\n",
+                  suspendedDiagnostics.stackClass.committedSizeBytes,
+                  suspendedDiagnostics.stackClass.committedSizeBytes - emptyDiagnostics.committedSizeBytes,
                   suspendedDiagnostics.stackClass.peakCommittedBytes);
     console.print("  completedCommittedBytes={} taskAllocatorPeakBytes={} allocatorFailures={}\n",
                   completedDiagnostics.stackClass.committedSizeBytes, allocator.peakUsed(),
@@ -909,6 +948,11 @@ static Result runForcedStealingBenchmark(Console& console)
     SC_TRY(taskClass.close());
     stackClass.release();
     SC_TRY(allocator.close());
+    if (commitMode == FiberStackCommitMode::Incremental)
+    {
+        SC_TRY(growthThread.close());
+        SC_TRY(growthRuntime.close());
+    }
     return Result(true);
 }
 
@@ -1655,21 +1699,22 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     Console::tryAttachingToParentConsole();
     printBenchmarkEnvironment(console);
 
-    bool       schedulerThroughput = false;
-    bool       jobThroughput       = false;
-    bool       jobPoolThroughput   = false;
-    bool       jobWorkerThroughput = false;
-    bool       jobWorkerMatrix     = false;
-    bool       jobWorkerSustained  = false;
-    int32_t    jobWorkers          = 4;
-    int32_t    jobRounds           = 5;
-    int32_t    massSuspensionCount = 0;
-    int32_t    externalProducers   = 1;
-    int32_t    schedulerWorkers    = 0;
-    int32_t    schedulerRounds     = 1;
-    StringView schedulerWorkload   = "all";
+    bool       schedulerThroughput  = false;
+    bool       jobThroughput        = false;
+    bool       jobPoolThroughput    = false;
+    bool       jobWorkerThroughput  = false;
+    bool       jobWorkerMatrix      = false;
+    bool       jobWorkerSustained   = false;
+    int32_t    jobWorkers           = 4;
+    int32_t    jobRounds            = 5;
+    int32_t    massSuspensionCount  = 0;
+    int32_t    externalProducers    = 1;
+    int32_t    schedulerWorkers     = 0;
+    int32_t    schedulerRounds      = 1;
+    StringView massSuspensionCommit = "full";
+    StringView schedulerWorkload    = "all";
 
-    CommandLineOption options[13];
+    CommandLineOption options[14];
     options[0].longName = "scheduler-throughput";
     options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
     options[0].value    = CommandLineValue::boolean(schedulerThroughput);
@@ -1730,6 +1775,11 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     options[12].valueName = "COUNT";
     options[12].value     = CommandLineValue::int32(schedulerRounds);
 
+    options[13].longName  = "mass-suspension-commit";
+    options[13].help      = "Select full or incremental stack commitment for mass suspension";
+    options[13].valueName = "MODE";
+    options[13].value     = CommandLineValue::stringView(massSuspensionCommit);
+
     CommandLineSpec spec;
     spec.programName = "FibersBenchmark";
     spec.summary     = "Measure Fibers scheduler throughput, contention, and live-fiber density.";
@@ -1787,6 +1837,10 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     {
         return Result::Error("FiberJob benchmark rounds must be between one and 15");
     }
+    if (massSuspensionCommit != "full" and massSuspensionCommit != "incremental")
+    {
+        return Result::Error("Mass-suspension commitment must be full or incremental");
+    }
     if (massSuspensionCount < 0 or (not schedulerThroughput and not jobThroughput and not jobPoolThroughput and
                                     not jobWorkerThroughput and not jobWorkerMatrix and not jobWorkerSustained and
                                     arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
@@ -1795,7 +1849,9 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     }
     if (massSuspensionCount > 0)
     {
-        return runMassSuspensionBenchmark(console, static_cast<size_t>(massSuspensionCount));
+        return runMassSuspensionBenchmark(console, static_cast<size_t>(massSuspensionCount),
+                                          massSuspensionCommit == "incremental" ? FiberStackCommitMode::Incremental
+                                                                                : FiberStackCommitMode::Full);
     }
     if (jobThroughput)
     {
@@ -1849,8 +1905,8 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
 
     SC_TRY(runWorkerPoolBenchmark(console));
     SC_TRY(runForcedStealingBenchmark(console));
-    SC_TRY(runMassSuspensionBenchmark(console, 10'000));
-    SC_TRY(runMassSuspensionBenchmark(console, 100'000));
+    SC_TRY(runMassSuspensionBenchmark(console, 10'000, FiberStackCommitMode::Full));
+    SC_TRY(runMassSuspensionBenchmark(console, 100'000, FiberStackCommitMode::Full));
     SC_TRY(runAsyncFiberHighWaterBenchmark(console));
     SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers), 0, "all"));
     SC_TRY(runCounterCompletionBenchmark(console));

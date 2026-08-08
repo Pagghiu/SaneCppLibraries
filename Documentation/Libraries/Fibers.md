@@ -505,7 +505,10 @@ diagnostics types.
   storage. Its `--job-worker-sustained --job-workers <COUNT>` mode keeps one job worker pool alive and reuses a fixed
   8,192-record batch across one million jobs, timing transactional batch publication through each explicit idle
   boundary. It reports both the stackful-comparable shared-atomic payload and an independent per-record output variant
-  that isolates scheduler throughput from application cache-line contention.
+  that isolates scheduler throughput from application cache-line contention. Its equal-reservation density modes use
+  `--mass-suspension <COUNT> --mass-suspension-commit full` and `incremental`; compare matching Release runs rather
+  than unlike stack sizes or task counts. The output separates reservation, metadata and slot commitment, peak
+  commitment, spawn/acquire, suspension, wake, and completion/slot-release boundaries.
 - `Examples/FibersSkynetBenchmark` is enabled after `./SC.sh package install taskflow-benchmarks` and compares the
   stackful scheduler and stackless jobs with Taskflow's pinned upstream Skynet backend. The stackful depth limit is
   explicit because each live `FiberTask` owns a fixed stack; the `FiberJob` backend uses distinct stable continuation
