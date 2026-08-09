@@ -36,6 +36,27 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     }
 
+    bool runUntil(AsyncEventLoop& eventLoop, Function<bool()> predicate)
+    {
+        bool             timedOut = false;
+        AsyncLoopTimeout timeout;
+        timeout.callback = [&timedOut](AsyncLoopTimeout::Result&) { timedOut = true; };
+        SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{5000}));
+        eventLoop.excludeFromActiveCount(timeout);
+
+        while (not predicate() and not timedOut)
+        {
+            SC_TEST_EXPECT(eventLoop.runOnce());
+        }
+        if (not timedOut)
+        {
+            SC_TEST_EXPECT(timeout.stop(eventLoop));
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+            SC_TEST_EXPECT(timeout.isFree());
+        }
+        return predicate() and not timedOut;
+    }
+
     void eventLoopSubdirectory(const StringView appDirectory)
     {
         if (test_section("AsyncEventLoop"))
@@ -51,33 +72,45 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
             struct Params
             {
-                uint64_t   callbackThreadID = 0;
-                uint64_t   changes          = 0;
+                uint64_t callbackThreadID       = 0;
+                uint64_t addRemoveRenameChanges = 0;
+                uint64_t modifiedChanges        = 0;
+
                 StringView appDirectory;
+
+                SmallStringNative<255>  expectedRelativePath = StringEncoding::Native;
+                SmallStringNative<1024> expectedFullPath     = StringEncoding::Native;
             } params;
             params.appDirectory = appDirectory;
 
+            constexpr native_char_t nativeSep = Path::Separator;
+            SC_TEST_EXPECT(StringBuilder::format(params.expectedRelativePath, "{}{}{}{}{}", "dir", nativeSep, "subdir2",
+                                                 nativeSep, "test.txt"));
+            SC_TEST_EXPECT(StringBuilder::format(params.expectedFullPath, "{}{}{}", params.appDirectory, nativeSep,
+                                                 params.expectedRelativePath.view()));
+
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
-                constexpr native_char_t nativeSep = Path::Separator;
-
-                SmallStringNative<255>  dirBuffer      = StringEncoding::Native;
-                SmallStringNative<1024> expectedBuffer = StringEncoding::Native;
+                if (notification.relativePath != params.expectedRelativePath.view())
+                {
+                    return;
+                }
 
                 params.callbackThreadID = Thread::CurrentThreadID();
-                params.changes++;
-                SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
+                if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                {
+                    params.addRemoveRenameChanges++;
+                }
+                else
+                {
+                    SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
+                    params.modifiedChanges++;
+                }
                 SC_TEST_EXPECT(params.appDirectory == notification.basePath);
-                SC_TEST_EXPECT(
-                    StringBuilder::format(dirBuffer, "{}{}{}{}{}", "dir", nativeSep, "subdir2", nativeSep, "test.txt"));
-                SC_TEST_EXPECT(dirBuffer.view() == notification.relativePath);
 
                 StringPath fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPath));
-
-                SC_TEST_EXPECT(
-                    StringBuilder::format(expectedBuffer, "{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
-                SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
+                SC_TEST_EXPECT(fullPath.view() == params.expectedFullPath.view());
             };
 
             FileSystem fs;
@@ -94,13 +127,11 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SmallStringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
-            Thread::Sleep(200); // on macOS watch latency is 500 ms, so we sleep to avoid report of 'dir' creation
             watcher.notifyCallback = lambda;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
             submitQueuedWatcher(eventLoop);
             SC_TEST_EXPECT(fs.write("dir/subdir2/test.txt", "content"));
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(params.changes == 1);
+            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.addRemoveRenameChanges > 0; }));
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID == Thread::CurrentThreadID());
             SC_TEST_EXPECT(fs.removeFile({"dir/subdir2/test.txt"_a8}));
@@ -140,10 +171,8 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             submitQueuedWatcher(eventLoop);
             SC_TEST_EXPECT(fs.write("salve2.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti2.txt", "content"));
-            Thread::Sleep(100);
             // On different OS and FileSystems it's possible to get completely random number of changes
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(params.changes > 0);
+            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.changes > 0; }));
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs.removeFiles({"salve2.txt", "a_tutti2.txt"}));
         }
@@ -175,39 +204,48 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             }
             SC_TEST_EXPECT(fs.makeDirectory(path1.view()));
             SC_TEST_EXPECT(fs.makeDirectory(path2.view()));
-            Thread::Sleep(250); // avoid aggregation of previous events
             FileSystemWatcher::FolderWatcher watcher1, watcher2;
             watcher1.setDebugName("Watcher1");
             watcher2.setDebugName("Watcher2");
             struct Params
             {
-                int changes1 = 0;
-                int changes2 = 0;
+                int addRemoveRename1 = 0;
+                int addRemoveRename2 = 0;
+                int modified1        = 0;
+                int modified2        = 0;
             } params;
             auto lambda1 = [&](const FileSystemWatcher::Notification& notification)
             {
-                if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                if (notification.relativePath == "salve.txt")
                 {
-                    params.changes1++;
+                    if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                    {
+                        params.addRemoveRename1++;
+                    }
+                    else
+                    {
+                        SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
+                        params.modified1++;
+                    }
                 }
             };
             watcher1.notifyCallback = lambda1;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, path1.view()));
             auto lambda2 = [&](const FileSystemWatcher::Notification& notification)
             {
-                if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                if (notification.relativePath == "a_tutti.txt")
                 {
-                    params.changes2++;
+                    if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                    {
+                        params.addRemoveRename2++;
+                    }
+                    else
+                    {
+                        SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
+                        params.modified2++;
+                    }
                 }
             };
-// Sleeps exist because Windows does not recognize events properly if we're running too fast.
-// Additionally we explicitly create and delete files and only listen for Operation::AddRemoveRename
-// because in some cases we also get modified Operation::Modified
-#if SC_PLATFORM_WINDOWS
-            constexpr int waitForEventsTimeout = 200;
-#else
-            constexpr int waitForEventsTimeout = 100;
-#endif
             watcher2.notifyCallback = lambda2;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
             SC_TEST_EXPECT(eventLoop.runNoWait());
@@ -217,46 +255,48 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs2.init(path2.view()));
 
             SC_TEST_EXPECT(fs1.write("salve.txt", "content"));
-
-            Thread::Sleep(waitForEventsTimeout);
-            SC_TEST_EXPECT(eventLoop.runOnce());
+            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.addRemoveRename1 > 0; }));
             SC_TEST_EXPECT(fs2.write("a_tutti.txt", "content"));
-
-            Thread::Sleep(waitForEventsTimeout);
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(params.changes1 == 1);
-            SC_TEST_EXPECT(params.changes2 == 1);
+            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.addRemoveRename2 > 0; }));
+            SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(watcher2.stopWatching());
+            const int addRemoveRename1BeforeRemove = params.addRemoveRename1;
+            const int addRemoveRename2AfterStop    = params.addRemoveRename2;
             SC_TEST_EXPECT(fs1.removeFile("salve.txt"));
             SC_TEST_EXPECT(fs2.removeFile("a_tutti.txt"));
 
-            Thread::Sleep(waitForEventsTimeout);
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(params.changes1 == 2);
-            SC_TEST_EXPECT(params.changes2 == 1);
+            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.addRemoveRename1 > addRemoveRename1BeforeRemove; }));
+            SC_TEST_EXPECT(params.addRemoveRename2 == addRemoveRename2AfterStop);
             SC_TEST_EXPECT(watcher1.stopWatching());
+            const int addRemoveRename1AfterStop = params.addRemoveRename1;
             SC_TEST_EXPECT(fs1.write("salve.txt", "content NEW YEAH"));
             SC_TEST_EXPECT(fs2.write("a_tutti.txt", "content NEW YEAH"));
 
             SC_TEST_EXPECT(eventLoop.runNoWait());
-            SC_TEST_EXPECT(params.changes1 == 2);
-            SC_TEST_EXPECT(params.changes2 == 1);
+            SC_TEST_EXPECT(params.addRemoveRename1 == addRemoveRename1AfterStop);
+            SC_TEST_EXPECT(params.addRemoveRename2 == addRemoveRename2AfterStop);
 
             auto lambda3 = [&](const FileSystemWatcher::Notification& notification)
             {
-                if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                if (notification.relativePath == "a_tutti.txt")
                 {
-                    params.changes2++;
+                    if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                    {
+                        params.addRemoveRename2++;
+                    }
+                    else
+                    {
+                        SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
+                        params.modified2++;
+                    }
                 }
             };
             watcher2.notifyCallback = lambda3;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
             SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(fs2.removeFile("a_tutti.txt"));
-            Thread::Sleep(waitForEventsTimeout);
-            SC_TEST_EXPECT(eventLoop.runOnce());
-            SC_TEST_EXPECT(params.changes1 == 2);
-            SC_TEST_EXPECT(params.changes2 == 2);
+            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.addRemoveRename2 > addRemoveRename2AfterStop; }));
+            SC_TEST_EXPECT(params.addRemoveRename1 == addRemoveRename1AfterStop);
 
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs1.removeFile("salve.txt"));
