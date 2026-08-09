@@ -8003,7 +8003,9 @@ struct SC::FibersTest : public SC::TestCase
             if (sectionIndex == 0)
             {
 #if SC_PLATFORM_WINDOWS
-                SC_TEST_EXPECT(process.getExitStatus() == static_cast<int32_t>(0xC00000FDu));
+                const int32_t exitStatus = process.getExitStatus();
+                SC_TEST_EXPECT(exitStatus == static_cast<int32_t>(0xC00000FDu) or
+                               exitStatus == static_cast<int32_t>(0xC0000005u));
 #else
                 const int32_t exitStatus = process.getExitStatus();
                 SC_TEST_EXPECT(exitStatus == SIGSEGV or exitStatus == SIGBUS or exitStatus == 128 + SIGSEGV or

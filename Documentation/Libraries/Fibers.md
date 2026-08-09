@@ -329,7 +329,9 @@ clears that state immediately after returning to the worker root. A valid fault 
 yielding and migration republish the same slot on the resuming OS thread. Completion and cancellation release the
 slot's actual committed interval before it becomes reusable. On Windows, the first dispatch may commit one growth
 increment while preparing the native guard page, so diagnostics rather than the requested initial size remain the
-source of truth for physical commitment.
+source of truth for physical commitment. Exhausting the reservation is always fatal; Windows can report either native
+stack overflow when no further guard can be created or native access violation when the final stack probe crosses the
+reservation boundary.
 
 High-water diagnostics remain exact for fully committed classes. For an incremental stack they scan the initial
 interval until growth occurs, then conservatively report its committed boundary; diagnostics never read a live guard
