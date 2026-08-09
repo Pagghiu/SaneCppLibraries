@@ -1578,7 +1578,9 @@ struct FiberStackClassInternal
         active.previousStackBase  = threadStack.StackBase;
         active.previousStackLimit = threadStack.StackLimit;
         threadStack.StackBase     = active.stackEnd;
-        threadStack.StackLimit    = active.stackEnd - fiberStackCommitLoad(*active.committedBytes);
+        // Keep StackLimit on the guard; the lowest committed page is reserved for native exception dispatch.
+        threadStack.StackLimit =
+            active.stackEnd - fiberStackCommitLoad(*active.committedBytes) + FiberVirtualMemory::getPageSize();
 #endif
         fiberStackGrowthActiveStack = active;
         outPublished                = true;
