@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Fibers/Fibers.h"
+#include "Libraries/Common/PlacementNew.h"
 #include "Libraries/Fibers/Internal/FiberContext.h"
 #include "Libraries/Process/Process.h"
 #include "Libraries/Testing/Testing.h"
@@ -11,6 +12,11 @@
 #if !SC_PLATFORM_WINDOWS
 #include <signal.h>
 #include <unistd.h>
+#endif
+
+#if SC_PLATFORM_LINUX
+#include <stdlib.h>
+#include <sys/mman.h>
 #endif
 
 #if SC_PLATFORM_WINDOWS
@@ -334,6 +340,12 @@ struct SC::FibersTest : public SC::TestCase
         {
             incrementalStackRestorationChild();
         }
+#if SC_PLATFORM_LINUX
+        if (test_section("incremental stack nested child", Execute::OnlyExplicit))
+        {
+            incrementalStackNestedChild();
+        }
+#endif
         if (test_section("stack class"))
         {
             stackClass();
@@ -7976,6 +7988,9 @@ struct SC::FibersTest : public SC::TestCase
             "incremental stack terminal child",
             "incremental stack foreign child",
             "incremental stack restoration child",
+#if SC_PLATFORM_LINUX
+            "incremental stack nested child",
+#endif
         };
         for (size_t sectionIndex = 0; sectionIndex < sizeof(sections) / sizeof(sections[0]); ++sectionIndex)
         {
@@ -8003,10 +8018,16 @@ struct SC::FibersTest : public SC::TestCase
                 SC_TEST_EXPECT(process.getExitStatus() == 73);
 #endif
             }
-            else
+            else if (sectionIndex == 2)
             {
                 SC_TEST_EXPECT(process.getExitStatus() == 0);
             }
+#if SC_PLATFORM_LINUX
+            else
+            {
+                SC_TEST_EXPECT(process.getExitStatus() == 73);
+            }
+#endif
         }
     }
 
@@ -8117,6 +8138,69 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(sigaction(SIGSEGV, &previousSegmentation, nullptr) == 0);
 #endif
     }
+
+#if SC_PLATFORM_LINUX
+    void incrementalStackNestedChild()
+    {
+        if (not FiberStackGrowthRuntime::isSupported())
+        {
+            return;
+        }
+
+        struct sigaction action = {};
+        action.sa_handler       = incrementalStackForeignHandler;
+        sigemptyset(&action.sa_mask);
+        SC_TEST_EXPECT(sigaction(SIGSEGV, &action, nullptr) == 0);
+        SC_TEST_EXPECT(sigaction(SIGBUS, &action, nullptr) == 0);
+
+        FiberStackGrowthRuntime runtime;
+        FiberStackGrowthThread  growthThread;
+        SC_TEST_EXPECT(runtime.create());
+        char signalStack[FiberStackGrowthSignalStackSize] = {};
+        SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
+
+        const size_t pageSize = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+        char         path[]   = "/tmp/sc-fibers-nested-XXXXXX";
+        const int    file     = mkstemp(path);
+        SC_TEST_EXPECT(file >= 0);
+        SC_TEST_EXPECT(unlink(path) == 0);
+        SC_TEST_EXPECT(ftruncate(file, static_cast<off_t>(pageSize)) == 0);
+        void* stackClassPage = mmap(nullptr, pageSize, PROT_READ | PROT_WRITE, MAP_SHARED, file, 0);
+        SC_TEST_EXPECT(stackClassPage != MAP_FAILED);
+
+        auto& stackClass = *static_cast<FiberStackClass*>(stackClassPage);
+        placementNew(stackClass);
+
+        char           taskMemory[64 * 1024] = {};
+        FiberAllocator allocator;
+        FiberTaskClass taskClass;
+        FiberTaskPool  pool;
+        SC_TEST_EXPECT(allocator.createFixed(taskMemory));
+        SC_TEST_EXPECT(taskClass.create(allocator, {1}));
+
+        FiberStackClassOptions stackOptions;
+        stackOptions.stackSizeInBytes         = 256 * 1024;
+        stackOptions.maxStacks                = 1;
+        stackOptions.guardPage                = true;
+        stackOptions.commitMode               = FiberStackCommitMode::Incremental;
+        stackOptions.initialCommitSizeInBytes = 32 * 1024;
+        stackOptions.growthCommitSizeInBytes  = FiberStackSize::FourKiB;
+        SC_TEST_EXPECT(stackClass.reserve(stackOptions));
+        SC_TEST_EXPECT(pool.create(taskClass, stackClass));
+
+        FiberScheduler scheduler;
+        size_t         checksum = 0;
+        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
+                                                 [file, &checksum](FiberScheduler&)
+                                                 {
+                                                     SC_TRY_MSG(ftruncate(file, 0) == 0,
+                                                                "Could not invalidate nested-fault accounting");
+                                                     consumeIncrementalStack(24, checksum);
+                                                     return Result(true);
+                                                 })));
+        SC_TEST_EXPECT(not scheduler.run());
+    }
+#endif
 
     void virtualStack()
     {
