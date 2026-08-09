@@ -170,6 +170,22 @@ or otherwise coordinated if the caller needs a closed submission boundary; a con
 A persistent pool rejects `join()` until stop has been requested, avoiding an accidental indefinite wait while it is
 still accepting work.
 
+`Examples/FibersMandelbrot` applies this model to a bounded image renderer. It preallocates one stable job per possible
+row, starts a persistent worker pool, transactionally publishes the requested rows, waits for the wave, and then
+inspects every retained result before writing the image:
+
+@snippet Examples/FibersMandelbrot/FibersMandelbrot.cpp FibersMandelbrotRun
+
+The example deliberately keeps worker count explicit. Its job, ready-queue, pixel, worker, thread, and deque capacities
+all have fixed maxima, and invalid dimensions fail rather than growing them. This is the intended `FiberJob` shape for
+independent CPU records that cannot suspend. Its command-line positional array is also stable storage; assigning a
+temporary braced span to `CommandLineSpec::positionals` would leave a dangling borrowed view before parsing.
+
+One batch procedure is copied into every submitted record. The renderer therefore uses `context.job()` to map each
+stable record to its row in caller-owned sidecar storage. This preserves compact records and transactional publication,
+but is less direct than per-record payload fields; keep that tradeoff in mind when choosing between one shared batch
+procedure and individually captured job procedures.
+
 # Capacity Is Part of Control Flow
 
 When producing more work than the pool can hold at once, capacity pressure is explicit. From inside a fiber,
@@ -498,6 +514,8 @@ diagnostics types.
 # Further Examples
 
 - `Examples/FibersDemo` shows a tiny CPU fiber workload, `AsyncFibers` sleeps, and worker-pool I/O.
+- `Examples/FibersMandelbrot` renders a bounded grayscale image with one stackless job per row and reports worker
+  execution and stealing diagnostics.
 - `Examples/FibersBenchmark` contains explicit benchmark-style workloads for yield/resume, sustained micro-tasking,
   raw stackless dispatch, and pooled stackless acquire/run/release overhead. Its
   `--job-worker-matrix --job-rounds <COUNT>` mode runs one warm-up and bounded repeated samples at unique

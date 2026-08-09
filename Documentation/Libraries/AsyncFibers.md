@@ -46,6 +46,27 @@ The example also exposes the storage model. The caller supplies the event loop, 
 task group, and error collection. `AsyncFiberIO` itself borrows the event loop, scheduler, and command span; the
 scheduler and task group use the remaining storage.
 
+# A bounded file-copy consumer
+
+`Examples/AsyncFibersFileCopy` is a complete command-line file copier rather than a sleep demonstration. It resolves
+two input paths, opens non-blocking descriptors, associates them with the event loop, and copies through a fixed 64 KiB
+buffer owned by the caller:
+
+@snippet Examples/AsyncFibersFileCopy/AsyncFibersFileCopy.cpp AsyncFibersFileCopyLoop
+
+The loop makes the partial-operation contract visible: `fileReadAt` sizes its result span to the bytes received, while
+`fileWriteAllAt` repeats writes at an explicit destination offset until that span is consumed. Explicit offsets keep
+multi-chunk behavior independent of platform file-cursor semantics. An empty non-EOF read is rejected as no progress. The
+destination is opened without truncation until descriptor identities prove that a symlink or hard link does not alias
+the source. It is then reopened once as the nonblocking write descriptor, which also performs the truncation. The
+executable demonstrates the required shutdown order: finish the task, destroy the bridge, close both descriptors, then
+close the event loop. Run it with
+`./SC.sh build run AsyncFibersFileCopy -- <source> <destination>`.
+
+Using the API in this consumer exposes one intentional boundary: opening and associating descriptors is still explicit
+`File`/`Async` setup. `AsyncFibers` adapts waits on an existing descriptor; it does not hide resource creation or turn
+filesystem metadata operations into fiber calls.
+
 # What the I/O calls return
 
 Operations return SC::Result for success, cancellation, or an OS/backend error. Values produced by an operation use

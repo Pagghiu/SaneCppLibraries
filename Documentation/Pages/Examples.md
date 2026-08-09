@@ -139,6 +139,10 @@ build target.
 
 - [FibersDemo](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersDemo) demonstrates CPU fibers,
   `AsyncFibers` sleeps, and worker-pool work in three focused sections.
+- [AsyncFibersFileCopy](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/AsyncFibersFileCopy) copies a file
+  through a fixed caller-owned buffer using stackful asynchronous file reads and writes.
+- [FibersMandelbrot](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersMandelbrot) renders a bounded
+  grayscale image with one stackless `FiberJob` per row and an explicit worker count.
 - [FibersBenchmark](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersBenchmark) is a maintainer
   benchmark for scheduler, contention, and sustained micro-task workloads.
 - [FibersSkynetBenchmark](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersSkynetBenchmark) is an
