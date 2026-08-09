@@ -1062,6 +1062,7 @@ struct SC_FIBERS_EXPORT FiberJobWorkerPool
 
     void                   wakeOneWorker();
     void                   wakeAllWorkers();
+    void                   advanceWakeGeneration();
     [[nodiscard]] bool     waitForWork(uint32_t observedGeneration);
     [[nodiscard]] uint32_t wakeGeneration() const;
     [[nodiscard]] bool     isStopRequested() const;

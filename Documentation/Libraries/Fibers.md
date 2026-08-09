@@ -509,6 +509,10 @@ diagnostics types.
   `--mass-suspension <COUNT> --mass-suspension-commit full` and `incremental`; compare matching Release runs rather
   than unlike stack sizes or task counts. The output separates reservation, metadata and slot commitment, peak
   commitment, spawn/acquire, suspension, wake, and completion/slot-release boundaries.
+- Worker-local `FiberJob` batch publication wakes one parked peer when it creates a new local backlog. Appending a
+  batch behind work that is already visible still advances the wake generation, closing the publication-versus-park
+  race, but avoids another condition-variable signal. Single-job publication retains wake-one behavior and external
+  batch publication retains wake-all behavior.
 - `Examples/FibersSkynetBenchmark` is enabled after `./SC.sh package install taskflow-benchmarks` and compares the
   stackful scheduler and stackless jobs with Taskflow's pinned upstream Skynet backend. The stackful depth limit is
   explicit because each live `FiberTask` owns a fixed stack; the `FiberJob` backend uses distinct stable continuation

@@ -2143,6 +2143,8 @@ struct FiberWorkerPoolWakeEvent
     }
 #endif
 
+    void notifyWithoutSignal() { fiberAtomicFetchAddUInt32(generation, 1); }
+
     uint32_t currentGeneration() const { return fiberAtomicLoadUInt32(generation); }
 
     [[nodiscard]] uint32_t parkedCount() const { return fiberAtomicLoadUInt32(parked); }
@@ -3096,6 +3098,8 @@ size_t FiberJobWorkerPool::parkedWorkerCount() const { return wakeEvent.get().pa
 void FiberJobWorkerPool::wakeOneWorker() { wakeEvent.get().notifyOne(); }
 
 void FiberJobWorkerPool::wakeAllWorkers() { wakeEvent.get().notifyAll(); }
+
+void FiberJobWorkerPool::advanceWakeGeneration() { wakeEvent.get().notifyWithoutSignal(); }
 
 bool FiberJobWorkerPool::waitForWork(uint32_t observedGeneration) { return wakeEvent.get().wait(observedGeneration); }
 
@@ -4409,7 +4413,16 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
             }
             if (workerPool != nullptr)
             {
-                workerPool->wakeOneWorker();
+                // Existing local backlog already prevents a peer's final ready-work check from parking. Still advance
+                // the generation so a peer racing that check cannot sleep on a stale observation.
+                if (bottom == top)
+                {
+                    workerPool->wakeOneWorker();
+                }
+                else
+                {
+                    workerPool->advanceWakeGeneration();
+                }
             }
             return Result(true);
         }
