@@ -8354,6 +8354,9 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.initialCommitSizeInBytes >= FiberStackSize::FourKiB);
         SC_TEST_EXPECT(diagnostics.initialCommitSizeInBytes <= diagnostics.stackSizeInBytes);
         SC_TEST_EXPECT(diagnostics.growthCommitSizeInBytes >= FiberStackSize::FourKiB);
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(diagnostics.growthCommitSizeInBytes == 2 * diagnostics.initialCommitSizeInBytes);
+#endif
         SC_TEST_EXPECT(diagnostics.growthCommitSizeInBytes <= diagnostics.stackSizeInBytes);
 
         FiberStack incrementalFirst({});

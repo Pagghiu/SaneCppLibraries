@@ -319,9 +319,10 @@ supported CPU/OS path. Keep full commitment in portable production configuration
 
 Full commitment remains the `FiberStackClass` default. Opt-in `FiberStackCommitMode::Incremental` classes take explicit
 non-zero `initialCommitSizeInBytes` and `growthCommitSizeInBytes`; both are page-rounded, bounded by the usable stack,
-and exposed through `FiberStackClassDiagnostics`. Acquisition commits only the initial high end of the downward-growing
-stack, release decommits its actual committed interval, and committed-byte diagnostics include metadata plus active
-slot commitment rather than virtual reservation.
+and exposed through `FiberStackClassDiagnostics`. Windows rounds the effective growth interval to at least two pages,
+leaving one writable page below the native guard for exception dispatch. Acquisition commits only the initial high end
+of the downward-growing stack, release decommits its actual committed interval, and committed-byte diagnostics include
+metadata plus active slot commitment rather than virtual reservation.
 
 The scheduler publishes the active incremental slot in thread-local execution state immediately before entering it and
 clears that state immediately after returning to the worker root. A valid fault commits one bounded growth increment;

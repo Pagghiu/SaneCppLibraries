@@ -1260,6 +1260,13 @@ struct FiberStackClassInternal
             }
             initialCommitBytes = FiberVirtualMemory::roundUpToPageSize(options.initialCommitSizeInBytes);
             growthCommitBytes  = FiberVirtualMemory::roundUpToPageSize(options.growthCommitSizeInBytes);
+#if SC_PLATFORM_WINDOWS
+            const size_t minimumGrowthCommitBytes = 2 * FiberVirtualMemory::getPageSize();
+            if (growthCommitBytes < minimumGrowthCommitBytes)
+            {
+                growthCommitBytes = minimumGrowthCommitBytes;
+            }
+#endif
             if (initialCommitBytes > stackBytes or growthCommitBytes > stackBytes)
             {
                 resetMetadata();

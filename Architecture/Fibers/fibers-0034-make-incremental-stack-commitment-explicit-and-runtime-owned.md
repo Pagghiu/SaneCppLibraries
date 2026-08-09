@@ -22,8 +22,9 @@ Add production incremental commitment as an explicit opt-in capability with thre
 - `FiberStackClassOptions` selects full or incremental commitment. Full commitment remains the default and preserves
   existing behavior and tooling compatibility.
 - Incremental options specify caller-selected initial commitment and growth increments. Both are page-rounded,
-  validated against the usable stack size, and exposed through diagnostics. Reservation and maximum stack count remain
-  explicit exactly as they are for full commitment.
+  validated against the usable stack size, and exposed through diagnostics. Windows uses an effective minimum of two
+  pages per growth interval so native exception dispatch retains one writable page below the guard. Reservation and
+  maximum stack count remain explicit exactly as they are for full commitment.
 - A caller-owned `FiberStackGrowthRuntime` owns process-wide fault integration. Creating and closing it are explicit
   fallible operations. Closing is rejected while any participating thread remains registered.
 - A caller-owned `FiberStackGrowthThread` owns one thread registration and, on POSIX, caller-provided alternate signal

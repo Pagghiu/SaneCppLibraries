@@ -243,7 +243,8 @@ struct SC_FIBERS_EXPORT FiberStackClassOptions
 
     FiberStackCommitMode commitMode               = FiberStackCommitMode::Full;
     size_t               initialCommitSizeInBytes = 0;
-    size_t               growthCommitSizeInBytes  = 0;
+    //! Page-rounded effective growth is reported by diagnostics; Windows reserves at least two pages per increment.
+    size_t growthCommitSizeInBytes = 0;
 };
 
 struct SC_FIBERS_EXPORT FiberStackClassDiagnostics
