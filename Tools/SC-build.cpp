@@ -743,6 +743,12 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         StringView name, extension;
         SC_TRY(Path::parseNameExtension(entry.name, name, extension));
 
+        String normalizedName = StringEncoding::Utf8;
+        auto   nameBuilder    = StringBuilder::create(normalizedName);
+        SC_TRY(nameBuilder.append(name));
+        nameBuilder.finalize();
+        name = normalizedName.view();
+
         String taskflowBenchmarksRoot = StringEncoding::Utf8;
         bool   hasTaskflowBenchmarks  = false;
         if (name == "FibersSkynetBenchmark")
@@ -821,6 +827,12 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
         SC_TRY(Path::parseNameExtension(fsi.get().name, name, extension));
         if (extension != "cpp" or not name.startsWith("Test_"))
             continue;
+
+        String normalizedName = StringEncoding::Utf8;
+        auto   nameBuilder    = StringBuilder::create(normalizedName);
+        SC_TRY(nameBuilder.append(name));
+        nameBuilder.finalize();
+        name = normalizedName.view();
 
         Project project;
         project.targetType = TargetType::ConsoleExecutable;
