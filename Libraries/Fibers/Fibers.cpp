@@ -482,7 +482,8 @@ struct FiberStackGrowthRuntimeInternal
 #if !SC_PLATFORM_WINDOWS
         struct sigaction action = {};
         action.sa_sigaction     = fiberStackGrowthSignalHandler;
-        action.sa_flags         = SA_SIGINFO | SA_ONSTACK;
+        // Re-enter on same-signal handler faults so handlingFault can forward them.
+        action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_NODEFER;
         sigemptyset(&action.sa_mask);
         if (sigaction(SIGSEGV, &action, &previousSegmentationAction) != 0)
         {

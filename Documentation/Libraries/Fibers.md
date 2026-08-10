@@ -314,8 +314,9 @@ reducing a production stack class, and retain enough margin for platform and bui
 
 # Incremental Stack Lifecycle
 
-Incremental execution remains a Draft capability while its production scheduler and fault matrix is completed on every
-supported CPU/OS path. Keep full commitment in portable production configurations until that qualification is removed.
+Incremental execution is an opt-in Draft capability with production growth, migration, teardown, and isolated fault
+coverage on the supported CPU/OS paths. Full commitment remains the simpler portable choice for configurations that
+cannot give Fibers ownership of process fault handling.
 
 Full commitment remains the `FiberStackClass` default. Opt-in `FiberStackCommitMode::Incremental` classes take explicit
 non-zero `initialCommitSizeInBytes` and `growthCommitSizeInBytes`; both are page-rounded, bounded by the usable stack,
@@ -340,6 +341,10 @@ or uncommitted page and may therefore overestimate actual use within the committ
 The POSIX growth handler relies on the validated macOS and Linux signal-context behavior of page protection changes
 and lock-free native accounting. Incremental execution is therefore supported only on the CPU/OS paths explicitly
 qualified by the library rather than being implied by generic POSIX availability.
+
+The POSIX action permits same-signal re-entry so a fault raised inside growth handling reaches the re-entrancy guard
+and is forwarded to the previously installed handler. Windows uses native guard-page growth and leaves nested native
+faults under OS exception dispatch.
 
 One `FiberStackGrowthRuntime` owns the process-wide fault-handler integration. Every OS thread that may execute an
 incremental stack will register one thread-affine `FiberStackGrowthThread`. On POSIX, registration requires at least

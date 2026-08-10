@@ -14,7 +14,7 @@
 #include <unistd.h>
 #endif
 
-#if SC_PLATFORM_LINUX
+#if !SC_PLATFORM_WINDOWS
 #include <stdlib.h>
 #include <sys/mman.h>
 #endif
@@ -340,7 +340,7 @@ struct SC::FibersTest : public SC::TestCase
         {
             incrementalStackRestorationChild();
         }
-#if SC_PLATFORM_LINUX
+#if !SC_PLATFORM_WINDOWS
         if (test_section("incremental stack nested child", Execute::OnlyExplicit))
         {
             incrementalStackNestedChild();
@@ -7988,7 +7988,7 @@ struct SC::FibersTest : public SC::TestCase
             "incremental stack terminal child",
             "incremental stack foreign child",
             "incremental stack restoration child",
-#if SC_PLATFORM_LINUX
+#if !SC_PLATFORM_WINDOWS
             "incremental stack nested child",
 #endif
         };
@@ -8024,7 +8024,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 SC_TEST_EXPECT(process.getExitStatus() == 0);
             }
-#if SC_PLATFORM_LINUX
+#if !SC_PLATFORM_WINDOWS
             else
             {
                 SC_TEST_EXPECT(process.getExitStatus() == 73);
@@ -8141,7 +8141,7 @@ struct SC::FibersTest : public SC::TestCase
 #endif
     }
 
-#if SC_PLATFORM_LINUX
+#if !SC_PLATFORM_WINDOWS
     void incrementalStackNestedChild()
     {
         if (not FiberStackGrowthRuntime::isSupported())

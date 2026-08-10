@@ -39,7 +39,8 @@ Add production incremental commitment as an explicit opt-in capability with thre
   the same reservation. The handler commits at most one configured increment and resumes execution. Exhausted
   reservation remains a terminal native fault; Windows may report either stack overflow when it cannot create another
   guard page or access violation when the final probe crosses the reservation boundary. Unrelated and nested faults are
-  forwarded to the previously installed platform handler.
+  forwarded to the previously installed platform handler. The POSIX action permits same-signal re-entry so the
+  re-entrancy guard can forward a fault raised inside growth handling rather than deferring and retrying it.
 - The POSIX path deliberately relies on the validated macOS/Linux signal-context behavior of `mprotect`; it is not a
   portable claim about every POSIX implementation. Signal-side accounting is compile-time restricted to lock-free
   native `size_t` atomics so the handler cannot fall back to a runtime lock or allocation.
