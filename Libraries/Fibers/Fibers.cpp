@@ -3886,7 +3886,9 @@ FiberJob& FiberJobContext::job() const
 
 bool FiberJobContext::isCancellationRequested() const
 {
-    return job().isCancellationRequested() or scheduler().isWorkerStopRequested();
+    SC_FIBERS_ASSERT_RELEASE(jobScheduler != nullptr);
+    SC_FIBERS_ASSERT_RELEASE(currentJob != nullptr);
+    return jobScheduler->isJobCancellationRequested(*currentJob);
 }
 
 Result FiberJobContext::checkCancellation() const
@@ -4519,7 +4521,7 @@ Result FiberJobScheduler::runOne(bool& outRanJob)
     fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
     FiberJobContext context(*this, *job);
     const Result    result =
-        context.isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
+        isJobCancellationRequested(*job) ? Result::Error("FiberJob cancelled") : job->procedure(context);
     outRanJob = true;
     return complete(*job, result);
 }
@@ -4615,7 +4617,7 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
     fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
     FiberJobContext context(*this, *job);
     const Result    procedureResult =
-        context.isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
+        isJobCancellationRequested(*job) ? Result::Error("FiberJob cancelled") : job->procedure(context);
     outRanJob              = true;
     const Result runResult = complete(*job, procedureResult);
     worker.executedJobs += 1;
@@ -4782,6 +4784,16 @@ Result FiberJobScheduler::complete(FiberJob& job, Result result)
 bool FiberJobScheduler::isWorkerStopRequested() const
 {
     return workerPool != nullptr and workerPool->isStopRequested();
+}
+
+bool FiberJobScheduler::isJobCancellationRequested(const FiberJob& job) const
+{
+    const bool schedulerCancelled = job.cancelGeneration != fiberAtomicLoadUInt32(cancelGeneration);
+    const bool tokenCancelled =
+        job.cancellationToken.source != nullptr and fiberAtomicLoad(job.cancellationToken.source->requested) != 0;
+    const bool workerStopRequested = workerPool != nullptr and fiberAtomicLoad(workerPool->stopRequested) != 0;
+    return schedulerCancelled or fiberTaskCancellationLoad(job.cancelRequested) or tokenCancelled or
+           workerStopRequested;
 }
 
 bool FiberJobScheduler::usesDistributedAccounting(const FiberJobWorker& worker) const

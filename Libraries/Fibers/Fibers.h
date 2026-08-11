@@ -962,6 +962,7 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
     FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);
     bool      usesDistributedAccounting(const FiberJobWorker& worker) const;
+    bool      isJobCancellationRequested(const FiberJob& job) const;
     bool      isWorkerStopRequested() const;
 };
 #if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
