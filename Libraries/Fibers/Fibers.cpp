@@ -2077,6 +2077,7 @@ struct FiberWorkerPoolWakeEvent
         ::LeaveCriticalSection(&mutex);
         return conditionWaited;
     }
+
 #else
     mutable pthread_mutex_t mutex;
     pthread_cond_t          condition;
@@ -2151,6 +2152,7 @@ struct FiberWorkerPoolWakeEvent
         ::pthread_mutex_unlock(&mutex);
         return conditionWaited;
     }
+
 #endif
 
     void notifyWithoutSignal() { fiberAtomicFetchAddUInt32(generation, 1); }
@@ -3002,6 +3004,7 @@ Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWork
     wakeEvent.get().resetDiagnostics();
     fiberAtomicStore(stopRequested, 0);
     fiberAtomicStore(running, 1);
+    fiberAtomicStoreUInt32(preparingToWait, 0);
 
     for (size_t index = 0; index < threads.sizeInElements(); ++index)
     {
@@ -3095,6 +3098,7 @@ Result FiberJobWorkerPool::join()
     keepAliveWhenIdle = false;
     fiberAtomicStore(stopRequested, 0);
     fiberAtomicStore(running, 0);
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadUInt32(preparingToWait) == 0);
     return hasError ? firstError : Result(true);
 }
 
@@ -3114,9 +3118,37 @@ void FiberJobWorkerPool::wakeOneWorker() { wakeEvent.get().notifyOne(); }
 
 void FiberJobWorkerPool::wakeAllWorkers() { wakeEvent.get().notifyAll(); }
 
-void FiberJobWorkerPool::advanceWakeGeneration() { wakeEvent.get().notifyWithoutSignal(); }
+void FiberJobWorkerPool::notifyPreparingWorkers()
+{
+    // Pair with prepareToWaitForWork so publication and park intent cannot both remain unobserved.
+    fiberAtomicSequentialFence();
+    if (fiberAtomicLoadUInt32(preparingToWait) != 0)
+    {
+        wakeEvent.get().notifyWithoutSignal();
+    }
+}
 
 bool FiberJobWorkerPool::waitForWork(uint32_t observedGeneration) { return wakeEvent.get().wait(observedGeneration); }
+
+bool FiberJobWorkerPool::waitForPreparedWork(uint32_t observedGeneration)
+{
+    const bool wasWoken = wakeEvent.get().wait(observedGeneration);
+    cancelWaitForWork();
+    return wasWoken;
+}
+
+uint32_t FiberJobWorkerPool::prepareToWaitForWork()
+{
+    fiberAtomicFetchAddUInt32(preparingToWait, 1);
+    fiberAtomicSequentialFence();
+    return wakeEvent.get().currentGeneration();
+}
+
+void FiberJobWorkerPool::cancelWaitForWork()
+{
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadUInt32(preparingToWait) > 0);
+    fiberAtomicFetchSubUInt32(preparingToWait, 1);
+}
 
 uint32_t FiberJobWorkerPool::wakeGeneration() const { return wakeEvent.get().currentGeneration(); }
 
@@ -3156,11 +3188,15 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
         }
 
         idleSpins                         = 0;
-        const uint32_t observedGeneration = wakeGeneration();
+        const uint32_t observedGeneration = prepareToWaitForWork();
         if ((keepAliveWhenIdle or scheduler.hasActiveJobs()) and not scheduler.hasReadyJobs())
         {
-            const bool wasWoken = waitForWork(observedGeneration);
+            const bool wasWoken = waitForPreparedWork(observedGeneration);
             static_cast<void>(wasWoken);
+        }
+        else
+        {
+            cancelWaitForWork();
         }
     }
     return Result(true);
@@ -4430,15 +4466,13 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
             }
             if (workerPool != nullptr)
             {
-                // Existing local backlog already prevents a peer's final ready-work check from parking. Still advance
-                // the generation so a peer racing that check cannot sleep on a stale observation.
                 if (bottom == top)
                 {
                     workerPool->wakeOneWorker();
                 }
                 else
                 {
-                    workerPool->advanceWakeGeneration();
+                    workerPool->notifyPreparingWorkers();
                 }
             }
             return Result(true);

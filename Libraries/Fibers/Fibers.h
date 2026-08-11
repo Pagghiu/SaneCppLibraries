@@ -1062,11 +1062,15 @@ struct SC_FIBERS_EXPORT FiberJobWorkerPool
     mutable volatile int32_t   running           = 0;
     size_t                     idleSpinAttempts  = 0;
     bool                       keepAliveWhenIdle = false;
+    volatile uint32_t          preparingToWait   = 0;
 
     void                   wakeOneWorker();
     void                   wakeAllWorkers();
-    void                   advanceWakeGeneration();
+    void                   notifyPreparingWorkers();
     [[nodiscard]] bool     waitForWork(uint32_t observedGeneration);
+    [[nodiscard]] bool     waitForPreparedWork(uint32_t observedGeneration);
+    [[nodiscard]] uint32_t prepareToWaitForWork();
+    void                   cancelWaitForWork();
     [[nodiscard]] uint32_t wakeGeneration() const;
     [[nodiscard]] bool     isStopRequested() const;
 

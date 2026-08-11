@@ -1613,6 +1613,86 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());
         }
+
+        {
+            static constexpr size_t RaceWorkers  = 4;
+            static constexpr size_t RaceChildren = 16;
+            static constexpr size_t RaceWaves    = 128;
+
+            struct RaceState
+            {
+                FiberJobScheduler* scheduler = nullptr;
+                FiberJob*          children  = nullptr;
+                Atomic<int32_t>    completed;
+                Atomic<bool>       batchesPublished;
+
+                Result spawnBatches()
+                {
+                    RaceState* state = this;
+                    SC_TRY(scheduler->spawn({children, RaceChildren / 2},
+                                            FiberJob::Procedure(
+                                                [state](FiberJobContext&)
+                                                {
+                                                    while (not state->batchesPublished.load()) {}
+                                                    state->completed.fetch_add(1);
+                                                    return Result(true);
+                                                })));
+                    SC_TRY(scheduler->spawn({children + RaceChildren / 2, RaceChildren / 2},
+                                            FiberJob::Procedure(
+                                                [state](FiberJobContext&)
+                                                {
+                                                    while (not state->batchesPublished.load()) {}
+                                                    state->completed.fetch_add(1);
+                                                    return Result(true);
+                                                })));
+                    batchesPublished.store(true);
+                    return Result(true);
+                }
+            };
+
+            FiberJob                  root;
+            FiberJob                  children[RaceChildren];
+            FiberJob*                 readyStorage[1] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[RaceWorkers];
+            FiberJobWorkerThread      threads[RaceWorkers];
+            FiberJobWorkerPool        workerPool;
+            FiberJobWorkerPoolOptions options;
+            char                      allocatorStorage[RaceWorkers * RaceChildren * sizeof(FiberJob*) + 4096] = {};
+            FiberAllocator            allocator;
+            RaceState                 state;
+            state.scheduler                = &scheduler;
+            state.children                 = children;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = RaceChildren;
+            options.idleSpinAttempts       = 0;
+            options.keepAliveWhenIdle      = true;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+            for (size_t wave = 0; wave < RaceWaves; ++wave)
+            {
+                state.batchesPublished.store(false);
+                RaceState* statePointer = &state;
+                SC_TEST_EXPECT(scheduler.spawn(root, FiberJob::Procedure([statePointer](FiberJobContext&)
+                                                                         { return statePointer->spawnBatches(); })));
+                SC_TEST_EXPECT(workerPool.waitIdle());
+                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * RaceChildren));
+                SC_TEST_EXPECT(root.result());
+                for (FiberJob& child : children)
+                {
+                    SC_TEST_EXPECT(child.result());
+                }
+            }
+
+            SC_TEST_EXPECT(workerPool.requestStop());
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
     }
 
     void explicitWorker()

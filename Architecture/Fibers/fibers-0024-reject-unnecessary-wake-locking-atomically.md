@@ -42,6 +42,9 @@ generation recheck, and atomic retract around the existing condition wait. The a
 32-bit wrap behavior; equality remains valid because pool reuse resets them while quiescent and a worker only compares
 against its immediately observed generation.
 
+FIBERS-0037 later narrows the generation requirement for stackless local batches appended behind existing backlog. It
+uses a separate prepare-to-wait handshake with paired barriers while preserving this decision for all other paths.
+
 Five macOS ARM64 Release samples of the sustained one-million-job workload increased median throughput from about
 0.83 million to 1.46 million jobs per second. Median individual OS wake signals fell from roughly 110 thousand to 27
 thousand. Five complete Debug and five complete Release Fibers stress runs passed before the full validation matrix.
@@ -62,6 +65,8 @@ A change preserves this decision when every ready publication advances generatio
 before its final generation check, pending signals never exceed the parked count observed under the mutex, pool reuse
 resets diagnostics only while quiescent, repeated publication-versus-park stress cannot hang, and Debug/Release tests
 pass on the supported platform families.
+
+FIBERS-0037 defines the only accepted exception to the first condition.
 
 ## Related
 

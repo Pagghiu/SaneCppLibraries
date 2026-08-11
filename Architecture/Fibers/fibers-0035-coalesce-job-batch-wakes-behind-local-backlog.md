@@ -1,6 +1,6 @@
 # FIBERS-0035 - Coalesce Job Batch Wakes Behind Local Backlog
 
-Status: Accepted
+Status: Superseded in part by FIBERS-0037
 Date: 2026-08-09
 
 ## Context
@@ -17,6 +17,9 @@ parked peers for every local batch was rejected experimentally because it regres
 FIBERS-0024 requires every ready publication to advance the wake generation even when it emits no operating-system
 signal. A peer can otherwise capture an old generation during its final ready-work recheck and sleep across a racing
 publication.
+
+FIBERS-0037 supersedes that unconditional generation change with an explicit prepare-to-wait handshake for this
+non-empty local batch path.
 
 ## Decision
 

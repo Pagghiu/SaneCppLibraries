@@ -36,6 +36,9 @@ diagnostic notification count includes wake-all operations; `wakeSignals` intent
 FIBERS-0024 later removes that notification-mutex requirement while preserving this decision's generation and pending
 signal contracts.
 
+FIBERS-0037 later narrows the every-publication generation rule for stackless local batches appended behind existing
+backlog. That path uses a separate prepare-to-wait handshake and paired barriers instead.
+
 A quiet macOS ARM64 Release comparison used one warm-up and five measured runs, followed by a complete confirmation
 set. In the confirmation set, individual signals fell by 85-99.7% for high-worker tiny-work cases. Sustained
 eight-worker throughput improved 8.9%, useful-payload four/eight-worker throughput remained within 1.4% of the prior
@@ -55,6 +58,8 @@ baseline, and four-worker external-producer throughput improved 14.3%.
 A change preserves this decision when every ready publication still changes the generation, pending signals never
 exceed parked workers, a waking worker consumes its pending signal, normal publication cannot lose work, diagnostics
 reset across pool reuse, and shutdown or terminal completion still wakes every parked worker.
+
+FIBERS-0037 defines the only accepted exception to the first condition.
 
 ## Related
 

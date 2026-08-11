@@ -139,3 +139,6 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0032 - Assign injected fibers a home registry before publication](fibers-0032-assign-injected-fibers-a-home-registry-before-publication.md)
 - [FIBERS-0033 - Claim contiguous injection batches transactionally](fibers-0033-claim-contiguous-injection-batches-transactionally.md)
 - [FIBERS-0034 - Make incremental stack commitment explicit and runtime-owned](fibers-0034-make-incremental-stack-commitment-explicit-and-runtime-owned.md)
+- [FIBERS-0035 - Coalesce job batch wakes behind local backlog](fibers-0035-coalesce-job-batch-wakes-behind-local-backlog.md)
+- [FIBERS-0036 - Reject coalescing all local job wakes behind backlog](fibers-0036-coalesce-all-local-job-wakes-behind-backlog.md)
+- [FIBERS-0037 - Publish job wait intent before backlog checks](fibers-0037-publish-job-wait-intent-before-backlog-checks.md)
