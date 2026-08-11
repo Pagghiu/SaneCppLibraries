@@ -1478,11 +1478,13 @@ struct SC::FibersTest : public SC::TestCase
         {
             struct StopState
             {
-                Atomic<bool> entered;
+                Atomic<int32_t> invoked;
             };
 
-            FiberJob                  job;
-            FiberJob*                 readyStorage[1] = {};
+            static constexpr size_t StopJobs = 4;
+
+            FiberJob                  jobs[StopJobs];
+            FiberJob*                 readyStorage[StopJobs] = {};
             FiberJobScheduler         scheduler;
             FiberJobWorker            worker;
             FiberJobWorkerThread      thread;
@@ -1492,23 +1494,27 @@ struct SC::FibersTest : public SC::TestCase
             FiberAllocator            allocator;
             StopState                 stopState;
             options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = 1;
+            options.dequeCapacityPerWorker = StopJobs;
 
             SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
             SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
-                                                    [&stopState](FiberJobContext& context)
-                                                    {
-                                                        stopState.entered.store(true);
-                                                        while (not context.isCancellationRequested()) {}
-                                                        return context.checkCancellation();
-                                                    })));
+            SC_TEST_EXPECT(scheduler.spawn(jobs, FiberJob::Procedure(
+                                                     [&stopState](FiberJobContext& context)
+                                                     {
+                                                         stopState.invoked.fetch_add(1);
+                                                         while (not context.isCancellationRequested()) {}
+                                                         return context.checkCancellation();
+                                                     })));
             SC_TEST_EXPECT(workerPool.start(scheduler, {worker}, {thread}, options));
-            while (not stopState.entered.load()) {}
+            while (stopState.invoked.load() == 0) {}
             SC_TEST_EXPECT(workerPool.requestStop());
             SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(job.isCompleted());
-            SC_TEST_EXPECT(not job.result());
+            SC_TEST_EXPECT(stopState.invoked.load() == 1);
+            for (FiberJob& job : jobs)
+            {
+                SC_TEST_EXPECT(job.isCompleted());
+                SC_TEST_EXPECT(not job.result());
+            }
             SC_TEST_EXPECT(allocator.used() == 0);
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());

@@ -1026,6 +1026,7 @@ struct SC_FIBERS_EXPORT FiberJobWorkerPool
                  Span<FiberJobWorkerThread> threadStorage, const FiberJobWorkerPoolOptions& options);
     //! Waits for the scheduler to reach an idle observation point without stopping a persistent pool.
     Result waitIdle();
+    //! Requests scheduler-wide cooperative cancellation and wakes every worker before the pool drains.
     Result requestStop();
     //! Persistent pools reject join until requestStop() has established the terminal boundary.
     Result join();

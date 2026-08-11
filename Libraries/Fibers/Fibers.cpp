@@ -3029,8 +3029,13 @@ Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWork
 Result FiberJobWorkerPool::requestStop()
 {
     fiberAtomicStore(stopRequested, 1);
+    Result cancelResult = Result(true);
+    if (poolScheduler != nullptr)
+    {
+        cancelResult = poolScheduler->requestCancelAll();
+    }
     wakeAllWorkers();
-    return Result(true);
+    return cancelResult;
 }
 
 Result FiberJobWorkerPool::waitIdle()
@@ -4791,9 +4796,7 @@ bool FiberJobScheduler::isJobCancellationRequested(const FiberJob& job) const
     const bool schedulerCancelled = job.cancelGeneration != fiberAtomicLoadUInt32(cancelGeneration);
     const bool tokenCancelled =
         job.cancellationToken.source != nullptr and fiberAtomicLoad(job.cancellationToken.source->requested) != 0;
-    const bool workerStopRequested = workerPool != nullptr and fiberAtomicLoad(workerPool->stopRequested) != 0;
-    return schedulerCancelled or fiberTaskCancellationLoad(job.cancelRequested) or tokenCancelled or
-           workerStopRequested;
+    return schedulerCancelled or fiberTaskCancellationLoad(job.cancelRequested) or tokenCancelled;
 }
 
 bool FiberJobScheduler::usesDistributedAccounting(const FiberJobWorker& worker) const
