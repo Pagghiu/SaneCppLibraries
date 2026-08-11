@@ -795,11 +795,11 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
             configureSaneStrictNoStdCpp(project);
             SC_TRY(addSaneCppLibraries(project, parameters));
         }
-        if (name == "FibersBenchmark")
+        if (name == "FibersBenchmark" or name == "FibersSkynetBenchmark")
         {
-            // This maintainer target must remain symbolized for optimized Instruments captures.
+            // Fibers maintainer targets must remain symbolized for optimized Instruments captures.
             Configuration* releaseConfiguration = project.getConfiguration("Release");
-            SC_TRY_MSG(releaseConfiguration != nullptr, "FibersBenchmark Release configuration is missing");
+            SC_TRY_MSG(releaseConfiguration != nullptr, "Fibers benchmark Release configuration is missing");
             releaseConfiguration->link.enableDeadCodeStripping = false;
         }
         SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
