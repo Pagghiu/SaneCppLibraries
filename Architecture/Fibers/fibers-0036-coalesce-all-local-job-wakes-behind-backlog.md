@@ -1,53 +1,54 @@
-# FIBERS-0036 - Coalesce All Local Job Wakes Behind Backlog
+# FIBERS-0036 - Reject Coalescing All Local Job Wakes Behind Backlog
 
-Status: Accepted
+Status: Rejected
 Date: 2026-08-11
 
 ## Context
 
-FIBERS-0035 suppressed redundant operating-system signals for worker-local multi-job batches appended behind visible
-local backlog, but retained unconditional wake-one behavior for worker-local single jobs. Continuation-heavy workloads
-publish many single jobs and therefore continued to serialize through the condition-variable mutex while thieves
-already had visible work available.
+FIBERS-0035 suppresses redundant operating-system signals for worker-local multi-job batches appended behind visible
+local backlog, but retains wake-one behavior for worker-local single jobs. Continuation-heavy workloads publish many
+single jobs and can therefore serialize through the condition-variable mutex while parked workers exist.
 
 An optimized macOS ARM64 Time Profiler capture of the pinned depth-six Skynet workload attributed about 40% of
-eight-worker samples to `FiberJobWorkerPool::wakeOneWorker`, with about 34% in the slow pthread mutex path. The local
-single-job path was the dominant caller. This is the same publication state and parking race already analyzed by
-FIBERS-0035; the number of jobs in one publication does not change the wake contract.
+eight-worker samples to `FiberJobWorkerPool::wakeOneWorker`, with about 34% in the slow pthread mutex path. Applying the
+batch backlog rule to single jobs reduced the six-worker median from about 49.4 ms to 19.4 ms, which made the
+generalization initially attractive.
+
+Cross-platform validation exposed a semantic counterexample. A running parent can publish single jobs whose procedures
+must begin concurrently before any can finish. Waking only one peer for the first local job leaves later peers parked,
+because existing backlog suppresses their signals, and the active publisher and first child then wait forever. The
+scheduler cannot infer from deque depth whether an active job is available to drain that backlog.
 
 ## Decision
 
-Every worker-local job publication distinguishes whether its deque was empty immediately before publication:
+Reject backlog-based signal suppression for the general worker-local single-job API. Every local single-job
+publication retains wake-one semantics, including pending-signal coalescing and the no-parked-worker fast path from
+FIBERS-0022 and FIBERS-0024.
 
-- publishing into an empty local deque advances the generation and requests one peer wake;
-- appending behind existing local backlog advances the generation without requesting an operating-system signal.
-
-This rule applies to both single-job and multi-job publication. External single-job publication retains wake-one
-behavior, external batch publication retains wake-all behavior, and terminal completion and shutdown retain their
-existing wake behavior. The implementation adds no allocation, dependency, public layout, or scheduler-global lock.
+Callers that publish a group of jobs with shared parallelism intent may use transactional batch publication, including
+a one-record batch when existing work already supplies sufficient parallelism. Batch publication retains the
+empty-deque/backlog rule from FIBERS-0035.
 
 ## Consequences
 
-Continuation-heavy fan-out avoids repeated condition-variable serialization while preserving the
-prepare-recheck-park protocol. In controlled macOS ARM64 Release measurements of the checksum-validated million-node
-Skynet workload, the six-worker median moved from about 49.4 ms to 19.4 ms. A post-change eight-worker profile reduced
-`wakeOneWorker` from about 40% to below 1% inclusive sampled time and the slow mutex lock path from about 34% to below
-1%. These are diagnostic results, not portable publication claims.
+Arbitrary single jobs preserve progressive parallelism even when currently active procedures are cooperatively
+blocked. Continuation-heavy workloads must express stronger publication intent through the batch API or accept the
+general wake-one cost; the scheduler does not guess from transient worker or deque state.
 
-One local publisher does not request additional parallelism for every job appended behind existing work. Active peers
-can steal that backlog, an empty deque still wakes one peer, and every publication still advances the generation to
-close the publication-versus-park race.
+The Skynet benchmark publishes aggregation continuations as one-record batches because child fan-out already supplies
+parallelism. Controlled macOS ARM64 Release samples retain the improvement without changing the general runtime
+contract, but remain diagnostic rather than portable publication claims.
 
 ## Confirmation
 
-The decision remains valid when empty local deques wake one peer, non-empty local deques advance the generation,
-single-job and batch fan-out complete while peers transition through parking, external publication and shutdown retain
-their existing wake behavior, and the full Debug/Release and supported-platform suites pass. Performance confirmation
-must compare identical benchmark revisions, worker counts, allocation policies, timing boundaries, warm-ups, and
-measured rounds.
+The decision remains valid when a parent can sequentially publish enough single jobs to start every worker before any
+child completes, batch publication retains its backlog-aware wake behavior, repeated Debug/Release worker-pool tests do
+not hang, and supported-platform suites pass. Reviews must reject scheduler heuristics based only on local deque depth
+or an estimated active-worker count because active procedures may be blocked.
 
 ## Related
 
+- [FIBERS-0022 - Coalesce Redundant Worker Wake Signals](fibers-0022-coalesce-redundant-worker-wake-signals.md)
 - [FIBERS-0024 - Reject Unnecessary Wake Locking Atomically](fibers-0024-reject-unnecessary-wake-locking-atomically.md)
 - [FIBERS-0035 - Coalesce Job Batch Wakes Behind Local Backlog](fibers-0035-coalesce-job-batch-wakes-behind-local-backlog.md)
 - [Fibers architecture](fibers-architecture.md)

@@ -192,7 +192,8 @@ static Result spawnFiberJobSkynetContinuation(FiberJobSkynetState& state, FiberJ
 {
     FiberJobSkynetState* statePointer = &state;
     const size_t         nodeIndex    = static_cast<size_t>(&node - state.nodes);
-    return state.scheduler->spawn(state.continuations[nodeIndex],
+    // Child fan-out already supplies parallelism; publish aggregation as a one-record batch to avoid requesting more.
+    return state.scheduler->spawn({&state.continuations[nodeIndex], 1},
                                   FiberJob::Procedure(
                                       [statePointer](FiberJobContext& context)
                                       {

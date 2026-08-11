@@ -4328,16 +4328,7 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
             SC_FIBERS_ASSERT_RELEASE(tryPushWorkerDeque(*worker, job));
             if (workerPool != nullptr)
             {
-                // Existing local backlog already prevents a peer's final ready-work check from parking. Still advance
-                // the generation so a peer racing that check cannot sleep on a stale observation.
-                if (bottom == top)
-                {
-                    workerPool->wakeOneWorker();
-                }
-                else
-                {
-                    workerPool->advanceWakeGeneration();
-                }
+                workerPool->wakeOneWorker();
             }
             return Result(true);
         }

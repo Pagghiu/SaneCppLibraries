@@ -1,6 +1,6 @@
 # FIBERS-0035 - Coalesce Job Batch Wakes Behind Local Backlog
 
-Status: Superseded by FIBERS-0036
+Status: Accepted
 Date: 2026-08-09
 
 ## Context
@@ -66,6 +66,6 @@ worker counts, allocation policy, timing boundaries, warm-ups, and measured roun
 - [FIBERS-0022 - Coalesce Redundant Worker Wake Signals](fibers-0022-coalesce-redundant-worker-wake-signals.md)
 - [FIBERS-0024 - Reject Unnecessary Wake Locking Atomically](fibers-0024-reject-unnecessary-wake-locking-atomically.md)
 - [FIBERS-0029 - Publish Contiguous Job Batches Transactionally](fibers-0029-publish-contiguous-job-batches-transactionally.md)
-- [FIBERS-0036 - Coalesce All Local Job Wakes Behind Backlog](fibers-0036-coalesce-all-local-job-wakes-behind-backlog.md)
+- [FIBERS-0036 - Reject Coalescing All Local Job Wakes Behind Backlog](fibers-0036-coalesce-all-local-job-wakes-behind-backlog.md)
 - [Fibers architecture](fibers-architecture.md)
 - [Fibers documentation](../../Documentation/Libraries/Fibers.md)
