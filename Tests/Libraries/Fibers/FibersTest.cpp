@@ -1331,6 +1331,80 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            static constexpr size_t SingleWorkers  = 2;
+            static constexpr size_t SingleChildren = 8;
+
+            struct SingleState
+            {
+                FiberJobScheduler* scheduler = nullptr;
+                FiberJob*          children  = nullptr;
+                Atomic<int32_t>    started;
+                Atomic<int32_t>    completed;
+                Atomic<bool>       parentEntered;
+                Atomic<bool>       publishChildren;
+                Atomic<bool>       childrenPublished;
+
+                Result spawnChildren()
+                {
+                    parentEntered.store(true);
+                    while (not publishChildren.load()) {}
+                    SingleState* state = this;
+                    for (size_t index = 0; index < SingleChildren; ++index)
+                    {
+                        SC_TRY(scheduler->spawn(children[index], FiberJob::Procedure(
+                                                                     [state](FiberJobContext&)
+                                                                     {
+                                                                         const int32_t ticket =
+                                                                             state->started.fetch_add(1);
+                                                                         if (ticket == 0)
+                                                                         {
+                                                                             while (not state->childrenPublished.load())
+                                                                             {}
+                                                                         }
+                                                                         state->completed.fetch_add(1);
+                                                                         return Result(true);
+                                                                     })));
+                    }
+                    childrenPublished.store(true);
+                    return Result(true);
+                }
+            };
+
+            FiberJob                  jobs[SingleChildren + 1];
+            FiberJob*                 readyStorage[1] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[SingleWorkers];
+            FiberJobWorkerThread      threads[SingleWorkers];
+            FiberJobWorkerPool        workerPool;
+            FiberJobWorkerPoolOptions options;
+            char                      allocatorStorage[2048] = {};
+            FiberAllocator            allocator;
+            SingleState               state;
+            state.scheduler                = &scheduler;
+            state.children                 = &jobs[1];
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = SingleChildren;
+            options.idleSpinAttempts       = 0;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SingleState* statePointer = &state;
+            SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
+                                                                        { return statePointer->spawnChildren(); })));
+            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+            while (not state.parentEntered.load()) {}
+            while (workerPool.parkedWorkerCount() != 1) {}
+            state.publishChildren.store(true);
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(SingleChildren));
+            SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(SingleChildren));
+            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
+
+        {
             static constexpr size_t CancelWorkers = 2;
             static constexpr size_t CancelJobs    = 64;
 
