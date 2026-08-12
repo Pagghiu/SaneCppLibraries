@@ -328,7 +328,7 @@ jobs:
       with:
         path: |
           _Build/_PackagesCache/zlib-filc
-        key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
         restore-keys: |
           sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: test SCTest with Fil-C

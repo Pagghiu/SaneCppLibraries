@@ -2718,8 +2718,9 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
                        StringView importDirectory)
 {
     static constexpr StringView packageVersion = "1.3.1";
-    static constexpr StringView packageURL     = "https://zlib.net/fossils/zlib-1.3.1.tar.gz";
-    static constexpr StringView packageHash    = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23";
+    static constexpr StringView packageURL =
+        "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz";
+    static constexpr StringView packageHash = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23";
 
     package.packageFullName       = "zlib-filc-1.3.1";
     package.packageBaseName       = "zlib-1.3.1.tar.gz";
