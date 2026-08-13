@@ -47,6 +47,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 stopSubmittedRequestSuppressesNormalCallback();
             }
+            if (test_section("unscheduling a timeout does not dispatch callbacks"))
+            {
+                unschedulingTimeoutDoesNotDispatchCallbacks();
+            }
             if (test_section("latest close callback wins while cancelling"))
             {
                 latestCloseCallbackWinsWhileCancelling();
@@ -184,6 +188,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
     void stopSubmittedRequestSuppressesNormalCallback();
+    void unschedulingTimeoutDoesNotDispatchCallbacks();
     void latestCloseCallbackWinsWhileCancelling();
     void reactivationKeepsRequestOwned();
     void reactivatedRequestCanBeStoppedFromCallback();
@@ -373,6 +378,70 @@ void SC::AsyncContractTest::stopSubmittedRequestSuppressesNormalCallback()
     SC_TEST_EXPECT(wasFreeOnClose);
     SC_TEST_EXPECT(timeout.isFree());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::unschedulingTimeoutDoesNotDispatchCallbacks()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+
+    AsyncLoopTimeout target;
+    AsyncLoopTimeout unrelated;
+    int              targetCallbacks    = 0;
+    int              unrelatedCallbacks = 0;
+    target.callback                     = [&](AsyncLoopTimeout::Result&) { targetCallbacks++; };
+    unrelated.callback                  = [&](AsyncLoopTimeout::Result&) { unrelatedCallbacks++; };
+
+    SC_TEST_EXPECT(target.unschedule(loop));
+    SC_TEST_EXPECT(target.isFree());
+
+    SC_TEST_EXPECT(target.start(loop, TimeMs{1000}));
+    SC_TEST_EXPECT(unrelated.start(loop, TimeMs{0}));
+    SC_TEST_EXPECT(target.unschedule(loop));
+    SC_TEST_EXPECT(target.isFree());
+    SC_TEST_EXPECT(targetCallbacks == 0);
+    SC_TEST_EXPECT(unrelatedCallbacks == 0);
+
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(unrelatedCallbacks == 1);
+    SC_TEST_EXPECT(unrelated.isFree());
+
+    SC_TEST_EXPECT(target.start(loop, TimeMs{1000}));
+    SC_TEST_EXPECT(loop.runNoWait());
+    SC_TEST_EXPECT(target.isActive());
+    SC_TEST_EXPECT(unrelated.start(loop, TimeMs{0}));
+    SC_TEST_EXPECT(target.unschedule(loop));
+    SC_TEST_EXPECT(target.isFree());
+    SC_TEST_EXPECT(targetCallbacks == 0);
+    SC_TEST_EXPECT(unrelatedCallbacks == 1);
+
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(unrelatedCallbacks == 2);
+
+    AsyncTaskSequence sequence;
+    AsyncLoopTimeout  sequenced;
+    sequenced.executeOn(sequence);
+    SC_TEST_EXPECT(sequenced.start(loop, TimeMs{0}));
+    SC_TEST_EXPECT(not sequenced.unschedule(loop));
+    SC_TEST_EXPECT(not sequenced.isFree());
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(sequenced.isFree());
+
+    SC_TEST_EXPECT(target.start(loop, TimeMs{1000}));
+    SC_TEST_EXPECT(loop.wakeUpFromExternalThread());
+    SC_TEST_EXPECT(loop.runOnce());
+    SC_TEST_EXPECT(target.isActive());
+    SC_TEST_EXPECT(target.unschedule(loop));
+
+    SC_TEST_EXPECT(loop.wakeUpFromExternalThread());
+    SC_TEST_EXPECT(loop.runOnce());
+
+    SC_TEST_EXPECT(unrelated.start(loop, TimeMs{0}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(targetCallbacks == 0);
+    SC_TEST_EXPECT(unrelatedCallbacks == 3);
+
+    SC_TEST_EXPECT(loop.close());
 }
 
 void SC::AsyncContractTest::latestCloseCallbackWinsWhileCancelling()

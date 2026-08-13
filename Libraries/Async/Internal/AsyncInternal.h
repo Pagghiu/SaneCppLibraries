@@ -148,6 +148,7 @@ struct SC::AsyncEventLoop::Internal
     void updateTime();
 
     Result stop(AsyncEventLoop& eventLoop, AsyncRequest& async, Function<void(AsyncResult&)>* onClose);
+    Result unscheduleLoopTimeout(AsyncLoopTimeout& timeout);
 
     // LoopWakeUp
     void executeWakeUps(AsyncEventLoop& eventLoop);

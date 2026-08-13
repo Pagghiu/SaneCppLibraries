@@ -48,6 +48,8 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - Keep `run`, `runOnce`, and `runNoWait` as convenience modes over submit, poll, and dispatch phases.
 - Prefer native backends and make thread-pool fallback explicit through caller-provided `ThreadPool` state.
 - Use explicit request reactivation for recurring work instead of hidden repeating wrappers.
+- Allow unsequenced loop timeouts to be synchronously removed from their userspace schedule without generalizing that
+  guarantee to kernel-owned requests.
 - Keep file readiness and external completion as separate request concepts.
 
 ## Explicitly Excluded Targets
@@ -76,3 +78,4 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - [ASYNC-0003 - Prefer native backend I/O with explicit thread-pool escape hatches](async-0003-prefer-native-backend-io-with-explicit-thread-pool-escape-hatches.md)
 - [ASYNC-0004 - Separate file readiness from external completion injection](async-0004-separate-file-readiness-from-external-completion-injection.md)
 - [ASYNC-0005 - Use request reactivation for recurring async work](async-0005-use-request-reactivation-for-recurring-async-work.md)
+- [ASYNC-0006 - Unschedule loop timeouts from the userspace schedule](async-0006-unschedule-loop-timeouts-from-the-userspace-schedule.md)

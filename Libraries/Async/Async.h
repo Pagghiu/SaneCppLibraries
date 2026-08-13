@@ -339,6 +339,11 @@ struct SC_ASYNC_EXPORT AsyncLoopTimeout : public AsyncRequest
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, TimeMs relativeTimeout);
 
+    /// @brief Synchronously removes an unsequenced timeout from the event loop schedule without invoking its callback.
+    /// @note The caller must serialize this operation with event-loop submission, polling, and callback dispatch.
+    /// @note The timeout is free on success. Native shared deadline maintenance may happen during a later poll.
+    SC::Result unschedule(AsyncEventLoop& eventLoop);
+
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
 
     TimeMs relativeTimeout; ///< First timer expiration (relative) time in milliseconds
@@ -1714,6 +1719,7 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     Internal&      internal;
 
     friend struct AsyncRequest;
+    friend struct AsyncLoopTimeout;
     friend struct AsyncFileWrite;
     friend struct AsyncFileRead;
     friend struct AsyncFileSystemOperation;

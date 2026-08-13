@@ -239,6 +239,11 @@ SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& eventLoop, TimeMs timeout
     return eventLoop.start(*this);
 }
 
+SC::Result SC::AsyncLoopTimeout::unschedule(AsyncEventLoop& eventLoop)
+{
+    return eventLoop.internal.unscheduleLoopTimeout(*this);
+}
+
 SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& eventLoop, AsyncLoopWakeUpOptions options)
 {
     SC_TRY(checkState());
@@ -2268,6 +2273,30 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
         break;
     }
     return Result(true);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::unscheduleLoopTimeout(AsyncLoopTimeout& timeout)
+{
+    SC_TRY_MSG(timeout.sequence == nullptr, "Cannot unschedule a sequenced AsyncLoopTimeout");
+    switch (timeout.state)
+    {
+    case AsyncRequest::State::Free: timeout.closeCallback = nullptr; return Result(true);
+    case AsyncRequest::State::Setup:
+        timeout.closeCallback = nullptr;
+        submissions.remove(timeout);
+        numberOfSubmissions -= 1;
+        timeout.markAsFree();
+        return Result(true);
+    case AsyncRequest::State::Active:
+        timeout.closeCallback = nullptr;
+        removeActiveHandle(timeout);
+        return Result(true);
+    case AsyncRequest::State::Submitting:
+    case AsyncRequest::State::Reactivate:
+    case AsyncRequest::State::Cancelling:
+        return Result::Error("Cannot unschedule AsyncLoopTimeout in transitional state");
+    }
+    return Result::Error("Cannot unschedule AsyncLoopTimeout in unknown state");
 }
 
 void SC::AsyncEventLoop::Internal::updateTime()

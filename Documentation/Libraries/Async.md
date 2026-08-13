@@ -82,6 +82,11 @@ turning the same stable object into a repeating timer:
 
 @snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopTimeoutSnippet
 
+An unsequenced timeout can be removed synchronously with `AsyncLoopTimeout::unschedule`. Success suppresses its callback
+and leaves the request free without dispatching other event-loop callbacks. The caller must serialize this operation
+with event-loop submission, polling, and callback dispatch. Use the ordinary asynchronous `stop` operation for
+sequenced timeouts and other request types.
+
 `AsyncLoopWakeUp` is the explicit bridge from another thread into the event loop. Waking a request through the event
 loop is thread-safe; the callback is delivered by the thread dispatching the event loop:
 

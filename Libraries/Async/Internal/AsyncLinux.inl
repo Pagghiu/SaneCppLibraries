@@ -24,8 +24,15 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 {
     static constexpr int QueueDepth = 64;
 
-    bool ringInited = false;
-    bool timerIsSet = false;
+    enum class TimerState : uint8_t
+    {
+        Idle,
+        Armed,
+        Removing,
+    };
+
+    bool       ringInited = false;
+    TimerState timerState = TimerState::Idle;
 
     AsyncLinuxIOUring ring;
     char              createErrorMessage[64] = {};
@@ -45,6 +52,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
             ringInited = false;
             ring.close();
         }
+        timerState = TimerState::Idle;
         return Result(true);
     }
 
@@ -219,9 +227,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         while (readIdx < newEvents)
         {
             const io_uring_cqe cqe = *eventPointers[readIdx];
-            if (cqe.user_data == reinterpret_cast<__u64>(&kq.timerIsSet))
+            if (cqe.user_data == reinterpret_cast<__u64>(&kq.timerState))
             {
-                kq.timerIsSet = false;
+                kq.timerState = KernelQueueIoURing::TimerState::Idle;
                 // Sanity check: expired timeouts are reported with ETIME errno
                 SC_ASYNC_ASSERT_RELEASE(cqe.res == -ETIME or cqe.res == -ECANCELED);
             }
@@ -275,7 +283,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             }
             case Internal::SyncMode::ForcedForwardProgress: {
                 __kernel_timespec kts; // Must stay here to be valid until submit
-                if (nextTimer)
+                if (nextTimer and kq.timerState != KernelQueueIoURing::TimerState::Removing)
                 {
                     io_uring_sqe* sqe = kq.ring.getSubmission();
                     if (sqe == nullptr)
@@ -286,21 +294,21 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     auto timespec = KernelEventsPosix::timerToRelativeTimespec(eventLoop.internal.loopTime, nextTimer);
                     kts.tv_sec    = timespec.tv_sec;
                     kts.tv_nsec   = timespec.tv_nsec;
-                    if (kq.timerIsSet)
+                    if (kq.timerState == KernelQueueIoURing::TimerState::Armed)
                     {
                         // Timer was already added earlier let's just update it
-                        const __u64 userData = reinterpret_cast<__u64>(&kq.timerIsSet);
+                        const __u64 userData = reinterpret_cast<__u64>(&kq.timerState);
                         AsyncLinuxIOUring::prepTimeoutUpdate(sqe, &kts, userData, 0);
                     }
                     else
                     {
                         // We need to add a new timeout
                         AsyncLinuxIOUring::prepTimeout(sqe, &kts, 0, 0);
-                        AsyncLinuxIOUring::setData(sqe, &kq.timerIsSet);
-                        kq.timerIsSet = true;
+                        AsyncLinuxIOUring::setData(sqe, &kq.timerState);
+                        kq.timerState = KernelQueueIoURing::TimerState::Armed;
                     }
                 }
-                else if (kq.timerIsSet)
+                else if (kq.timerState == KernelQueueIoURing::TimerState::Armed)
                 {
                     // Timer was set earlier, but it's not anymore needed, and it must be removed
                     io_uring_sqe* sqe = kq.ring.getSubmission();
@@ -309,9 +317,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                         // TODO: is it correct returning if failing to get a new sqe?
                         return Result::Error("io_uring get timeout submission failed");
                     }
-                    const __u64 userData = reinterpret_cast<__u64>(&kq.timerIsSet);
+                    const __u64 userData = reinterpret_cast<__u64>(&kq.timerState);
                     AsyncLinuxIOUring::prepTimeoutRemove(sqe, userData, 0);
-                    kq.timerIsSet = false;
+                    kq.timerState = KernelQueueIoURing::TimerState::Removing;
                 }
 
                 res = kq.ring.submitAndWait(1);
