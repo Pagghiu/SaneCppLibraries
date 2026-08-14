@@ -85,6 +85,11 @@
             "Reflection"
         ]
     },
+    "Cryptography": {
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
+    },
     "Fibers": {
         "direct_dependencies": [],
         "minimal_dependencies": [],

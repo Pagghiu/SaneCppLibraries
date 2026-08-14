@@ -10,6 +10,7 @@ Library                                     | Description                       
 @subpage library_await                  | @copybrief library_await                  | 1199 | 3231 | 24431
 @subpage library_containers             | @copybrief library_containers             | 1007 | 3 | 4428
 @subpage library_containers_reflection  | @copybrief library_containers_reflection  | 231 | 0 | 5609
+@subpage library_cryptography           | @copybrief library_cryptography           | 158 | 1231 | 1949
 @subpage library_fibers                 | @copybrief library_fibers                 | 1453 | 7731 | 10173
 @subpage library_file                   | @copybrief library_file                   | 200 | 1364 | 3018
 @subpage library_file_system            | @copybrief library_file_system            | 188 | 1858 | 3403
@@ -35,10 +36,13 @@ Common source fragments                    | Shared source fragments, not a libr
 
 LOC metric                         | Header | Source | Sum
 :-----------------------------------|-------:|-------:|----:
-Library source                      | 16745 | 47564 | 64309
+Library source                      | 16903 | 48795 | 65698
 Common source fragments             | 1676 | 582 | 2258
 
 All LOC counts in the tables above exclude comments.
+
+
+
 
 
 

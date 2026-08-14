@@ -403,6 +403,7 @@ static constexpr SC::StringView ALL_SC_EXPORT_LIBRARIES[] = {
     "AsyncStreams",
     "Containers",
     "ContainersReflection",
+    "Cryptography",
     "File",
     "FileSystem",
     "FileSystemIterator",

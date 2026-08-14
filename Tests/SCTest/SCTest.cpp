@@ -54,6 +54,9 @@ void runFileSystemWatcherAsyncTest(TestReport& report);
 // Hashing
 void runHashingTest(TestReport& report);
 
+// Cryptography
+void runCryptographyTest(TestReport& report);
+
 // Http
 void runHttpParserTest(TestReport& report);
 void runHttpAsyncClientTest(TestReport& report);
@@ -200,6 +203,9 @@ int main(int argc, const char* argv[])
 
     // Hashing tests
     runHashingTest(report);
+
+    // Cryptography tests
+    runCryptographyTest(report);
 
     // Http tests
     runHttpParserTest(report);
