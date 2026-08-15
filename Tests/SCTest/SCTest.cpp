@@ -56,6 +56,8 @@ void runHashingTest(TestReport& report);
 
 // Cryptography
 void runCryptographyTest(TestReport& report);
+void runCryptographyAsyncStreamsTest(TestReport& report);
+void runCryptographyTransformStreamsTest(TestReport& report);
 
 // Http
 void runHttpParserTest(TestReport& report);
@@ -206,6 +208,8 @@ int main(int argc, const char* argv[])
 
     // Cryptography tests
     runCryptographyTest(report);
+    runCryptographyAsyncStreamsTest(report);
+    runCryptographyTransformStreamsTest(report);
 
     // Http tests
     runHttpParserTest(report);

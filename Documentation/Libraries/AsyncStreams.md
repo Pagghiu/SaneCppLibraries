@@ -32,6 +32,7 @@ Use Async Streams when you need:
 - backpressure when a sink, transform, or buffer pool cannot keep up;
 - a fixed pipeline of one source, up to eight transforms, and up to eight sinks;
 - file, pipe, socket, or compression streams built on the same byte-buffer model.
+- optional cipher transforms and HMAC sinks instantiated with a caller-selected cryptography session type.
 
 It is not a general container for arbitrary objects, a pull-based `read()` interface, or an unbounded buffering layer.
 There is currently no object mode, and consumers receive pushed data events rather than a Node.js-style readable event.
@@ -109,6 +110,72 @@ sinks. Every sink receives the source data, with buffer references held until ea
 bounded fan-out, but the slowest sink applies backpressure to the shared source. If consumers need independent pacing or
 unbounded history, that storage and policy belongs outside this library.
 
+# Cryptography Adapters Without A Library Dependency
+
+`CryptographyTransformStreams.h` provides two header-only adapters:
+
+- `AsyncCipherTransformStreamT<T_Cipher>` turns a compatible incremental cipher into a transform;
+- `AsyncHmacWritableStreamT<T_Hmac>` authenticates every byte written to it and is especially useful as a fan-out sink.
+
+The header includes no Cryptography interface. A translation unit that wants the native implementation includes both
+libraries and chooses the concrete session at instantiation time:
+
+```cpp
+#include "Libraries/AsyncStreams/CryptographyTransformStreams.h"
+#include "Libraries/Cryptography/Cryptography.h"
+
+SC::AsyncCipherTransformStreamT<SC::Cryptography::Cipher> encrypt;
+SC_TRY(encrypt.cipher.start(SC::Cryptography::CipherType::AES256CBCPKCS7,
+                            SC::Cryptography::Cipher::Operation::Encrypt, key, initializationVector));
+
+SC::AsyncReadableStream::Request cipherReads[3];
+SC::AsyncWritableStream::Request cipherWrites[3];
+SC_TRY(encrypt.init(buffersPool, cipherReads, cipherWrites));
+
+SC::AsyncPipeline pipeline = {&source, {&encrypt}, {&destination}};
+SC_TRY(pipeline.pipe());
+SC_TRY(pipeline.start());
+```
+
+`source`, `encrypt`, and `destination` must use the same pool. Every reusable writable view that the pool may return to
+the cipher must be at least 16 bytes. Larger buffers are more efficient: the adapter reserves up to 15 bytes of capacity
+for output caused by input retained from an earlier update. Decryption uses the same setup with `Operation::Decrypt`.
+
+This cipher is AES-CBC with PKCS#7 padding. CBC does not authenticate ciphertext and is suitable only when an existing
+protocol already supplies correct authentication, IV rules, framing, and failure handling. Stream errors include native
+cipher failures, invalid ciphertext or padding, and undersized output buffers. Decryption may emit earlier plaintext
+blocks before `finish()` validates the final padding, so the surrounding protocol must authenticate the ciphertext
+before any plaintext is released to an application.
+
+An HMAC sink can share source buffers with a storage or network sink through normal pipeline fan-out:
+
+```cpp
+SC::AsyncHmacWritableStreamT<SC::Cryptography::Hmac> authentication;
+SC_TRY(authentication.hmac.setType(SC::Cryptography::HashType::SHA256));
+SC_TRY(authentication.hmac.setKey(macKey));
+
+SC::AsyncWritableStream::Request hmacWrites[3];
+authentication.setWriteQueue(hmacWrites);
+SC_TRY(authentication.init(buffersPool));
+
+SC::Cryptography::MacResult mac;
+SC_TRY_MSG(authentication.eventFinish.addListener(
+               [&authentication, &mac] { SC_TRUST_RESULT(authentication.hmac.getMac(mac)); }),
+           "Too many HMAC finish listeners");
+
+SC::AsyncPipeline pipeline = {&source, {}, {&destination, &authentication}};
+SC_TRY(pipeline.pipe());
+SC_TRY(pipeline.start());
+```
+
+Retrieve the MAC inside `eventFinish`. Streams auto-destroy immediately after that event returns, and destruction resets
+the HMAC session so key-dependent native state is released. The fan-out does not copy the source buffer: the pool keeps
+the same view referenced until both sinks finish their writes.
+
+There is intentionally no AES-GCM byte-stream adapter. Secure AEAD decryption must authenticate a complete bounded
+record before releasing any plaintext, which requires explicit record framing, nonce derivation, tag placement, AAD,
+and storage policy. Those protocol decisions do not belong in an apparently generic byte transform.
+
 # Errors, Ending, And Destruction
 
 Stream errors are delivered through `eventError`, and `AsyncPipeline::eventError` forwards failures from connected
@@ -149,7 +216,8 @@ as pauses or invalid `Result` values and must be handled as normal control flow.
 # Details
 
 For the complete API reference, see @ref group_async_streams. The tests under `Tests/Libraries/AsyncStreams` contain
-working file, pipe, socket, fan-out, backpressure, child-view, and synchronous/asynchronous zlib compositions.
+working file, pipe, socket, fan-out, backpressure, child-view, cryptography-adapter, and synchronous/asynchronous zlib
+compositions.
 
 # Status
 🟨 MVP

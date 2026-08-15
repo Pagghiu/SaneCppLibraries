@@ -16,7 +16,8 @@ Back-pressure is part of the interface: readable streams pause when buffers or r
 
 `AsyncStreams` owns byte-buffer movement, bounded queuing, stream state transitions, transform composition, pipeline fan-out, and optional compression transforms. It does not own descriptor creation, event-loop polling, native I/O submission, coroutine tasks, or unbounded storage.
 
-Adapters may bridge to `Async` request types, but core stream code must remain usable without linking the `Async` library.
+Adapters may bridge to `Async` request types or synchronous cryptography sessions, but core stream code must remain
+usable without linking either concrete library.
 
 ## Similarities With Other Libraries
 
@@ -45,6 +46,8 @@ Inferred negative target: avoid treating `drain` as the only coordination primit
 - Keep `AsyncPipeline` as one source, bounded transforms, and bounded sinks.
 - Use pause/resume and pending-write state to make back-pressure observable.
 - Keep ZLib as optional dynamic loading, with load failures reported through `Result`.
+- Adapt cipher and HMAC sessions through header-only templates without adding a Cryptography dependency.
+- Require a separately designed authenticated record protocol before exposing an AEAD stream.
 
 ## Explicitly Excluded Targets
 
@@ -53,6 +56,7 @@ Inferred negative target: avoid treating `drain` as the only coordination primit
 - Dynamic arbitrary stream graphs in `AsyncPipeline`.
 - A mandatory zlib build dependency.
 - Direct ownership of event loops, descriptors, coroutine tasks, or thread pools.
+- A generic AEAD byte transform that releases unauthenticated plaintext or invents implicit framing and nonce policy.
 
 ## Sources
 
@@ -71,3 +75,4 @@ Inferred negative target: avoid treating `drain` as the only coordination primit
 - [ASYNCSTREAMS-0002 - Model back-pressure with caller-owned buffers and fixed queues](asyncstreams-0002-model-back-pressure-with-caller-owned-buffers-and-fixed-queues.md)
 - [ASYNCSTREAMS-0003 - Use a fixed-layout pipeline instead of dynamic stream graphs](asyncstreams-0003-use-a-fixed-layout-pipeline-instead-of-dynamic-stream-graphs.md)
 - [ASYNCSTREAMS-0004 - Keep ZLib compression as optional runtime loading, not a build dependency](asyncstreams-0004-keep-zlib-compression-as-optional-runtime-loading-not-a-build-dependency.md)
+- [ASYNCSTREAMS-0005 - Adapt Cryptography through template-only streams](asyncstreams-0005-adapt-cryptography-through-template-only-streams.md)

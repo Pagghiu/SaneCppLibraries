@@ -48,8 +48,10 @@ documentation, and external review justify promotion.
 - [Cryptography tests](../../Tests/Libraries/Cryptography/CryptographyTest.cpp)
 - [CRYPTOGRAPHY-0001](cryptography-0001-wrap-native-symmetric-cryptography-with-capability-reporting.md)
 - [CRYPTOGRAPHY-0002](cryptography-0002-prefer-aead-and-keep-cbc-explicitly-legacy.md)
+- [CRYPTOGRAPHY-0003](cryptography-0003-expose-idempotent-session-reset.md)
 
 ## Decision Log
 
 - [CRYPTOGRAPHY-0001 - Wrap native symmetric cryptography with capability reporting](cryptography-0001-wrap-native-symmetric-cryptography-with-capability-reporting.md)
 - [CRYPTOGRAPHY-0002 - Prefer AEAD and keep CBC explicitly legacy](cryptography-0002-prefer-aead-and-keep-cbc-explicitly-legacy.md)
+- [CRYPTOGRAPHY-0003 - Expose idempotent session reset](cryptography-0003-expose-idempotent-session-reset.md)

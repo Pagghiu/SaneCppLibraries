@@ -102,6 +102,8 @@ See [NIST SP 800-38D](https://doi.org/10.6028/NIST.SP.800-38D) for GCM requireme
 
 `getMac()` consumes the running session. Call `setKey()` again before authenticating another message. `MacResult`
 contains 48 inline bytes plus the actual size; `toBytesSpan()` borrows those bytes and must not outlive the result.
+Call `reset()` to abandon an active computation without producing a MAC; it clears library-owned state while preserving
+the selected hash family, so a new computation still requires `setKey()`.
 
 \snippet Tests/Libraries/Cryptography/CryptographyTest.cpp CryptographyHmacSnippet
 
@@ -140,9 +142,26 @@ For every `update()`, an output span of `input.sizeInBytes() + 15` bytes is suff
 retried with more storage. Successful `finish()`, invalid ciphertext length, invalid padding, or a native processing
 failure consumes the session; call `start()` before reuse.
 
+Call `reset()` to abandon an operation before `finish()`. It is idempotent and releases native resources plus buffered
+key, IV, block, and padding state owned by the library.
+
 \snippet Tests/Libraries/Cryptography/CryptographyTest.cpp CryptographyCbcSnippet
 
 Again, the zero values in this snippet are a known-answer vector, not acceptable production key or IV generation.
+
+# Composing CBC And HMAC With Async Streams
+
+[Async Streams](@ref library_async_streams) provides header-only `AsyncCipherTransformStreamT` and
+`AsyncHmacWritableStreamT` adapters. They are templates specifically so Cryptography remains synchronous and neither
+library acquires a hard dependency on the other. Include both headers only in the application translation unit that
+builds the pipeline.
+
+The cipher adapter inherits all CBC warnings above. The HMAC adapter is a sink rather than a pass-through transform;
+use pipeline fan-out when the same bytes must also reach a file, socket, or another destination. The Async Streams
+documentation shows complete setup and buffer requirements.
+
+There is no AES-GCM stream adapter. The one-shot `Aead` interface deliberately keeps authenticated messages explicit;
+streaming it safely requires a separately specified record protocol that withholds plaintext until its tag verifies.
 
 # Storage, allocation, and secret lifetime
 

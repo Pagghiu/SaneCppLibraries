@@ -489,6 +489,8 @@ struct SC::Cryptography::Cipher::Internal
         initialized = false;
     }
 
+    void reset() { close(); }
+
     Result start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         close();
@@ -533,6 +535,12 @@ struct SC::Cryptography::Hmac::Internal
     bool          initialized = false;
 
     ~Internal() { secureClear(Span<uint8_t>(reinterpret_cast<uint8_t*>(&context), sizeof(context))); }
+
+    void reset()
+    {
+        secureClear(Span<uint8_t>(reinterpret_cast<uint8_t*>(&context), sizeof(context)));
+        initialized = false;
+    }
 
     Result setType(HashType newType)
     {
@@ -732,6 +740,8 @@ struct SC::Cryptography::Cipher::Internal
         initialized     = false;
     }
 
+    void reset() { close(); }
+
     Result start(CipherType type, Operation newOperation, Span<const uint8_t> keyBytes, Span<const uint8_t> iv)
     {
         close();
@@ -856,6 +866,8 @@ struct SC::Cryptography::Hmac::Internal
         objectLength = 0;
         initialized  = false;
     }
+
+    void reset() { close(); }
 
     Result setType(HashType newType)
     {
@@ -1001,6 +1013,8 @@ struct SC::Cryptography::Cipher::Internal
         initialized = false;
     }
 
+    void reset() { close(); }
+
     Result start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         close();
@@ -1093,6 +1107,8 @@ struct SC::Cryptography::Hmac::Internal
         initialized = false;
     }
 
+    void reset() { close(); }
+
     const char* algorithmName() const
     {
         switch (type)
@@ -1177,6 +1193,7 @@ struct SC::Cryptography::Cipher::Internal
         return Result::Error("Cryptography::Cipher - unsupported platform");
     }
     Result finish(Span<uint8_t>, size_t&) { return Result::Error("Cryptography::Cipher - unsupported platform"); }
+    void   reset() {}
 };
 
 struct SC::Cryptography::Hmac::Internal
@@ -1185,6 +1202,7 @@ struct SC::Cryptography::Hmac::Internal
     Result setKey(Span<const uint8_t>) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
     Result add(Span<const uint8_t>) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
     Result getMac(MacResult&) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
+    void   reset() {}
 };
 #endif
 
@@ -1303,6 +1321,8 @@ SC::Result SC::Cryptography::Cipher::finish(Span<uint8_t> output, size_t& bytesW
     return internal.get().finish(output, bytesWritten);
 }
 
+void SC::Cryptography::Cipher::reset() { internal.get().reset(); }
+
 SC::Result SC::Cryptography::Hmac::setType(HashType type)
 {
     SC_TRY_MSG(isValid(type), "Cryptography::Hmac::setType - invalid hash type");
@@ -1318,6 +1338,8 @@ SC::Result SC::Cryptography::Hmac::getMac(MacResult& result)
     result.size = 0;
     return internal.get().getMac(result);
 }
+
+void SC::Cryptography::Hmac::reset() { internal.get().reset(); }
 
 SC::Result SC::Cryptography::Hkdf::derive(HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm,
                                           Span<const uint8_t> info, Span<uint8_t> output)

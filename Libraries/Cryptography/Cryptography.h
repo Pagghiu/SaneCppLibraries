@@ -188,6 +188,10 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @note Output must have at least 16 bytes. Success and invalid ciphertext or padding consume the session.
         Result finish(Span<uint8_t> output, size_t& bytesWritten);
 
+        /// @brief Discard the current operation and clear library-owned session state.
+        /// @note This operation is idempotent.
+        void reset();
+
       private:
         friend decltype(internal);
     };
@@ -235,6 +239,10 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @brief Finalize the current HMAC computation.
         /// @note Finalization consumes the session. Call setKey again before computing another MAC.
         Result getMac(MacResult& result);
+
+        /// @brief Discard the current HMAC computation and clear library-owned session state.
+        /// @note This operation is idempotent. The selected hash type is preserved.
+        void reset();
 
       private:
         friend decltype(internal);

@@ -104,6 +104,7 @@ struct SC::CryptographyTest : public SC::TestCase
     void testHmacSha256();
     void testHmacSha384();
     void testHmacStreamingAndLifecycle();
+    void testExplicitReset();
     void testHkdfSha256();
     void testHkdfSha384();
     void testHkdfBounds();
@@ -189,6 +190,11 @@ struct SC::CryptographyTest : public SC::TestCase
         if (test_section("HMAC Streaming And Lifecycle"))
         {
             testHmacStreamingAndLifecycle();
+        }
+
+        if (test_section("Explicit Reset"))
+        {
+            testExplicitReset();
         }
 
         if (test_section("HKDF SHA256"))
@@ -690,6 +696,36 @@ void CryptographyTest::testHmacStreamingAndLifecycle()
     Cryptography::MacResult streamingResult;
     SC_TEST_EXPECT(streaming.getMac(streamingResult));
     SC_TEST_EXPECT(sameBytes(streamingResult.toBytesSpan(), hmacSha256Expected));
+}
+
+void CryptographyTest::testExplicitReset()
+{
+    Cryptography::Cipher cipher;
+    cipher.reset();
+    cipher.reset();
+
+    if (features.aes128CbcPkcs7)
+    {
+        SC_TEST_EXPECT(cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
+                                    zeroKey16, zeroIV16));
+        cipher.reset();
+        size_t bytesWritten = 77;
+        SC_TEST_EXPECT(not cipher.update(zeroPlain16, {}, bytesWritten));
+        SC_TEST_EXPECT(bytesWritten == 0);
+    }
+
+    Cryptography::Hmac hmac;
+    hmac.reset();
+    hmac.reset();
+
+    if (features.hmacSha256)
+    {
+        SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
+        SC_TEST_EXPECT(hmac.setKey(zeroKey16));
+        SC_TEST_EXPECT(hmac.add(zeroPlain16));
+        hmac.reset();
+        SC_TEST_EXPECT(not hmac.add(zeroPlain16));
+    }
 }
 
 void SC::CryptographyTest::testHkdfSha256()
