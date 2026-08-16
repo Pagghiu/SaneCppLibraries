@@ -97,6 +97,7 @@ struct SC::CryptographyTest : public SC::TestCase
     void testCbcOutputRetry();
     void testCbcEmptyAndMalformed();
     void testCbcInvalidPaddingConsumesSession();
+    void testCbcDeterministicStress();
     void testAes128Gcm();
     void testAes256Gcm();
     void testAes128GcmWithAad();
@@ -155,6 +156,11 @@ struct SC::CryptographyTest : public SC::TestCase
         if (test_section("CBC Invalid Padding Consumes Session"))
         {
             testCbcInvalidPaddingConsumesSession();
+        }
+
+        if (test_section("CBC Deterministic Stress"))
+        {
+            testCbcDeterministicStress();
         }
 
         if (test_section("AES128 GCM Known Answer"))
@@ -505,6 +511,112 @@ void CryptographyTest::testCbcInvalidPaddingConsumesSession()
     SC_TEST_EXPECT(written == 16);
     SC_TEST_EXPECT(not cipher.finish(Span<uint8_t>(output + written, sizeof(output) - written), written));
     SC_TEST_EXPECT(not cipher.update({}, output, written));
+}
+
+void CryptographyTest::testCbcDeterministicStress()
+{
+    if (not features.aes128CbcPkcs7)
+    {
+        printUnsupported("CBC Deterministic Stress");
+        return;
+    }
+
+    static constexpr size_t   messageSizes[] = {0,  1,  2,  7,  15, 16,  17,  31,  32,  33,  47,
+                                                48, 49, 63, 64, 65, 127, 128, 129, 255, 256, 257};
+    static constexpr uint32_t chunkSeeds[]   = {1, 0x12345678, 0x9e3779b9, 0xffffffff};
+
+    uint8_t plaintext[257];
+    uint8_t expectedCiphertext[288];
+    uint8_t chunkedCiphertext[288];
+    uint8_t decrypted[288];
+
+    for (size_t messageSize : messageSizes)
+    {
+        for (size_t idx = 0; idx < messageSize; ++idx)
+            plaintext[idx] = static_cast<uint8_t>((idx * 29 + messageSize * 17 + 11) & 0xff);
+
+        Cryptography::Cipher reference;
+        SC_TEST_EXPECT(reference.start(Cryptography::CipherType::AES128CBCPKCS7,
+                                       Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
+
+        size_t expectedSize = 0;
+        size_t written      = 0;
+        SC_TEST_EXPECT(reference.update(Span<const uint8_t>(plaintext, messageSize), expectedCiphertext, written));
+        expectedSize += written;
+        SC_TEST_EXPECT(reference.finish(
+            Span<uint8_t>(expectedCiphertext + expectedSize, sizeof(expectedCiphertext) - expectedSize), written));
+        expectedSize += written;
+
+        for (uint32_t initialSeed : chunkSeeds)
+        {
+            Cryptography::Cipher encrypt;
+            SC_TEST_EXPECT(encrypt.start(Cryptography::CipherType::AES128CBCPKCS7,
+                                         Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
+
+            uint32_t seed         = initialSeed ^ static_cast<uint32_t>(messageSize);
+            size_t   inputOffset  = 0;
+            size_t   outputOffset = 0;
+            while (inputOffset < messageSize)
+            {
+                seed             = seed * 1664525u + 1013904223u;
+                size_t chunkSize = static_cast<size_t>(seed % 37u) + 1;
+                if (chunkSize > messageSize - inputOffset)
+                    chunkSize = messageSize - inputOffset;
+
+                SC_TEST_EXPECT(encrypt.update(
+                    Span<const uint8_t>(plaintext + inputOffset, chunkSize),
+                    Span<uint8_t>(chunkedCiphertext + outputOffset, sizeof(chunkedCiphertext) - outputOffset),
+                    written));
+                inputOffset += chunkSize;
+                outputOffset += written;
+            }
+            SC_TEST_EXPECT(encrypt.finish(
+                Span<uint8_t>(chunkedCiphertext + outputOffset, sizeof(chunkedCiphertext) - outputOffset), written));
+            outputOffset += written;
+            SC_TEST_EXPECT(outputOffset == expectedSize);
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(chunkedCiphertext, outputOffset),
+                                     Span<const uint8_t>(expectedCiphertext, expectedSize)));
+
+            Cryptography::Cipher decrypt;
+            SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7,
+                                         Cryptography::Cipher::Operation::Decrypt, zeroKey16, zeroIV16));
+
+            seed         = initialSeed ^ static_cast<uint32_t>(expectedSize) ^ 0xa5a5a5a5u;
+            inputOffset  = 0;
+            outputOffset = 0;
+            while (inputOffset < expectedSize)
+            {
+                seed             = seed * 22695477u + 1u;
+                size_t chunkSize = static_cast<size_t>(seed % 41u) + 1;
+                if (chunkSize > expectedSize - inputOffset)
+                    chunkSize = expectedSize - inputOffset;
+
+                SC_TEST_EXPECT(decrypt.update(Span<const uint8_t>(chunkedCiphertext + inputOffset, chunkSize),
+                                              Span<uint8_t>(decrypted + outputOffset, sizeof(decrypted) - outputOffset),
+                                              written));
+                inputOffset += chunkSize;
+                outputOffset += written;
+            }
+            SC_TEST_EXPECT(
+                decrypt.finish(Span<uint8_t>(decrypted + outputOffset, sizeof(decrypted) - outputOffset), written));
+            outputOffset += written;
+            SC_TEST_EXPECT(outputOffset == messageSize);
+            SC_TEST_EXPECT(
+                sameBytes(Span<const uint8_t>(decrypted, outputOffset), Span<const uint8_t>(plaintext, messageSize)));
+        }
+    }
+
+    for (size_t malformedSize = 1; malformedSize < 16; ++malformedSize)
+    {
+        Cryptography::Cipher malformed;
+        SC_TEST_EXPECT(malformed.start(Cryptography::CipherType::AES128CBCPKCS7,
+                                       Cryptography::Cipher::Operation::Decrypt, zeroKey16, zeroIV16));
+        size_t written = 0;
+        SC_TEST_EXPECT(malformed.update(Span<const uint8_t>(expectedCiphertext, malformedSize), {}, written));
+        SC_TEST_EXPECT(written == 0);
+        SC_TEST_EXPECT(not malformed.finish(decrypted, written));
+        SC_TEST_EXPECT(written == 0);
+    }
 }
 
 void SC::CryptographyTest::testAes128Gcm()
