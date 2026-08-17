@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Cryptography/Cryptography.h"
+#include "Libraries/Common/PlatformMacrosType.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -102,6 +103,7 @@ struct SC::CryptographyTest : public SC::TestCase
     void testAes256Gcm();
     void testAes128GcmWithAad();
     void testAes128GcmWrongTag();
+    void testAes128GcmEmptyAndInPlace();
     void testHmacSha256();
     void testHmacSha384();
     void testHmacStreamingAndLifecycle();
@@ -181,6 +183,11 @@ struct SC::CryptographyTest : public SC::TestCase
         if (test_section("AES128 GCM Wrong Tag"))
         {
             testAes128GcmWrongTag();
+        }
+
+        if (test_section("AES128 GCM Empty And In Place"))
+        {
+            testAes128GcmEmptyAndInPlace();
         }
 
         if (test_section("HMAC SHA256"))
@@ -714,6 +721,29 @@ void CryptographyTest::testAes128GcmWithAad()
     SC_TEST_EXPECT(aead.open(nonce.toBytesSpan(), aad.toBytesSpan(), ciphertext, tag, decrypted, bytesWritten));
     SC_TEST_EXPECT(bytesWritten == sizeof(decrypted));
     SC_TEST_EXPECT(sameBytes(decrypted, plaintext.toBytesSpan()));
+
+    uint8_t inPlace[64];
+    memcpy(inPlace, plaintext.toBytesSpan().data(), sizeof(inPlace));
+    SC_TEST_EXPECT(aead.seal(nonce.toBytesSpan(), aad.toBytesSpan(), inPlace, inPlace, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(inPlace));
+    SC_TEST_EXPECT(sameBytes(inPlace, expectedCipher.toBytesSpan()));
+    SC_TEST_EXPECT(sameBytes(tag, expectedTag.toBytesSpan()));
+    SC_TEST_EXPECT(aead.open(nonce.toBytesSpan(), aad.toBytesSpan(), inPlace, tag, inPlace, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(inPlace));
+    SC_TEST_EXPECT(sameBytes(inPlace, plaintext.toBytesSpan()));
+
+#if SC_PLATFORM_LINUX
+    uint8_t maximumAad[4096] = {0};
+    SC_TEST_EXPECT(aead.seal(zeroNonce12, maximumAad, {}, {}, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+    SC_TEST_EXPECT(aead.open(zeroNonce12, maximumAad, {}, tag, {}, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+
+    uint8_t oversizedAad[4097] = {0};
+    bytesWritten               = 77;
+    SC_TEST_EXPECT(not aead.seal(zeroNonce12, oversizedAad, {}, {}, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+#endif
 }
 
 void SC::CryptographyTest::testAes128GcmWrongTag()
@@ -739,6 +769,41 @@ void SC::CryptographyTest::testAes128GcmWrongTag()
     {
         printUnsupported("AES128 GCM Wrong Tag");
     }
+}
+
+void CryptographyTest::testAes128GcmEmptyAndInPlace()
+{
+    if (not features.aes128Gcm)
+    {
+        printUnsupported("AES128 GCM Empty And In Place");
+        return;
+    }
+
+    static constexpr uint8_t emptyTag[16] = {
+        0x58, 0xe2, 0xfc, 0xce, 0xfa, 0x7e, 0x30, 0x61, 0x36, 0x7f, 0x1d, 0x57, 0xa4, 0xe7, 0x45, 0x5a,
+    };
+
+    Cryptography::Aead aead;
+    SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
+
+    uint8_t tag[16]      = {0};
+    size_t  bytesWritten = 77;
+    SC_TEST_EXPECT(aead.seal(zeroNonce12, {}, {}, {}, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+    SC_TEST_EXPECT(sameBytes(tag, emptyTag));
+    SC_TEST_EXPECT(aead.open(zeroNonce12, {}, {}, tag, {}, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+
+    uint8_t inPlace[16];
+    memcpy(inPlace, zeroPlain16, sizeof(inPlace));
+    SC_TEST_EXPECT(aead.seal(zeroNonce12, {}, inPlace, inPlace, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(inPlace));
+    SC_TEST_EXPECT(sameBytes(inPlace, aes128GcmExpectedCipher));
+    SC_TEST_EXPECT(sameBytes(tag, aes128GcmExpectedTag));
+
+    SC_TEST_EXPECT(aead.open(zeroNonce12, {}, inPlace, tag, inPlace, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(inPlace));
+    SC_TEST_EXPECT(sameBytes(inPlace, zeroPlain16));
 }
 
 void SC::CryptographyTest::testHmacSha256()

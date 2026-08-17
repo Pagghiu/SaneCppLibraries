@@ -34,7 +34,7 @@ namespace
 using namespace SC;
 
 static constexpr size_t AESBlockSize = 16;
-#if SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static constexpr size_t GCMNonceSize = 12;
 static constexpr size_t GCMTagSize   = 16;
 #endif
@@ -81,7 +81,7 @@ static bool isValid(Cryptography::Cipher::Operation operation)
     return false;
 }
 
-#if SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static size_t keySize(Cryptography::AeadType type)
 {
     switch (type)
@@ -103,7 +103,7 @@ static size_t keySize(Cryptography::CipherType type)
     return 0;
 }
 
-#if SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static bool spansExactlyOverlap(Span<const uint8_t> input, Span<uint8_t> output)
 {
     return input.data() == output.data() and input.sizeInBytes() == output.sizeInBytes();
@@ -122,7 +122,7 @@ static bool spansOverlap(Span<const uint8_t> input, Span<uint8_t> output)
     return inputBegin < outputEnd and outputBegin < inputEnd;
 }
 
-#if SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static Result validateOutputNoPartialOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
 {
     if (spansOverlap(input, output) and not spansExactlyOverlap(input, output))
@@ -355,14 +355,23 @@ static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytes
 
 #if SC_PLATFORM_WINDOWS
 static constexpr size_t BcryptMaxInputSize = 0xffffffffu;
+#endif
+
+#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_PLATFORM_WINDOWS
+static constexpr size_t AeadMaxInputSize = BcryptMaxInputSize;
+#else
+static constexpr size_t AeadMaxInputSize          = 0x7fffffffu;
+static constexpr size_t AeadMaxAssociatedDataSize = 4096;
+#endif
 
 static Result validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> input,
                                     Span<uint8_t> output, size_t tagSize)
 {
     SC_TRY_MSG(nonce.sizeInBytes() == GCMNonceSize, "Cryptography::Aead - invalid nonce size");
     SC_TRY_MSG(tagSize == GCMTagSize, "Cryptography::Aead - invalid tag size");
-    SC_TRY_MSG(aad.sizeInBytes() <= BcryptMaxInputSize and input.sizeInBytes() <= BcryptMaxInputSize and
-                   output.sizeInBytes() <= BcryptMaxInputSize,
+    SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxInputSize and input.sizeInBytes() <= AeadMaxInputSize and
+                   output.sizeInBytes() <= AeadMaxInputSize,
                "Cryptography::Aead - message is too large for the backend");
     SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Aead - insufficient output buffer");
     SC_TRY(validateOutputNoPartialOverlap(input, output, "Cryptography::Aead - partial overlap is not supported"));
@@ -446,6 +455,55 @@ static Result configureKey(int mainSocket, Span<const uint8_t> key)
         ::setsockopt(mainSocket, SOL_ALG, ALG_SET_KEY, key.data(), static_cast<unsigned int>(key.sizeInBytes())) == 0,
         "Cryptography - ALG_SET_KEY failed");
     return Result(true);
+}
+
+static bool aeadSupported(size_t requestedKeySize)
+{
+    uint8_t key[32]    = {0};
+    int     mainSocket = -1;
+    int     opSocket   = -1;
+
+    bool supported = requestedKeySize <= sizeof(key) and openAlgorithmSocket("aead", "gcm(aes)", mainSocket);
+    if (supported and not configureKey(mainSocket, Span<const uint8_t>(key, requestedKeySize)))
+        supported = false;
+    if (supported)
+        supported = ::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) == 0;
+    if (supported)
+        supported = acceptOperationSocket(mainSocket, opSocket);
+
+    closeIfValid(opSocket);
+    closeIfValid(mainSocket);
+    return supported;
+}
+
+static void configureAeadMessage(msghdr& message, char* control, size_t controlSize, uint32_t operation,
+                                 Span<const uint8_t> nonce, size_t associatedDataSize)
+{
+    memset(&message, 0, sizeof(message));
+    memset(control, 0, controlSize);
+    message.msg_control    = control;
+    message.msg_controllen = controlSize;
+
+    cmsghdr* cmsg    = CMSG_FIRSTHDR(&message);
+    cmsg->cmsg_level = SOL_ALG;
+    cmsg->cmsg_type  = ALG_SET_OP;
+    cmsg->cmsg_len   = CMSG_LEN(sizeof(operation));
+    memcpy(CMSG_DATA(cmsg), &operation, sizeof(operation));
+
+    cmsg             = CMSG_NXTHDR(&message, cmsg);
+    cmsg->cmsg_level = SOL_ALG;
+    cmsg->cmsg_type  = ALG_SET_IV;
+    cmsg->cmsg_len   = CMSG_LEN(sizeof(af_alg_iv) + GCMNonceSize);
+    af_alg_iv* iv    = reinterpret_cast<af_alg_iv*>(CMSG_DATA(cmsg));
+    iv->ivlen        = GCMNonceSize;
+    memcpy(iv->iv, nonce.data(), GCMNonceSize);
+
+    const uint32_t associatedLength = static_cast<uint32_t>(associatedDataSize);
+    cmsg                            = CMSG_NXTHDR(&message, cmsg);
+    cmsg->cmsg_level                = SOL_ALG;
+    cmsg->cmsg_type                 = ALG_SET_AEAD_ASSOCLEN;
+    cmsg->cmsg_len                  = CMSG_LEN(sizeof(associatedLength));
+    memcpy(CMSG_DATA(cmsg), &associatedLength, sizeof(associatedLength));
 }
 #endif
 } // namespace
@@ -963,34 +1021,135 @@ struct SC::Cryptography::Aead::Internal
 
     Result init(AeadType type, Span<const uint8_t> key)
     {
-        (void)type;
-        (void)key;
         close();
-        return Result::Error("Cryptography::Aead - AES-GCM is not supported on this Linux backend");
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
+        SC_TRY(openAlgorithmSocket("aead", "gcm(aes)", mainSocket));
+        auto deferClose = MakeDeferred([&] { close(); });
+        SC_TRY(configureKey(mainSocket, key));
+        SC_TRY_MSG(::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) == 0,
+                   "Cryptography::Aead::init - ALG_SET_AEAD_AUTHSIZE failed");
+        initialized = true;
+        deferClose.disarm();
+        return Result(true);
     }
 
     Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
                 Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
-        (void)nonce;
-        (void)aad;
-        (void)plaintext;
-        (void)ciphertext;
-        (void)tag;
         bytesWritten = 0;
-        return Result::Error("Cryptography::Aead - AES-GCM is not supported on this Linux backend");
+        SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
+        SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
+        SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxAssociatedDataSize,
+                   "Cryptography::Aead - associated data is too large for the Linux backend");
+        SC_TRY_MSG(plaintext.sizeInBytes() <= AeadMaxInputSize - GCMTagSize and
+                       aad.sizeInBytes() <= AeadMaxInputSize - plaintext.sizeInBytes(),
+                   "Cryptography::Aead - message is too large for the backend");
+        SC_TRY(acceptOperationSocket(mainSocket, opSocket));
+        auto deferClose = MakeDeferred([&] { closeIfValid(opSocket); });
+
+        iovec inputIov[2];
+        inputIov[0].iov_base = const_cast<uint8_t*>(aad.data());
+        inputIov[0].iov_len  = aad.sizeInBytes();
+        inputIov[1].iov_base = const_cast<uint8_t*>(plaintext.data());
+        inputIov[1].iov_len  = plaintext.sizeInBytes();
+
+        char   control[CMSG_SPACE(sizeof(uint32_t)) + CMSG_SPACE(sizeof(af_alg_iv) + GCMNonceSize) +
+                     CMSG_SPACE(sizeof(uint32_t))];
+        msghdr inputMessage;
+        configureAeadMessage(inputMessage, control, sizeof(control), ALG_OP_ENCRYPT, nonce, aad.sizeInBytes());
+        inputMessage.msg_iov    = inputIov;
+        inputMessage.msg_iovlen = 2;
+
+        const size_t  inputSize = aad.sizeInBytes() + plaintext.sizeInBytes();
+        const ssize_t sent      = ::sendmsg(opSocket, &inputMessage, 0);
+        SC_TRY_MSG(sent == static_cast<ssize_t>(inputSize), "Cryptography::Aead::seal - sendmsg failed");
+
+        uint8_t associatedDataOutput[AeadMaxAssociatedDataSize];
+        iovec   outputIov[3];
+        outputIov[0].iov_base = associatedDataOutput;
+        outputIov[0].iov_len  = aad.sizeInBytes();
+        outputIov[1].iov_base = ciphertext.data();
+        outputIov[1].iov_len  = plaintext.sizeInBytes();
+        outputIov[2].iov_base = tag.data();
+        outputIov[2].iov_len  = tag.sizeInBytes();
+
+        msghdr outputMessage;
+        memset(&outputMessage, 0, sizeof(outputMessage));
+        outputMessage.msg_iov    = outputIov;
+        outputMessage.msg_iovlen = 3;
+
+        const size_t  outputSize = aad.sizeInBytes() + plaintext.sizeInBytes() + GCMTagSize;
+        const ssize_t received   = ::recvmsg(opSocket, &outputMessage, 0);
+        if (received != static_cast<ssize_t>(outputSize))
+        {
+            secureClear(tag);
+            return Result::Error("Cryptography::Aead::seal - recvmsg failed");
+        }
+
+        bytesWritten = plaintext.sizeInBytes();
+        return Result(true);
     }
 
     Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
                 Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
-        (void)nonce;
-        (void)aad;
-        (void)ciphertext;
-        (void)tag;
-        (void)plaintext;
         bytesWritten = 0;
-        return Result::Error("Cryptography::Aead - AES-GCM is not supported on this Linux backend");
+        SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
+        SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
+        SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxAssociatedDataSize,
+                   "Cryptography::Aead - associated data is too large for the Linux backend");
+        SC_TRY_MSG(ciphertext.sizeInBytes() <= AeadMaxInputSize - GCMTagSize and
+                       aad.sizeInBytes() <= AeadMaxInputSize - ciphertext.sizeInBytes() - GCMTagSize,
+                   "Cryptography::Aead - message is too large for the backend");
+        SC_TRY(acceptOperationSocket(mainSocket, opSocket));
+        auto deferClose = MakeDeferred([&] { closeIfValid(opSocket); });
+
+        iovec inputIov[3];
+        inputIov[0].iov_base = const_cast<uint8_t*>(aad.data());
+        inputIov[0].iov_len  = aad.sizeInBytes();
+        inputIov[1].iov_base = const_cast<uint8_t*>(ciphertext.data());
+        inputIov[1].iov_len  = ciphertext.sizeInBytes();
+        inputIov[2].iov_base = const_cast<uint8_t*>(tag.data());
+        inputIov[2].iov_len  = tag.sizeInBytes();
+
+        char   control[CMSG_SPACE(sizeof(uint32_t)) + CMSG_SPACE(sizeof(af_alg_iv) + GCMNonceSize) +
+                     CMSG_SPACE(sizeof(uint32_t))];
+        msghdr inputMessage;
+        configureAeadMessage(inputMessage, control, sizeof(control), ALG_OP_DECRYPT, nonce, aad.sizeInBytes());
+        inputMessage.msg_iov    = inputIov;
+        inputMessage.msg_iovlen = 3;
+
+        const size_t  inputSize = aad.sizeInBytes() + ciphertext.sizeInBytes() + GCMTagSize;
+        const ssize_t sent      = ::sendmsg(opSocket, &inputMessage, 0);
+        if (sent != static_cast<ssize_t>(inputSize))
+        {
+            secureClear(plaintext);
+            return Result::Error("Cryptography::Aead::open - sendmsg failed");
+        }
+
+        uint8_t associatedDataOutput[AeadMaxAssociatedDataSize];
+        iovec   outputIov[2];
+        outputIov[0].iov_base = associatedDataOutput;
+        outputIov[0].iov_len  = aad.sizeInBytes();
+        outputIov[1].iov_base = plaintext.data();
+        outputIov[1].iov_len  = ciphertext.sizeInBytes();
+
+        msghdr outputMessage;
+        memset(&outputMessage, 0, sizeof(outputMessage));
+        outputMessage.msg_iov    = outputIov;
+        outputMessage.msg_iovlen = 2;
+
+        const ssize_t received = ::recvmsg(opSocket, &outputMessage, 0);
+        if (received != static_cast<ssize_t>(aad.sizeInBytes() + ciphertext.sizeInBytes()))
+        {
+            secureClear(plaintext);
+            if (received == -1 and errno == EBADMSG)
+                return Result::Error("Cryptography::Aead::open - authentication failed");
+            return Result::Error("Cryptography::Aead::open - recvmsg failed");
+        }
+
+        bytesWritten = ciphertext.sizeInBytes();
+        return Result(true);
     }
 };
 
@@ -1230,8 +1389,8 @@ SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
     outFeatures.hkdfSha384     = true;
 #elif SC_PLATFORM_LINUX
     outFeatures.secureRandom   = true;
-    outFeatures.aes128Gcm      = false;
-    outFeatures.aes256Gcm      = false;
+    outFeatures.aes128Gcm      = aeadSupported(16);
+    outFeatures.aes256Gcm      = aeadSupported(32);
     outFeatures.aes128CbcPkcs7 = algorithmSupported("skcipher", "cbc(aes)");
     outFeatures.aes256CbcPkcs7 = outFeatures.aes128CbcPkcs7;
     outFeatures.hmacSha256     = algorithmSupported("hash", "hmac(sha256)");

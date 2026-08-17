@@ -32,7 +32,7 @@ protocol requires that exact construction; CBC encryption by itself does not aut
 | Requirement | API | Important boundary |
 |:------------|:----|:-------------------|
 | Generate keys, nonces, IVs, or salts | `SC::Cryptography::Random` | Random bytes still need protocol-specific length and reuse rules |
-| Encrypt and authenticate one message | `SC::Cryptography::Aead` | AES-GCM currently requires Windows; never reuse a nonce with the same key |
+| Encrypt and authenticate one message | `SC::Cryptography::Aead` | AES-GCM is available on Windows and capable Linux kernels; never reuse a nonce with the same key |
 | Authenticate a byte stream | `SC::Cryptography::Hmac` | Compare MACs with a constant-time comparison supplied by the protocol/application |
 | Derive independent keys | `SC::Cryptography::Hkdf` | `info` should identify the protocol, purpose, and key role |
 | Interoperate with legacy AES-CBC | `SC::Cryptography::Cipher` | CBC is unauthenticated; use only inside a correctly specified authenticated protocol |
@@ -79,6 +79,8 @@ For every message encrypted under one key:
 
 - the nonce must be unique; nonce reuse can destroy GCM's confidentiality and authentication guarantees;
 - AAD is authenticated but is not encrypted, and the same AAD must be supplied to `open()`;
+- the Linux AF_ALG backend accepts at most 4096 bytes of AAD because patched kernels require an AAD-sized writable
+  destination, which the allocation-free adapter provides on the stack;
 - `ciphertext` needs at least `plaintext.sizeInBytes()` bytes and `tag` needs exactly 16 bytes;
 - `plaintext` needs at least `ciphertext.sizeInBytes()` bytes;
 - exact in-place input/output is supported by the current GCM backend, but partial overlap is rejected;
@@ -186,11 +188,17 @@ key-erasure requirements need platform-specific memory and process controls in a
 |:----------------|:--------------|:----------------|:--------|:------------|
 | macOS 13+ | CommonCrypto | AES-128 / AES-256 | Unsupported by the selected public CommonCrypto backend | SHA-256 / SHA-384 |
 | Windows 10+ | CNG | AES-128 / AES-256 | AES-128 / AES-256 | SHA-256 / SHA-384 |
-| Linux | `getrandom()` | `AF_ALG cbc(aes)` when available | Unsupported by the current backend | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
+| Linux | `getrandom()` | `AF_ALG cbc(aes)` when available | `AF_ALG gcm(aes)` when available | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
 
 Linux capability reporting probes the running kernel. A Linux build can therefore compile successfully while a
-particular primitive reports unavailable at runtime. Unsupported platforms compile stubs that return errors and report
-all features as unavailable.
+particular primitive reports unavailable at runtime. AES-GCM additionally requires the kernel's AF_ALG AEAD interface
+(commonly the `algif_aead` module) to be loaded or available for automatic module loading. Unsupported platforms compile
+stubs that return errors and report all features as unavailable.
+
+Use `algif_aead` only on a security-updated kernel. The interface was affected by
+[CVE-2026-31431](https://ubuntu.com/security/CVE-2026-31431), and some distributions disable its module on affected
+kernels. `queryFeatures()` can detect whether the interface is usable, but it cannot prove that a vendor kernel contains
+all relevant security fixes.
 
 # Error handling
 

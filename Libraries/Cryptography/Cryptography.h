@@ -114,7 +114,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @brief Encrypt a single message using AEAD.
         /// @param nonce Nonce/IV for the message. Must be 12 bytes for AES-GCM and unique for every message under a
         /// key.
-        /// @param aad Additional authenticated data.
+        /// @param aad Additional authenticated data. The Linux AF_ALG backend accepts at most 4096 bytes.
         /// @param plaintext Input plaintext.
         /// @param ciphertext Output ciphertext span. Must be at least plaintext size. Exact overlap is allowed; partial
         /// overlap is rejected.
@@ -125,7 +125,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
 
         /// @brief Decrypt a single message using AEAD.
         /// @param nonce Nonce/IV for the message. Must be 12 bytes for AES-GCM.
-        /// @param aad Additional authenticated data.
+        /// @param aad Additional authenticated data. The Linux AF_ALG backend accepts at most 4096 bytes.
         /// @param ciphertext Input ciphertext.
         /// @param tag Input authentication tag. Must be 16 bytes.
         /// @param plaintext Output plaintext span. Must be at least ciphertext size. Exact overlap is allowed; partial

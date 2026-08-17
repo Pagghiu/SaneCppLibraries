@@ -14,7 +14,8 @@ no operation owns caller data or grows storage.
 
 Apple uses CommonCrypto, Windows uses CNG, and Linux uses `getrandom()` and `AF_ALG`. CBC buffering and PKCS#7 handling
 are platform-neutral so native backends process only aligned raw CBC blocks. HKDF is the RFC 5869 composition over the
-library's native HMAC adapter.
+library's native HMAC adapter. Linux AES-GCM uses a fresh AF_ALG operation socket per message and bounds AAD at 4096
+bytes so patched kernels can receive their required writable AAD copy without allocation.
 
 ## Boundaries
 
@@ -49,9 +50,11 @@ documentation, and external review justify promotion.
 - [CRYPTOGRAPHY-0001](cryptography-0001-wrap-native-symmetric-cryptography-with-capability-reporting.md)
 - [CRYPTOGRAPHY-0002](cryptography-0002-prefer-aead-and-keep-cbc-explicitly-legacy.md)
 - [CRYPTOGRAPHY-0003](cryptography-0003-expose-idempotent-session-reset.md)
+- [CRYPTOGRAPHY-0004](cryptography-0004-bound-linux-af-alg-aead-associated-data.md)
 
 ## Decision Log
 
 - [CRYPTOGRAPHY-0001 - Wrap native symmetric cryptography with capability reporting](cryptography-0001-wrap-native-symmetric-cryptography-with-capability-reporting.md)
 - [CRYPTOGRAPHY-0002 - Prefer AEAD and keep CBC explicitly legacy](cryptography-0002-prefer-aead-and-keep-cbc-explicitly-legacy.md)
 - [CRYPTOGRAPHY-0003 - Expose idempotent session reset](cryptography-0003-expose-idempotent-session-reset.md)
+- [CRYPTOGRAPHY-0004 - Bound Linux AF_ALG AEAD associated data](cryptography-0004-bound-linux-af-alg-aead-associated-data.md)
