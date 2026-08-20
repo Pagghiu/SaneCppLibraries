@@ -34,7 +34,7 @@ namespace
 using namespace SC;
 
 static constexpr size_t AESBlockSize = 16;
-#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static constexpr size_t GCMNonceSize = 12;
 static constexpr size_t GCMTagSize   = 16;
 #endif
@@ -81,7 +81,7 @@ static bool isValid(Cryptography::Cipher::Operation operation)
     return false;
 }
 
-#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static size_t keySize(Cryptography::AeadType type)
 {
     switch (type)
@@ -103,7 +103,7 @@ static size_t keySize(Cryptography::CipherType type)
     return 0;
 }
 
-#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static bool spansExactlyOverlap(Span<const uint8_t> input, Span<uint8_t> output)
 {
     return input.data() == output.data() and input.sizeInBytes() == output.sizeInBytes();
@@ -122,7 +122,7 @@ static bool spansOverlap(Span<const uint8_t> input, Span<uint8_t> output)
     return inputBegin < outputEnd and outputBegin < inputEnd;
 }
 
-#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static Result validateOutputNoPartialOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
 {
     if (spansOverlap(input, output) and not spansExactlyOverlap(input, output))
@@ -357,9 +357,11 @@ static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytes
 static constexpr size_t BcryptMaxInputSize = 0xffffffffu;
 #endif
 
-#if SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 #if SC_PLATFORM_WINDOWS
 static constexpr size_t AeadMaxInputSize = BcryptMaxInputSize;
+#elif SC_PLATFORM_APPLE
+static constexpr size_t AeadMaxInputSize = static_cast<size_t>(0xfffffffeULL) * AESBlockSize;
 #else
 static constexpr size_t AeadMaxInputSize          = 0x7fffffffu;
 static constexpr size_t AeadMaxAssociatedDataSize = 4096;
@@ -376,6 +378,113 @@ static Result validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_
     SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Aead - insufficient output buffer");
     SC_TRY(validateOutputNoPartialOverlap(input, output, "Cryptography::Aead - partial overlap is not supported"));
     return Result(true);
+}
+#endif
+
+#if SC_PLATFORM_APPLE
+static void storeBigEndian64(uint8_t* destination, uint64_t value)
+{
+    for (size_t idx = 0; idx < sizeof(value); ++idx)
+    {
+        destination[sizeof(value) - idx - 1] = static_cast<uint8_t>(value);
+        value >>= 8;
+    }
+}
+
+static void gcmMultiply(const uint8_t left[AESBlockSize], const uint8_t right[AESBlockSize],
+                        uint8_t result[AESBlockSize])
+{
+    uint8_t product[AESBlockSize] = {0};
+    uint8_t value[AESBlockSize];
+    memcpy(value, right, sizeof(value));
+
+    for (size_t bitIndex = 0; bitIndex < AESBlockSize * 8; ++bitIndex)
+    {
+        const uint8_t bit  = static_cast<uint8_t>((left[bitIndex / 8] >> (7 - bitIndex % 8)) & 1);
+        const uint8_t mask = static_cast<uint8_t>(0u - bit);
+        for (size_t byteIndex = 0; byteIndex < AESBlockSize; ++byteIndex)
+            product[byteIndex] ^= static_cast<uint8_t>(value[byteIndex] & mask);
+
+        const uint8_t reductionMask = static_cast<uint8_t>(0u - (value[AESBlockSize - 1] & 1));
+        for (size_t byteIndex = AESBlockSize - 1; byteIndex > 0; --byteIndex)
+        {
+            value[byteIndex] =
+                static_cast<uint8_t>((value[byteIndex] >> 1) | static_cast<uint8_t>(value[byteIndex - 1] << 7));
+        }
+        value[0] = static_cast<uint8_t>((value[0] >> 1) ^ (0xe1u & reductionMask));
+    }
+
+    memcpy(result, product, AESBlockSize);
+    secureClear(product);
+    secureClear(value);
+}
+
+static void gcmHashBlock(uint8_t hash[AESBlockSize], const uint8_t block[AESBlockSize],
+                         const uint8_t hashSubkey[AESBlockSize])
+{
+    for (size_t idx = 0; idx < AESBlockSize; ++idx)
+        hash[idx] ^= block[idx];
+    gcmMultiply(hash, hashSubkey, hash);
+}
+
+static void gcmHashSpan(uint8_t hash[AESBlockSize], Span<const uint8_t> input, const uint8_t hashSubkey[AESBlockSize])
+{
+    size_t offset = 0;
+    while (input.sizeInBytes() - offset >= AESBlockSize)
+    {
+        gcmHashBlock(hash, input.data() + offset, hashSubkey);
+        offset += AESBlockSize;
+    }
+
+    const size_t remaining = input.sizeInBytes() - offset;
+    if (remaining > 0)
+    {
+        uint8_t finalBlock[AESBlockSize] = {0};
+        memcpy(finalBlock, input.data() + offset, remaining);
+        gcmHashBlock(hash, finalBlock, hashSubkey);
+        secureClear(finalBlock);
+    }
+}
+
+static void gcmHash(const uint8_t hashSubkey[AESBlockSize], Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                    uint8_t result[AESBlockSize])
+{
+    memset(result, 0, AESBlockSize);
+    gcmHashSpan(result, aad, hashSubkey);
+    gcmHashSpan(result, ciphertext, hashSubkey);
+
+    uint8_t lengths[AESBlockSize];
+    storeBigEndian64(lengths, static_cast<uint64_t>(aad.sizeInBytes()) * 8);
+    storeBigEndian64(lengths + 8, static_cast<uint64_t>(ciphertext.sizeInBytes()) * 8);
+    gcmHashBlock(result, lengths, hashSubkey);
+    secureClear(lengths);
+}
+
+static void gcmInitialCounter(Span<const uint8_t> nonce, uint8_t counter[AESBlockSize])
+{
+    memcpy(counter, nonce.data(), GCMNonceSize);
+    counter[12] = 0;
+    counter[13] = 0;
+    counter[14] = 0;
+    counter[15] = 1;
+}
+
+static void gcmIncrementCounter(uint8_t counter[AESBlockSize])
+{
+    for (size_t idx = AESBlockSize; idx > GCMNonceSize; --idx)
+    {
+        counter[idx - 1] = static_cast<uint8_t>(counter[idx - 1] + 1);
+        if (counter[idx - 1] != 0)
+            break;
+    }
+}
+
+static bool gcmTagsEqual(Span<const uint8_t> supplied, const uint8_t expected[AESBlockSize])
+{
+    volatile uint8_t difference = 0;
+    for (size_t idx = 0; idx < AESBlockSize; ++idx)
+        difference = static_cast<uint8_t>(difference | static_cast<uint8_t>(supplied[idx] ^ expected[idx]));
+    return difference == 0;
 }
 #endif
 
@@ -511,22 +620,169 @@ static void configureAeadMessage(msghdr& message, char* control, size_t controlS
 #if SC_PLATFORM_APPLE
 struct SC::Cryptography::Aead::Internal
 {
-    Result init(AeadType, Span<const uint8_t>)
+    static constexpr size_t CounterBatchBlocks = 16;
+
+    CCCryptorRef aesEncryptor             = nullptr;
+    uint8_t      hashSubkey[AESBlockSize] = {0};
+    bool         initialized              = false;
+
+    ~Internal() { close(); }
+
+    void close()
     {
-        return Result::Error("Cryptography::Aead - AES-GCM is not supported on Apple");
+        if (aesEncryptor != nullptr)
+        {
+            CCCryptorRelease(aesEncryptor);
+            aesEncryptor = nullptr;
+        }
+        secureClear(hashSubkey);
+        initialized = false;
     }
 
-    Result seal(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>, Span<uint8_t>, size_t&)
+    Result encryptBlocks(Span<const uint8_t> input, Span<uint8_t> output)
     {
-        return Result::Error("Cryptography::Aead - AES-GCM is not supported on Apple");
+        size_t                written = 0;
+        const CCCryptorStatus status  = CCCryptorUpdate(aesEncryptor, input.data(), input.sizeInBytes(), output.data(),
+                                                        output.sizeInBytes(), &written);
+        SC_TRY_MSG(status == kCCSuccess and written == input.sizeInBytes(),
+                   "Cryptography::Aead - CommonCrypto AES encryption failed");
+        return Result(true);
     }
 
-    Result open(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>,
-                size_t&)
+    Result init(AeadType type, Span<const uint8_t> key)
     {
-        return Result::Error("Cryptography::Aead - AES-GCM is not supported on Apple");
+        close();
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
+
+        const CCCryptorStatus status = CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, kCCOptionECBMode, key.data(),
+                                                       key.sizeInBytes(), nullptr, &aesEncryptor);
+        if (status != kCCSuccess)
+        {
+            close();
+            return Result::Error("Cryptography::Aead::init - CCCryptorCreate failed");
+        }
+
+        uint8_t zeroBlock[AESBlockSize] = {0};
+        Result  result                  = encryptBlocks(zeroBlock, hashSubkey);
+        secureClear(zeroBlock);
+        if (not result)
+        {
+            close();
+            return result;
+        }
+        initialized = true;
+        return Result(true);
+    }
+
+    Result transform(Span<const uint8_t> nonce, Span<const uint8_t> input, Span<uint8_t> output)
+    {
+        uint8_t counter[AESBlockSize];
+        uint8_t counterBlocks[CounterBatchBlocks * AESBlockSize];
+        uint8_t keyStream[CounterBatchBlocks * AESBlockSize];
+        gcmInitialCounter(nonce, counter);
+
+        size_t offset = 0;
+        while (offset < input.sizeInBytes())
+        {
+            const size_t remaining   = input.sizeInBytes() - offset;
+            const size_t blockCount  = min(CounterBatchBlocks, (remaining + AESBlockSize - 1) / AESBlockSize);
+            const size_t counterSize = blockCount * AESBlockSize;
+            for (size_t blockIndex = 0; blockIndex < blockCount; ++blockIndex)
+            {
+                gcmIncrementCounter(counter);
+                memcpy(counterBlocks + blockIndex * AESBlockSize, counter, AESBlockSize);
+            }
+
+            Result result =
+                encryptBlocks(Span<const uint8_t>(counterBlocks, counterSize), Span<uint8_t>(keyStream, counterSize));
+            if (not result)
+            {
+                secureClear(counter);
+                secureClear(counterBlocks);
+                secureClear(keyStream);
+                return result;
+            }
+
+            const size_t bytesToProcess = min(remaining, counterSize);
+            for (size_t idx = 0; idx < bytesToProcess; ++idx)
+                output[offset + idx] = static_cast<uint8_t>(input[offset + idx] ^ keyStream[idx]);
+            offset += bytesToProcess;
+        }
+
+        secureClear(counter);
+        secureClear(counterBlocks);
+        secureClear(keyStream);
+        return Result(true);
+    }
+
+    Result calculateTag(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                        uint8_t tag[AESBlockSize])
+    {
+        uint8_t counter[AESBlockSize];
+        uint8_t encryptedCounter[AESBlockSize];
+        gcmInitialCounter(nonce, counter);
+        Result result = encryptBlocks(counter, encryptedCounter);
+        if (result)
+        {
+            gcmHash(hashSubkey, aad, ciphertext, tag);
+            for (size_t idx = 0; idx < AESBlockSize; ++idx)
+                tag[idx] ^= encryptedCounter[idx];
+        }
+        secureClear(counter);
+        secureClear(encryptedCounter);
+        return result;
+    }
+
+    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
+    {
+        SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
+        SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
+
+        Result result = transform(nonce, plaintext, ciphertext);
+        if (result)
+        {
+            result =
+                calculateTag(nonce, aad, Span<const uint8_t>(ciphertext.data(), plaintext.sizeInBytes()), tag.data());
+        }
+        if (not result)
+        {
+            secureClear(ciphertext);
+            secureClear(tag);
+            return result;
+        }
+        bytesWritten = plaintext.sizeInBytes();
+        return Result(true);
+    }
+
+    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
+    {
+        SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
+        SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
+
+        uint8_t expectedTag[AESBlockSize];
+        Result  result = calculateTag(nonce, aad, ciphertext, expectedTag);
+        if (not result or not gcmTagsEqual(tag, expectedTag))
+        {
+            secureClear(expectedTag);
+            secureClear(plaintext);
+            return result ? Result::Error("Cryptography::Aead::open - authentication failed") : result;
+        }
+        secureClear(expectedTag);
+
+        result = transform(nonce, ciphertext, plaintext);
+        if (not result)
+        {
+            secureClear(plaintext);
+            return result;
+        }
+        bytesWritten = ciphertext.sizeInBytes();
+        return Result(true);
     }
 };
+
+constexpr size_t SC::Cryptography::Aead::Internal::CounterBatchBlocks;
 
 struct SC::Cryptography::Cipher::Internal
 {
@@ -1371,6 +1627,8 @@ SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
 
 #if SC_PLATFORM_APPLE
     outFeatures.secureRandom   = true;
+    outFeatures.aes128Gcm      = true;
+    outFeatures.aes256Gcm      = true;
     outFeatures.aes128CbcPkcs7 = true;
     outFeatures.aes256CbcPkcs7 = true;
     outFeatures.hmacSha256     = true;

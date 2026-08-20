@@ -15,9 +15,9 @@ no operation owns caller data or grows storage.
 Apple uses CommonCrypto, Windows uses CNG, and Linux uses `getrandom()` and `AF_ALG`. CBC buffering and PKCS#7 handling
 are platform-neutral so native backends process only aligned raw CBC blocks. HKDF is the RFC 5869 composition over the
 library's native HMAC adapter. Linux AES-GCM uses a fresh AF_ALG operation socket per message and bounds AAD at 4096
-bytes so patched kernels can receive their required writable AAD copy without allocation. Apple AES-GCM remains
-unavailable because CryptoKit's generated C++ interface requires a separately compiled Swift implementation and runtime,
-which is incompatible with the standalone C++ amalgamation contract.
+bytes so patched kernels can receive their required writable AAD copy without allocation. Apple composes the narrowly
+supported GCM construction over CommonCrypto AES because CryptoKit's generated C++ interface requires a separately
+compiled Swift implementation and runtime, which is incompatible with the standalone C++ amalgamation contract.
 
 ## Boundaries
 
@@ -54,6 +54,7 @@ documentation, and external review justify promotion.
 - [CRYPTOGRAPHY-0003](cryptography-0003-expose-idempotent-session-reset.md)
 - [CRYPTOGRAPHY-0004](cryptography-0004-bound-linux-af-alg-aead-associated-data.md)
 - [CRYPTOGRAPHY-0005](cryptography-0005-keep-swift-interop-out-of-the-core-backend.md)
+- [CRYPTOGRAPHY-0006](cryptography-0006-compose-apple-gcm-over-commoncrypto-aes.md)
 
 ## Decision Log
 
@@ -62,3 +63,4 @@ documentation, and external review justify promotion.
 - [CRYPTOGRAPHY-0003 - Expose idempotent session reset](cryptography-0003-expose-idempotent-session-reset.md)
 - [CRYPTOGRAPHY-0004 - Bound Linux AF_ALG AEAD associated data](cryptography-0004-bound-linux-af-alg-aead-associated-data.md)
 - [CRYPTOGRAPHY-0005 - Keep Swift interoperability out of the core backend](cryptography-0005-keep-swift-interop-out-of-the-core-backend.md)
+- [CRYPTOGRAPHY-0006 - Compose Apple GCM over CommonCrypto AES](cryptography-0006-compose-apple-gcm-over-commoncrypto-aes.md)

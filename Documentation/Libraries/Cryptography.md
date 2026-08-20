@@ -6,8 +6,9 @@
 
 [SaneCppCryptography.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppCryptography.h)
 provides synchronous, caller-buffered access to secure random bytes, AES-GCM, HMAC, HKDF, and legacy AES-CBC with
-PKCS#7 padding. The implementation delegates primitive operations to the operating system instead of bundling
-cryptographic algorithms or introducing a third-party dependency.
+PKCS#7 padding. AES and hash primitives are delegated to operating-system providers. On Apple, the library implements
+the narrowly scoped SP 800-38D GCM composition over CommonCrypto AES because CommonCrypto has no public GCM interface.
+No third-party dependency or portable AES implementation is included.
 
 # Status and security notice
 
@@ -32,7 +33,7 @@ protocol requires that exact construction; CBC encryption by itself does not aut
 | Requirement | API | Important boundary |
 |:------------|:----|:-------------------|
 | Generate keys, nonces, IVs, or salts | `SC::Cryptography::Random` | Random bytes still need protocol-specific length and reuse rules |
-| Encrypt and authenticate one message | `SC::Cryptography::Aead` | AES-GCM is available on Windows and capable Linux kernels; never reuse a nonce with the same key |
+| Encrypt and authenticate one message | `SC::Cryptography::Aead` | AES-GCM is available on Apple, Windows, and capable Linux kernels; never reuse a nonce with the same key |
 | Authenticate a byte stream | `SC::Cryptography::Hmac` | Compare MACs with a constant-time comparison supplied by the protocol/application |
 | Derive independent keys | `SC::Cryptography::Hkdf` | `info` should identify the protocol, purpose, and key role |
 | Interoperate with legacy AES-CBC | `SC::Cryptography::Cipher` | CBC is unauthenticated; use only inside a correctly specified authenticated protocol |
@@ -92,6 +93,10 @@ callers must generate and manage them according to their protocol:
 \snippet Tests/Libraries/Cryptography/CryptographyTest.cpp CryptographyAeadSnippet
 
 See [NIST SP 800-38D](https://doi.org/10.6028/NIST.SP.800-38D) for GCM requirements and usage bounds.
+
+The Apple adapter uses CommonCrypto for every AES block operation and implements counter construction, GHASH, and tag
+verification privately. It supports only the fixed nonce and tag sizes above. GHASH uses fixed-iteration multiplication
+without secret-indexed lookup tables, and `open()` authenticates ciphertext before decrypting it.
 
 # HMAC
 
@@ -186,7 +191,7 @@ key-erasure requirements need platform-specific memory and process controls in a
 
 | Platform target | Secure random | AES-CBC PKCS#7 | AES-GCM | HMAC / HKDF |
 |:----------------|:--------------|:----------------|:--------|:------------|
-| macOS 13+ | CommonCrypto | AES-128 / AES-256 | Unsupported by the selected public CommonCrypto backend | SHA-256 / SHA-384 |
+| macOS 13+ | CommonCrypto | AES-128 / AES-256 | AES-128 / AES-256 over CommonCrypto AES | SHA-256 / SHA-384 |
 | Windows 10+ | CNG | AES-128 / AES-256 | AES-128 / AES-256 | SHA-256 / SHA-384 |
 | Linux | `getrandom()` | `AF_ALG cbc(aes)` when available | `AF_ALG gcm(aes)` when available | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
 
@@ -212,7 +217,7 @@ Current Draft goals:
 
 - keep the API small and allocation-free;
 - validate every advertised primitive on macOS, Windows, and Linux;
-- broaden AEAD coverage only where a public native API gives reliable no-allocation integration;
+- keep the Apple GCM composition narrow, directly traceable to SP 800-38D, and covered by shared known-answer tests;
 - consider a C binding only after the C++ lifecycle and storage contract stabilizes;
 - obtain external security review before promoting the library beyond Draft.
 

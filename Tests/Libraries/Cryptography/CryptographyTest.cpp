@@ -105,6 +105,9 @@ struct SC::CryptographyTest : public SC::TestCase
     void testAes128GcmWithAad();
     void testAes128GcmWrongTag();
     void testAes128GcmEmptyAndInPlace();
+    void testAes128GcmPartialBlocks();
+    void testAes128GcmBatchBoundary();
+    void testAesGcmAuthenticationInputs();
     void testHmacSha256();
     void testHmacSha384();
     void testHmacStreamingAndLifecycle();
@@ -189,6 +192,21 @@ struct SC::CryptographyTest : public SC::TestCase
         if (test_section("AES128 GCM Empty And In Place"))
         {
             testAes128GcmEmptyAndInPlace();
+        }
+
+        if (test_section("AES128 GCM Partial Blocks"))
+        {
+            testAes128GcmPartialBlocks();
+        }
+
+        if (test_section("AES128 GCM Batch Boundary"))
+        {
+            testAes128GcmBatchBoundary();
+        }
+
+        if (test_section("AES GCM Authentication Inputs"))
+        {
+            testAesGcmAuthenticationInputs();
         }
 
         if (test_section("HMAC SHA256"))
@@ -815,6 +833,144 @@ void CryptographyTest::testAes128GcmEmptyAndInPlace()
     SC_TEST_EXPECT(sameBytes(inPlace, zeroPlain16));
 }
 
+void CryptographyTest::testAes128GcmPartialBlocks()
+{
+    if (not features.aes128Gcm)
+    {
+        printUnsupported("AES128 GCM Partial Blocks");
+        return;
+    }
+
+    const auto key       = "\xfe\xff\xe9\x92\x86\x65\x73\x1c\x6d\x6a\x8f\x94\x67\x30\x83\x08"_a8;
+    const auto nonce     = "\xca\xfe\xba\xbe\xfa\xce\xdb\xad\xde\xca\xf8\x88"_a8;
+    const auto aad       = "\xfe\xed\xfa\xce\xde\xad\xbe\xef\xfe\xed\xfa\xce\xde\xad\xbe\xef\xab\xad\xda\xd2"_a8;
+    const auto plaintext = "\xd9\x31\x32\x25\xf8\x84\x06\xe5\xa5\x59\x09\xc5\xaf\xf5\x26\x9a"
+                           "\x86\xa7\xa9\x53\x15\x34\xf7\xda\x2e\x4c\x30\x3d\x8a\x31\x8a\x72"
+                           "\x1c\x3c\x0c\x95\x95\x68\x09\x53\x2f\xcf\x0e\x24\x49\xa6\xb5\x25"
+                           "\xb1\x6a\xed\xf5\xaa\x0d\xe6\x57\xba\x63\x7b\x39"_a8;
+    const auto expectedCiphertext = "\x42\x83\x1e\xc2\x21\x77\x74\x24\x4b\x72\x21\xb7\x84\xd0\xd4\x9c"
+                                    "\xe3\xaa\x21\x2f\x2c\x02\xa4\xe0\x35\xc1\x7e\x23\x29\xac\xa1\x2e"
+                                    "\x21\xd5\x14\xb2\x54\x66\x93\x1c\x7d\x8f\x6a\x5a\xac\x84\xaa\x05"
+                                    "\x1b\xa3\x0b\x39\x6a\x0a\xac\x97\x3d\x58\xe0\x91"_a8;
+    const auto expectedTag        = "\x5b\xc9\x4f\xbc\x32\x21\xa5\xdb\x94\xfa\xe9\x5a\xe7\x12\x1a\x47"_a8;
+
+    Cryptography::Aead aead;
+    SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, key.toBytesSpan()));
+    uint8_t ciphertext[60] = {0};
+    uint8_t tag[16]        = {0};
+    size_t  bytesWritten   = 0;
+    SC_TEST_EXPECT(
+        aead.seal(nonce.toBytesSpan(), aad.toBytesSpan(), plaintext.toBytesSpan(), ciphertext, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(ciphertext));
+    SC_TEST_EXPECT(sameBytes(ciphertext, expectedCiphertext.toBytesSpan()));
+    SC_TEST_EXPECT(sameBytes(tag, expectedTag.toBytesSpan()));
+
+    uint8_t decrypted[60] = {0};
+    SC_TEST_EXPECT(aead.open(nonce.toBytesSpan(), aad.toBytesSpan(), ciphertext, tag, decrypted, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(decrypted));
+    SC_TEST_EXPECT(sameBytes(decrypted, plaintext.toBytesSpan()));
+}
+
+void CryptographyTest::testAes128GcmBatchBoundary()
+{
+    if (not features.aes128Gcm)
+    {
+        printUnsupported("AES128 GCM Batch Boundary");
+        return;
+    }
+
+    uint8_t key[16];
+    uint8_t nonce[12];
+    uint8_t aad[37];
+    uint8_t plaintext[257];
+    for (size_t idx = 0; idx < sizeof(key); ++idx)
+        key[idx] = static_cast<uint8_t>(idx);
+    for (size_t idx = 0; idx < sizeof(nonce); ++idx)
+        nonce[idx] = static_cast<uint8_t>(0xa0 + idx);
+    for (size_t idx = 0; idx < sizeof(aad); ++idx)
+        aad[idx] = static_cast<uint8_t>(idx * 13 + 7);
+    for (size_t idx = 0; idx < sizeof(plaintext); ++idx)
+        plaintext[idx] = static_cast<uint8_t>(idx * 29 + 3);
+
+    static constexpr uint8_t expectedPrefix[16] = {
+        0xa9, 0xa6, 0x05, 0xe1, 0x09, 0x1d, 0x82, 0xc4, 0x61, 0x70, 0x90, 0x42, 0x19, 0x6e, 0x29, 0xd6,
+    };
+    static constexpr uint8_t expectedSuffix[16] = {
+        0xf0, 0x7f, 0xbf, 0xc8, 0x69, 0xa7, 0xc4, 0x0f, 0x05, 0xce, 0x4f, 0xf8, 0x9a, 0x1f, 0x33, 0x77,
+    };
+    static constexpr uint8_t expectedTag[16] = {
+        0xeb, 0xc6, 0x11, 0xe8, 0xe7, 0xfb, 0x2e, 0x36, 0x18, 0x45, 0x13, 0x9e, 0x8b, 0x8e, 0x05, 0x31,
+    };
+
+    Cryptography::Aead aead;
+    SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, key));
+    uint8_t ciphertext[257] = {0};
+    uint8_t tag[16]         = {0};
+    size_t  bytesWritten    = 0;
+    SC_TEST_EXPECT(aead.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(ciphertext));
+    SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(ciphertext, sizeof(expectedPrefix)), expectedPrefix));
+    SC_TEST_EXPECT(
+        sameBytes(Span<const uint8_t>(ciphertext + sizeof(ciphertext) - sizeof(expectedSuffix), sizeof(expectedSuffix)),
+                  expectedSuffix));
+    SC_TEST_EXPECT(sameBytes(tag, expectedTag));
+
+    uint8_t decrypted[257] = {0};
+    SC_TEST_EXPECT(aead.open(nonce, aad, ciphertext, tag, decrypted, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(decrypted));
+    SC_TEST_EXPECT(sameBytes(decrypted, plaintext));
+}
+
+void CryptographyTest::testAesGcmAuthenticationInputs()
+{
+    if (not features.aes128Gcm)
+    {
+        printUnsupported("AES GCM Authentication Inputs");
+        return;
+    }
+
+    Cryptography::Aead aead;
+    SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
+
+    for (size_t bitIndex = 0; bitIndex < sizeof(aes128GcmExpectedTag) * 8; ++bitIndex)
+    {
+        uint8_t corruptedTag[16];
+        memcpy(corruptedTag, aes128GcmExpectedTag, sizeof(corruptedTag));
+        corruptedTag[bitIndex / 8] ^= static_cast<uint8_t>(1u << (bitIndex % 8));
+
+        uint8_t output[32];
+        memset(output, 0xa5, sizeof(output));
+        size_t bytesWritten = 77;
+        SC_TEST_EXPECT(not aead.open(zeroNonce12, {}, aes128GcmExpectedCipher, corruptedTag, output, bytesWritten));
+        SC_TEST_EXPECT(bytesWritten == 0);
+        SC_TEST_EXPECT(not anyNonZero(output));
+    }
+
+    uint8_t corruptedCiphertext[16];
+    memcpy(corruptedCiphertext, aes128GcmExpectedCipher, sizeof(corruptedCiphertext));
+    corruptedCiphertext[7] ^= 0x80;
+    uint8_t output[16];
+    memset(output, 0xa5, sizeof(output));
+    size_t bytesWritten = 77;
+    SC_TEST_EXPECT(not aead.open(zeroNonce12, {}, corruptedCiphertext, aes128GcmExpectedTag, output, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+    SC_TEST_EXPECT(not anyNonZero(output));
+
+    const uint8_t aad[3] = {1, 2, 3};
+    uint8_t       ciphertext[16];
+    uint8_t       tag[16];
+    SC_TEST_EXPECT(aead.seal(zeroNonce12, aad, zeroPlain16, ciphertext, tag, bytesWritten));
+    const uint8_t corruptedAad[3] = {1, 2, 2};
+    memset(output, 0xa5, sizeof(output));
+    SC_TEST_EXPECT(not aead.open(zeroNonce12, corruptedAad, ciphertext, tag, output, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == 0);
+    SC_TEST_EXPECT(not anyNonZero(output));
+
+    SC_TEST_EXPECT(aead.open(zeroNonce12, aad, ciphertext, tag, output, bytesWritten));
+    SC_TEST_EXPECT(bytesWritten == sizeof(output));
+    SC_TEST_EXPECT(sameBytes(output, zeroPlain16));
+}
+
 void SC::CryptographyTest::testHmacSha256()
 {
     if (features.hmacSha256)
@@ -1006,6 +1162,21 @@ void CryptographyTest::testInvalidInputs()
         uint8_t overlap[32] = {0};
         SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, Span<const uint8_t>(overlap, 16), Span<uint8_t>(overlap + 1, 16),
                                      tag, written));
+        SC_TEST_EXPECT(not aead.open(zeroNonce12, {}, Span<const uint8_t>(overlap, 16), tag,
+                                     Span<uint8_t>(overlap + 1, 16), written));
+
+        SC_TEST_EXPECT(not aead.init(Cryptography::AeadType::AES128GCM, Span<const uint8_t>(zeroKey32, 15)));
+        SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, zeroPlain16, output, tag, written));
+        SC_TEST_EXPECT(written == 0);
+        SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
+        SC_TEST_EXPECT(aead.seal(zeroNonce12, {}, zeroPlain16, output, tag, written));
+
+#if SC_PLATFORM_APPLE
+        const size_t oversizedMessageSize = static_cast<size_t>(0xfffffffeULL) * 16 + 1;
+        SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, Span<const uint8_t>(zeroPlain16, oversizedMessageSize),
+                                     Span<uint8_t>(output, oversizedMessageSize), tag, written));
+        SC_TEST_EXPECT(written == 0);
+#endif
     }
 }
 

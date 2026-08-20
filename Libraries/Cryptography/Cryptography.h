@@ -85,7 +85,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         struct InternalDefinition
         {
             static constexpr int Windows = 4600;
-            static constexpr int Apple   = sizeof(void*);
+            static constexpr int Apple   = 64;
             static constexpr int Linux   = 64;
             static constexpr int Default = Linux;
 
