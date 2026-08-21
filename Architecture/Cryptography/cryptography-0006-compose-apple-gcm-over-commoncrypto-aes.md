@@ -36,5 +36,4 @@ and message contents, and standalone amalgamation builds require no Swift or add
 
 - [CRYPTOGRAPHY-0001](cryptography-0001-wrap-native-symmetric-cryptography-with-capability-reporting.md)
 - [CRYPTOGRAPHY-0005](cryptography-0005-keep-swift-interop-out-of-the-core-backend.md)
-- [Apple AES-GCM implementation plan](../../Plans/Cryptography/apple-aes-gcm.md)
 - [NIST SP 800-38D](https://doi.org/10.6028/NIST.SP.800-38D)

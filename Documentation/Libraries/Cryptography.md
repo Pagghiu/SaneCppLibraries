@@ -14,9 +14,11 @@ No third-party dependency or portable AES implementation is included.
 
 🟨 **Draft / experimental**
 
-The API, storage sizes, and platform coverage may change while the library is in Draft. The implementation has known-
-answer and cross-platform tests, but it has **not received an independent cryptographic or side-channel audit**. Treat it
-as a low-level primitive adapter, not as a complete protocol or a substitute for expert review of a security design.
+The API, storage sizes, and platform coverage may change while the library is in Draft. The implementation has NIST
+known-answer, deterministic mutation, and cross-platform tests, but it has **not received a formal cryptographic or
+side-channel audit**. No formal audit has been performed or is required for Draft publication; users should judge the
+library accordingly. Treat it as a low-level primitive adapter, not as a complete protocol or a substitute for expert
+review of a security design.
 
 Prefer an authenticated-encryption mode such as AES-GCM whenever it is available. Use AES-CBC only when an existing
 protocol requires that exact construction; CBC encryption by itself does not authenticate ciphertext and is malleable.
@@ -74,7 +76,7 @@ only a smoke check that the backend wrote the buffer.
 
 `Aead` binds one AES-128 or AES-256 key with `init()`, then encrypts or decrypts independent messages with `seal()` and
 `open()`. Ciphertext has the same length as plaintext. This API fixes the nonce at 12 bytes and the authentication tag
-at 16 bytes.
+at 16 bytes. Every `init()` attempt discards the previous key, including when initialization fails.
 
 For every message encrypted under one key:
 
@@ -85,6 +87,9 @@ For every message encrypted under one key:
 - `ciphertext` needs at least `plaintext.sizeInBytes()` bytes and `tag` needs exactly 16 bytes;
 - `plaintext` needs at least `ciphertext.sizeInBytes()` bytes;
 - exact in-place input/output is supported by the current GCM backend, but partial overlap is rejected;
+- writable outputs must not overlap nonce or AAD, and the tag must not overlap any other argument;
+- `bytesWritten` is zero on every failure; validation failures leave output spans unchanged;
+- after a sealing backend failure, ciphertext and tag must be treated as unusable;
 - an authentication failure returns `bytesWritten == 0` and clears the supplied plaintext output span.
 
 This known-answer test shows the complete operation. Zero keys and nonces are appropriate only for test vectors—real
@@ -96,13 +101,16 @@ See [NIST SP 800-38D](https://doi.org/10.6028/NIST.SP.800-38D) for GCM requireme
 
 The Apple adapter uses CommonCrypto for every AES block operation and implements counter construction, GHASH, and tag
 verification privately. It supports only the fixed nonce and tag sizes above. GHASH uses fixed-iteration multiplication
-without secret-indexed lookup tables, and `open()` authenticates ciphertext before decrypting it.
+without secret-indexed lookup tables, and `open()` authenticates ciphertext before decrypting it. Shared tests include
+official NIST CAVP vectors plus deterministic boundary and corruption stress for both key sizes.
+The vectors come from the
+[NIST GCM validation corpus](https://csrc.nist.gov/Projects/Cryptographic-Algorithm-Validation-Program/CAVP-TESTING-BLOCK-CIPHER-MODES).
 
 # HMAC
 
 `Hmac` is an incremental HMAC-SHA256 or HMAC-SHA384 session:
 
-1. Call `setType()` to select and reset the hash family.
+1. Call `setType()` to select and reset the hash family. Every attempt discards any active computation, even on failure.
 2. Call `setKey()` to install a key and start a fresh message.
 3. Call `add()` zero or more times; chunk boundaries do not affect the MAC.
 4. Call `getMac()` to finalize into `MacResult`.
@@ -140,7 +148,8 @@ authentication or message failures; doing so can create a padding oracle.
 
 The streaming lifecycle is:
 
-1. Call `start()` with the algorithm, operation, key, and a 16-byte IV.
+1. Call `start()` with the algorithm, operation, key, and a 16-byte IV. Every attempt discards the previous operation,
+   even on failure.
 2. Call `update()` with any chunk size. Input and output must not overlap.
 3. Call `finish()` exactly once to emit or validate PKCS#7 padding.
 
@@ -219,7 +228,8 @@ Current Draft goals:
 - validate every advertised primitive on macOS, Windows, and Linux;
 - keep the Apple GCM composition narrow, directly traceable to SP 800-38D, and covered by shared known-answer tests;
 - consider a C binding only after the C++ lifecycle and storage contract stabilizes;
-- obtain external security review before promoting the library beyond Draft.
+- keep the absence of a formal audit explicit and use sustained testing, real-world use, and focused community feedback
+  to inform any future maturity change.
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Cryptography`.

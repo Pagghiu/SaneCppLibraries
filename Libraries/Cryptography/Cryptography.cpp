@@ -29,9 +29,10 @@
 #include <unistd.h>
 #endif
 
+namespace SC
+{
 namespace
 {
-using namespace SC;
 
 static constexpr size_t AESBlockSize = 16;
 #if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
@@ -379,6 +380,29 @@ static Result validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_
     SC_TRY(validateOutputNoPartialOverlap(input, output, "Cryptography::Aead - partial overlap is not supported"));
     return Result(true);
 }
+
+static Result validateAeadSealArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                        Span<const uint8_t> plaintext, Span<uint8_t> ciphertext, Span<uint8_t> tag)
+{
+    SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
+    SC_TRY_MSG(not spansOverlap(nonce, ciphertext) and not spansOverlap(aad, ciphertext),
+               "Cryptography::Aead::seal - ciphertext overlaps nonce or associated data");
+    SC_TRY_MSG(not spansOverlap(nonce, tag) and not spansOverlap(aad, tag) and not spansOverlap(plaintext, tag) and
+                   not spansOverlap(Span<const uint8_t>(ciphertext.data(), ciphertext.sizeInBytes()), tag),
+               "Cryptography::Aead::seal - tag overlaps another argument");
+    return Result(true);
+}
+
+static Result validateAeadOpenArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                        Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
+                                        Span<uint8_t> plaintext)
+{
+    SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
+    SC_TRY_MSG(not spansOverlap(nonce, plaintext) and not spansOverlap(aad, plaintext) and
+                   not spansOverlap(tag, plaintext),
+               "Cryptography::Aead::open - plaintext overlaps nonce, associated data, or tag");
+    return Result(true);
+}
 #endif
 
 #if SC_PLATFORM_APPLE
@@ -616,6 +640,7 @@ static void configureAeadMessage(msghdr& message, char* control, size_t controlS
 }
 #endif
 } // namespace
+} // namespace SC
 
 #if SC_PLATFORM_APPLE
 struct SC::Cryptography::Aead::Internal
@@ -638,6 +663,8 @@ struct SC::Cryptography::Aead::Internal
         secureClear(hashSubkey);
         initialized = false;
     }
+
+    void reset() { close(); }
 
     Result encryptBlocks(Span<const uint8_t> input, Span<uint8_t> output)
     {
@@ -737,7 +764,7 @@ struct SC::Cryptography::Aead::Internal
                 Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
-        SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
+        SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
 
         Result result = transform(nonce, plaintext, ciphertext);
         if (result)
@@ -759,7 +786,7 @@ struct SC::Cryptography::Aead::Internal
                 Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
-        SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
+        SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
 
         uint8_t expectedTag[AESBlockSize];
         Result  result = calculateTag(nonce, aad, ciphertext, expectedTag);
@@ -919,6 +946,8 @@ struct SC::Cryptography::Aead::Internal
         initialized     = false;
     }
 
+    void reset() { close(); }
+
     Result init(AeadType type, Span<const uint8_t> keyBytes)
     {
         close();
@@ -969,7 +998,7 @@ struct SC::Cryptography::Aead::Internal
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
-        SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
+        SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
 
         BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
         BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
@@ -996,7 +1025,7 @@ struct SC::Cryptography::Aead::Internal
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
-        SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
+        SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
 
         BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
         BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
@@ -1275,6 +1304,8 @@ struct SC::Cryptography::Aead::Internal
         initialized = false;
     }
 
+    void reset() { close(); }
+
     Result init(AeadType type, Span<const uint8_t> key)
     {
         close();
@@ -1294,7 +1325,7 @@ struct SC::Cryptography::Aead::Internal
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
-        SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
+        SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
         SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxAssociatedDataSize,
                    "Cryptography::Aead - associated data is too large for the Linux backend");
         SC_TRY_MSG(plaintext.sizeInBytes() <= AeadMaxInputSize - GCMTagSize and
@@ -1351,7 +1382,7 @@ struct SC::Cryptography::Aead::Internal
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
-        SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
+        SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
         SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxAssociatedDataSize,
                    "Cryptography::Aead - associated data is too large for the Linux backend");
         SC_TRY_MSG(ciphertext.sizeInBytes() <= AeadMaxInputSize - GCMTagSize and
@@ -1384,11 +1415,15 @@ struct SC::Cryptography::Aead::Internal
         }
 
         uint8_t associatedDataOutput[AeadMaxAssociatedDataSize];
+        uint8_t emptyPlaintextOutput = 0;
         iovec   outputIov[2];
         outputIov[0].iov_base = associatedDataOutput;
         outputIov[0].iov_len  = aad.sizeInBytes();
-        outputIov[1].iov_base = plaintext.data();
-        outputIov[1].iov_len  = ciphertext.sizeInBytes();
+        outputIov[1].iov_base = ciphertext.sizeInBytes() == 0 ? &emptyPlaintextOutput : plaintext.data();
+        // A zero-capacity recvmsg returns before AF_ALG authenticates an empty message. One scratch byte makes the
+        // kernel execute the operation; valid empty plaintext still returns zero bytes and an invalid tag returns
+        // EBADMSG.
+        outputIov[1].iov_len = ciphertext.sizeInBytes() == 0 and aad.sizeInBytes() == 0 ? 1 : ciphertext.sizeInBytes();
 
         msghdr outputMessage;
         memset(&outputMessage, 0, sizeof(outputMessage));
@@ -1585,6 +1620,8 @@ struct SC::Cryptography::Hmac::Internal
 #else
 struct SC::Cryptography::Aead::Internal
 {
+    void reset() {}
+
     Result init(AeadType, Span<const uint8_t>) { return Result::Error("Cryptography::Aead - unsupported platform"); }
     Result seal(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>, Span<uint8_t>, size_t&)
     {
@@ -1698,6 +1735,7 @@ SC::Result SC::Cryptography::Random::fill(Span<uint8_t> output)
 
 SC::Result SC::Cryptography::Aead::init(AeadType type, Span<const uint8_t> key)
 {
+    internal.get().reset();
     SC_TRY_MSG(isValid(type), "Cryptography::Aead::init - invalid AEAD type");
     return internal.get().init(type, key);
 }
@@ -1721,6 +1759,7 @@ SC::Result SC::Cryptography::Aead::open(Span<const uint8_t> nonce, Span<const ui
 SC::Result SC::Cryptography::Cipher::start(CipherType type, Operation operation, Span<const uint8_t> key,
                                            Span<const uint8_t> iv)
 {
+    reset();
     SC_TRY_MSG(isValid(type), "Cryptography::Cipher::start - invalid cipher type");
     SC_TRY_MSG(isValid(operation), "Cryptography::Cipher::start - invalid operation");
     return internal.get().start(type, operation, key, iv);
@@ -1742,6 +1781,7 @@ void SC::Cryptography::Cipher::reset() { internal.get().reset(); }
 
 SC::Result SC::Cryptography::Hmac::setType(HashType type)
 {
+    reset();
     SC_TRY_MSG(isValid(type), "Cryptography::Hmac::setType - invalid hash type");
     return internal.get().setType(type);
 }

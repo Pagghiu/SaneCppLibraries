@@ -23,7 +23,7 @@ compiled Swift implementation and runtime, which is incompatible with the standa
 
 The library owns primitive invocation, fixed state, capability discovery, buffer validation, and lifecycle cleanup. It
 does not own certificates, public-key cryptography, password hashing, nonce allocation, persistent keys, protocol
-framing, constant-time comparison, or application authorization decisions.
+framing, a general-purpose constant-time comparison interface, or application authorization decisions.
 
 System headers and platform handles remain in `Cryptography.cpp`. Common guarded headers are inlined source fragments,
 not a Foundation or Common library dependency.
@@ -32,12 +32,12 @@ not a Foundation or Common library dependency.
 
 AES-GCM is preferred. AES-CBC is explicitly legacy and unauthenticated. Authentication failures do not report plaintext
 and clear the supplied output span. Native key-object buffers, CBC pending blocks, HMAC state, and HKDF intermediates are
-cleared when their sessions end where the library owns those bytes. Draft status remains visible until platform coverage,
-documentation, and external review justify promotion.
+cleared when their sessions end where the library owns those bytes. Draft status remains visible until sustained use,
+platform coverage, documentation, and maintainer review justify promotion.
 
 ## Explicitly Excluded Targets
 
-- Bundled algorithm implementations or third-party crypto dependencies.
+- Portable AES implementations, general-purpose bundled cryptography, or third-party crypto dependencies.
 - A generic pluggable algorithm registry.
 - Bespoke encrypt-then-MAC protocol construction.
 - Hidden heap allocation or movable native sessions.

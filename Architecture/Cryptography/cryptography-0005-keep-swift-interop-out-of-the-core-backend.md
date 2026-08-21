@@ -1,7 +1,10 @@
 # CRYPTOGRAPHY-0005 - Keep Swift Interoperability Out of the Core Backend
 
-Status: Accepted
+Status: Superseded in part by CRYPTOGRAPHY-0006
 Date: 2026-08-20
+
+CRYPTOGRAPHY-0006 supersedes the conclusion that Apple AES-GCM must remain unavailable. The decision not to introduce
+Swift interoperability into the core backend remains accepted.
 
 ## Context
 
@@ -38,6 +41,7 @@ AES-GCM feature flags as unavailable.
 ## Related
 
 - [CRYPTOGRAPHY-0001](cryptography-0001-wrap-native-symmetric-cryptography-with-capability-reporting.md)
+- [CRYPTOGRAPHY-0006](cryptography-0006-compose-apple-gcm-over-commoncrypto-aes.md)
 - [Swift C++ interoperability](https://www.swift.org/documentation/cxx-interop/)
 - [Setting up mixed-language Swift and C++ projects](https://www.swift.org/documentation/cxx-interop/project-build-setup/)
 - [Swift C++ interoperability constraints](https://www.swift.org/documentation/cxx-interop/status/)
