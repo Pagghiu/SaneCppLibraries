@@ -5,10 +5,23 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "../Common/CompilerMacrosType.h"
 #include "../Common/CompilerMinMax.h"
 #include "../Common/Deferred.h"
 #include "../Common/PlacementNew.h"
 #include "../Common/PlatformMacrosType.h"
+
+#if SC_PLATFORM_LINUX && !SC_COMPILER_FILC
+#define SC_CRYPTOGRAPHY_LINUX_AF_ALG 1
+#else
+#define SC_CRYPTOGRAPHY_LINUX_AF_ALG 0
+#endif
+
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_CRYPTOGRAPHY_LINUX_AF_ALG
+#define SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND 1
+#else
+#define SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND 0
+#endif
 
 #if SC_PLATFORM_APPLE
 #include <CommonCrypto/CommonCryptor.h>
@@ -23,10 +36,12 @@
 #pragma comment(lib, "bcrypt.lib")
 #elif SC_PLATFORM_LINUX
 #include <errno.h>
-#include <linux/if_alg.h>
 #include <sys/random.h>
+#if SC_CRYPTOGRAPHY_LINUX_AF_ALG
+#include <linux/if_alg.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
 #endif
 
 namespace SC
@@ -34,8 +49,8 @@ namespace SC
 namespace
 {
 
+#if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
 static constexpr size_t AESBlockSize = 16;
-#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static constexpr size_t GCMNonceSize = 12;
 static constexpr size_t GCMTagSize   = 16;
 #endif
@@ -82,7 +97,7 @@ static bool isValid(Cryptography::Cipher::Operation operation)
     return false;
 }
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
 static size_t keySize(Cryptography::AeadType type)
 {
     switch (type)
@@ -92,7 +107,6 @@ static size_t keySize(Cryptography::AeadType type)
     }
     return 0;
 }
-#endif
 
 static size_t keySize(Cryptography::CipherType type)
 {
@@ -104,12 +118,10 @@ static size_t keySize(Cryptography::CipherType type)
     return 0;
 }
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static bool spansExactlyOverlap(Span<const uint8_t> input, Span<uint8_t> output)
 {
     return input.data() == output.data() and input.sizeInBytes() == output.sizeInBytes();
 }
-#endif
 
 static bool spansOverlap(Span<const uint8_t> input, Span<uint8_t> output)
 {
@@ -123,14 +135,12 @@ static bool spansOverlap(Span<const uint8_t> input, Span<uint8_t> output)
     return inputBegin < outputEnd and outputBegin < inputEnd;
 }
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
 static Result validateOutputNoPartialOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
 {
     if (spansOverlap(input, output) and not spansExactlyOverlap(input, output))
         return Result::FromStableCharPointer(message);
     return Result(true);
 }
-#endif
 
 static Result validateOutputNoOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
 {
@@ -145,6 +155,7 @@ static Result validateKeySize(size_t actual, size_t expected, const char* messag
         return Result::FromStableCharPointer(message);
     return Result(true);
 }
+#endif
 
 static void secureClear(Span<uint8_t> bytes)
 {
@@ -153,6 +164,7 @@ static void secureClear(Span<uint8_t> bytes)
         current[idx] = 0;
 }
 
+#if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
 struct CipherStreamState
 {
     Cryptography::Cipher::Operation operation = Cryptography::Cipher::Operation::Encrypt;
@@ -353,12 +365,13 @@ static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytes
     secureClear(block);
     return Result(true);
 }
+#endif
 
 #if SC_PLATFORM_WINDOWS
 static constexpr size_t BcryptMaxInputSize = 0xffffffffu;
 #endif
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX
+#if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
 #if SC_PLATFORM_WINDOWS
 static constexpr size_t AeadMaxInputSize = BcryptMaxInputSize;
 #elif SC_PLATFORM_APPLE
@@ -526,7 +539,7 @@ static LPCWSTR bcryptHashName(Cryptography::HashType type)
 }
 #endif
 
-#if SC_PLATFORM_LINUX
+#if SC_CRYPTOGRAPHY_LINUX_AF_ALG
 static void closeIfValid(int& fd)
 {
     if (fd != -1)
@@ -1288,7 +1301,7 @@ struct SC::Cryptography::Hmac::Internal
     }
 };
 
-#elif SC_PLATFORM_LINUX
+#elif SC_CRYPTOGRAPHY_LINUX_AF_ALG
 struct SC::Cryptography::Aead::Internal
 {
     int  mainSocket  = -1;
@@ -1683,7 +1696,8 @@ SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
     outFeatures.hkdfSha256     = true;
     outFeatures.hkdfSha384     = true;
 #elif SC_PLATFORM_LINUX
-    outFeatures.secureRandom   = true;
+    outFeatures.secureRandom = true;
+#if SC_CRYPTOGRAPHY_LINUX_AF_ALG
     outFeatures.aes128Gcm      = aeadSupported(16);
     outFeatures.aes256Gcm      = aeadSupported(32);
     outFeatures.aes128CbcPkcs7 = algorithmSupported("skcipher", "cbc(aes)");
@@ -1692,6 +1706,7 @@ SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
     outFeatures.hmacSha384     = algorithmSupported("hash", "hmac(sha384)");
     outFeatures.hkdfSha256     = outFeatures.hmacSha256;
     outFeatures.hkdfSha384     = outFeatures.hmacSha384;
+#endif
 #endif
     return Result(true);
 }
@@ -1898,3 +1913,6 @@ SC::Cryptography::Cipher::~Cipher() = default;
 
 SC::Cryptography::Hmac::Hmac()  = default;
 SC::Cryptography::Hmac::~Hmac() = default;
+
+#undef SC_CRYPTOGRAPHY_LINUX_AF_ALG
+#undef SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND

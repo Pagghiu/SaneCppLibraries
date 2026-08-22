@@ -5,7 +5,6 @@
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 namespace SC
@@ -297,13 +296,13 @@ constexpr uint8_t CryptographyTest::hkdfSha384Expected[42];
 void CryptographyTest::testFeatures()
 {
     SC_TEST_EXPECT(features.secureRandom);
-#if SC_PLATFORM_LINUX
-    const char* requireAesGcm = ::getenv("SC_CRYPTOGRAPHY_REQUIRE_AES_GCM");
-    if (requireAesGcm != nullptr and requireAesGcm[0] == '1' and requireAesGcm[1] == '\0')
-    {
-        SC_TEST_EXPECT(features.aes128Gcm);
-        SC_TEST_EXPECT(features.aes256Gcm);
-    }
+#if SC_COMPILER_FILC
+    SC_TEST_EXPECT(not features.aes128Gcm);
+    SC_TEST_EXPECT(not features.aes256Gcm);
+    SC_TEST_EXPECT(not features.aes128CbcPkcs7);
+    SC_TEST_EXPECT(not features.aes256CbcPkcs7);
+    SC_TEST_EXPECT(not features.hmacSha256);
+    SC_TEST_EXPECT(not features.hmacSha384);
 #endif
 #if SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS
     SC_TEST_EXPECT(features.aes128CbcPkcs7);
@@ -1454,6 +1453,12 @@ void CryptographyTest::testInvalidInputs()
 
 void CryptographyTest::testOverlapRejected()
 {
+    if (not features.aes128CbcPkcs7)
+    {
+        printUnsupported("Overlap Rejected");
+        return;
+    }
+
     uint8_t buffer[32] = {0};
     memcpy(buffer, zeroPlain16, sizeof(zeroPlain16));
 

@@ -215,8 +215,6 @@ jobs:
       run: ./SC.sh build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }}
     - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
-      env:
-        SC_CRYPTOGRAPHY_REQUIRE_AES_GCM: ${{ matrix.params.os == 'ubuntu-latest' && '1' || '0' }}
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: test SCBuildTest
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
