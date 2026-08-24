@@ -41,6 +41,10 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         bool hmacSha384     = false;
         bool hkdfSha256     = false;
         bool hkdfSha384     = false;
+
+        /// @brief Maximum associated data size accepted by Aead::seal and Aead::open on the current backend.
+        /// @n Zero means no backend-specific limit beyond the maximum message size.
+        size_t maximumAeadAssociatedDataSize = 0;
     };
 
     enum class HashType : uint8_t
