@@ -32,6 +32,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <bcrypt.h>
+#include <ntstatus.h>
+#include <ntstatus.h>
 
 #pragma comment(lib, "bcrypt.lib")
 #elif SC_PLATFORM_LINUX
@@ -1057,7 +1059,9 @@ struct SC::Cryptography::Aead::Internal
         if (not bcryptSuccess(status))
         {
             secureClear(plaintext);
-            return Result::Error("Cryptography::Aead::open - authentication failed");
+            if (status == static_cast<NTSTATUS>(STATUS_AUTH_TAG_MISMATCH))
+                return Result::Error("Cryptography::Aead::open - authentication failed");
+            return Result::Error("Cryptography::Aead::open - BCryptDecrypt failed");
         }
 
         bytesWritten = written;
@@ -1698,14 +1702,15 @@ SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
 #elif SC_PLATFORM_LINUX
     outFeatures.secureRandom = true;
 #if SC_CRYPTOGRAPHY_LINUX_AF_ALG
-    outFeatures.aes128Gcm      = aeadSupported(16);
-    outFeatures.aes256Gcm      = aeadSupported(32);
-    outFeatures.aes128CbcPkcs7 = algorithmSupported("skcipher", "cbc(aes)");
-    outFeatures.aes256CbcPkcs7 = outFeatures.aes128CbcPkcs7;
-    outFeatures.hmacSha256     = algorithmSupported("hash", "hmac(sha256)");
-    outFeatures.hmacSha384     = algorithmSupported("hash", "hmac(sha384)");
-    outFeatures.hkdfSha256     = outFeatures.hmacSha256;
-    outFeatures.hkdfSha384     = outFeatures.hmacSha384;
+    outFeatures.maximumAeadAssociatedDataSize = AeadMaxAssociatedDataSize;
+    outFeatures.aes128Gcm                     = aeadSupported(16);
+    outFeatures.aes256Gcm                     = aeadSupported(32);
+    outFeatures.aes128CbcPkcs7                = algorithmSupported("skcipher", "cbc(aes)");
+    outFeatures.aes256CbcPkcs7                = outFeatures.aes128CbcPkcs7;
+    outFeatures.hmacSha256                    = algorithmSupported("hash", "hmac(sha256)");
+    outFeatures.hmacSha384                    = algorithmSupported("hash", "hmac(sha384)");
+    outFeatures.hkdfSha256                    = outFeatures.hmacSha256;
+    outFeatures.hkdfSha384                    = outFeatures.hmacSha384;
 #endif
 #endif
     return Result(true);
