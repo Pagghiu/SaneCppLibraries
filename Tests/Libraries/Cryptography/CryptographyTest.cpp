@@ -79,6 +79,22 @@ struct SC::CryptographyTest : public SC::TestCase
         0xb6, 0x13, 0x67, 0x9a, 0x08, 0x14, 0xd9, 0xec, 0x77, 0x2f, 0x95, 0xd7, 0x78, 0xc3, 0x5f, 0xc5,
         0xff, 0x16, 0x97, 0xc4, 0x93, 0x71, 0x56, 0x53, 0xc6, 0xc7, 0x12, 0x14, 0x42, 0x92, 0xc5, 0xad,
     };
+    // RFC 4231 test case 6 (key longer than block size), HMAC-SHA-256.
+    static constexpr uint8_t hmacSha256LongKeyExpected[32] = {
+        0x60, 0xe4, 0x31, 0x59, 0x1e, 0xe0, 0xb6, 0x7f, 0x0d, 0x8a, 0x26, 0xaa, 0xcb, 0xf5, 0xb7, 0x7f,
+        0x8e, 0x0b, 0xc6, 0x21, 0x37, 0x28, 0xc5, 0x14, 0x05, 0x46, 0x04, 0x0f, 0x0e, 0xe3, 0x7f, 0x54,
+    };
+    // RFC 4231 test case 6 (key longer than block size), HMAC-SHA-384.
+    static constexpr uint8_t hmacSha384LongKeyExpected[48] = {
+        0x4e, 0xce, 0x08, 0x44, 0x85, 0x81, 0x3e, 0x90, 0x88, 0xd2, 0xc6, 0x3a, 0x04, 0x1b, 0xc5, 0xb4,
+        0x4f, 0x9e, 0xf1, 0x01, 0x2a, 0x2b, 0x58, 0x8f, 0x3c, 0xd1, 0x1f, 0x05, 0x03, 0x3a, 0xc4, 0xc6,
+        0x0c, 0x2e, 0xf6, 0xab, 0x40, 0x30, 0xfe, 0x82, 0x96, 0x24, 0x8d, 0xf1, 0x63, 0xf4, 0x49, 0x52,
+    };
+    // RFC 4231 test case 7 (key and data longer than block size), HMAC-SHA-256.
+    static constexpr uint8_t hmacSha256LongKeyLongDataExpected[32] = {
+        0x9b, 0x09, 0xff, 0xa7, 0x1b, 0x94, 0x2f, 0xcb, 0x27, 0x63, 0x5f, 0xbc, 0xd5, 0xb0, 0xe9, 0x44,
+        0xbf, 0xdc, 0x63, 0x64, 0x4f, 0x07, 0x13, 0x93, 0x8a, 0x7f, 0x51, 0x53, 0x5c, 0x3a, 0x35, 0xe2,
+    };
     static constexpr uint8_t hkdfSha256Expected[42] = {
         0x3c, 0xb2, 0x5f, 0x25, 0xfa, 0xac, 0xd5, 0x7a, 0x90, 0x43, 0x4f, 0x64, 0xd0, 0x36,
         0x2f, 0x2a, 0x2d, 0x2d, 0x0a, 0x90, 0xcf, 0x1a, 0x5a, 0x4c, 0x5d, 0xb0, 0x2d, 0x56,
@@ -113,6 +129,7 @@ struct SC::CryptographyTest : public SC::TestCase
     void testHmacSha256();
     void testHmacSha384();
     void testHmacStreamingAndLifecycle();
+    void testHmacLongKey();
     void testExplicitReset();
     void testHkdfSha256();
     void testHkdfSha384();
@@ -241,6 +258,11 @@ struct SC::CryptographyTest : public SC::TestCase
             testHmacStreamingAndLifecycle();
         }
 
+        if (test_section("HMAC Long Key"))
+        {
+            testHmacLongKey();
+        }
+
         if (test_section("Explicit Reset"))
         {
             testExplicitReset();
@@ -290,6 +312,9 @@ constexpr uint8_t CryptographyTest::aes256GcmExpectedTag[16];
 constexpr uint8_t CryptographyTest::hmacSha256Expected[32];
 constexpr uint8_t CryptographyTest::hmacSha384Expected[48];
 constexpr uint8_t CryptographyTest::hmacSha256EmptyExpected[32];
+constexpr uint8_t CryptographyTest::hmacSha256LongKeyExpected[32];
+constexpr uint8_t CryptographyTest::hmacSha384LongKeyExpected[48];
+constexpr uint8_t CryptographyTest::hmacSha256LongKeyLongDataExpected[32];
 constexpr uint8_t CryptographyTest::hkdfSha256Expected[42];
 constexpr uint8_t CryptographyTest::hkdfSha384Expected[42];
 
@@ -951,6 +976,82 @@ void CryptographyTest::testAesGcmNistCorpus()
         checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), aad.toBytesSpan(),
                     plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
     }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 0, AADlen 0, Taglen 128 (empty message and AAD).
+    {
+        const auto key   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto tag   = "\x58\xe2\xfc\xce\xfa\x7e\x30\x61\x36\x7f\x1d\x57\xa4\xe7\x45\x5a"_a8;
+        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {}, {}, {},
+                    tag.toBytesSpan());
+    }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 0, AADlen 128, Taglen 128 (empty plaintext with AAD).
+    {
+        const auto key   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto aad   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto tag   = "\x21\xc2\xeb\x20\xcd\x22\x14\xdb\xdf\x34\xc9\xb8\x2e\xcb\x7e\xd2"_a8;
+        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), aad.toBytesSpan(), {},
+                    {}, tag.toBytesSpan());
+    }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 128, AADlen 0, Taglen 128 (empty AAD, one block).
+    {
+        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe\x78"_a8;
+        const auto tag        = "\xab\x6e\x47\xd4\x2c\xec\x13\xbd\xf5\x3a\x67\xb2\x12\x57\xbd\xdf"_a8;
+        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+    }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 8, AADlen 0, Taglen 128 (sub-block plaintext).
+    {
+        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92"_a8;
+        const auto tag        = "\x88\x5e\xe5\x6e\x54\xab\xcd\x3e\x64\xd4\x80\x9d\xe3\x2c\x09\x8a"_a8;
+        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+    }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 24, AADlen 0, Taglen 128 (block plus partial).
+    {
+        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                                "\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe\x78"
+                                "\xf7\x95\xaa\xab\x49\x4b\x59\x23"_a8;
+        const auto tag        = "\x84\x9d\xf2\x18\x22\x90\xd3\x5e\x82\x28\x2d\x41\x9b\x72\xb7\xa6"_a8;
+        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+    }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 0, AADlen 0, Taglen 128, AES-256.
+    {
+        const auto key   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                           "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto tag   = "\x53\x0f\x8a\xfb\xc7\x45\x36\xb9\xa9\x63\xb4\xf1\xc4\xcb\x73\x8b"_a8;
+        checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {}, {}, {},
+                    tag.toBytesSpan());
+    }
+
+    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 128, AADlen 0, Taglen 128, AES-256.
+    {
+        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                                "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+        const auto ciphertext = "\xce\xa7\x40\x3d\x4d\x60\x6b\x6e\x07\x4e\xc5\xd3\xba\xf3\x9d\x18"_a8;
+        const auto tag        = "\xd0\xd1\xc8\xa7\x99\x99\x6b\xf0\x26\x5b\x98\xb5\xd4\x8a\xb9\x19"_a8;
+        checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+    }
 }
 
 void CryptographyTest::testAes128GcmBatchBoundary()
@@ -1281,6 +1382,57 @@ void CryptographyTest::testHmacStreamingAndLifecycle()
     Cryptography::MacResult streamingResult;
     SC_TEST_EXPECT(streaming.getMac(streamingResult));
     SC_TEST_EXPECT(sameBytes(streamingResult.toBytesSpan(), hmacSha256Expected));
+}
+
+void CryptographyTest::testHmacLongKey()
+{
+    // RFC 4231 test cases 6 and 7: keys longer than the hash block size must be hashed before use.
+    uint8_t longKey[131];
+    for (size_t idx = 0; idx < sizeof(longKey); ++idx)
+        longKey[idx] = 0xaa;
+
+    if (features.hmacSha256)
+    {
+        Cryptography::Hmac hmac;
+        SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
+        SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
+        SC_TEST_EXPECT(hmac.add("Test Using Larger Than Block-Size Key - Hash Key First"_a8.toBytesSpan()));
+        Cryptography::MacResult result;
+        SC_TEST_EXPECT(hmac.getMac(result));
+        SC_TEST_EXPECT(sameBytes(result.toBytesSpan(), hmacSha256LongKeyExpected));
+    }
+    else
+    {
+        printUnsupported("HMAC Long Key SHA256");
+    }
+
+    if (features.hmacSha384)
+    {
+        Cryptography::Hmac hmac;
+        SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA384));
+        SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
+        SC_TEST_EXPECT(hmac.add("Test Using Larger Than Block-Size Key - Hash Key First"_a8.toBytesSpan()));
+        Cryptography::MacResult result;
+        SC_TEST_EXPECT(hmac.getMac(result));
+        SC_TEST_EXPECT(sameBytes(result.toBytesSpan(), hmacSha384LongKeyExpected));
+    }
+    else
+    {
+        printUnsupported("HMAC Long Key SHA384");
+    }
+
+    if (features.hmacSha256)
+    {
+        Cryptography::Hmac hmac;
+        SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
+        SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
+        SC_TEST_EXPECT(
+            hmac.add("This is a test using a larger than block-size key and a larger than block-size "
+                     "data. The key needs to be hashed before being used by the HMAC algorithm."_a8.toBytesSpan()));
+        Cryptography::MacResult result;
+        SC_TEST_EXPECT(hmac.getMac(result));
+        SC_TEST_EXPECT(sameBytes(result.toBytesSpan(), hmacSha256LongKeyLongDataExpected));
+    }
 }
 
 void CryptographyTest::testExplicitReset()
