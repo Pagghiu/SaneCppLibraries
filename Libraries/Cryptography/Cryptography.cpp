@@ -32,8 +32,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <bcrypt.h>
-#include <ntstatus.h>
-#include <ntstatus.h>
+
+// ntstatus.h defines hundreds of STATUS_* macros that clash with fallback
+// constexpr definitions in other libraries, so only define what's needed.
+#ifndef STATUS_AUTH_TAG_MISMATCH
+#define STATUS_AUTH_TAG_MISMATCH 0xC000A002
+#endif
 
 #pragma comment(lib, "bcrypt.lib")
 #elif SC_PLATFORM_LINUX
@@ -1059,7 +1063,7 @@ struct SC::Cryptography::Aead::Internal
         if (not bcryptSuccess(status))
         {
             secureClear(plaintext);
-            if (status == static_cast<NTSTATUS>(STATUS_AUTH_TAG_MISMATCH))
+            if (status == STATUS_AUTH_TAG_MISMATCH)
                 return Result::Error("Cryptography::Aead::open - authentication failed");
             return Result::Error("Cryptography::Aead::open - BCryptDecrypt failed");
         }
