@@ -57,7 +57,9 @@ if (features.aes256Gcm)
 ```
 
 `queryFeatures()` reports primitive availability, not whether a chosen key, nonce, IV, message size, or surrounding
-protocol is secure.
+protocol is secure. `maximumAeadAssociatedDataSize` is zero when AES-GCM is unavailable or when the active backend has
+no AAD-specific limit below its general maximum message size. Linux reports 4096 when either AF_ALG AES-GCM variant is
+available.
 
 # Secure random bytes
 

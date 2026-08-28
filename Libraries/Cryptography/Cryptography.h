@@ -43,7 +43,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         bool hkdfSha384     = false;
 
         /// @brief Maximum associated data size accepted by Aead::seal and Aead::open on the current backend.
-        /// @n Zero means no backend-specific limit beyond the maximum message size.
+        /// @n Zero means AES-GCM is unavailable or there is no backend-specific limit beyond the maximum message size.
         size_t maximumAeadAssociatedDataSize = 0;
     };
 

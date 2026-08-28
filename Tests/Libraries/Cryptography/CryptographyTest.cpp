@@ -17,7 +17,7 @@ struct SC::CryptographyTest : public SC::TestCase
     static bool sameBytes(Span<const uint8_t> actual, Span<const uint8_t> expected)
     {
         return actual.sizeInBytes() == expected.sizeInBytes() and
-               memcmp(actual.data(), expected.data(), actual.sizeInBytes()) == 0;
+               (actual.empty() or memcmp(actual.data(), expected.data(), actual.sizeInBytes()) == 0);
     }
 
     static bool anyNonZero(Span<const uint8_t> bytes)
@@ -94,6 +94,12 @@ struct SC::CryptographyTest : public SC::TestCase
     static constexpr uint8_t hmacSha256LongKeyLongDataExpected[32] = {
         0x9b, 0x09, 0xff, 0xa7, 0x1b, 0x94, 0x2f, 0xcb, 0x27, 0x63, 0x5f, 0xbc, 0xd5, 0xb0, 0xe9, 0x44,
         0xbf, 0xdc, 0x63, 0x64, 0x4f, 0x07, 0x13, 0x93, 0x8a, 0x7f, 0x51, 0x53, 0x5c, 0x3a, 0x35, 0xe2,
+    };
+    // RFC 4231 test case 7 (key and data longer than block size), HMAC-SHA-384.
+    static constexpr uint8_t hmacSha384LongKeyLongDataExpected[48] = {
+        0x66, 0x17, 0x17, 0x8e, 0x94, 0x1f, 0x02, 0x0d, 0x35, 0x1e, 0x2f, 0x25, 0x4e, 0x8f, 0xd3, 0x2c,
+        0x60, 0x24, 0x20, 0xfe, 0xb0, 0xb8, 0xfb, 0x9a, 0xdc, 0xce, 0xbb, 0x82, 0x46, 0x1e, 0x99, 0xc5,
+        0xa6, 0x78, 0xcc, 0x31, 0xe7, 0x99, 0x17, 0x6d, 0x38, 0x60, 0xe6, 0x11, 0x0c, 0x46, 0x52, 0x3e,
     };
     static constexpr uint8_t hkdfSha256Expected[42] = {
         0x3c, 0xb2, 0x5f, 0x25, 0xfa, 0xac, 0xd5, 0x7a, 0x90, 0x43, 0x4f, 0x64, 0xd0, 0x36,
@@ -315,12 +321,21 @@ constexpr uint8_t CryptographyTest::hmacSha256EmptyExpected[32];
 constexpr uint8_t CryptographyTest::hmacSha256LongKeyExpected[32];
 constexpr uint8_t CryptographyTest::hmacSha384LongKeyExpected[48];
 constexpr uint8_t CryptographyTest::hmacSha256LongKeyLongDataExpected[32];
+constexpr uint8_t CryptographyTest::hmacSha384LongKeyLongDataExpected[48];
 constexpr uint8_t CryptographyTest::hkdfSha256Expected[42];
 constexpr uint8_t CryptographyTest::hkdfSha384Expected[42];
 
 void CryptographyTest::testFeatures()
 {
     SC_TEST_EXPECT(features.secureRandom);
+#if SC_PLATFORM_LINUX and not SC_COMPILER_FILC
+    if (features.aes128Gcm or features.aes256Gcm)
+        SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 4096);
+    else
+        SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 0);
+#else
+    SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 0);
+#endif
 #if SC_COMPILER_FILC
     SC_TEST_EXPECT(not features.aes128Gcm);
     SC_TEST_EXPECT(not features.aes256Gcm);
@@ -977,80 +992,96 @@ void CryptographyTest::testAesGcmNistCorpus()
                     plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
     }
 
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 0, AADlen 0, Taglen 128 (empty message and AAD).
+    // Zero-input known answers, plus block-boundary values independently cross-checked against OpenSSL.
+    if (features.aes128Gcm)
     {
         const auto key   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
         const auto nonce = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto tag   = "\x58\xe2\xfc\xce\xfa\x7e\x30\x61\x36\x7f\x1d\x57\xa4\xe7\x45\x5a"_a8;
-        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {}, {}, {},
-                    tag.toBytesSpan());
+
+        {
+            const auto tag = "\x58\xe2\xfc\xce\xfa\x7e\x30\x61\x36\x7f\x1d\x57\xa4\xe7\x45\x5a"_a8;
+            checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {}, {}, {},
+                        tag.toBytesSpan());
+        }
+
+        {
+            const auto aad = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto tag = "\x21\xc2\xeb\x20\xcd\x22\x14\xdb\xdf\x34\xc9\xb8\x2e\xcb\x7e\xd2"_a8;
+            checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), aad.toBytesSpan(),
+                        {}, {}, tag.toBytesSpan());
+        }
+
+        {
+            const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe\x78"_a8;
+            const auto tag        = "\xab\x6e\x47\xd4\x2c\xec\x13\xbd\xf5\x3a\x67\xb2\x12\x57\xbd\xdf"_a8;
+            checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                        plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        }
+
+        // PTlen 120: one byte below the AES block boundary.
+        {
+            const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe"_a8;
+            const auto tag        = "\x73\xe8\xcd\xf2\xb0\xb4\x77\x1c\x83\x20\x6a\xf6\xf3\xa3\xc0\x1a"_a8;
+            checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                        plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        }
+
+        // PTlen 136: one byte above the AES block boundary.
+        {
+            const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe\x78\xf7"_a8;
+            const auto tag        = "\xdf\x04\x5e\x21\xf1\xe4\x73\x63\xd7\xe2\x4c\x10\x8b\xa5\xfc\x51"_a8;
+            checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                        plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        }
     }
 
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 0, AADlen 128, Taglen 128 (empty plaintext with AAD).
-    {
-        const auto key   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto nonce = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto aad   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto tag   = "\x21\xc2\xeb\x20\xcd\x22\x14\xdb\xdf\x34\xc9\xb8\x2e\xcb\x7e\xd2"_a8;
-        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), aad.toBytesSpan(), {},
-                    {}, tag.toBytesSpan());
-    }
-
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 128, AADlen 0, Taglen 128 (empty AAD, one block).
-    {
-        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe\x78"_a8;
-        const auto tag        = "\xab\x6e\x47\xd4\x2c\xec\x13\xbd\xf5\x3a\x67\xb2\x12\x57\xbd\xdf"_a8;
-        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
-                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
-    }
-
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 8, AADlen 0, Taglen 128 (sub-block plaintext).
-    {
-        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92"_a8;
-        const auto tag        = "\x88\x5e\xe5\x6e\x54\xab\xcd\x3e\x64\xd4\x80\x9d\xe3\x2c\x09\x8a"_a8;
-        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
-                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
-    }
-
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 24, AADlen 0, Taglen 128 (block plus partial).
-    {
-        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-                                "\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto ciphertext = "\x03\x88\xda\xce\x60\xb6\xa3\x92\xf3\x28\xc2\xb9\x71\xb2\xfe\x78"
-                                "\xf7\x95\xaa\xab\x49\x4b\x59\x23"_a8;
-        const auto tag        = "\x84\x9d\xf2\x18\x22\x90\xd3\x5e\x82\x28\x2d\x41\x9b\x72\xb7\xa6"_a8;
-        checkVector(Cryptography::AeadType::AES128GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
-                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
-    }
-
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 0, AADlen 0, Taglen 128, AES-256.
+    if (features.aes256Gcm)
     {
         const auto key   = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
                            "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
         const auto nonce = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto tag   = "\x53\x0f\x8a\xfb\xc7\x45\x36\xb9\xa9\x63\xb4\xf1\xc4\xcb\x73\x8b"_a8;
-        checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {}, {}, {},
-                    tag.toBytesSpan());
-    }
 
-    // NIST CAVP GCM Encrypt with external IV, Count 0, PTlen 128, AADlen 0, Taglen 128, AES-256.
-    {
-        const auto key        = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-                                "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto nonce      = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
-        const auto ciphertext = "\xce\xa7\x40\x3d\x4d\x60\x6b\x6e\x07\x4e\xc5\xd3\xba\xf3\x9d\x18"_a8;
-        const auto tag        = "\xd0\xd1\xc8\xa7\x99\x99\x6b\xf0\x26\x5b\x98\xb5\xd4\x8a\xb9\x19"_a8;
-        checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
-                    plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        {
+            const auto tag = "\x53\x0f\x8a\xfb\xc7\x45\x36\xb9\xa9\x63\xb4\xf1\xc4\xcb\x73\x8b"_a8;
+            checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {}, {}, {},
+                        tag.toBytesSpan());
+        }
+
+        {
+            const auto aad = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto tag = "\x2d\x45\x55\x2d\x85\x75\x92\x2b\x3c\xa3\xcc\x53\x84\x42\xfa\x26"_a8;
+            checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), aad.toBytesSpan(),
+                        {}, {}, tag.toBytesSpan());
+        }
+
+        {
+            const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto ciphertext = "\xce\xa7\x40\x3d\x4d\x60\x6b\x6e\x07\x4e\xc5\xd3\xba\xf3\x9d\x18"_a8;
+            const auto tag        = "\xd0\xd1\xc8\xa7\x99\x99\x6b\xf0\x26\x5b\x98\xb5\xd4\x8a\xb9\x19"_a8;
+            checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                        plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        }
+
+        // PTlen 120: one byte below the AES block boundary.
+        {
+            const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto ciphertext = "\xce\xa7\x40\x3d\x4d\x60\x6b\x6e\x07\x4e\xc5\xd3\xba\xf3\x9d"_a8;
+            const auto tag        = "\x0f\xdf\x35\xe1\x42\x8b\x68\xaf\xfe\x4a\xe4\xe9\x49\x38\x1c\x4e"_a8;
+            checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                        plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        }
+
+        // PTlen 136: one byte above the AES block boundary.
+        {
+            const auto plaintext  = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"_a8;
+            const auto ciphertext = "\xce\xa7\x40\x3d\x4d\x60\x6b\x6e\x07\x4e\xc5\xd3\xba\xf3\x9d\x18\x72"_a8;
+            const auto tag        = "\xb9\x49\x1b\x96\xac\x77\x39\xad\x52\x6d\x5d\x09\x85\x0e\xb4\xe6"_a8;
+            checkVector(Cryptography::AeadType::AES256GCM, key.toBytesSpan(), nonce.toBytesSpan(), {},
+                        plaintext.toBytesSpan(), ciphertext.toBytesSpan(), tag.toBytesSpan());
+        }
     }
 }
 
@@ -1432,6 +1463,19 @@ void CryptographyTest::testHmacLongKey()
         Cryptography::MacResult result;
         SC_TEST_EXPECT(hmac.getMac(result));
         SC_TEST_EXPECT(sameBytes(result.toBytesSpan(), hmacSha256LongKeyLongDataExpected));
+    }
+
+    if (features.hmacSha384)
+    {
+        Cryptography::Hmac hmac;
+        SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA384));
+        SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
+        SC_TEST_EXPECT(
+            hmac.add("This is a test using a larger than block-size key and a larger than block-size "
+                     "data. The key needs to be hashed before being used by the HMAC algorithm."_a8.toBytesSpan()));
+        Cryptography::MacResult result;
+        SC_TEST_EXPECT(hmac.getMac(result));
+        SC_TEST_EXPECT(sameBytes(result.toBytesSpan(), hmacSha384LongKeyLongDataExpected));
     }
 }
 

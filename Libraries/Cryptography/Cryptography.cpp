@@ -1706,15 +1706,16 @@ SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
 #elif SC_PLATFORM_LINUX
     outFeatures.secureRandom = true;
 #if SC_CRYPTOGRAPHY_LINUX_AF_ALG
-    outFeatures.maximumAeadAssociatedDataSize = AeadMaxAssociatedDataSize;
-    outFeatures.aes128Gcm                     = aeadSupported(16);
-    outFeatures.aes256Gcm                     = aeadSupported(32);
-    outFeatures.aes128CbcPkcs7                = algorithmSupported("skcipher", "cbc(aes)");
-    outFeatures.aes256CbcPkcs7                = outFeatures.aes128CbcPkcs7;
-    outFeatures.hmacSha256                    = algorithmSupported("hash", "hmac(sha256)");
-    outFeatures.hmacSha384                    = algorithmSupported("hash", "hmac(sha384)");
-    outFeatures.hkdfSha256                    = outFeatures.hmacSha256;
-    outFeatures.hkdfSha384                    = outFeatures.hmacSha384;
+    outFeatures.aes128Gcm      = aeadSupported(16);
+    outFeatures.aes256Gcm      = aeadSupported(32);
+    outFeatures.aes128CbcPkcs7 = algorithmSupported("skcipher", "cbc(aes)");
+    outFeatures.aes256CbcPkcs7 = outFeatures.aes128CbcPkcs7;
+    outFeatures.hmacSha256     = algorithmSupported("hash", "hmac(sha256)");
+    outFeatures.hmacSha384     = algorithmSupported("hash", "hmac(sha384)");
+    outFeatures.hkdfSha256     = outFeatures.hmacSha256;
+    outFeatures.hkdfSha384     = outFeatures.hmacSha384;
+    if (outFeatures.aes128Gcm or outFeatures.aes256Gcm)
+        outFeatures.maximumAeadAssociatedDataSize = AeadMaxAssociatedDataSize;
 #endif
 #endif
     return Result(true);
