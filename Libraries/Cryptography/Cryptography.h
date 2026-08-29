@@ -22,16 +22,26 @@ namespace SC
 //! @addtogroup group_cryptography
 //! @{
 
-/// @brief OS-backed symmetric cryptography primitives.
+/// @brief Platform-backed symmetric cryptography primitives.
 /// @n
-/// The library uses operating system cryptographic primitives and keeps the core interface synchronous,
-/// allocation-free and span-based. Apple GCM is narrowly composed over CommonCrypto AES.
+/// The native backend uses operating system cryptographic primitives and keeps the core interface synchronous,
+/// allocation-free and span-based. Linux can explicitly select a runtime-loaded OpenSSL 3 backend, whose internal
+/// allocations are outside the library's control. Apple GCM is narrowly composed over CommonCrypto AES.
 /// @warning This is a Draft, unaudited low-level primitive API. Prefer AEAD, keep keys and nonces under an explicit
 /// protocol policy, and use AES-CBC only for compatibility with an existing authenticated construction.
 struct SC_CRYPTOGRAPHY_EXPORT Cryptography
 {
+    /// @brief Selects the provider used by a cryptographic session.
+    enum class Backend : uint8_t
+    {
+        Native,
+        OpenSSL,
+    };
+
     struct Features
     {
+        Backend backend = Backend::Native;
+
         bool secureRandom   = false;
         bool aes128Gcm      = false;
         bool aes256Gcm      = false;
@@ -73,8 +83,11 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         Span<const uint8_t> toBytesSpan() const SC_LANGUAGE_LIFETIME_BOUND { return {bytes, size}; }
     };
 
-    /// @brief Query which primitives are available on the current backend.
+    /// @brief Query which primitives are available on the default native backend.
     static Result queryFeatures(Features& outFeatures);
+
+    /// @brief Query which primitives are available on a specific backend.
+    static Result queryFeatures(Backend backend, Features& outFeatures);
 
     struct SC_CRYPTOGRAPHY_EXPORT Random
     {
@@ -90,7 +103,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         {
             static constexpr int Windows = 4600;
             static constexpr int Apple   = 64;
-            static constexpr int Linux   = 64;
+            static constexpr int Linux   = 96;
             static constexpr int Default = Linux;
 
             static constexpr size_t Alignment = alignof(void*);
@@ -105,7 +118,10 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         InternalOpaque internal;
 
       public:
+        /// @brief Construct a session using the default native backend.
         Aead();
+        /// @brief Construct a session using an explicitly selected backend.
+        explicit Aead(Backend backend);
         ~Aead();
         Aead(const Aead&)            = delete;
         Aead(Aead&&)                 = delete;
@@ -176,7 +192,10 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         InternalOpaque internal;
 
       public:
+        /// @brief Construct a session using the default native backend.
         Cipher();
+        /// @brief Construct a session using an explicitly selected backend.
+        explicit Cipher(Backend backend);
         ~Cipher();
         Cipher(const Cipher&)            = delete;
         Cipher(Cipher&&)                 = delete;
@@ -231,7 +250,10 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         InternalOpaque internal;
 
       public:
+        /// @brief Construct a session using the default native backend.
         Hmac();
+        /// @brief Construct a session using an explicitly selected backend.
+        explicit Hmac(Backend backend);
         ~Hmac();
         Hmac(const Hmac&)            = delete;
         Hmac(Hmac&&)                 = delete;
@@ -265,11 +287,15 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
 
     struct SC_CRYPTOGRAPHY_EXPORT Hkdf
     {
-        /// @brief Derive output keying material with RFC5869 HKDF built on top of the OS HMAC primitive.
+        /// @brief Derive output keying material with RFC5869 HKDF built on top of the native HMAC primitive.
         /// @note Output is limited to 255 times the selected hash output size. An empty salt uses HashLen zero bytes.
         /// On failure output can contain partial keying material and must be treated as unusable.
         static Result derive(HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm, Span<const uint8_t> info,
                              Span<uint8_t> output);
+
+        /// @brief Derive output keying material using HMAC from a specific backend.
+        static Result derive(Backend backend, HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm,
+                             Span<const uint8_t> info, Span<uint8_t> output);
     };
 };
 

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/CompilerMove.h"
 #include "AsyncStreams.h"
 
 //! @addtogroup group_async_streams
@@ -19,6 +20,12 @@ template <typename T_Cipher>
 struct AsyncCipherTransformStreamT : public AsyncTransformStream
 {
     T_Cipher cipher;
+
+    AsyncCipherTransformStreamT() = default;
+
+    template <typename T_Argument>
+    explicit AsyncCipherTransformStreamT(T_Argument&& argument) : cipher(forward<T_Argument>(argument))
+    {}
 
   private:
     static constexpr size_t BlockSize             = 16;
@@ -111,6 +118,12 @@ template <typename T_Hmac>
 struct AsyncHmacWritableStreamT : public AsyncWritableStream
 {
     T_Hmac hmac;
+
+    AsyncHmacWritableStreamT() = default;
+
+    template <typename T_Argument>
+    explicit AsyncHmacWritableStreamT(T_Argument&& argument) : hmac(forward<T_Argument>(argument))
+    {}
 
   private:
     virtual Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> callback) override

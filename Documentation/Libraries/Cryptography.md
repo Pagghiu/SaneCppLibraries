@@ -1,14 +1,15 @@
 @page library_cryptography Cryptography
 
-@brief 🟨 Allocation-free wrappers over native symmetric cryptography APIs
+@brief 🟨 Fixed-storage wrappers over native and optional OpenSSL symmetric cryptography APIs
 
 [TOC]
 
 [SaneCppCryptography.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppCryptography.h)
 provides synchronous, caller-buffered access to secure random bytes, AES-GCM, HMAC, HKDF, and legacy AES-CBC with
-PKCS#7 padding. AES and hash primitives are delegated to operating-system providers. On Apple, the library implements
-the narrowly scoped SP 800-38D GCM composition over CommonCrypto AES because CommonCrypto has no public GCM interface.
-No third-party dependency or portable AES implementation is included.
+PKCS#7 padding. The default `Native` backend delegates to operating-system providers. Linux callers can explicitly
+select a runtime-loaded OpenSSL 3 backend instead. On Apple, the native backend implements the narrowly scoped SP
+800-38D GCM composition over CommonCrypto AES because CommonCrypto has no public GCM interface. No portable AES
+implementation is included.
 
 # Status and security notice
 
@@ -24,8 +25,9 @@ Prefer an authenticated-encryption mode such as AES-GCM whenever it is available
 protocol requires that exact construction; CBC encryption by itself does not authenticate ciphertext and is malleable.
 
 # Dependencies
-- Dependencies: *(none)*
-- All dependencies: *(none)*
+- Build dependencies: *(none)*
+- Optional Linux runtime dependency: OpenSSL 3 (`libcrypto.so.3`), used only when explicitly selected
+- Linux system link dependency: `dl` on glibc older than 2.34
 
 ![Dependency Graph](Cryptography.svg)
 
@@ -45,7 +47,7 @@ storage, nonce allocation, protocol framing, or constant-time comparison.
 
 # Capability discovery
 
-Backend availability is part of the API. Query it at runtime before selecting an optional primitive:
+Backend availability is part of the API. The overload without a backend always queries `Backend::Native`:
 
 ```cpp
 SC::Cryptography::Features features;
@@ -56,10 +58,28 @@ if (features.aes256Gcm)
 }
 ```
 
+Linux applications that prefer userspace OpenSSL can query and select it explicitly:
+
+```cpp
+SC::Cryptography::Features openSSLFeatures;
+SC_TRY(SC::Cryptography::queryFeatures(SC::Cryptography::Backend::OpenSSL, openSSLFeatures));
+if (openSSLFeatures.aes256Gcm)
+{
+    SC::Cryptography::Aead aead(SC::Cryptography::Backend::OpenSSL);
+    // aead.init(...), aead.seal(...), or aead.open(...)
+}
+```
+
+Default constructors, the original `queryFeatures()` overload, and the original `Hkdf::derive()` overload all use
+`Backend::Native`. On Linux this means AF_ALG. `Aead`, `Cipher`, and `Hmac` bind their backend at construction;
+`Hkdf::derive()` has a backend-taking overload because it constructs HMAC sessions internally. OpenSSL selection
+currently reports unavailable on Apple and Windows, while preserving a platform-neutral selection interface for a
+possible future loader implementation.
+
 `queryFeatures()` reports primitive availability, not whether a chosen key, nonce, IV, message size, or surrounding
 protocol is secure. `maximumAeadAssociatedDataSize` is zero when AES-GCM is unavailable or when the active backend has
-no AAD-specific limit below its general maximum message size. Linux reports 4096 when either AF_ALG AES-GCM variant is
-available.
+no AAD-specific limit below its general maximum message size. Linux `Backend::Native` reports 4096 when either AF_ALG
+AES-GCM variant is available; `Backend::OpenSSL` reports zero because it has no AF_ALG-specific AAD ceiling.
 
 # Secure random bytes
 
@@ -183,9 +203,15 @@ streaming it safely requires a separately specified record protocol that withhol
 
 # Storage, allocation, and secret lifetime
 
-All public objects hold platform state in fixed inline opaque storage. Public operations borrow input spans only for the
-duration of the call and write to caller-owned output spans. The library performs no C++ heap allocation and has no
-STL, exception, or RTTI dependency; native operating-system providers may manage their own internal resources.
+All public objects hold provider state in fixed inline opaque storage. Public operations borrow input spans only for the
+duration of the call and write to caller-owned output spans. The library performs no C++ heap allocation and has no STL,
+exception, or RTTI dependency. The Linux AF_ALG backend uses fixed Sane storage and kernel resources and does not require
+or load OpenSSL.
+
+Selecting `Backend::OpenSSL` changes that end-to-end allocation contract. OpenSSL allocates provider, algorithm,
+cipher/MAC context, process, and thread state internally; Cryptography cannot redirect or prevent those allocations.
+Capability queries, session initialization, and provider operations can therefore allocate inside OpenSSL even though
+Sane C++ continues to use fixed inline storage and caller-owned output buffers.
 
 `Aead`, `Cipher`, and `Hmac` are non-copyable and non-movable because each owns live native state. Keep an active object
 on one thread unless the caller provides external synchronization. Destruction releases native handles. Fixed native
@@ -204,7 +230,8 @@ key-erasure requirements need platform-specific memory and process controls in a
 |:----------------|:--------------|:----------------|:--------|:------------|
 | macOS 13+ | CommonCrypto | AES-128 / AES-256 | AES-128 / AES-256 over CommonCrypto AES | SHA-256 / SHA-384 |
 | Windows 10+ | CNG | AES-128 / AES-256 | AES-128 / AES-256 | SHA-256 / SHA-384 |
-| Linux | `getrandom()` | `AF_ALG cbc(aes)` when available | `AF_ALG gcm(aes)` when available | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
+| Linux, `Native` | `getrandom()` | `AF_ALG cbc(aes)` when available | `AF_ALG gcm(aes)` when available | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
+| Linux, `OpenSSL` | `getrandom()` | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
 
 Linux capability reporting probes the running kernel. A Linux build can therefore compile successfully while a
 particular primitive reports unavailable at runtime. AES-GCM additionally requires the kernel's AF_ALG AEAD interface
@@ -216,6 +243,11 @@ Use `algif_aead` only on a security-updated kernel. The interface was affected b
 kernels. `queryFeatures()` can detect whether the interface is usable, but it cannot prove that a vendor kernel contains
 all relevant security fixes.
 
+The optional OpenSSL backend loads only the versioned `libcrypto.so.3` ABI, requires no OpenSSL headers or link-time
+`libcrypto` dependency, and probes actual provider algorithm initialization. It uses the process default OpenSSL library
+context without loading providers or changing policy. Missing libraries, incomplete symbols, configuration/FIPS policy,
+or unavailable algorithms are reflected in that backend's feature result and do not affect the native backend.
+
 # Error handling
 
 Every operation returns `SC::Result`. Check every result and propagate failures with `SC_TRY`; do not continue with
@@ -226,7 +258,7 @@ not portable native error codes and not suitable as protocol responses.
 
 Current Draft goals:
 
-- keep the API small and allocation-free;
+- keep the API small, keep Sane code and the AF_ALG adapter allocation-free, and make OpenSSL allocations explicit;
 - validate every advertised primitive on macOS, Windows, and Linux;
 - keep the Apple GCM composition narrow, directly traceable to SP 800-38D, and covered by shared known-answer tests;
 - consider a C binding only after the C++ lifecycle and storage contract stabilizes;

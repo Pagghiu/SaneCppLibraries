@@ -30,6 +30,7 @@ struct SC::CryptographyTest : public SC::TestCase
         return false;
     }
 
+    Cryptography::Backend  backend;
     Cryptography::Features features;
 
     void printUnsupported(StringSpan sectionName)
@@ -143,11 +144,12 @@ struct SC::CryptographyTest : public SC::TestCase
     void testInvalidInputs();
     void testOverlapRejected();
 
-    CryptographyTest(SC::TestReport& report) : TestCase(report, "CryptographyTest")
+    CryptographyTest(SC::TestReport& report, Cryptography::Backend backend, StringView name)
+        : TestCase(report, name), backend(backend)
     {
         using namespace SC;
 
-        SC_TEST_EXPECT(Cryptography::queryFeatures(features));
+        SC_TEST_EXPECT(Cryptography::queryFeatures(backend, features));
 
         if (test_section("Features"))
         {
@@ -327,9 +329,26 @@ constexpr uint8_t CryptographyTest::hkdfSha384Expected[42];
 
 void CryptographyTest::testFeatures()
 {
+    SC_TEST_EXPECT(features.backend == backend);
     SC_TEST_EXPECT(features.secureRandom);
+    if (backend == Cryptography::Backend::Native)
+    {
+        Cryptography::Features defaultFeatures;
+        SC_TEST_EXPECT(Cryptography::queryFeatures(defaultFeatures));
+        SC_TEST_EXPECT(defaultFeatures.backend == Cryptography::Backend::Native);
+        SC_TEST_EXPECT(defaultFeatures.secureRandom == features.secureRandom);
+        SC_TEST_EXPECT(defaultFeatures.aes128Gcm == features.aes128Gcm);
+        SC_TEST_EXPECT(defaultFeatures.aes256Gcm == features.aes256Gcm);
+        SC_TEST_EXPECT(defaultFeatures.aes128CbcPkcs7 == features.aes128CbcPkcs7);
+        SC_TEST_EXPECT(defaultFeatures.aes256CbcPkcs7 == features.aes256CbcPkcs7);
+        SC_TEST_EXPECT(defaultFeatures.hmacSha256 == features.hmacSha256);
+        SC_TEST_EXPECT(defaultFeatures.hmacSha384 == features.hmacSha384);
+        SC_TEST_EXPECT(defaultFeatures.hkdfSha256 == features.hkdfSha256);
+        SC_TEST_EXPECT(defaultFeatures.hkdfSha384 == features.hkdfSha384);
+        SC_TEST_EXPECT(defaultFeatures.maximumAeadAssociatedDataSize == features.maximumAeadAssociatedDataSize);
+    }
 #if SC_PLATFORM_LINUX and not SC_COMPILER_FILC
-    if (features.aes128Gcm or features.aes256Gcm)
+    if (backend == Cryptography::Backend::Native and (features.aes128Gcm or features.aes256Gcm))
         SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 4096);
     else
         SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 0);
@@ -377,7 +396,7 @@ void SC::CryptographyTest::testAes128CbcPkcs7()
     if (features.aes128CbcPkcs7)
     {
         //! [CryptographyCbcSnippet]
-        Cryptography::Cipher cipher;
+        Cryptography::Cipher cipher(backend);
         SC_TEST_EXPECT(cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                     zeroKey16, zeroIV16));
 
@@ -390,7 +409,7 @@ void SC::CryptographyTest::testAes128CbcPkcs7()
         SC_TEST_EXPECT(updateBytes + finishBytes == sizeof(aes128CbcExpected));
         SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(ciphertext, updateBytes + finishBytes), aes128CbcExpected));
 
-        Cryptography::Cipher decrypt;
+        Cryptography::Cipher decrypt(backend);
         SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                      zeroKey16, zeroIV16));
 
@@ -418,7 +437,7 @@ void CryptographyTest::testAes256CbcPkcs7()
         return;
     }
 
-    Cryptography::Cipher cipher;
+    Cryptography::Cipher cipher(backend);
     SC_TEST_EXPECT(cipher.start(Cryptography::CipherType::AES256CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                 zeroKey32, zeroIV16));
 
@@ -431,7 +450,7 @@ void CryptographyTest::testAes256CbcPkcs7()
     SC_TEST_EXPECT(updateBytes + finishBytes == sizeof(aes256CbcExpected));
     SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(ciphertext, sizeof(ciphertext)), aes256CbcExpected));
 
-    Cryptography::Cipher decrypt;
+    Cryptography::Cipher decrypt(backend);
     SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES256CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                  zeroKey32, zeroIV16));
     uint8_t plaintext[32] = {0};
@@ -454,7 +473,7 @@ void CryptographyTest::testCbcStreaming()
     for (size_t idx = 0; idx < sizeof(plaintext); ++idx)
         plaintext[idx] = static_cast<uint8_t>(idx * 17 + 3);
 
-    Cryptography::Cipher encrypt;
+    Cryptography::Cipher encrypt(backend);
     SC_TEST_EXPECT(encrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                  zeroKey16, zeroIV16));
 
@@ -478,7 +497,7 @@ void CryptographyTest::testCbcStreaming()
     SC_TEST_EXPECT(inputOffset == sizeof(plaintext));
     SC_TEST_EXPECT(outputOffset == sizeof(ciphertext));
 
-    Cryptography::Cipher decrypt;
+    Cryptography::Cipher decrypt(backend);
     SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                  zeroKey16, zeroIV16));
     static constexpr size_t decryptChunks[] = {7, 9, 33, 1, 78};
@@ -510,7 +529,7 @@ void CryptographyTest::testCbcOutputRetry()
         return;
     }
 
-    Cryptography::Cipher cipher;
+    Cryptography::Cipher cipher(backend);
     SC_TEST_EXPECT(cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                 zeroKey16, zeroIV16));
 
@@ -530,7 +549,7 @@ void CryptographyTest::testCbcOutputRetry()
     SC_TEST_EXPECT(written + finishBytes == sizeof(aes128CbcExpected));
     SC_TEST_EXPECT(sameBytes(ciphertext, aes128CbcExpected));
 
-    Cryptography::Cipher decrypt;
+    Cryptography::Cipher decrypt(backend);
     SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                  zeroKey16, zeroIV16));
     SC_TEST_EXPECT(not decrypt.update(aes128CbcExpected, tooSmall, written));
@@ -552,7 +571,7 @@ void CryptographyTest::testCbcEmptyAndMalformed()
         return;
     }
 
-    Cryptography::Cipher encrypt;
+    Cryptography::Cipher encrypt(backend);
     SC_TEST_EXPECT(encrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                  zeroKey16, zeroIV16));
     size_t  written         = 0;
@@ -562,7 +581,7 @@ void CryptographyTest::testCbcEmptyAndMalformed()
     SC_TEST_EXPECT(encrypt.finish(emptyCipher, written));
     SC_TEST_EXPECT(written == sizeof(emptyCipher));
 
-    Cryptography::Cipher decrypt;
+    Cryptography::Cipher decrypt(backend);
     SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                  zeroKey16, zeroIV16));
     uint8_t emptyPlain[16];
@@ -573,7 +592,7 @@ void CryptographyTest::testCbcEmptyAndMalformed()
     SC_TEST_EXPECT(written == 0);
     SC_TEST_EXPECT(emptyPlain[0] == 0xA5 and emptyPlain[sizeof(emptyPlain) - 1] == 0xA5);
 
-    Cryptography::Cipher malformed;
+    Cryptography::Cipher malformed(backend);
     SC_TEST_EXPECT(malformed.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                    zeroKey16, zeroIV16));
     SC_TEST_EXPECT(malformed.update(Span<const uint8_t>(emptyCipher, 15), {}, written));
@@ -593,7 +612,7 @@ void CryptographyTest::testCbcInvalidPaddingConsumesSession()
     memcpy(corrupted, aes128CbcExpected, sizeof(corrupted));
     corrupted[15] ^= 0x01;
 
-    Cryptography::Cipher cipher;
+    Cryptography::Cipher cipher(backend);
     SC_TEST_EXPECT(cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                 zeroKey16, zeroIV16));
     uint8_t output[32] = {0};
@@ -626,7 +645,7 @@ void CryptographyTest::testCbcDeterministicStress()
         for (size_t idx = 0; idx < messageSize; ++idx)
             plaintext[idx] = static_cast<uint8_t>((idx * 29 + messageSize * 17 + 11) & 0xff);
 
-        Cryptography::Cipher reference;
+        Cryptography::Cipher reference(backend);
         SC_TEST_EXPECT(reference.start(Cryptography::CipherType::AES128CBCPKCS7,
                                        Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
 
@@ -640,7 +659,7 @@ void CryptographyTest::testCbcDeterministicStress()
 
         for (uint32_t initialSeed : chunkSeeds)
         {
-            Cryptography::Cipher encrypt;
+            Cryptography::Cipher encrypt(backend);
             SC_TEST_EXPECT(encrypt.start(Cryptography::CipherType::AES128CBCPKCS7,
                                          Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
 
@@ -668,7 +687,7 @@ void CryptographyTest::testCbcDeterministicStress()
             SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(chunkedCiphertext, outputOffset),
                                      Span<const uint8_t>(expectedCiphertext, expectedSize)));
 
-            Cryptography::Cipher decrypt;
+            Cryptography::Cipher decrypt(backend);
             SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7,
                                          Cryptography::Cipher::Operation::Decrypt, zeroKey16, zeroIV16));
 
@@ -699,7 +718,7 @@ void CryptographyTest::testCbcDeterministicStress()
 
     for (size_t malformedSize = 1; malformedSize < 16; ++malformedSize)
     {
-        Cryptography::Cipher malformed;
+        Cryptography::Cipher malformed(backend);
         SC_TEST_EXPECT(malformed.start(Cryptography::CipherType::AES128CBCPKCS7,
                                        Cryptography::Cipher::Operation::Decrypt, zeroKey16, zeroIV16));
         size_t written = 0;
@@ -715,7 +734,7 @@ void SC::CryptographyTest::testAes128Gcm()
     if (features.aes128Gcm)
     {
         //! [CryptographyAeadSnippet]
-        Cryptography::Aead aead;
+        Cryptography::Aead aead(backend);
         SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
 
         uint8_t ciphertext[16] = {0};
@@ -738,7 +757,7 @@ void SC::CryptographyTest::testAes128Gcm()
     else
     {
         printUnsupported("AES128 GCM Known Answer");
-        Cryptography::Aead aead;
+        Cryptography::Aead aead(backend);
         auto               res = aead.init(Cryptography::AeadType::AES128GCM, zeroKey16);
         SC_TEST_EXPECT(not res);
     }
@@ -752,7 +771,7 @@ void CryptographyTest::testAes256Gcm()
         return;
     }
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES256GCM, zeroKey32));
 
     uint8_t ciphertext[16] = {0};
@@ -790,7 +809,7 @@ void CryptographyTest::testAes128GcmWithAad()
                                 "\x1b\xa3\x0b\x39\x6a\x0a\xac\x97\x3d\x58\xe0\x91\x47\x3f\x59\x85"_a8;
     const auto expectedTag    = "\xda\x80\xce\x83\x0c\xfd\xa0\x2d\xa2\xa2\x18\xa1\x74\x4f\x4c\x76"_a8;
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, key.toBytesSpan()));
     uint8_t ciphertext[64] = {0};
     uint8_t tag[16]        = {0};
@@ -817,15 +836,18 @@ void CryptographyTest::testAes128GcmWithAad()
     SC_TEST_EXPECT(sameBytes(inPlace, plaintext.toBytesSpan()));
 
 #if SC_PLATFORM_LINUX
-    uint8_t maximumAad[4096] = {0};
-    SC_TEST_EXPECT(aead.seal(zeroNonce12, maximumAad, {}, {}, tag, bytesWritten));
-    SC_TEST_EXPECT(bytesWritten == 0);
-    SC_TEST_EXPECT(aead.open(zeroNonce12, maximumAad, {}, tag, {}, bytesWritten));
-    SC_TEST_EXPECT(bytesWritten == 0);
-
-    uint8_t oversizedAad[4097] = {0};
-    bytesWritten               = 77;
-    SC_TEST_EXPECT(not aead.seal(zeroNonce12, oversizedAad, {}, {}, tag, bytesWritten));
+    uint8_t largeAad[4097] = {0};
+    if (backend == Cryptography::Backend::Native)
+    {
+        SC_TEST_EXPECT(aead.seal(zeroNonce12, Span<const uint8_t>(largeAad, 4096), {}, {}, tag, bytesWritten));
+        SC_TEST_EXPECT(aead.open(zeroNonce12, Span<const uint8_t>(largeAad, 4096), {}, tag, {}, bytesWritten));
+        SC_TEST_EXPECT(not aead.seal(zeroNonce12, largeAad, {}, {}, tag, bytesWritten));
+    }
+    else
+    {
+        SC_TEST_EXPECT(aead.seal(zeroNonce12, largeAad, {}, {}, tag, bytesWritten));
+        SC_TEST_EXPECT(aead.open(zeroNonce12, largeAad, {}, tag, {}, bytesWritten));
+    }
     SC_TEST_EXPECT(bytesWritten == 0);
 #endif
 }
@@ -834,7 +856,7 @@ void SC::CryptographyTest::testAes128GcmWrongTag()
 {
     if (features.aes128Gcm)
     {
-        Cryptography::Aead aead;
+        Cryptography::Aead aead(backend);
         SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
 
         uint8_t badTag[16];
@@ -867,7 +889,7 @@ void CryptographyTest::testAes128GcmEmptyAndInPlace()
         0x58, 0xe2, 0xfc, 0xce, 0xfa, 0x7e, 0x30, 0x61, 0x36, 0x7f, 0x1d, 0x57, 0xa4, 0xe7, 0x45, 0x5a,
     };
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
 
     uint8_t tag[16]      = {0};
@@ -918,7 +940,7 @@ void CryptographyTest::testAes128GcmPartialBlocks()
                                     "\x1b\xa3\x0b\x39\x6a\x0a\xac\x97\x3d\x58\xe0\x91"_a8;
     const auto expectedTag        = "\x5b\xc9\x4f\xbc\x32\x21\xa5\xdb\x94\xfa\xe9\x5a\xe7\x12\x1a\x47"_a8;
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, key.toBytesSpan()));
     uint8_t ciphertext[60] = {0};
     uint8_t tag[16]        = {0};
@@ -947,7 +969,7 @@ void CryptographyTest::testAesGcmNistCorpus()
                            Span<const uint8_t> aad, Span<const uint8_t> plaintext,
                            Span<const uint8_t> expectedCiphertext, Span<const uint8_t> expectedTag)
     {
-        Cryptography::Aead aead;
+        Cryptography::Aead aead(backend);
         SC_TEST_EXPECT(aead.init(type, key));
 
         uint8_t ciphertext[32] = {0};
@@ -1116,7 +1138,7 @@ void CryptographyTest::testAes128GcmBatchBoundary()
         0xeb, 0xc6, 0x11, 0xe8, 0xe7, 0xfb, 0x2e, 0x36, 0x18, 0x45, 0x13, 0x9e, 0x8b, 0x8e, 0x05, 0x31,
     };
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, key));
     uint8_t ciphertext[257] = {0};
     uint8_t tag[16]         = {0};
@@ -1143,7 +1165,7 @@ void CryptographyTest::testAesGcmAuthenticationInputs()
         return;
     }
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
 
     for (size_t bitIndex = 0; bitIndex < sizeof(aes128GcmExpectedTag) * 8; ++bitIndex)
@@ -1193,7 +1215,7 @@ void CryptographyTest::testAesGcmCrossArgumentOverlap()
         return;
     }
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
 
     uint8_t shared[32] = {0};
@@ -1283,7 +1305,7 @@ void CryptographyTest::testAesGcmDeterministicFuzz()
             for (size_t idx = 0; idx < messageSize; ++idx)
                 plaintext[idx] = nextByte();
 
-            Cryptography::Aead aead;
+            Cryptography::Aead aead(backend);
             SC_TEST_EXPECT(aead.init(type, Span<const uint8_t>(key, keySize)));
             size_t bytesWritten = 0;
             SC_TEST_EXPECT(aead.seal(nonce, Span<const uint8_t>(aad, aadSize),
@@ -1351,7 +1373,7 @@ void SC::CryptographyTest::testHmacSha256()
     if (features.hmacSha256)
     {
         //! [CryptographyHmacSnippet]
-        Cryptography::Hmac hmac;
+        Cryptography::Hmac hmac(backend);
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
         SC_TEST_EXPECT(hmac.setKey(
             "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b"_a8.toBytesSpan()));
@@ -1372,7 +1394,7 @@ void SC::CryptographyTest::testHmacSha384()
 {
     if (features.hmacSha384)
     {
-        Cryptography::Hmac hmac;
+        Cryptography::Hmac hmac(backend);
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA384));
         SC_TEST_EXPECT(hmac.setKey(
             "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b"_a8.toBytesSpan()));
@@ -1396,7 +1418,7 @@ void CryptographyTest::testHmacStreamingAndLifecycle()
         return;
     }
 
-    Cryptography::Hmac empty;
+    Cryptography::Hmac empty(backend);
     SC_TEST_EXPECT(empty.setType(Cryptography::HashType::SHA256));
     SC_TEST_EXPECT(empty.setKey({}));
     Cryptography::MacResult emptyResult;
@@ -1404,7 +1426,7 @@ void CryptographyTest::testHmacStreamingAndLifecycle()
     SC_TEST_EXPECT(sameBytes(emptyResult.toBytesSpan(), hmacSha256EmptyExpected));
     SC_TEST_EXPECT(not empty.add({}));
 
-    Cryptography::Hmac streaming;
+    Cryptography::Hmac streaming(backend);
     SC_TEST_EXPECT(streaming.setType(Cryptography::HashType::SHA256));
     SC_TEST_EXPECT(streaming.setKey(
         "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b"_a8.toBytesSpan()));
@@ -1424,7 +1446,7 @@ void CryptographyTest::testHmacLongKey()
 
     if (features.hmacSha256)
     {
-        Cryptography::Hmac hmac;
+        Cryptography::Hmac hmac(backend);
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
         SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
         SC_TEST_EXPECT(hmac.add("Test Using Larger Than Block-Size Key - Hash Key First"_a8.toBytesSpan()));
@@ -1439,7 +1461,7 @@ void CryptographyTest::testHmacLongKey()
 
     if (features.hmacSha384)
     {
-        Cryptography::Hmac hmac;
+        Cryptography::Hmac hmac(backend);
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA384));
         SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
         SC_TEST_EXPECT(hmac.add("Test Using Larger Than Block-Size Key - Hash Key First"_a8.toBytesSpan()));
@@ -1454,7 +1476,7 @@ void CryptographyTest::testHmacLongKey()
 
     if (features.hmacSha256)
     {
-        Cryptography::Hmac hmac;
+        Cryptography::Hmac hmac(backend);
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
         SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
         SC_TEST_EXPECT(
@@ -1467,7 +1489,7 @@ void CryptographyTest::testHmacLongKey()
 
     if (features.hmacSha384)
     {
-        Cryptography::Hmac hmac;
+        Cryptography::Hmac hmac(backend);
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA384));
         SC_TEST_EXPECT(hmac.setKey(Span<const uint8_t>(longKey, sizeof(longKey))));
         SC_TEST_EXPECT(
@@ -1481,7 +1503,7 @@ void CryptographyTest::testHmacLongKey()
 
 void CryptographyTest::testExplicitReset()
 {
-    Cryptography::Cipher cipher;
+    Cryptography::Cipher cipher(backend);
     cipher.reset();
     cipher.reset();
 
@@ -1495,7 +1517,7 @@ void CryptographyTest::testExplicitReset()
         SC_TEST_EXPECT(bytesWritten == 0);
     }
 
-    Cryptography::Hmac hmac;
+    Cryptography::Hmac hmac(backend);
     hmac.reset();
     hmac.reset();
 
@@ -1516,7 +1538,8 @@ void SC::CryptographyTest::testHkdfSha256()
         //! [CryptographyHkdfSnippet]
         uint8_t output[42] = {0};
         SC_TEST_EXPECT(Cryptography::Hkdf::derive(
-            Cryptography::HashType::SHA256, "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c"_a8.toBytesSpan(),
+            backend, Cryptography::HashType::SHA256,
+            "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c"_a8.toBytesSpan(),
             "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b"_a8.toBytesSpan(),
             "\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9"_a8.toBytesSpan(), output));
         SC_TEST_EXPECT(sameBytes(output, hkdfSha256Expected));
@@ -1534,7 +1557,7 @@ void CryptographyTest::testHkdfSha384()
     {
         uint8_t output[42] = {0};
         SC_TEST_EXPECT(Cryptography::Hkdf::derive(
-            Cryptography::HashType::SHA384,
+            backend, Cryptography::HashType::SHA384,
             "\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf"_a8.toBytesSpan(),
             "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"_a8.toBytesSpan(),
             "\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7"_a8.toBytesSpan(), output));
@@ -1555,16 +1578,16 @@ void CryptographyTest::testHkdfBounds()
     }
 
     uint8_t byte = 0xA5;
-    SC_TEST_EXPECT(Cryptography::Hkdf::derive(Cryptography::HashType::SHA384, {}, {}, {}, {}));
+    SC_TEST_EXPECT(Cryptography::Hkdf::derive(backend, Cryptography::HashType::SHA384, {}, {}, {}, {}));
     SC_TEST_EXPECT(byte == 0xA5);
-    SC_TEST_EXPECT(
-        not Cryptography::Hkdf::derive(Cryptography::HashType::SHA384, {}, {}, {}, Span<uint8_t>(&byte, 255 * 48 + 1)));
+    SC_TEST_EXPECT(not Cryptography::Hkdf::derive(backend, Cryptography::HashType::SHA384, {}, {}, {},
+                                                  Span<uint8_t>(&byte, 255 * 48 + 1)));
     SC_TEST_EXPECT(byte == 0xA5);
 }
 
 void CryptographyTest::testInvalidInputs()
 {
-    Cryptography::Hmac hmac;
+    Cryptography::Hmac hmac(backend);
     SC_TEST_EXPECT(not hmac.setType(static_cast<Cryptography::HashType>(255)));
     if (features.hmacSha256)
     {
@@ -1574,11 +1597,11 @@ void CryptographyTest::testInvalidInputs()
         SC_TEST_EXPECT(not hmac.add({}));
     }
 
-    Cryptography::Aead aead;
+    Cryptography::Aead aead(backend);
     auto               badAead = aead.init(Cryptography::AeadType::AES128GCM, Span<const uint8_t>(zeroKey32, 15));
     SC_TEST_EXPECT(not badAead);
 
-    Cryptography::Cipher cipher;
+    Cryptography::Cipher cipher(backend);
     auto badCipher = cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                   zeroKey16, Span<const uint8_t>(zeroIV16, 8));
     SC_TEST_EXPECT(not badCipher);
@@ -1658,20 +1681,26 @@ void CryptographyTest::testOverlapRejected()
     uint8_t buffer[32] = {0};
     memcpy(buffer, zeroPlain16, sizeof(zeroPlain16));
 
-    Cryptography::Cipher partialOverlap;
+    Cryptography::Cipher partialOverlap(backend);
     SC_TEST_EXPECT(partialOverlap.start(Cryptography::CipherType::AES128CBCPKCS7,
                                         Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
     size_t bytesWritten = 0;
     SC_TEST_EXPECT(not partialOverlap.update(Span<const uint8_t>(buffer, sizeof(zeroPlain16)),
                                              Span<uint8_t>(buffer + 4, sizeof(zeroPlain16)), bytesWritten));
 
-    Cryptography::Cipher exactOverlap;
+    Cryptography::Cipher exactOverlap(backend);
     SC_TEST_EXPECT(exactOverlap.start(Cryptography::CipherType::AES128CBCPKCS7,
                                       Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
     SC_TEST_EXPECT(not exactOverlap.update(Span<const uint8_t>(buffer, sizeof(zeroPlain16)),
                                            Span<uint8_t>(buffer, sizeof(zeroPlain16)), bytesWritten));
 }
 
-void runCryptographyTest(SC::TestReport& report) { CryptographyTest test(report); }
+void runCryptographyTest(SC::TestReport& report)
+{
+    CryptographyTest nativeTest(report, Cryptography::Backend::Native, "CryptographyTest");
+#if SC_PLATFORM_LINUX and not SC_COMPILER_FILC
+    CryptographyTest openSSLTest(report, Cryptography::Backend::OpenSSL, "CryptographyOpenSSLTest");
+#endif
+}
 
 } // namespace SC

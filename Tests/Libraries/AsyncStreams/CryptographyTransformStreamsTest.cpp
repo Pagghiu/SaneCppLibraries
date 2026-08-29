@@ -14,9 +14,13 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
 {
     struct TestCipher
     {
-        int updateCalls = 0;
-        int finishCalls = 0;
-        int resetCalls  = 0;
+        int constructorArgument = 0;
+        int updateCalls         = 0;
+        int finishCalls         = 0;
+        int resetCalls          = 0;
+
+        TestCipher() = default;
+        explicit TestCipher(int argument) : constructorArgument(argument) {}
 
         Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
         {
@@ -44,9 +48,13 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
 
     struct TestHmac
     {
-        uint8_t bytes[32]  = {0};
-        size_t  size       = 0;
-        int     resetCalls = 0;
+        int     constructorArgument = 0;
+        uint8_t bytes[32]           = {0};
+        size_t  size                = 0;
+        int     resetCalls          = 0;
+
+        TestHmac() = default;
+        explicit TestHmac(int argument) : constructorArgument(argument) {}
 
         Result add(Span<const uint8_t> data)
         {
@@ -94,9 +102,10 @@ void SC::CryptographyTransformStreamsTest::cipherTemplateAdapter()
     AsyncBuffersPool pool;
     pool.setBuffers(bufferViews);
 
-    AsyncCipherTransformStreamT<TestCipher> stream;
-    AsyncReadableStream::Request            readRequests[3];
-    AsyncWritableStream::Request            writeRequests[3];
+    AsyncCipherTransformStreamT<TestCipher> stream(17);
+    SC_TEST_EXPECT(stream.cipher.constructorArgument == 17);
+    AsyncReadableStream::Request readRequests[3];
+    AsyncWritableStream::Request writeRequests[3];
     SC_TEST_EXPECT(stream.init(pool, readRequests, writeRequests));
 
     uint8_t transformed[32] = {0};
@@ -143,8 +152,9 @@ void SC::CryptographyTransformStreamsTest::hmacTemplateAdapter()
     AsyncBuffersPool pool;
     pool.setBuffers(bufferViews);
 
-    AsyncHmacWritableStreamT<TestHmac> sink;
-    AsyncWritableStream::Request       writeRequests[3];
+    AsyncHmacWritableStreamT<TestHmac> sink(23);
+    SC_TEST_EXPECT(sink.hmac.constructorArgument == 23);
+    AsyncWritableStream::Request writeRequests[3];
     sink.setWriteQueue(writeRequests);
     SC_TEST_EXPECT(sink.init(pool));
 

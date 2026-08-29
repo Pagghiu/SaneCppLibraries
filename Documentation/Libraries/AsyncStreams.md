@@ -137,6 +137,14 @@ SC_TRY(pipeline.pipe());
 SC_TRY(pipeline.start());
 ```
 
+The adapters forward a single constructor argument to the concrete session, so an explicitly selected backend remains
+possible without teaching Async Streams about Cryptography:
+
+```cpp
+SC::AsyncCipherTransformStreamT<SC::Cryptography::Cipher> encrypt(SC::Cryptography::Backend::OpenSSL);
+SC::AsyncHmacWritableStreamT<SC::Cryptography::Hmac> authentication(SC::Cryptography::Backend::OpenSSL);
+```
+
 `source`, `encrypt`, and `destination` must use the same pool. Every reusable writable view that the pool may return to
 the cipher must be at least 16 bytes. Larger buffers are more efficient: the adapter reserves up to 15 bytes of capacity
 for output caused by input retained from an earlier update. Decryption uses the same setup with `Operation::Decrypt`.
