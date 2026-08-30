@@ -102,7 +102,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         struct InternalDefinition
         {
             static constexpr int Windows = 4600;
-            static constexpr int Apple   = 64;
+            static constexpr int Apple   = 128;
             static constexpr int Linux   = 96;
             static constexpr int Default = Linux;
 

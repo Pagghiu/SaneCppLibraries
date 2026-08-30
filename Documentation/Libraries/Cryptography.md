@@ -1,19 +1,19 @@
 @page library_cryptography Cryptography
 
-@brief 🟨 Fixed-storage wrappers over native and optional OpenSSL symmetric cryptography APIs
+@brief 🟥 Fixed-storage wrappers over native and optional OpenSSL symmetric cryptography APIs
 
 [TOC]
 
 [SaneCppCryptography.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppCryptography.h)
 provides synchronous, caller-buffered access to secure random bytes, AES-GCM, HMAC, HKDF, and legacy AES-CBC with
-PKCS#7 padding. The default `Native` backend delegates to operating-system providers. Linux callers can explicitly
-select a runtime-loaded OpenSSL 3 backend instead. On Apple, the native backend implements the narrowly scoped SP
-800-38D GCM composition over CommonCrypto AES because CommonCrypto has no public GCM interface. No portable AES
-implementation is included.
+PKCS#7 padding. The default `Native` backend delegates to operating-system providers. Apple, Windows, and Linux callers
+can explicitly select a runtime-loaded OpenSSL 3 backend instead. On Apple, the native backend implements the narrowly
+scoped SP 800-38D GCM composition over CommonCrypto AES because CommonCrypto has no public GCM interface. No portable
+AES implementation is included.
 
 # Status and security notice
 
-🟨 **Draft / experimental**
+🟥 **Draft / experimental**
 
 The API, storage sizes, and platform coverage may change while the library is in Draft. The implementation has NIST
 known-answer, deterministic mutation, and cross-platform tests, but it has **not received a formal cryptographic or
@@ -26,7 +26,8 @@ protocol requires that exact construction; CBC encryption by itself does not aut
 
 # Dependencies
 - Build dependencies: *(none)*
-- Optional Linux runtime dependency: OpenSSL 3 (`libcrypto.so.3`), used only when explicitly selected
+- Optional runtime dependency: OpenSSL 3 (`libcrypto.3.dylib`, `libcrypto-3-*.dll`, or `libcrypto.so.3`), used only when
+  explicitly selected
 - Linux system link dependency: `dl` on glibc older than 2.34
 
 ![Dependency Graph](Cryptography.svg)
@@ -58,7 +59,7 @@ if (features.aes256Gcm)
 }
 ```
 
-Linux applications that prefer userspace OpenSSL can query and select it explicitly:
+Applications that prefer OpenSSL can query and select it explicitly:
 
 ```cpp
 SC::Cryptography::Features openSSLFeatures;
@@ -72,9 +73,9 @@ if (openSSLFeatures.aes256Gcm)
 
 Default constructors, the original `queryFeatures()` overload, and the original `Hkdf::derive()` overload all use
 `Backend::Native`. On Linux this means AF_ALG. `Aead`, `Cipher`, and `Hmac` bind their backend at construction;
-`Hkdf::derive()` has a backend-taking overload because it constructs HMAC sessions internally. OpenSSL selection
-currently reports unavailable on Apple and Windows, while preserving a platform-neutral selection interface for a
-possible future loader implementation.
+`Hkdf::derive()` has a backend-taking overload because it constructs HMAC sessions internally. OpenSSL remains
+optional on every platform: if a suitable OpenSSL 3 shared library cannot be loaded, its cryptographic features report
+unavailable without affecting the native backend.
 
 `queryFeatures()` reports primitive availability, not whether a chosen key, nonce, IV, message size, or surrounding
 protocol is secure. `maximumAeadAssociatedDataSize` is zero when AES-GCM is unavailable or when the active backend has
@@ -229,7 +230,9 @@ key-erasure requirements need platform-specific memory and process controls in a
 | Platform target | Secure random | AES-CBC PKCS#7 | AES-GCM | HMAC / HKDF |
 |:----------------|:--------------|:----------------|:--------|:------------|
 | macOS 13+ | CommonCrypto | AES-128 / AES-256 | AES-128 / AES-256 over CommonCrypto AES | SHA-256 / SHA-384 |
+| macOS, `OpenSSL` | CommonCrypto | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
 | Windows 10+ | CNG | AES-128 / AES-256 | AES-128 / AES-256 | SHA-256 / SHA-384 |
+| Windows, `OpenSSL` | CNG | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
 | Linux, `Native` | `getrandom()` | `AF_ALG cbc(aes)` when available | `AF_ALG gcm(aes)` when available | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
 | Linux, `OpenSSL` | `getrandom()` | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
 
@@ -243,10 +246,15 @@ Use `algif_aead` only on a security-updated kernel. The interface was affected b
 kernels. `queryFeatures()` can detect whether the interface is usable, but it cannot prove that a vendor kernel contains
 all relevant security fixes.
 
-The optional OpenSSL backend loads only the versioned `libcrypto.so.3` ABI, requires no OpenSSL headers or link-time
-`libcrypto` dependency, and probes actual provider algorithm initialization. It uses the process default OpenSSL library
-context without loading providers or changing policy. Missing libraries, incomplete symbols, configuration/FIPS policy,
-or unavailable algorithms are reflected in that backend's feature result and do not affect the native backend.
+The optional OpenSSL backend loads only an OpenSSL 3 `libcrypto` ABI, requires no OpenSSL headers or link-time
+`libcrypto` dependency, and probes actual provider algorithm initialization. Linux probes `libcrypto.so.3`. macOS first
+uses the dynamic loader's search paths for `libcrypto.3.dylib`, then checks the conventional Homebrew and MacPorts
+locations. Windows probes the architecture-specific OpenSSL 3 DLL name and `libcrypto-3.dll` through the safe default
+DLL directories. It does not search the process working directory.
+
+The backend uses the process default OpenSSL library context without loading providers or changing policy. Missing
+libraries, incomplete symbols, configuration/FIPS policy, or unavailable algorithms are reflected in that backend's
+feature result and do not affect the native backend.
 
 # Error handling
 
