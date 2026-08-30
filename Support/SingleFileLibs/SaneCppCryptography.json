@@ -1,0 +1,10 @@
+{
+    "name": "SaneCppCryptography",
+    "includeOrder": [
+        "Cryptography.h"
+    ],
+    "implementationOrder": [
+        "Internal/OpenSSL3API.h",
+        "Cryptography.cpp"
+    ]
+}

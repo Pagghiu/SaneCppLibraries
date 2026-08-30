@@ -5,6 +5,7 @@
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 namespace SC
@@ -28,6 +29,19 @@ struct SC::CryptographyTest : public SC::TestCase
                 return true;
         }
         return false;
+    }
+
+    static bool requireOpenSSL()
+    {
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996) // getenv
+#endif
+        const char* value = ::getenv("SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL");
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+        return value != nullptr and value[0] == '1' and value[1] == '\0';
     }
 
     Cryptography::Backend  backend;
@@ -370,6 +384,19 @@ void CryptographyTest::testFeatures()
         SC_TEST_EXPECT(features.aes256CbcPkcs7);
         SC_TEST_EXPECT(features.hmacSha256);
         SC_TEST_EXPECT(features.hmacSha384);
+    }
+#endif
+#if (SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX) and not SC_COMPILER_FILC
+    if (backend == Cryptography::Backend::OpenSSL and requireOpenSSL())
+    {
+        SC_TEST_EXPECT(features.aes128Gcm);
+        SC_TEST_EXPECT(features.aes256Gcm);
+        SC_TEST_EXPECT(features.aes128CbcPkcs7);
+        SC_TEST_EXPECT(features.aes256CbcPkcs7);
+        SC_TEST_EXPECT(features.hmacSha256);
+        SC_TEST_EXPECT(features.hmacSha384);
+        SC_TEST_EXPECT(features.hkdfSha256);
+        SC_TEST_EXPECT(features.hkdfSha384);
     }
 #endif
     SC_TEST_EXPECT(features.hkdfSha256 == features.hmacSha256);
