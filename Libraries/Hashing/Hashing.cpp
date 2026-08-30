@@ -86,6 +86,7 @@ bool SC::Hashing::getHash(Result& res)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <wincrypt.h>
+#pragma comment(lib, "Advapi32.lib")
 
 struct SC::Hashing::CryptoPrivate
 {
