@@ -5,6 +5,7 @@ on:
   pull_request:
 
 env:
+  ASAN_OPTIONS: halt_on_error=1
   UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
 
 permissions:
@@ -219,6 +220,15 @@ jobs:
       run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
     - name: compile SCStdCppHeaderNoLinkTest
       run: ./SC.sh build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }}
+    - name: test Cryptography with ASan and UBSan
+      run: |
+        ./SC.sh build run SCTest Debug -- --test CryptographyTest
+        ./SC.sh build run SCTest Debug -- --test CryptographyOpenSSLTest
+        ./SC.sh build run SCTest Debug -- --test CryptographyAsyncStreamsTest
+        ./SC.sh build run SCTest Debug -- --test CryptographyTransformStreamsTest
+      env:
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+      if: matrix.config == 'Debug'
     - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
       env:
