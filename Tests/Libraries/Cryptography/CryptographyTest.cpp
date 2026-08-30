@@ -147,6 +147,7 @@ struct SC::CryptographyTest : public SC::TestCase
     void testAesGcmAuthenticationInputs();
     void testAesGcmCrossArgumentOverlap();
     void testAesGcmDeterministicFuzz();
+    void testAesGcmNativeOpenSSLDifferential();
     void testHmacSha256();
     void testHmacSha384();
     void testHmacStreamingAndLifecycle();
@@ -263,6 +264,11 @@ struct SC::CryptographyTest : public SC::TestCase
         if (test_section("AES GCM Deterministic Fuzz"))
         {
             testAesGcmDeterministicFuzz();
+        }
+
+        if (backend == Cryptography::Backend::Native and test_section("AES GCM Native OpenSSL Differential"))
+        {
+            testAesGcmNativeOpenSSLDifferential();
         }
 
         if (test_section("HMAC SHA256"))
@@ -1393,6 +1399,148 @@ void CryptographyTest::testAesGcmDeterministicFuzz()
                                              bytesWritten));
                 SC_TEST_EXPECT(bytesWritten == 0);
                 SC_TEST_EXPECT(not anyNonZero(decrypted));
+            }
+        }
+    }
+}
+
+void CryptographyTest::testAesGcmNativeOpenSSLDifferential()
+{
+    Cryptography::Features nativeFeatures;
+    Cryptography::Features openSSLFeatures;
+    SC_TEST_EXPECT(Cryptography::queryFeatures(Cryptography::Backend::Native, nativeFeatures));
+    SC_TEST_EXPECT(Cryptography::queryFeatures(Cryptography::Backend::OpenSSL, openSSLFeatures));
+    if (not nativeFeatures.aes128Gcm or not nativeFeatures.aes256Gcm or not openSSLFeatures.aes128Gcm or
+        not openSSLFeatures.aes256Gcm)
+    {
+        printUnsupported("AES GCM Native OpenSSL Differential");
+        return;
+    }
+
+    static constexpr size_t messageSizes[] = {0,  1,  2,  7,  15, 16,  17,  31,  32,  33,  47,
+                                              48, 49, 63, 64, 65, 127, 128, 129, 255, 256, 257};
+    static constexpr size_t aadSizes[]     = {0, 1, 15, 16, 17, 31, 32, 33, 63, 64, 65, 95, 96, 97};
+
+    uint8_t key[32];
+    uint8_t nonce[12];
+    uint8_t aad[97];
+    uint8_t corruptedAad[97];
+    uint8_t plaintext[257];
+    uint8_t nativeCiphertext[257];
+    uint8_t openSSLCiphertext[257];
+    uint8_t corruptedCiphertext[257];
+    uint8_t decrypted[257];
+    uint8_t nativeInPlace[257];
+    uint8_t openSSLInPlace[257];
+    uint8_t nativeTag[16];
+    uint8_t openSSLTag[16];
+    uint8_t corruptedTag[16];
+
+    for (size_t typeIndex = 0; typeIndex < 2; ++typeIndex)
+    {
+        const Cryptography::AeadType type =
+            typeIndex == 0 ? Cryptography::AeadType::AES128GCM : Cryptography::AeadType::AES256GCM;
+        const size_t keySize = typeIndex == 0 ? 16 : 32;
+
+        for (size_t caseIndex = 0; caseIndex < sizeof(messageSizes) / sizeof(messageSizes[0]); ++caseIndex)
+        {
+            const size_t messageSize = messageSizes[caseIndex];
+            const size_t aadSize = aadSizes[(caseIndex * 5 + typeIndex * 3) % (sizeof(aadSizes) / sizeof(aadSizes[0]))];
+            uint32_t     state   = static_cast<uint32_t>(0xa511e9b3u ^ (caseIndex * 0x9e3779b9u) ^ typeIndex);
+            auto         nextByte = [&]()
+            {
+                state = state * 1664525u + 1013904223u;
+                return static_cast<uint8_t>(state >> 24);
+            };
+
+            for (size_t idx = 0; idx < keySize; ++idx)
+                key[idx] = nextByte();
+            for (auto& value : nonce)
+                value = nextByte();
+            for (size_t idx = 0; idx < aadSize; ++idx)
+                aad[idx] = nextByte();
+            for (size_t idx = 0; idx < messageSize; ++idx)
+                plaintext[idx] = nextByte();
+
+            Cryptography::Aead nativeAead(Cryptography::Backend::Native);
+            Cryptography::Aead openSSLAead(Cryptography::Backend::OpenSSL);
+            SC_TEST_EXPECT(nativeAead.init(type, Span<const uint8_t>(key, keySize)));
+            SC_TEST_EXPECT(openSSLAead.init(type, Span<const uint8_t>(key, keySize)));
+
+            const Span<const uint8_t> aadSpan(aad, aadSize);
+            const Span<const uint8_t> plaintextSpan(plaintext, messageSize);
+            size_t                    nativeWritten  = 0;
+            size_t                    openSSLWritten = 0;
+            SC_TEST_EXPECT(nativeAead.seal(nonce, aadSpan, plaintextSpan, Span<uint8_t>(nativeCiphertext, messageSize),
+                                           nativeTag, nativeWritten));
+            SC_TEST_EXPECT(openSSLAead.seal(nonce, aadSpan, plaintextSpan,
+                                            Span<uint8_t>(openSSLCiphertext, messageSize), openSSLTag, openSSLWritten));
+            SC_TEST_EXPECT(nativeWritten == messageSize);
+            SC_TEST_EXPECT(openSSLWritten == messageSize);
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(nativeCiphertext, messageSize),
+                                     Span<const uint8_t>(openSSLCiphertext, messageSize)));
+            SC_TEST_EXPECT(sameBytes(nativeTag, openSSLTag));
+
+            memset(decrypted, 0xa5, messageSize);
+            SC_TEST_EXPECT(nativeAead.open(nonce, aadSpan, Span<const uint8_t>(openSSLCiphertext, messageSize),
+                                           openSSLTag, Span<uint8_t>(decrypted, messageSize), nativeWritten));
+            SC_TEST_EXPECT(nativeWritten == messageSize);
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(decrypted, messageSize), plaintextSpan));
+
+            memset(decrypted, 0xa5, messageSize);
+            SC_TEST_EXPECT(openSSLAead.open(nonce, aadSpan, Span<const uint8_t>(nativeCiphertext, messageSize),
+                                            nativeTag, Span<uint8_t>(decrypted, messageSize), openSSLWritten));
+            SC_TEST_EXPECT(openSSLWritten == messageSize);
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(decrypted, messageSize), plaintextSpan));
+
+            memcpy(nativeInPlace, plaintext, messageSize);
+            memcpy(openSSLInPlace, plaintext, messageSize);
+            SC_TEST_EXPECT(nativeAead.seal(nonce, aadSpan, Span<const uint8_t>(nativeInPlace, messageSize),
+                                           Span<uint8_t>(nativeInPlace, messageSize), nativeTag, nativeWritten));
+            SC_TEST_EXPECT(openSSLAead.seal(nonce, aadSpan, Span<const uint8_t>(openSSLInPlace, messageSize),
+                                            Span<uint8_t>(openSSLInPlace, messageSize), openSSLTag, openSSLWritten));
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(nativeInPlace, messageSize),
+                                     Span<const uint8_t>(openSSLInPlace, messageSize)));
+            SC_TEST_EXPECT(sameBytes(nativeTag, openSSLTag));
+            SC_TEST_EXPECT(nativeAead.open(nonce, aadSpan, Span<const uint8_t>(nativeInPlace, messageSize), nativeTag,
+                                           Span<uint8_t>(nativeInPlace, messageSize), nativeWritten));
+            SC_TEST_EXPECT(openSSLAead.open(nonce, aadSpan, Span<const uint8_t>(openSSLInPlace, messageSize),
+                                            openSSLTag, Span<uint8_t>(openSSLInPlace, messageSize), openSSLWritten));
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(nativeInPlace, messageSize), plaintextSpan));
+            SC_TEST_EXPECT(sameBytes(Span<const uint8_t>(openSSLInPlace, messageSize), plaintextSpan));
+
+            auto expectRejected = [&](Cryptography::Aead& aead, Span<const uint8_t> candidateAad,
+                                      Span<const uint8_t> candidateCiphertext, Span<const uint8_t> candidateTag)
+            {
+                memset(decrypted, 0xa5, messageSize);
+                size_t bytesWritten = 77;
+                SC_TEST_EXPECT(not aead.open(nonce, candidateAad, candidateCiphertext, candidateTag,
+                                             Span<uint8_t>(decrypted, messageSize), bytesWritten));
+                SC_TEST_EXPECT(bytesWritten == 0);
+                SC_TEST_EXPECT(not anyNonZero(Span<const uint8_t>(decrypted, messageSize)));
+            };
+
+            memcpy(corruptedTag, nativeTag, sizeof(nativeTag));
+            corruptedTag[(caseIndex + typeIndex) % sizeof(corruptedTag)] ^= 0x01;
+            expectRejected(nativeAead, aadSpan, Span<const uint8_t>(nativeCiphertext, messageSize), corruptedTag);
+            expectRejected(openSSLAead, aadSpan, Span<const uint8_t>(nativeCiphertext, messageSize), corruptedTag);
+
+            if (messageSize > 0)
+            {
+                memcpy(corruptedCiphertext, nativeCiphertext, messageSize);
+                corruptedCiphertext[(caseIndex * 7 + typeIndex) % messageSize] ^= 0x80;
+                expectRejected(nativeAead, aadSpan, Span<const uint8_t>(corruptedCiphertext, messageSize), nativeTag);
+                expectRejected(openSSLAead, aadSpan, Span<const uint8_t>(corruptedCiphertext, messageSize), nativeTag);
+            }
+
+            if (aadSize > 0)
+            {
+                memcpy(corruptedAad, aad, aadSize);
+                corruptedAad[(caseIndex * 11 + typeIndex) % aadSize] ^= 0x20;
+                expectRejected(nativeAead, Span<const uint8_t>(corruptedAad, aadSize),
+                               Span<const uint8_t>(nativeCiphertext, messageSize), nativeTag);
+                expectRejected(openSSLAead, Span<const uint8_t>(corruptedAad, aadSize),
+                               Span<const uint8_t>(nativeCiphertext, messageSize), nativeTag);
             }
         }
     }
