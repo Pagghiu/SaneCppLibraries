@@ -135,9 +135,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install OpenSSL 3
+    - name: Verify OpenSSL 3
       shell: pwsh
-      run: choco install openssl --version=3.6.2 --allow-downgrade --force --no-progress --yes
+      run: |
+        $openSSLExe = "$env:ProgramFiles\Git\usr\bin\openssl.exe"
+        $openSSLDll = "$env:ProgramFiles\Git\mingw64\bin\libcrypto-3-x64.dll"
+        if (-not (Test-Path $openSSLExe) -or -not (Test-Path $openSSLDll)) {
+          throw "The Git for Windows OpenSSL runtime was not found"
+        }
+
+        $version = & $openSSLExe version
+        if ($LASTEXITCODE -ne 0 -or $version -notmatch '^OpenSSL 3\.') {
+          throw "OpenSSL 3 is required, found: $version"
+        }
+        Write-Output $version
     - name: Restore LLVM package cache
       id: llvm-cache
       if: matrix.config == 'Release'
@@ -198,14 +209,7 @@ jobs:
     - name: Stage OpenSSL 3 runtime
       shell: pwsh
       run: |
-        $candidates = @(
-          "$env:ProgramFiles\OpenSSL-Win64\bin\libcrypto-3-x64.dll",
-          "$env:ProgramFiles\OpenSSL\bin\libcrypto-3-x64.dll"
-        )
-        $openSSLDll = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-        if (-not $openSSLDll) {
-          throw "The OpenSSL 3 runtime DLL was not installed"
-        }
+        $openSSLDll = "$env:ProgramFiles\Git\mingw64\bin\libcrypto-3-x64.dll"
 
         $scTest = Get-ChildItem "_Build/_Outputs" -Filter "SCTest.exe" -Recurse |
           Where-Object { $_.Directory.Name -like "*-${{ matrix.config }}" } |
@@ -215,7 +219,6 @@ jobs:
         }
 
         Copy-Item $openSSLDll $scTest.Directory.FullName
-        & (Join-Path (Split-Path $openSSLDll) "openssl.exe") version
     - name: compile SCBuildTest
       shell: cmd
       run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
