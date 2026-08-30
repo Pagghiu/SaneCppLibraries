@@ -6,6 +6,7 @@
 #ifdef _WIN32
 #include <Windows.h>
 #include <stdlib.h>
+#pragma comment(lib, "Advapi32.lib")
 #else
 #include <dlfcn.h>
 #endif
