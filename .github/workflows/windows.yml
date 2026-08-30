@@ -135,6 +135,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install OpenSSL 3
+      shell: pwsh
+      run: choco install openssl --version=3.6.2 --allow-downgrade --force --no-progress --yes
     - name: Restore LLVM package cache
       id: llvm-cache
       if: matrix.config == 'Release'
@@ -192,6 +195,27 @@ jobs:
     - name: compile SCTest
       shell: cmd
       run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: Stage OpenSSL 3 runtime
+      shell: pwsh
+      run: |
+        $candidates = @(
+          "$env:ProgramFiles\OpenSSL-Win64\bin\libcrypto-3-x64.dll",
+          "$env:ProgramFiles\OpenSSL\bin\libcrypto-3-x64.dll"
+        )
+        $openSSLDll = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+        if (-not $openSSLDll) {
+          throw "The OpenSSL 3 runtime DLL was not installed"
+        }
+
+        $scTest = Get-ChildItem "_Build/_Outputs" -Filter "SCTest.exe" -Recurse |
+          Where-Object { $_.Directory.Name -like "*-${{ matrix.config }}" } |
+          Select-Object -First 1
+        if (-not $scTest) {
+          throw "SCTest.exe was not found"
+        }
+
+        Copy-Item $openSSLDll $scTest.Directory.FullName
+        & (Join-Path (Split-Path $openSSLDll) "openssl.exe") version
     - name: compile SCBuildTest
       shell: cmd
       run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
@@ -205,6 +229,8 @@ jobs:
     - name: test SCTest
       shell: cmd
       run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS% -- --all-tests
+      env:
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
     - name: test SCBuildTest
       shell: cmd
       run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%

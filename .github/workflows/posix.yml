@@ -122,8 +122,14 @@ jobs:
     - name: install
       run:  |
         sudo apt-get update
-        sudo apt-get install -y liburing-dev
+        sudo apt-get install -y liburing-dev openssl
       if: matrix.params.os == 'ubuntu-latest'
+    - name: Install OpenSSL 3
+      run: |
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
+        "$(brew --prefix openssl@3)/bin/openssl" version
+        test -f "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib"
+      if: matrix.params.os == 'macos-latest'
     - name: Probe QEMU user runners
       id: qemu-user-runners
       shell: bash
@@ -215,6 +221,8 @@ jobs:
       run: ./SC.sh build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }}
     - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
+      env:
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: test SCBuildTest
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
@@ -231,6 +239,8 @@ jobs:
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: test SCTest xcode
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
+      env:
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Save llvm-mingw cache
       if: matrix.config == 'Release' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
