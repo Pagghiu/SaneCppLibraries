@@ -585,6 +585,7 @@ Current support includes:
 Development notes and design changes are recorded in the project updates:
 
 - [July 2026 Update](https://pagghiu.github.io/site/blog/2026-07-31-SaneCppLibrariesUpdate.html)
+- [August 2026 Update](https://pagghiu.github.io/site/blog/2026-08-31-SaneCppLibrariesUpdate.html)
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Fibers`.
