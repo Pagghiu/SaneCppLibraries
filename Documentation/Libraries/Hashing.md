@@ -108,6 +108,6 @@ payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 95		| 292		| 387	|
-| Single File | 404		| 372		| 776	|
-| Standalone  | 404		| 372		| 776	|
+| Library     | 95		| 293		| 388	|
+| Single File | 404		| 373		| 777	|
+| Standalone  | 404		| 373		| 777	|

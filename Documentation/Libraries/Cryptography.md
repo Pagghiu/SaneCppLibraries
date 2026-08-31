@@ -25,10 +25,8 @@ Prefer an authenticated-encryption mode such as AES-GCM whenever it is available
 protocol requires that exact construction; CBC encryption by itself does not authenticate ciphertext and is malleable.
 
 # Dependencies
-- Build dependencies: *(none)*
-- Optional runtime dependency: OpenSSL 3 (`libcrypto.3.dylib`, `libcrypto-3-*.dll`, or `libcrypto.so.3`), used only when
-  explicitly selected
-- Linux system link dependency: `dl` on glibc older than 2.34
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](Cryptography.svg)
 
@@ -282,6 +280,6 @@ payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 158		| 1231		| 1389	|
-| Single File | 620		| 1329		| 1949	|
-| Standalone  | 620		| 1329		| 1949	|
+| Library     | 494		| 2474		| 2968	|
+| Single File | 635		| 2912		| 3547	|
+| Standalone  | 635		| 2912		| 3547	|
