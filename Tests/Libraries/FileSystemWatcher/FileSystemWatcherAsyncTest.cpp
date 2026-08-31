@@ -23,6 +23,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         const StringView appDirectory = report.applicationRootDirectory.view();
         eventLoopSubdirectory(appDirectory);
         eventLoopWatchClose(appDirectory);
+        eventLoopWaitTimeout();
         eventLoopWatchStop(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
     }
@@ -36,13 +37,12 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     }
 
-    bool runUntil(AsyncEventLoop& eventLoop, Function<bool()> predicate)
+    bool runUntil(AsyncEventLoop& eventLoop, Function<bool()> predicate, TimeMs timeoutDuration = TimeMs{5000})
     {
         bool             timedOut = false;
         AsyncLoopTimeout timeout;
         timeout.callback = [&timedOut](AsyncLoopTimeout::Result&) { timedOut = true; };
-        SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{5000}));
-        eventLoop.excludeFromActiveCount(timeout);
+        SC_TEST_EXPECT(timeout.start(eventLoop, timeoutDuration));
 
         while (not predicate() and not timedOut)
         {
@@ -55,6 +55,16 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(timeout.isFree());
         }
         return predicate() and not timedOut;
+    }
+
+    void eventLoopWaitTimeout()
+    {
+        if (test_section("AsyncEventLoop wait timeout"))
+        {
+            AsyncEventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+            SC_TEST_EXPECT(not runUntil(eventLoop, [] { return false; }, TimeMs{1}));
+        }
     }
 
     void eventLoopSubdirectory(const StringView appDirectory)
