@@ -48,6 +48,69 @@ static bool isHttpTokenCharacter(char c)
            c == '_' or c == '`' or c == '|' or c == '~';
 }
 
+static bool isValidCookieName(SC::StringSpan name)
+{
+    const SC::Span<const char> bytes = name.toCharSpan();
+    if (bytes.empty())
+    {
+        return false;
+    }
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        if (not isHttpTokenCharacter(bytes[idx]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool isCookieValueByte(char value)
+{
+    const unsigned char byte = static_cast<unsigned char>(value);
+    return byte == 0x21 or (byte >= 0x23 and byte <= 0x2B) or (byte >= 0x2D and byte <= 0x3A) or
+           (byte >= 0x3C and byte <= 0x5B) or (byte >= 0x5D and byte <= 0x7E);
+}
+
+static bool isValidCookieValue(SC::StringSpan value)
+{
+    const SC::Span<const char> bytes = value.toCharSpan();
+    size_t                     start = 0;
+    size_t                     end   = bytes.sizeInBytes();
+    if (end > 0 and bytes[0] == '"')
+    {
+        if (end < 2 or bytes[end - 1] != '"')
+        {
+            return false;
+        }
+        start += 1;
+        end -= 1;
+    }
+
+    for (size_t idx = start; idx < end; ++idx)
+    {
+        if (not isCookieValueByte(bytes[idx]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool isValidCookiePath(SC::StringSpan path)
+{
+    const SC::Span<const char> bytes = path.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        const unsigned char byte = static_cast<unsigned char>(bytes[idx]);
+        if (byte < 0x20 or byte == 0x7F)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 static size_t skipAuthSpaces(SC::Span<const char> bytes, size_t offset, size_t end)
 {
     while (offset < end and (bytes[offset] == ' ' or bytes[offset] == '\t'))
@@ -433,6 +496,29 @@ static bool parseUrl(SC::StringSpan url, ParsedUrl& parsed)
     return true;
 }
 
+static bool isCookieIpHost(SC::StringSpan host)
+{
+    const SC::Span<const char> bytes = host.toCharSpan();
+    if (bytes.sizeInBytes() >= 2 and bytes[0] == '[' and bytes[bytes.sizeInBytes() - 1] == ']')
+    {
+        return true;
+    }
+
+    bool hasDot = false;
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        if (bytes[idx] == '.')
+        {
+            hasDot = true;
+        }
+        else if (bytes[idx] < '0' or bytes[idx] > '9')
+        {
+            return false;
+        }
+    }
+    return hasDot;
+}
+
 static bool cookieDomainMatches(const SC::HttpClientSessionCookie& cookie, SC::StringSpan host)
 {
     if ((cookie.flags & SC::HttpClientSessionCookie::DomainCookie) == 0)
@@ -443,6 +529,10 @@ static bool cookieDomainMatches(const SC::HttpClientSessionCookie& cookie, SC::S
     if (sessionAsciiEqualsIgnoreCase(cookie.domain, host))
     {
         return true;
+    }
+    if (isCookieIpHost(host))
+    {
+        return false;
     }
 
     if (host.sizeInBytes() <= cookie.domain.sizeInBytes() + 1)
@@ -464,6 +554,10 @@ static bool cookieDomainAttributeMatches(SC::StringSpan domain, SC::StringSpan h
     if (sessionAsciiEqualsIgnoreCase(domain, host))
     {
         return true;
+    }
+    if (isCookieIpHost(host))
+    {
+        return false;
     }
     if (host.sizeInBytes() <= domain.sizeInBytes() + 1)
     {
@@ -610,23 +704,35 @@ const char* SC::HttpClientSessionAuthChallenge::getSchemeName(Scheme scheme)
     return "unknown";
 }
 
-SC::Result SC::HttpClientSession::copyStateString(StringSpan source, StringSpan& destination)
+SC::Result SC::HttpClientSession::copyStateStrings(Span<const StringSpan> sources, Span<StringSpan> destinations)
 {
     SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
     SC_TRY_MSG(stateScratchUsed <= sessionMemory.stateScratch.sizeInBytes(), "HttpClientSession: invalid state");
+    SC_TRY_MSG(sources.sizeInElements() == destinations.sizeInElements(), "HttpClientSession: invalid copy state");
 
-    if (source.isEmpty())
+    size_t remaining = sessionMemory.stateScratch.sizeInBytes() - stateScratchUsed;
+    for (size_t idx = 0; idx < sources.sizeInElements(); ++idx)
     {
-        destination = StringSpan(source.getEncoding());
-        return Result(true);
+        SC_TRY_MSG(remaining >= sources[idx].sizeInBytes(), "HttpClientSession: state scratch exhausted");
+        remaining -= sources[idx].sizeInBytes();
     }
 
-    SC_TRY_MSG(sessionMemory.stateScratch.sizeInBytes() - stateScratchUsed >= source.sizeInBytes(),
-               "HttpClientSession: state scratch exhausted");
-    char* const destinationBytes = sessionMemory.stateScratch.data() + stateScratchUsed;
-    ::memcpy(destinationBytes, source.bytesWithoutTerminator(), source.sizeInBytes());
-    destination = StringSpan({destinationBytes, source.sizeInBytes()}, false, source.getEncoding());
-    stateScratchUsed += source.sizeInBytes();
+    size_t destinationOffset = stateScratchUsed;
+    for (size_t idx = 0; idx < sources.sizeInElements(); ++idx)
+    {
+        const StringSpan source = sources[idx];
+        if (source.isEmpty())
+        {
+            destinations[idx] = StringSpan(source.getEncoding());
+            continue;
+        }
+
+        char* const destinationBytes = sessionMemory.stateScratch.data() + destinationOffset;
+        ::memcpy(destinationBytes, source.bytesWithoutTerminator(), source.sizeInBytes());
+        destinations[idx] = StringSpan({destinationBytes, source.sizeInBytes()}, false, source.getEncoding());
+        destinationOffset += source.sizeInBytes();
+    }
+    stateScratchUsed = destinationOffset;
     return Result(true);
 }
 
@@ -686,8 +792,11 @@ SC::Result SC::HttpClientSession::addAuthorization(StringSpan origin, StringSpan
     }
 
     SC_TRY_MSG(target != nullptr, "HttpClientSession: auth cache capacity exhausted");
-    SC_TRY(copyStateString(origin, target->origin));
-    SC_TRY(copyStateString(authorizationHeader, target->authorizationHeader));
+    const StringSpan sources[] = {origin, authorizationHeader};
+    StringSpan       destinations[2];
+    SC_TRY(copyStateStrings(sources, destinations));
+    target->origin              = destinations[0];
+    target->authorizationHeader = destinations[1];
     return Result(true);
 }
 
@@ -758,6 +867,10 @@ SC::Result SC::HttpClientSession::makeBasicAuthorization(StringSpan username, St
     const size_t           encodedBytes  = ((sourceBytes + 2) / 3) * 4;
 
     SC_TRY_MSG(not username.isEmpty(), "HttpClientSession: basic auth username missing");
+    for (size_t idx = 0; idx < usernameBytes.sizeInBytes(); ++idx)
+    {
+        SC_TRY_MSG(usernameBytes[idx] != ':', "HttpClientSession: basic auth username contains colon");
+    }
     SC_TRY_MSG(destination.sizeInBytes() >= PrefixBytes + encodedBytes,
                "HttpClientSession: basic auth destination too small");
 
@@ -792,6 +905,10 @@ bool SC::HttpClientSession::findBasicAuthChallenge(const HttpClientResponse&    
 {
     challenge        = HttpClientSessionAuthChallenge();
     challenge.target = target;
+    if (target != HttpClientSessionAuthChallenge::Origin and target != HttpClientSessionAuthChallenge::Proxy)
+    {
+        return false;
+    }
 
     const StringSpan headerName = target == HttpClientSessionAuthChallenge::Proxy ? StringSpan("Proxy-Authenticate")
                                                                                   : StringSpan("WWW-Authenticate");
@@ -814,6 +931,8 @@ SC::Result SC::HttpClientSession::makeBasicAuthorizationForChallenge(const HttpC
                                                                      Span<char>  destination,
                                                                      StringSpan& authorizationHeader)
 {
+    SC_TRY_MSG(target == HttpClientSessionAuthChallenge::Origin or target == HttpClientSessionAuthChallenge::Proxy,
+               "HttpClientSession: invalid auth challenge target");
     const int expectedStatusCode = target == HttpClientSessionAuthChallenge::Proxy ? 407 : 401;
     SC_TRY_MSG(response.statusCode == expectedStatusCode, "HttpClientSession: response is not an auth challenge");
 
@@ -921,7 +1040,7 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
 
     name  = trimAsciiWhiteSpace(name);
     value = trimAsciiWhiteSpace(value);
-    if (name.isEmpty())
+    if (not isValidCookieName(name) or not isValidCookieValue(value))
     {
         return Result(true);
     }
@@ -967,7 +1086,8 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
             }
             else if (sessionAsciiEqualsIgnoreCase(attributeName, StringSpan("Path")))
             {
-                if (not attributeValue.isEmpty() and attributeValue.toCharSpan()[0] == '/')
+                if (not attributeValue.isEmpty() and attributeValue.toCharSpan()[0] == '/' and
+                    isValidCookiePath(attributeValue))
                 {
                     path = attributeValue;
                 }
@@ -987,6 +1107,10 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
     {
         flags = static_cast<uint8_t>(flags | HttpClientSessionCookie::DomainCookie);
     }
+    if ((flags & HttpClientSessionCookie::Secure) != 0 and not parsed.isHttps)
+    {
+        return Result(true);
+    }
 
     HttpClientSessionCookie* target = nullptr;
     for (size_t idx = 0; idx < sessionMemory.cookies.sizeInElements(); ++idx)
@@ -995,6 +1119,10 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
         if (cookie.isInUse() and sessionAsciiEqualsIgnoreCase(cookie.name, name) and
             sessionAsciiEqualsIgnoreCase(cookie.domain, domain) and cookie.path == path)
         {
+            if ((cookie.flags & HttpClientSessionCookie::Secure) != 0 and not parsed.isHttps)
+            {
+                return Result(true);
+            }
             target = &cookie;
             break;
         }
@@ -1005,11 +1133,14 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
     }
 
     SC_TRY_MSG(target != nullptr, "HttpClientSession: cookie capacity exhausted");
-    SC_TRY(copyStateString(name, target->name));
-    SC_TRY(copyStateString(value, target->value));
-    SC_TRY(copyStateString(domain, target->domain));
-    SC_TRY(copyStateString(path, target->path));
-    target->flags = flags;
+    const StringSpan sources[] = {name, value, domain, path};
+    StringSpan       destinations[4];
+    SC_TRY(copyStateStrings(sources, destinations));
+    target->name   = destinations[0];
+    target->value  = destinations[1];
+    target->domain = destinations[2];
+    target->path   = destinations[3];
+    target->flags  = flags;
     return Result(true);
 }
 

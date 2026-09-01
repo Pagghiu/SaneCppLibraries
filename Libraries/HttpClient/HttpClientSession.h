@@ -143,7 +143,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientSession
     [[nodiscard]] size_t getNumAuthorizations() const;
 
   private:
-    [[nodiscard]] Result copyStateString(StringSpan source, StringSpan& destination);
+    [[nodiscard]] Result copyStateStrings(Span<const StringSpan> sources, Span<StringSpan> destinations);
     [[nodiscard]] Result appendPreparedHeader(StringSpan name, StringSpan value, size_t& numHeaders);
     [[nodiscard]] Result appendScratch(StringSpan text, bool addSeparator);
     [[nodiscard]] Result appendMatchingCookies(StringSpan url, size_t& numHeaders);

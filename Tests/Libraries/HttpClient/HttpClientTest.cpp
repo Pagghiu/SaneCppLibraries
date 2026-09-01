@@ -1487,6 +1487,45 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(session.captureResponse(portResponseRequest, scopedCookieResponse));
         SC_TEST_EXPECT(session.findCookie("scoped"_a8, "example.test"_a8, "/api"_a8, cookie));
 
+        static const char InsecureCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                    "Set-Cookie: insecure=1; Secure\r\n"
+                                                    "Set-Cookie: global=attacker; Domain=.example.test; Path=/\r\n"
+                                                    "\r\n";
+        HttpClientRequest insecureResponseRequest;
+        insecureResponseRequest.url = "http://example.test/api/login"_a8;
+        HttpClientResponse insecureCookieResponse;
+        insecureCookieResponse.headers       = {InsecureCookieHeaders, sizeof(InsecureCookieHeaders) - 1};
+        insecureCookieResponse.headersLength = sizeof(InsecureCookieHeaders) - 1;
+        SC_TEST_EXPECT(session.captureResponse(insecureResponseRequest, insecureCookieResponse));
+        SC_TEST_EXPECT(not session.hasCookie("insecure"_a8, "example.test"_a8, "/api"_a8));
+        SC_TEST_EXPECT(session.findCookie("global"_a8, "example.test"_a8, "/"_a8, cookie));
+        SC_TEST_EXPECT(cookie.value == "1"_a8);
+        SC_TEST_EXPECT((cookie.flags & HttpClientSessionCookie::Secure) != 0);
+
+        static const char IpDomainCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                    "Set-Cookie: escaped=1; Domain=0.0.1\r\n"
+                                                    "\r\n";
+        HttpClientRequest ipResponseRequest;
+        ipResponseRequest.url = "https://127.0.0.1/api/login"_a8;
+        HttpClientResponse ipDomainCookieResponse;
+        ipDomainCookieResponse.headers       = {IpDomainCookieHeaders, sizeof(IpDomainCookieHeaders) - 1};
+        ipDomainCookieResponse.headersLength = sizeof(IpDomainCookieHeaders) - 1;
+        SC_TEST_EXPECT(session.captureResponse(ipResponseRequest, ipDomainCookieResponse));
+        SC_TEST_EXPECT(not session.hasCookie("escaped"_a8, "0.0.1"_a8, "/api"_a8));
+
+        static const char  MalformedCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                      "Set-Cookie: bad name=1\r\n"
+                                                      "Set-Cookie: quote=\"unterminated\r\n"
+                                                      "Set-Cookie: nul=bad\0value\r\n"
+                                                      "\r\n";
+        HttpClientResponse malformedCookieResponse;
+        malformedCookieResponse.headers       = {MalformedCookieHeaders, sizeof(MalformedCookieHeaders) - 1};
+        malformedCookieResponse.headersLength = sizeof(MalformedCookieHeaders) - 1;
+        SC_TEST_EXPECT(session.captureResponse(responseRequest, malformedCookieResponse));
+        SC_TEST_EXPECT(session.getNumCookies() == 3);
+        SC_TEST_EXPECT(not session.hasCookie("quote"_a8, "example.test"_a8, "/api"_a8));
+        SC_TEST_EXPECT(not session.hasCookie("nul"_a8, "example.test"_a8, "/api"_a8));
+
         StringSpan basicAuthorization;
         SC_TEST_EXPECT(HttpClientSession::makeBasicAuthorization(
             "test"_a8, "secret"_a8, {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)},
@@ -1496,6 +1535,9 @@ struct SC::HttpClientTest : public SC::TestCase
         StringSpan tinyAuthorization;
         SC_TEST_EXPECT(not HttpClientSession::makeBasicAuthorization(
             "test"_a8, "secret"_a8, {tinyAuthorizationScratch, sizeof(tinyAuthorizationScratch)}, tinyAuthorization));
+        SC_TEST_EXPECT(not HttpClientSession::makeBasicAuthorization(
+            "bad:name"_a8, "secret"_a8, {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)},
+            tinyAuthorization));
         SC_TEST_EXPECT(session.addAuthorization("https://example.test"_a8, basicAuthorization));
         SC_TEST_EXPECT(session.getNumAuthorizations() == 1);
         StringSpan cachedAuthorization;
@@ -1569,6 +1611,14 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(strcmp(HttpClientSessionAuthChallenge::getSchemeName(
                                   static_cast<HttpClientSessionAuthChallenge::Scheme>(0xFF)),
                               "unknown") == 0);
+        const HttpClientSessionAuthChallenge::Target invalidChallengeTarget =
+            static_cast<HttpClientSessionAuthChallenge::Target>(0xFF);
+        HttpClientSessionAuthChallenge invalidChallenge;
+        SC_TEST_EXPECT(not HttpClientSession::findBasicAuthChallenge(originChallengeResponse, invalidChallengeTarget,
+                                                                     invalidChallenge));
+        SC_TEST_EXPECT(not HttpClientSession::makeBasicAuthorizationForChallenge(
+            originChallengeResponse, invalidChallengeTarget, "test"_a8, "secret"_a8,
+            {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)}, challengeAuthorization));
         SC_TEST_EXPECT(challenge.realm == "proxy"_a8);
         SC_TEST_EXPECT(HttpClientSession::makeBasicAuthorizationForChallenge(
             proxyChallengeResponse, HttpClientSessionAuthChallenge::Proxy, "test"_a8, "secret"_a8,
@@ -1667,6 +1717,61 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(session.prepareRequest(source, prepared));
         SC_TEST_EXPECT(prepared.headers.sizeInElements() == 1);
         SC_TEST_EXPECT(prepared.headers[0].name == "X-Test"_a8);
+
+        {
+            HttpClientSessionAuthCacheEntry tinyAuthEntries[1];
+            HttpClientHeader                tinyRequestHeaders[1];
+            char                            tinyStateScratch[24];
+
+            HttpClientSessionMemory tinyMemory;
+            tinyMemory.authEntries    = tinyAuthEntries;
+            tinyMemory.requestHeaders = tinyRequestHeaders;
+            tinyMemory.stateScratch   = tinyStateScratch;
+
+            HttpClientSession tinySession;
+            SC_TEST_EXPECT(tinySession.init(tinyMemory));
+            SC_TEST_EXPECT(not tinySession.addAuthorization("https://example.test"_a8, "Basic x"_a8));
+            SC_TEST_EXPECT(tinySession.getNumAuthorizations() == 0);
+            SC_TEST_EXPECT(tinySession.addAuthorization("https://a"_a8, "Basic x"_a8));
+            SC_TEST_EXPECT(tinySession.findAuthorization("https://a"_a8, cachedAuthorization));
+            SC_TEST_EXPECT(cachedAuthorization == "Basic x"_a8);
+            SC_TEST_EXPECT(not tinySession.addAuthorization("https://a"_a8, "Basic replacement"_a8));
+            SC_TEST_EXPECT(tinySession.findAuthorization("https://a"_a8, cachedAuthorization));
+            SC_TEST_EXPECT(cachedAuthorization == "Basic x"_a8);
+        }
+
+        {
+            HttpClientSessionCookie tinyCookies[1];
+            HttpClientHeader        tinyRequestHeaders[1];
+            char                    tinyStateScratch[18];
+
+            HttpClientSessionMemory tinyMemory;
+            tinyMemory.cookies        = tinyCookies;
+            tinyMemory.requestHeaders = tinyRequestHeaders;
+            tinyMemory.stateScratch   = tinyStateScratch;
+
+            HttpClientSession tinySession;
+            SC_TEST_EXPECT(tinySession.init(tinyMemory));
+
+            static const char  OversizedCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                          "Set-Cookie: long=123456789\r\n"
+                                                          "\r\n";
+            HttpClientResponse oversizedCookieResponse;
+            oversizedCookieResponse.headers       = {OversizedCookieHeaders, sizeof(OversizedCookieHeaders) - 1};
+            oversizedCookieResponse.headersLength = sizeof(OversizedCookieHeaders) - 1;
+            SC_TEST_EXPECT(not tinySession.captureResponse(responseRequest, oversizedCookieResponse));
+            SC_TEST_EXPECT(tinySession.getNumCookies() == 0);
+
+            static const char  RecoverableCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                            "Set-Cookie: x=1\r\n"
+                                                            "\r\n";
+            HttpClientResponse recoverableCookieResponse;
+            recoverableCookieResponse.headers       = {RecoverableCookieHeaders, sizeof(RecoverableCookieHeaders) - 1};
+            recoverableCookieResponse.headersLength = sizeof(RecoverableCookieHeaders) - 1;
+            SC_TEST_EXPECT(tinySession.captureResponse(responseRequest, recoverableCookieResponse));
+            SC_TEST_EXPECT(tinySession.findCookie("x"_a8, "example.test"_a8, "/api"_a8, cookie));
+            SC_TEST_EXPECT(cookie.value == "1"_a8);
+        }
 
         HttpClientSessionRetryPolicy policy;
         policy.maxAttempts = 3;

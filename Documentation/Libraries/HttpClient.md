@@ -100,8 +100,13 @@ application shapes while preserving caller ownership:
 - `HttpClientSession` prepares cookie and exact-origin `Authorization` headers, captures response
   cookies, and tracks retry attempts in caller-provided slots and scratch spans. It is a small
   transport helper, not a browser cookie store: cookie matching is intentionally limited and only
-  Basic authentication challenge helpers are provided. A prepared request borrows the session's
-  header workspace, so start it before preparing another request with the same workspace.
+  Basic authentication challenge helpers are provided. Basic-auth usernames reject the credential
+  separator colon; IP-literal cookie hosts require exact domains; HTTP responses cannot create or
+  replace `Secure` cookie slots; malformed cookie names and values are ignored; malformed `Path`
+  attributes fall back to the request URL default path. Cookie and authorization updates preflight
+  all copied fields, so a state-scratch capacity error does not consume scratch or expose a partially
+  written session slot. A prepared request borrows the session's header workspace, so start it before
+  preparing another request with the same workspace.
 - `HttpClientOperationScheduler` installs the operation notifier and records readiness in one
   caller-provided byte per registered operation. It avoids scanning every operation, but owns no
   operation, starts no request, and does not change the one-request-per-operation rule.
