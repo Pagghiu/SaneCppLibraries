@@ -249,6 +249,39 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
     return Result(isValid());
 }
 
+SC::Result SC::SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
+{
+    const int addressSize = static_cast<int>(destination.sizeOfHandle());
+    const int sent        = ::sendto(handle, data.data(), static_cast<int>(data.sizeInBytes()), 0,
+                                     &destination.handle.reinterpret_as<const struct sockaddr>(), addressSize);
+    if (sent == SOCKET_ERROR and WSAGetLastError() == WSAEWOULDBLOCK)
+    {
+        return Result(false);
+    }
+    SC_TRY_MSG(sent >= 0, "sendto error");
+    SC_TRY_MSG(static_cast<size_t>(sent) == data.sizeInBytes(), "sendto didn't send the whole datagram");
+    return Result(true);
+}
+
+SC::Result SC::SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData,
+                                             SocketIPAddress& sourceAddress)
+{
+    SocketIPAddress receivedSourceAddress;
+    int             addressSize  = sizeof(struct sockaddr_in6);
+    const int       received     = ::recvfrom(handle, buffer.data(), static_cast<int>(buffer.sizeInBytes()), 0,
+                                              &receivedSourceAddress.handle.reinterpret_as<struct sockaddr>(), &addressSize);
+    const int       receiveError = received == SOCKET_ERROR ? WSAGetLastError() : 0;
+    if (receiveError == WSAEWOULDBLOCK)
+    {
+        return Result(false);
+    }
+    SC_TRY_MSG(receiveError != WSAEMSGSIZE, "receiveFrom datagram truncated");
+    SC_TRY_MSG(received >= 0, "receiveFrom error");
+    receivedData  = {buffer.data(), static_cast<size_t>(received)};
+    sourceAddress = receivedSourceAddress;
+    return Result(true);
+}
+
 struct SC::SocketNetworking::Internal
 {
 #if SC_COMPILER_MSVC

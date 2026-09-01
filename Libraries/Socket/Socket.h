@@ -241,6 +241,23 @@ struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDes
     /// @param interfaceAddress The local interface address
     /// @return Valid Result if the multicast outgoing interface has been set successfully
     Result setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress);
+
+    /// @brief Sends a datagram to the given destination address (unconnected UDP)
+    /// @param data Bytes to send as a single datagram; the whole span must be sent for success
+    /// @param destination The destination ip address and port of the datagram
+    /// @return Valid Result if the whole datagram has been sent successfully
+    /// @note On non-blocking sockets, an unsuccessful Result is also returned when the operation would block
+    Result sendTo(Span<const char> data, const SocketIPAddress& destination);
+
+    /// @brief Receives a datagram, reporting its source address (unconnected UDP)
+    /// @param[in,out] buffer Span of memory that will receive the datagram and may be modified on truncation
+    /// @param[out] receivedData A sub-Span of `buffer` containing the received bytes; unchanged on failure
+    /// @param[out] sourceAddress The source ip address and port; unchanged on failure
+    /// @return Valid Result if a complete datagram has been received successfully
+    /// @note On non-blocking sockets, an unsuccessful Result is also returned when no datagram is immediately available
+    /// @note An oversized datagram is consumed and returns an unsuccessful Result. `buffer` may contain a truncated
+    /// prefix
+    Result receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress);
 };
 
 /// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).

@@ -12,7 +12,7 @@ System socket headers and platform constants belong in internal implementation f
 
 ## Boundaries
 
-Socket owns synchronous socket creation, configuration, connect, bind, listen, accept, read, write, DNS resolution, and process-level networking init/shutdown where a platform requires it. It does not own event loops, task scheduling, TLS, HTTP, WebSocket, streams, or application protocols.
+Socket owns synchronous socket creation, configuration, connect, bind, listen, accept, read, write, unconnected datagram send/receive with source-address reporting, DNS resolution, and process-level networking init/shutdown where a platform requires it. It does not own event loops, task scheduling, TLS, HTTP, WebSocket, streams, or application protocols.
 
 Timeouts should remain representable without depending on Time. Concurrency should remain caller-owned.
 
@@ -40,6 +40,7 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 - Keep descriptor lifetime explicit through `SocketDescriptor`.
 - Keep TCP/UDP/address-family choices typed.
 - Keep socket options visible as named operations.
+- Keep unconnected datagram I/O caller-buffered with portable failure semantics.
 - Keep platform networking init explicit.
 
 ## Explicitly Excluded Targets
@@ -58,6 +59,7 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 - [Socket tests](../../Tests/Libraries/Socket/SocketTest.cpp)
 - [SOCKET-0001 - Keep Socket synchronous and dependency-free](socket-0001-keep-socket-synchronous-and-dependency-free.md)
 - [SOCKET-0002 - Expose Socket options as explicit descriptor operations](socket-0002-expose-socket-options-as-explicit-descriptor-operations.md)
+- [SOCKET-0003 - Expose unconnected datagrams as descriptor operations](socket-0003-expose-unconnected-datagrams-as-descriptor-operations.md)
 - [SC-0003 - Keep libraries independently consumable](../Global/sc-0003-keep-libraries-independently-consumable.md)
 - [SC-0009 - Isolate platform-specific implementations behind internal code](../Global/sc-0009-isolate-platform-specific-implementations-behind-internal-code.md)
 
@@ -65,3 +67,4 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 
 - [SOCKET-0001 - Keep Socket synchronous and dependency-free](socket-0001-keep-socket-synchronous-and-dependency-free.md)
 - [SOCKET-0002 - Expose Socket options as explicit descriptor operations](socket-0002-expose-socket-options-as-explicit-descriptor-operations.md)
+- [SOCKET-0003 - Expose unconnected datagrams as descriptor operations](socket-0003-expose-unconnected-datagrams-as-descriptor-operations.md)

@@ -16,6 +16,7 @@ struct SC::SocketTest : public SC::TestCase
     inline void resolveDNS();
     inline void socketCreate();
     inline void socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol);
+    inline void socketUDPSendToReceiveFrom(StringView address);
     inline void socketMulticast();
 
     inline Result socketServerSnippet();
@@ -44,6 +45,11 @@ struct SC::SocketTest : public SC::TestCase
         if (test_section("udp client server (connected)"))
         {
             socketClientServer(SocketFlags::SocketDgram, SocketFlags::ProtocolUdp);
+        }
+        if (test_section("udp unconnected sendTo receiveFrom"))
+        {
+            socketUDPSendToReceiveFrom("127.0.0.1");
+            socketUDPSendToReceiveFrom("::1");
         }
         if (test_section("udp multicast"))
         {
@@ -192,6 +198,89 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
     params.eventObject.signal();
     SC_TEST_EXPECT(thread.join());
     SC_TEST_EXPECT(params.connectRes and params.writeRes and params.closeRes);
+}
+
+void SC::SocketTest::socketUDPSendToReceiveFrom(StringView address)
+{
+    const uint16_t receiverPort = report.mapPort(5052);
+    const uint16_t senderPort   = report.mapPort(5053);
+
+    SocketIPAddress receiverAddress;
+    SC_TEST_EXPECT(receiverAddress.fromAddressPort(address, receiverPort));
+    SocketIPAddress senderAddress;
+    SC_TEST_EXPECT(senderAddress.fromAddressPort(address, senderPort));
+
+    SocketDescriptor receiverSocket;
+    SC_TEST_EXPECT(
+        receiverSocket.create(receiverAddress.getAddressFamily(), SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+    SocketServer receiverServer(receiverSocket);
+    SC_TEST_EXPECT(receiverServer.bind(receiverAddress));
+
+    SocketDescriptor senderSocket;
+    SC_TEST_EXPECT(
+        senderSocket.create(senderAddress.getAddressFamily(), SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+    SocketServer senderServer(senderSocket);
+    SC_TEST_EXPECT(senderServer.bind(senderAddress));
+
+    SocketDescriptor invalidSocket;
+    const char       invalidValue = 0;
+    SC_TEST_EXPECT(not invalidSocket.sendTo({&invalidValue, 1}, receiverAddress));
+
+    // Non-blocking receiveFrom without any pending datagram must fail softly
+    char       receiveBuffer[64] = {0};
+    Span<char> receivedData      = {receiveBuffer + 1, 1};
+
+    SocketIPAddress sourceAddress;
+    SC_TEST_EXPECT(sourceAddress.fromAddressPort("192.0.2.1", 1234));
+    char       sourceAddressString[SocketIPAddress::MAX_ASCII_STRING_LENGTH];
+    StringSpan sourceAddressSpan;
+
+    SC_TEST_EXPECT(receiverSocket.setBlocking(false));
+    SC_TEST_EXPECT(not receiverSocket.receiveFrom({receiveBuffer, sizeof(receiveBuffer)}, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.data() == receiveBuffer + 1 and receivedData.sizeInBytes() == 1);
+    SC_TEST_EXPECT(sourceAddress.toString(sourceAddressString, sourceAddressSpan));
+    SC_TEST_EXPECT(StringView(sourceAddressSpan) == StringView("192.0.2.1") and sourceAddress.getPort() == 1234);
+    SC_TEST_EXPECT(receiverSocket.setBlocking(true));
+
+    // Send a datagram from the sender to the unconnected receiver
+    const char testValue = 42;
+    SC_TEST_EXPECT(senderSocket.sendTo({&testValue, 1}, receiverAddress));
+
+    SC_TEST_EXPECT(receiverSocket.receiveFrom({receiveBuffer, sizeof(receiveBuffer)}, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.sizeInBytes() == 1 and receiveBuffer[0] == testValue);
+    SC_TEST_EXPECT(sourceAddress.toString(sourceAddressString, sourceAddressSpan));
+    SC_TEST_EXPECT(StringView(sourceAddressSpan) == address);
+    SC_TEST_EXPECT(sourceAddress.getPort() == senderPort);
+
+    // And back: reply from receiver to sender, still unconnected
+    const char replyValue = testValue + 1;
+    SC_TEST_EXPECT(receiverSocket.sendTo({&replyValue, 1}, sourceAddress));
+
+    SC_TEST_EXPECT(senderSocket.receiveFrom({receiveBuffer, sizeof(receiveBuffer)}, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.sizeInBytes() == 1 and receiveBuffer[0] == replyValue);
+    SC_TEST_EXPECT(sourceAddress.getPort() == receiverPort);
+
+    // A zero-length datagram is a successful receive, not a would-block result
+    Span<const char> emptyDatagram = {receiveBuffer, 0};
+    SC_TEST_EXPECT(senderSocket.sendTo(emptyDatagram, receiverAddress));
+    SC_TEST_EXPECT(receiverSocket.receiveFrom({receiveBuffer, sizeof(receiveBuffer)}, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.sizeInBytes() == 0 and sourceAddress.getPort() == senderPort);
+
+    // An oversized datagram is consumed but reported as an error without publishing partial outputs
+    char oversizedDatagram[sizeof(receiveBuffer) + 1] = {0};
+    SC_TEST_EXPECT(senderSocket.sendTo({oversizedDatagram, sizeof(oversizedDatagram)}, receiverAddress));
+
+    Span<char> unchangedReceivedData = {receiveBuffer + 1, 1};
+    receivedData                     = unchangedReceivedData;
+    SC_TEST_EXPECT(sourceAddress.fromAddressPort("192.0.2.1", 1234));
+    SC_TEST_EXPECT(not receiverSocket.receiveFrom({receiveBuffer, sizeof(receiveBuffer)}, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.data() == unchangedReceivedData.data() and
+                   receivedData.sizeInBytes() == unchangedReceivedData.sizeInBytes());
+    SC_TEST_EXPECT(sourceAddress.toString(sourceAddressString, sourceAddressSpan));
+    SC_TEST_EXPECT(StringView(sourceAddressSpan) == StringView("192.0.2.1") and sourceAddress.getPort() == 1234);
+
+    SC_TEST_EXPECT(senderSocket.close());
+    SC_TEST_EXPECT(receiverSocket.close());
 }
 
 void SC::SocketTest::socketMulticast()

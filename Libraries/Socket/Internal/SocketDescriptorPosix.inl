@@ -9,6 +9,8 @@
 #include <fcntl.h>       // fcntl
 #include <netdb.h>       // AF_INET / IPPROTO_TCP / AF_UNSPEC
 #include <netinet/tcp.h> // TCP_NODELAY
+#include <sys/socket.h>  // sendto / recvmsg
+#include <sys/uio.h>     // iovec
 #include <unistd.h>      // close
 
 namespace SC
@@ -272,6 +274,54 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
     }
 #endif // defined(SO_NOSIGPIPE)
     return Result(isValid());
+}
+
+Result SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
+{
+    const socklen_t addressSize = static_cast<socklen_t>(destination.sizeOfHandle());
+    ssize_t         sent;
+    do
+    {
+        sent = ::sendto(handle, data.data(), data.sizeInBytes(), 0,
+                        &destination.handle.reinterpret_as<const struct sockaddr>(), addressSize);
+    } while (sent == -1 and errno == EINTR);
+    if (sent == -1 and (errno == EAGAIN or errno == EWOULDBLOCK))
+    {
+        return Result(false);
+    }
+    SC_TRY_MSG(sent >= 0, "sendto error");
+    SC_TRY_MSG(static_cast<size_t>(sent) == data.sizeInBytes(), "sendto didn't send the whole datagram");
+    return Result(true);
+}
+
+Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress)
+{
+    SocketIPAddress receivedSourceAddress;
+    struct iovec    receiveBuffer = {};
+    receiveBuffer.iov_base        = buffer.data();
+    receiveBuffer.iov_len         = buffer.sizeInBytes();
+
+    struct msghdr message = {};
+    message.msg_name      = &receivedSourceAddress.handle.reinterpret_as<struct sockaddr>();
+    message.msg_iov       = &receiveBuffer;
+    message.msg_iovlen    = 1;
+
+    ssize_t received;
+    do
+    {
+        message.msg_namelen = sizeof(struct sockaddr_in6);
+        message.msg_flags   = 0;
+        received            = ::recvmsg(handle, &message, 0);
+    } while (received == -1 and errno == EINTR);
+    if (received == -1 and (errno == EAGAIN or errno == EWOULDBLOCK))
+    {
+        return Result(false);
+    }
+    SC_TRY_MSG(received >= 0, "receiveFrom error");
+    SC_TRY_MSG((message.msg_flags & MSG_TRUNC) == 0, "receiveFrom datagram truncated");
+    receivedData  = {buffer.data(), static_cast<size_t>(received)};
+    sourceAddress = receivedSourceAddress;
+    return Result(true);
 }
 
 void SocketNetworking::initNetworking() {}

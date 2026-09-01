@@ -1,6 +1,6 @@
 @page library_socket Socket
 
-@brief 🟨 Synchronous TCP, connected UDP, multicast configuration and DNS lookup
+@brief 🟨 Synchronous TCP, connected and unconnected UDP, multicast configuration and DNS lookup
 
 [SaneCppSocket.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppSocket.h) provides a
 small, synchronous portability layer over native sockets on Windows, macOS and Linux.
@@ -19,15 +19,14 @@ small, synchronous portability layer over native sockets on Windows, macOS and L
 Use Socket when an application wants direct control of a native network handle and blocking operations are acceptable:
 
 - a small TCP client or server running on a dedicated thread;
-- connected UDP request/response traffic;
+- connected or unconnected UDP request/response traffic;
 - joining an IPv4 or IPv6 multicast group and configuring its interface, loopback and hop limit; or
 - resolving a host name synchronously into an IPv4 or IPv6 text address.
 
 Socket is intentionally below a protocol or stream framework. It does not provide TLS, HTTP, buffering, message framing,
-automatic reconnects, readiness polling or an event loop. It also does not expose unconnected `sendto` / `recvfrom`
-operations. Use [Async](@ref library_async) when sockets must share an event loop, [Await](@ref library_await) for
-coroutine composition, [Async Streams](@ref library_async_streams) for queued and framed byte streams, and
-[HTTP](@ref library_http) when the protocol is HTTP.
+automatic reconnects, readiness polling or an event loop. Use [Async](@ref library_async) when sockets must share an
+event loop, [Await](@ref library_await) for coroutine composition, [Async Streams](@ref library_async_streams) for
+queued and framed byte streams, and [HTTP](@ref library_http) when the protocol is HTTP.
 
 # The handle is the socket; client and server are views
 
@@ -47,8 +46,8 @@ The server side of the lifecycle is visible in this snippet compiled with `Socke
 
 SC::SocketServer::bind enables address reuse by default. This is convenient for restarting a server, but callers can
 disable it or inspect SC::SocketServer::BindStatus when they need to distinguish an address already in use. `listen` and
-`accept` are TCP operations. For UDP, bind the datagram descriptor and use a SC::SocketClient view to read from it; the
-current synchronous UDP API models a connected peer rather than arbitrary per-datagram source addresses.
+`accept` are TCP operations. For UDP, bind the datagram descriptor and use a SC::SocketClient view to read from a
+connected peer, or use the unconnected operations described below to exchange datagrams with arbitrary peers.
 
 # Addresses, DNS and process initialization
 
@@ -92,13 +91,22 @@ non-blocking mode does not turn these synchronous wrappers into an event-driven 
 
 # UDP, broadcast and multicast
 
-Datagram descriptors use the same ownership model. The synchronous client/server facade supports UDP after connecting a
-sender to one peer and binding a receiver. SC::SocketDescriptor additionally exposes broadcast enablement and multicast
-group membership, loopback, hop-limit and outbound-interface controls for IPv4 and IPv6.
+Datagram descriptors use the same ownership model. The synchronous client/server facade supports connected UDP after
+connecting a sender to one peer and binding a receiver. Unconnected datagrams are sent with
+SC::SocketDescriptor::sendTo, which delivers the whole input span as a single datagram to an arbitrary destination, and
+received with SC::SocketDescriptor::receiveFrom, which reports the source address and port of each datagram through a
+caller-provided SC::SocketIPAddress. Both operations work on blocking and non-blocking descriptors: on non-blocking
+descriptors they return an unsuccessful SC::Result when the operation would block or no datagram is immediately
+available. A zero-length datagram is still a successful receive. When a datagram is larger than the receive buffer, the
+datagram is consumed and the operation returns an unsuccessful result consistently across platforms. The buffer may
+contain a truncated prefix, while the received-data span and source address remain unchanged on every failure.
+
+SC::SocketDescriptor additionally exposes broadcast enablement and multicast group membership, loopback, hop-limit and
+outbound-interface controls for IPv4 and IPv6.
 
 These are socket options, not a multicast protocol layer. The caller must provide family-compatible group and interface
 addresses, choose ports, define packet boundaries at the application level and decide how loss, duplication and ordering
-are handled. There is no source-address result on receive, and a datagram still has to fit the caller's buffer.
+are handled.
 
 # Boundaries and tradeoffs
 
@@ -108,7 +116,7 @@ SC::SocketDNS may allocate internally, so DNS lookup should not be treated as an
 
 That small surface is a good fit for bounded synchronous networking and for creating handles that higher-level SC
 libraries will drive. It is a poor fit when the application needs many concurrent connections, cancellation, portable
-readiness notification, scatter/gather I/O, arbitrary UDP peers, TLS, or protocol-aware buffering. Those omissions are
+readiness notification, scatter/gather I/O, TLS, or protocol-aware buffering. Those omissions are
 part of the current interface, not policies silently supplied by the library.
 
 For the complete option and method reference, see the [Socket module](@ref group_socket).
@@ -117,9 +125,9 @@ For the complete option and method reference, see the [Socket module](@ref group
 
 🟨 MVP
 
-The tested surface covers synchronous IPv4/IPv6 TCP, connected UDP, read timeouts, DNS, broadcast and multicast options.
-The API remains deliberately narrow and does not yet cover several facilities expected from a general-purpose socket
-library, especially unconnected datagrams and richer I/O/status reporting.
+The tested surface covers synchronous IPv4/IPv6 TCP, connected and unconnected UDP with source-address reporting, read
+timeouts, DNS, broadcast and multicast options. The API remains deliberately narrow and still lacks richer timeout and
+partial-I/O status for callers that need to distinguish would-block, timeout and transport failures structurally.
 
 # Blog
 
@@ -132,7 +140,7 @@ Some relevant blog posts are:
 # Roadmap
 
 🟩 Usable:
-- Add unconnected UDP send/receive operations with peer-address reporting
+- ~~Add unconnected UDP send/receive operations with peer-address reporting~~ (done)
 
 🟦 Complete Features:
 - Define richer timeout and partial-I/O status where callers need to distinguish outcomes
