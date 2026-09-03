@@ -19,7 +19,7 @@ SC::Result SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
     hints.ai_socktype = SOCK_STREAM; // Use SOCK_STREAM for TCP
 
     char nullTerminated[256] = {0};
-    SC_TRY_MSG(host.getEncoding() == StringEncoding::Ascii, "Only ASCII encoding is supported");
+    SC_TRY_MSG(detail::isASCII(host), "Only ASCII encoding is supported");
     SC_TRY_MSG(detail::writeNullTerminatedToBuffer(host.toCharSpan(), nullTerminated), "host is too big");
     // Get address information
     SC_TRY_MSG(::getaddrinfo(nullTerminated, NULL, &hints, &res) == 0, "getaddrinfo error");

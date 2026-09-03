@@ -68,6 +68,21 @@ void SC::SocketTest::parseAddress()
     SC_TEST_EXPECT(address.fromAddressPort("::1", 456));
     SC_TEST_EXPECT(address.getPort() == 456);
 
+    const char utf8IPV4[] = "127.0.0.1";
+    SC_TEST_EXPECT(
+        address.fromAddressPort(StringSpan({utf8IPV4, sizeof(utf8IPV4) - 1}, true, StringEncoding::Utf8), 789));
+    SC_TEST_EXPECT(address.getPort() == 789);
+
+    const char utf8IPV6[] = "::1";
+    SC_TEST_EXPECT(
+        address.fromAddressPort(StringSpan({utf8IPV6, sizeof(utf8IPV6) - 1}, true, StringEncoding::Utf8), 987));
+    SC_TEST_EXPECT(address.getPort() == 987);
+
+    const char nonAsciiAddress[] = {
+        '1', '2', '7', '.', '0', '.', '0', '.', '1', static_cast<char>(0xc3), static_cast<char>(0xa9)};
+    SC_TEST_EXPECT(not address.fromAddressPort(
+        StringSpan({nonAsciiAddress, sizeof(nonAsciiAddress)}, false, StringEncoding::Utf8), 123));
+
     const char  badMemory[]  = "oh yeah that's a really broken socket ip address";
     const auto& badIPAddress = *reinterpret_cast<const SocketIPAddress*>(&badMemory);
     SC_TEST_EXPECT(not badIPAddress.isValid());
@@ -82,6 +97,17 @@ void SC::SocketTest::resolveDNS()
     SC_TEST_EXPECT(SocketDNS::resolveDNS("localhost", ipAddress));
     StringView ipString = StringView(ipAddress, true, StringEncoding::Ascii);
     SC_TEST_EXPECT(ipString == "127.0.0.1" or ipString == "::1");
+
+    const char utf8Localhost[] = "localhost";
+    ipAddress                  = {buffer};
+    SC_TEST_EXPECT(SocketDNS::resolveDNS(
+        StringSpan({utf8Localhost, sizeof(utf8Localhost) - 1}, true, StringEncoding::Utf8), ipAddress));
+
+    const char nonAsciiHost[] = {
+        'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', static_cast<char>(0xc3), static_cast<char>(0xa9)};
+    ipAddress = {buffer};
+    SC_TEST_EXPECT(not SocketDNS::resolveDNS(
+        StringSpan({nonAsciiHost, sizeof(nonAsciiHost)}, false, StringEncoding::Utf8), ipAddress));
     //! [resolveDNSSnippet]
 }
 

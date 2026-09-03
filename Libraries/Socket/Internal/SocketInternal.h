@@ -1,12 +1,26 @@
 #pragma once
 
-#include "../../Common/Span.h"
+#include "../../Common/StringSpan.h"
 #include <memory.h> // memcpy
 
 namespace SC
 {
 namespace detail
 {
+[[nodiscard]] constexpr bool isASCII(StringSpan text)
+{
+    if (text.getEncoding() == StringEncoding::Utf16)
+        return false;
+
+    const Span<const char> bytes = text.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        if (static_cast<unsigned char>(bytes[idx]) > 0x7f)
+            return false;
+    }
+    return true;
+}
+
 template <size_t N>
 [[nodiscard]] bool writeNullTerminatedToBuffer(Span<const char> source, char (&destination)[N])
 {

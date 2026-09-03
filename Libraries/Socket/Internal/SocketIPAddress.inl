@@ -136,7 +136,7 @@ SC::Result SC::SocketIPAddress::fromAddressPort(StringSpan interfaceAddress, uin
 {
     static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
     static_assert(alignof(sockaddr_in6) >= alignof(sockaddr_in), "size");
-    SC_TRY_MSG(interfaceAddress.getEncoding() == StringEncoding::Ascii, "Only ASCII encoding is supported");
+    SC_TRY_MSG(detail::isASCII(interfaceAddress), "Only ASCII encoding is supported");
 
     Result res = SocketIPAddressInternal::parseIPV4(interfaceAddress, port, handle.reinterpret_as<sockaddr_in>());
     if (not res)
