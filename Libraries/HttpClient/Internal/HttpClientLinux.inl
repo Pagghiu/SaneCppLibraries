@@ -369,6 +369,10 @@ SC::Result SC::HttpClientOperation::platformStart()
 
     session.curl.curl_easy_reset(curlHandle);
 
+    // libcurl recommends disabling signal handlers for Unix multi-threaded callers.
+    SC_TRY_MSG(session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOSIGNAL, 1L) == CURLE_OK,
+               "HttpClient: libcurl signal policy not supported");
+
     Span<const char> urlSpan = currentRequest.url.toCharSpan();
     if (currentRequest.url.isNullTerminated())
     {

@@ -7,3 +7,4 @@ Entries use GitHub handles by default. Real names are used only when they are al
 ## Prompt and Issue Contributions
 
 - [@cozis](https://github.com/cozis) (Francesco Cozzuto) — Reported [#32](https://github.com/Pagghiu/SaneCppLibraries/issues/32): `SocketIPAddress` rejected UTF-8-tagged ASCII strings from command-line arguments.
+- [@cozis](https://github.com/cozis) (Francesco Cozzuto) — Reported [#33](https://github.com/Pagghiu/SaneCppLibraries/issues/33): Investigated `HttpClient` Linux worker-thread response truncation under scheduling and short-read conditions.
