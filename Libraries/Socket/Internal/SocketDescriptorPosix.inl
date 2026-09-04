@@ -235,6 +235,9 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
                                 SocketFlags::InheritableType inheritable)
 {
     SC_TRY(SocketNetworking::isNetworkingInited());
+#if SC_PLATFORM_EMSCRIPTEN
+    SC_TRY_MSG(addressFamily != SocketFlags::AddressFamilyUnix, "Unix-domain sockets are not supported on Emscripten");
+#endif
     SC_SOCKET_TRUST_RESULT(close());
 
     int typeWithAdditions = SocketFlags::toNative(socketType);
@@ -276,8 +279,9 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
     return Result(isValid());
 }
 
-Result SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
+Result SocketDescriptor::sendTo(Span<const char> data, const SocketAddress& destination)
 {
+    SC_TRY_MSG(destination.isValid(), "invalid sendTo destination address");
     const socklen_t addressSize = static_cast<socklen_t>(destination.sizeOfHandle());
     ssize_t         sent;
     do
@@ -294,12 +298,17 @@ Result SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& de
     return Result(true);
 }
 
-Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress)
+Result SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
 {
-    SocketIPAddress receivedSourceAddress;
-    struct iovec    receiveBuffer = {};
-    receiveBuffer.iov_base        = buffer.data();
-    receiveBuffer.iov_len         = buffer.sizeInBytes();
+    return sendTo(data, SocketAddress(destination));
+}
+
+Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress)
+{
+    SocketAddress receivedSourceAddress;
+    struct iovec  receiveBuffer = {};
+    receiveBuffer.iov_base      = buffer.data();
+    receiveBuffer.iov_len       = buffer.sizeInBytes();
 
     struct msghdr message = {};
     message.msg_name      = &receivedSourceAddress.handle.reinterpret_as<struct sockaddr>();
@@ -309,7 +318,7 @@ Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData
     ssize_t received;
     do
     {
-        message.msg_namelen = sizeof(struct sockaddr_in6);
+        message.msg_namelen = sizeof(receivedSourceAddress.handle);
         message.msg_flags   = 0;
         received            = ::recvmsg(handle, &message, 0);
     } while (received == -1 and errno == EINTR);
@@ -319,8 +328,22 @@ Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData
     }
     SC_TRY_MSG(received >= 0, "receiveFrom error");
     SC_TRY_MSG((message.msg_flags & MSG_TRUNC) == 0, "receiveFrom datagram truncated");
-    receivedData  = {buffer.data(), static_cast<size_t>(received)};
-    sourceAddress = receivedSourceAddress;
+    receivedSourceAddress.nativeSize = message.msg_namelen;
+    receivedData                     = {buffer.data(), static_cast<size_t>(received)};
+    sourceAddress                    = receivedSourceAddress;
+    return Result(true);
+}
+
+Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress)
+{
+    Span<char>    stagedReceivedData;
+    SocketAddress stagedSourceAddress;
+    SC_TRY(receiveFrom(buffer, stagedReceivedData, stagedSourceAddress));
+
+    SocketIPAddress stagedIPAddress;
+    SC_TRY(stagedSourceAddress.getIPAddress(stagedIPAddress));
+    receivedData  = stagedReceivedData;
+    sourceAddress = stagedIPAddress;
     return Result(true);
 }
 

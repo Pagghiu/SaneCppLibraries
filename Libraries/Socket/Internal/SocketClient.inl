@@ -17,16 +17,19 @@ SC::Result SC::SocketClient::connect(StringSpan address, uint16_t port)
     return connect(nativeAddress);
 }
 
-SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress)
+SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress) { return connect(SocketAddress(ipAddress)); }
+
+SC::Result SC::SocketClient::connect(const SocketAddress& address)
 {
     SC_TRY(SocketNetworking::isNetworkingInited());
+    SC_TRY_MSG(address.isValid(), "invalid connect address");
     SocketDescriptor::Handle openedSocket;
     SC_SOCKET_TRUST_RESULT(socket.get(openedSocket, Result::Error("invalid connect socket")));
-    socklen_t nativeSize = ipAddress.sizeOfHandle();
+    socklen_t nativeSize = address.sizeOfHandle();
     int       res;
     do
     {
-        res = ::connect(openedSocket, &ipAddress.handle.reinterpret_as<const struct sockaddr>(), nativeSize);
+        res = ::connect(openedSocket, &address.handle.reinterpret_as<const struct sockaddr>(), nativeSize);
     } while (res == SOCKET_ERROR and errno == EINTR);
     SC_TRY_MSG(res != SOCKET_ERROR, "connect failed");
     return Result(true);

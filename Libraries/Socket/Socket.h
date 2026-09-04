@@ -69,25 +69,27 @@ struct SC_SOCKET_EXPORT SocketFlags
         Inheritable     ///< SocketDescriptor will be inherited by child processes
     };
 
-    /// @brief Sets the address family of an IP Address (IPv4 or IPV6)
+    /// @brief Sets the socket address family
     enum AddressFamily
     {
         AddressFamilyIPV4, ///< IP Address is IPV4
         AddressFamilyIPV6, ///< IP Address is IPV6
+        AddressFamilyUnix  ///< Local Unix-domain address
     };
 
-    /// @brief Sets the socket type, if it's a Datagram (for UDP) or Streaming (for TCP and others)
+    /// @brief Sets the socket type to datagram or stream
     enum SocketType
     {
-        SocketStream, ///< Sets the socket type as Streaming type (for TCP and others)
-        SocketDgram   ///< Sets the socket type as Streaming type (for UDP)
+        SocketStream, ///< Streaming socket (for TCP and Unix-domain streams)
+        SocketDgram   ///< Datagram socket (for UDP and Unix-domain datagrams)
     };
 
     /// @brief Sets the socket protocol type
     enum ProtocolType
     {
-        ProtocolTcp, ///< The protocol is TCP
-        ProtocolUdp, ///< The protocol is UDP
+        ProtocolTcp,     ///< The protocol is TCP
+        ProtocolUdp,     ///< The protocol is UDP
+        ProtocolDefault, ///< Use the default protocol for the address family and socket type
     };
 
     /// @brief Sets the type of shutdown to perform
@@ -98,6 +100,7 @@ struct SC_SOCKET_EXPORT SocketFlags
 
   private:
     friend struct SocketDescriptor;
+    friend struct SocketAddress;
     friend struct SocketIPAddressInternal;
     [[nodiscard]] static AddressFamily AddressFamilyFromInt(int value);
     [[nodiscard]] static unsigned char toNative(AddressFamily family);
@@ -158,6 +161,43 @@ struct SC_SOCKET_EXPORT SocketIPAddress
     struct Internal;
 };
 
+/// @brief Family-neutral native socket address.
+///
+/// Stores IPv4, IPv6, or Unix-domain addresses inline without exposing platform socket headers.
+struct SC_SOCKET_EXPORT SocketAddress
+{
+    enum class UnixNamespace
+    {
+        Unnamed,
+        Pathname,
+        Abstract
+    };
+
+    SocketAddress() = default;
+    SocketAddress(const SocketIPAddress& ipAddress);
+
+    /// @brief Builds a filesystem-named Unix-domain address.
+    Result fromUnixPath(StringSpan path);
+
+    /// @brief Builds a Linux abstract-namespace Unix-domain address.
+    /// @note Returns an unsupported result on platforms other than Linux.
+    Result fromUnixAbstractName(Span<const char> name);
+
+    [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() const;
+    [[nodiscard]] uint32_t                   sizeOfHandle() const;
+    [[nodiscard]] bool                       isValid() const;
+
+    /// @brief Extracts an IP address when this address contains IPv4 or IPv6.
+    Result getIPAddress(SocketIPAddress& output) const;
+
+    /// @brief Returns a view into the inline Unix-domain name storage.
+    Result getUnixName(Span<const char>& output, UnixNamespace& unixNamespace) const;
+
+    /// @brief Handle to native OS representation of the socket address.
+    AlignedStorage<128> handle     = {};
+    uint32_t            nativeSize = 0;
+};
+
 /// @brief Low-level OS socket handle.
 /// It also allow querying inheritability and changing it (and blocking mode)
 /// @n
@@ -166,9 +206,9 @@ struct SC_SOCKET_EXPORT SocketIPAddress
 struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefinition>
 {
     /// @brief Creates a new SocketDescriptor Descriptor of given family, type, protocol
-    /// @param addressFamily Address family (IPV4 / IPV6)
+    /// @param addressFamily Address family (IPv4, IPv6, or Unix-domain)
     /// @param socketType SocketDescriptor type (Stream or Dgram)
-    /// @param protocol Protocol (TCP or UDP)
+    /// @param protocol Protocol (TCP, UDP, or the family/type default)
     /// @param blocking If the socket should be created in blocking mode
     /// @param inheritable If the socket should be inheritable by child processes
     /// @return Valid Result if a socket with the requested options has been successfully created
@@ -193,7 +233,7 @@ struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDes
     /// @return Valid Result if it has been possible changing the blocking status of this socket
     Result setBlocking(bool value);
 
-    /// @brief Get address family (IPV4 / IPV6) of this socket
+    /// @brief Get the address family of this socket
     /// @param[out] addressFamily The address family of this socket (if Result is valid)
     /// @return Valid Result the address family for this socket has been queried successfully
     Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
@@ -242,21 +282,27 @@ struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDes
     /// @return Valid Result if the multicast outgoing interface has been set successfully
     Result setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress);
 
-    /// @brief Sends a datagram to the given destination address (unconnected UDP)
+    /// @brief Sends a datagram to the given destination address
     /// @param data Bytes to send as a single datagram; the whole span must be sent for success
-    /// @param destination The destination ip address and port of the datagram
+    /// @param destination The destination address of the datagram
     /// @return Valid Result if the whole datagram has been sent successfully
     /// @note On non-blocking sockets, an unsuccessful Result is also returned when the operation would block
+    Result sendTo(Span<const char> data, const SocketAddress& destination);
+
+    /// @brief IP-address compatibility overload for sendTo.
     Result sendTo(Span<const char> data, const SocketIPAddress& destination);
 
-    /// @brief Receives a datagram, reporting its source address (unconnected UDP)
+    /// @brief Receives a datagram, reporting its source address
     /// @param[in,out] buffer Span of memory that will receive the datagram and may be modified on truncation
     /// @param[out] receivedData A sub-Span of `buffer` containing the received bytes; unchanged on failure
-    /// @param[out] sourceAddress The source ip address and port; unchanged on failure
+    /// @param[out] sourceAddress The source address; unchanged on failure
     /// @return Valid Result if a complete datagram has been received successfully
     /// @note On non-blocking sockets, an unsuccessful Result is also returned when no datagram is immediately available
     /// @note An oversized datagram is consumed and returns an unsuccessful Result. `buffer` may contain a truncated
     /// prefix
+    Result receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress);
+
+    /// @brief IP-address compatibility overload for receiveFrom.
     Result receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress);
 };
 
@@ -286,25 +332,32 @@ struct SC_SOCKET_EXPORT SocketServer
     /// @return The Result of SocketDescriptor::close
     Result close();
 
-    /// @brief Binds this socket to a given address / port combination
-    /// @param nativeAddress The interface ip address and port to start listening to
+    /// @brief Binds this socket to an address
+    /// @param nativeAddress The local address to bind
     /// @param reuseAddress Whether SO_REUSEADDR should be set before binding
     /// @param outStatus Optional detailed status for bind failures
     /// @return Valid Result if this socket has successfully been bound
+    Result bind(const SocketAddress& nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
+                BindStatus* outStatus = nullptr);
+
+    /// @brief IP-address compatibility overload for bind.
     Result bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
                 BindStatus* outStatus = nullptr);
 
     /// @brief Start listening for incoming connections at a specific address / port combination (after bind)
     /// @param numberOfWaitingConnections How many connections can be queued before `accept`
     /// @return Valid Result if this socket has successfully been put in listening mode
-    /// @note UDP socket cannot be listened. TCP socket need a successful SocketServer::bind before SocketServer::listen
+    /// @note Datagram sockets cannot be listened. Stream sockets need a successful bind before listen
     Result listen(uint32_t numberOfWaitingConnections);
 
     /// @brief Accepts a new client, blocking while waiting for it
-    /// @param[in] addressFamily The address family of the SocketDescriptor that will be created
+    /// @param[in] addressFamily Compatibility parameter; the accepted descriptor family is inherited from the listener
     /// @param[out] newClient The SocketDescriptor that will be accepted
     /// @return Valid Result if the socket has been successfully accepted
     Result accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
+
+    /// @brief Accepts a new client and optionally reports its peer address.
+    Result accept(SocketDescriptor& newClient, SocketAddress* peerAddress = nullptr);
 
   private:
     SocketDescriptor& socket;
@@ -337,6 +390,9 @@ struct SC_SOCKET_EXPORT SocketClient
     /// @param ipAddress Address and port to connect to
     /// @return Valid Result if this client successfully connected to the specified address and port
     Result connect(SocketIPAddress ipAddress);
+
+    /// @brief Connect to a family-neutral socket address.
+    Result connect(const SocketAddress& address);
 
     /// @brief Writes bytes to this socket
     /// @param data Bytes to write to this socket

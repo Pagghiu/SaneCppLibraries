@@ -21,13 +21,14 @@
 
 SC::Result SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const
 {
-    struct sockaddr_in6 socketInfo;
+    SocketAddress socketInfo;
 
-    socklen_t socketInfoLen = sizeof(socketInfo);
-    if (::getsockname(handle, reinterpret_cast<struct sockaddr*>(&socketInfo), &socketInfoLen) == SOCKET_ERROR)
+    socklen_t socketInfoLen = sizeof(socketInfo.handle);
+    if (::getsockname(handle, &socketInfo.handle.reinterpret_as<struct sockaddr>(), &socketInfoLen) == SOCKET_ERROR)
     {
         return Result::Error("getsockname failed");
     }
-    addressFamily = SocketFlags::AddressFamilyFromInt(socketInfo.sin6_family);
+    socketInfo.nativeSize = socketInfoLen;
+    addressFamily         = socketInfo.getAddressFamily();
     return Result(true);
 }

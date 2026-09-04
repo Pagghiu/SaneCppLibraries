@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
@@ -13,10 +15,14 @@ struct SocketTest;
 struct SC::SocketTest : public SC::TestCase
 {
     inline void parseAddress();
+    inline void parseUnixAddress();
     inline void resolveDNS();
     inline void socketCreate();
     inline void socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol);
     inline void socketUDPSendToReceiveFrom(StringView address);
+    inline void socketUnixStream();
+    inline void socketUnixDatagram();
+    inline void socketUnixAbstractDatagram();
     inline void socketMulticast();
 
     inline Result socketServerSnippet();
@@ -29,6 +35,10 @@ struct SC::SocketTest : public SC::TestCase
         if (test_section("parseAddress"))
         {
             parseAddress();
+        }
+        if (test_section("parse unix address"))
+        {
+            parseUnixAddress();
         }
         if (test_section("DNS"))
         {
@@ -54,6 +64,18 @@ struct SC::SocketTest : public SC::TestCase
         if (test_section("udp multicast"))
         {
             socketMulticast();
+        }
+        if (test_section("unix stream client server"))
+        {
+            socketUnixStream();
+        }
+        if (test_section("unix datagram sendTo receiveFrom"))
+        {
+            socketUnixDatagram();
+        }
+        if (test_section("unix abstract datagram sendTo receiveFrom"))
+        {
+            socketUnixAbstractDatagram();
         }
     }
 };
@@ -87,6 +109,51 @@ void SC::SocketTest::parseAddress()
     const auto& badIPAddress = *reinterpret_cast<const SocketIPAddress*>(&badMemory);
     SC_TEST_EXPECT(not badIPAddress.isValid());
     //! [socketIpAddressSnippet]
+}
+
+void SC::SocketTest::parseUnixAddress()
+{
+    SocketAddress address;
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+    SC_TEST_EXPECT(address.fromUnixPath("/tmp/sc-socket-test.sock"));
+    SC_TEST_EXPECT(address.isValid());
+    SC_TEST_EXPECT(address.getAddressFamily() == SocketFlags::AddressFamilyUnix);
+
+    Span<const char>             unixName;
+    SocketAddress::UnixNamespace unixNamespace = SocketAddress::UnixNamespace::Unnamed;
+    SC_TEST_EXPECT(address.getUnixName(unixName, unixNamespace));
+    SC_TEST_EXPECT(unixNamespace == SocketAddress::UnixNamespace::Pathname);
+    SC_TEST_EXPECT(StringView(unixName, false, StringEncoding::Ascii) == "/tmp/sc-socket-test.sock");
+
+    SC_TEST_EXPECT(not address.fromUnixPath(""));
+    char overlongPath[128];
+    for (size_t idx = 0; idx < sizeof(overlongPath); ++idx)
+    {
+        overlongPath[idx] = 'a';
+    }
+    SC_TEST_EXPECT(
+        not address.fromUnixPath(StringSpan({overlongPath, sizeof(overlongPath)}, false, StringEncoding::Ascii)));
+
+    const char pathWithNull[] = {'/', 't', 'm', 'p', '/', 'a', '\0', 'b'};
+    SC_TEST_EXPECT(
+        not address.fromUnixPath(StringSpan({pathWithNull, sizeof(pathWithNull)}, false, StringEncoding::Ascii)));
+#if SC_PLATFORM_LINUX
+    const char abstractName[] = {'s', 'c', '\0', 'x'};
+    SC_TEST_EXPECT(address.fromUnixAbstractName(abstractName));
+    SC_TEST_EXPECT(address.getUnixName(unixName, unixNamespace));
+    SC_TEST_EXPECT(unixNamespace == SocketAddress::UnixNamespace::Abstract);
+    SC_TEST_EXPECT(unixName.sizeInBytes() == sizeof(abstractName));
+    for (size_t idx = 0; idx < sizeof(abstractName); ++idx)
+    {
+        SC_TEST_EXPECT(unixName[idx] == abstractName[idx]);
+    }
+#endif
+#else
+    SC_TEST_EXPECT(not address.fromUnixPath("/tmp/sc-socket-test.sock"));
+    SocketDescriptor socket;
+    SC_TEST_EXPECT(
+        not socket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream, SocketFlags::ProtocolDefault));
+#endif
 }
 
 void SC::SocketTest::resolveDNS()
@@ -307,6 +374,175 @@ void SC::SocketTest::socketUDPSendToReceiveFrom(StringView address)
 
     SC_TEST_EXPECT(senderSocket.close());
     SC_TEST_EXPECT(receiverSocket.close());
+}
+
+void SC::SocketTest::socketUnixStream()
+{
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+    StringPath socketPath;
+    SC_TEST_EXPECT(StringBuilder::format(socketPath, "/tmp/sc-socket-stream-{0}.sock", report.mapPort(5060)));
+
+    FileSystem fileSystem;
+    if (fileSystem.exists(socketPath.view()))
+    {
+        SC_TEST_EXPECT(fileSystem.removeFile(socketPath.view()));
+    }
+
+    SocketAddress endpoint;
+    SC_TEST_EXPECT(endpoint.fromUnixPath(socketPath.view()));
+
+    SocketDescriptor serverSocket;
+    SC_TEST_EXPECT(
+        serverSocket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream, SocketFlags::ProtocolDefault));
+    SocketServer server(serverSocket);
+    SC_TEST_EXPECT(server.bind(endpoint));
+    SC_TEST_EXPECT(server.listen(1));
+
+    struct ClientState
+    {
+        SocketAddress endpoint;
+        Result        result = Result(false);
+    } clientState;
+    clientState.endpoint = endpoint;
+
+    Thread clientThread;
+    SC_TEST_EXPECT(clientThread.start(
+        [&clientState](Thread&)
+        {
+            clientState.result = [&]() -> Result
+            {
+                SocketDescriptor clientSocket;
+                SC_TRY(clientSocket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream,
+                                           SocketFlags::ProtocolDefault));
+                SocketClient client(clientSocket);
+                SC_TRY(client.connect(clientState.endpoint));
+                const char request = 42;
+                SC_TRY(client.write({&request, 1}));
+
+                char       reply = 0;
+                Span<char> readData;
+                SC_TRY(client.read({&reply, 1}, readData));
+                SC_TRY(readData.sizeInBytes() == 1 and reply == 43);
+                return clientSocket.close();
+            }();
+        }));
+
+    SocketDescriptor acceptedSocket;
+    SocketAddress    peerAddress;
+    SC_TEST_EXPECT(server.accept(acceptedSocket, &peerAddress));
+    SC_TEST_EXPECT(acceptedSocket.isValid());
+
+    SocketClient acceptedClient(acceptedSocket);
+    char         request = 0;
+    Span<char>   readData;
+    SC_TEST_EXPECT(acceptedClient.read({&request, 1}, readData));
+    SC_TEST_EXPECT(readData.sizeInBytes() == 1 and request == 42);
+    const char reply = 43;
+    SC_TEST_EXPECT(acceptedClient.write({&reply, 1}));
+
+    SC_TEST_EXPECT(acceptedSocket.close());
+    SC_TEST_EXPECT(serverSocket.close());
+    SC_TEST_EXPECT(clientThread.join());
+    SC_TEST_EXPECT(clientState.result);
+    SC_TEST_EXPECT(fileSystem.removeFile(socketPath.view()));
+#endif
+}
+
+void SC::SocketTest::socketUnixDatagram()
+{
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+    StringPath receiverPath;
+    StringPath senderPath;
+    SC_TEST_EXPECT(StringBuilder::format(receiverPath, "/tmp/sc-socket-dgram-r-{0}.sock", report.mapPort(5061)));
+    SC_TEST_EXPECT(StringBuilder::format(senderPath, "/tmp/sc-socket-dgram-s-{0}.sock", report.mapPort(5062)));
+
+    FileSystem fileSystem;
+    if (fileSystem.exists(receiverPath.view()))
+    {
+        SC_TEST_EXPECT(fileSystem.removeFile(receiverPath.view()));
+    }
+    if (fileSystem.exists(senderPath.view()))
+    {
+        SC_TEST_EXPECT(fileSystem.removeFile(senderPath.view()));
+    }
+
+    SocketAddress receiverAddress;
+    SocketAddress senderAddress;
+    SC_TEST_EXPECT(receiverAddress.fromUnixPath(receiverPath.view()));
+    SC_TEST_EXPECT(senderAddress.fromUnixPath(senderPath.view()));
+
+    SocketDescriptor receiverSocket;
+    SocketDescriptor senderSocket;
+    SC_TEST_EXPECT(
+        receiverSocket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketDgram, SocketFlags::ProtocolDefault));
+    SC_TEST_EXPECT(
+        senderSocket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketDgram, SocketFlags::ProtocolDefault));
+    SC_TEST_EXPECT(SocketServer(receiverSocket).bind(receiverAddress));
+    SC_TEST_EXPECT(SocketServer(senderSocket).bind(senderAddress));
+
+    const char payload = 73;
+    SC_TEST_EXPECT(senderSocket.sendTo({&payload, 1}, receiverAddress));
+
+    char          receiveBuffer[8] = {0};
+    Span<char>    receivedData;
+    SocketAddress sourceAddress;
+    SC_TEST_EXPECT(receiverSocket.receiveFrom(receiveBuffer, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.sizeInBytes() == 1 and receivedData[0] == payload);
+
+    Span<const char>             sourceName;
+    SocketAddress::UnixNamespace sourceNamespace = SocketAddress::UnixNamespace::Unnamed;
+    SC_TEST_EXPECT(sourceAddress.getUnixName(sourceName, sourceNamespace));
+    SC_TEST_EXPECT(sourceNamespace == SocketAddress::UnixNamespace::Pathname);
+    SC_TEST_EXPECT(StringView(sourceName, false, StringEncoding::Native) == senderPath.view());
+
+    SC_TEST_EXPECT(senderSocket.close());
+    SC_TEST_EXPECT(receiverSocket.close());
+    SC_TEST_EXPECT(fileSystem.removeFile(senderPath.view()));
+    SC_TEST_EXPECT(fileSystem.removeFile(receiverPath.view()));
+#endif
+}
+
+void SC::SocketTest::socketUnixAbstractDatagram()
+{
+#if SC_PLATFORM_LINUX
+    StringPath receiverName;
+    StringPath senderName;
+    SC_TEST_EXPECT(StringBuilder::format(receiverName, "sc-socket-abstract-r-{0}", report.mapPort(5069)));
+    SC_TEST_EXPECT(StringBuilder::format(senderName, "sc-socket-abstract-s-{0}", report.mapPort(5070)));
+
+    SocketAddress receiverAddress;
+    SocketAddress senderAddress;
+    SC_TEST_EXPECT(receiverAddress.fromUnixAbstractName(receiverName.view().toCharSpan()));
+    SC_TEST_EXPECT(senderAddress.fromUnixAbstractName(senderName.view().toCharSpan()));
+
+    SocketDescriptor receiverSocket;
+    SocketDescriptor senderSocket;
+    SC_TEST_EXPECT(
+        receiverSocket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketDgram, SocketFlags::ProtocolDefault));
+    SC_TEST_EXPECT(
+        senderSocket.create(SocketFlags::AddressFamilyUnix, SocketFlags::SocketDgram, SocketFlags::ProtocolDefault));
+    SC_TEST_EXPECT(SocketServer(receiverSocket).bind(receiverAddress));
+    SC_TEST_EXPECT(SocketServer(senderSocket).bind(senderAddress));
+
+    const char payload = 74;
+    SC_TEST_EXPECT(senderSocket.sendTo({&payload, 1}, receiverAddress));
+
+    char          receiveBuffer[8] = {0};
+    Span<char>    receivedData;
+    SocketAddress sourceAddress;
+    SC_TEST_EXPECT(receiverSocket.receiveFrom(receiveBuffer, receivedData, sourceAddress));
+    SC_TEST_EXPECT(receivedData.sizeInBytes() == 1 and receivedData[0] == payload);
+
+    Span<const char>             sourceName;
+    SocketAddress::UnixNamespace sourceNamespace = SocketAddress::UnixNamespace::Unnamed;
+    SC_TEST_EXPECT(sourceAddress.getUnixName(sourceName, sourceNamespace));
+    SC_TEST_EXPECT(sourceNamespace == SocketAddress::UnixNamespace::Abstract);
+    SC_TEST_EXPECT(sourceName.sizeInBytes() == senderName.view().sizeInBytes());
+    SC_TEST_EXPECT(StringView(sourceName, false, StringEncoding::Native) == senderName.view());
+
+    SC_TEST_EXPECT(senderSocket.close());
+    SC_TEST_EXPECT(receiverSocket.close());
+#endif
 }
 
 void SC::SocketTest::socketMulticast()

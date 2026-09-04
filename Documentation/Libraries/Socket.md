@@ -1,6 +1,6 @@
 @page library_socket Socket
 
-@brief 🟨 Synchronous TCP, connected and unconnected UDP, multicast configuration and DNS lookup
+@brief 🟨 Synchronous IP and Unix-domain streams and datagrams, multicast configuration and DNS lookup
 
 [SaneCppSocket.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppSocket.h) provides a
 small, synchronous portability layer over native sockets on Windows, macOS and Linux.
@@ -20,6 +20,7 @@ Use Socket when an application wants direct control of a native network handle a
 
 - a small TCP client or server running on a dedicated thread;
 - connected or unconnected UDP request/response traffic;
+- local stream or datagram IPC through Unix-domain sockets on macOS and Linux;
 - joining an IPv4 or IPv6 multicast group and configuring its interface, loopback and hop limit; or
 - resolving a host name synchronously into an IPv4 or IPv6 text address.
 
@@ -32,8 +33,9 @@ queued and framed byte streams, and [HTTP](@ref library_http) when the protocol 
 
 SC::SocketDescriptor is the central abstraction. It exclusively owns one native `SOCKET` on Windows or file descriptor
 on POSIX. It is move-only through SC::UniqueHandle: destruction or SC::SocketDescriptor::close releases the handle, and a
-move transfers that responsibility. Creation chooses IPv4 or IPv6, stream or datagram, TCP or UDP, blocking mode and
-child-process inheritance. The defaults are a blocking, non-inheritable TCP stream socket.
+move transfers that responsibility. Creation chooses IPv4, IPv6 or Unix-domain addressing; stream or datagram type;
+TCP, UDP or the family/type default protocol; blocking mode; and child-process inheritance. The defaults are a blocking,
+non-inheritable TCP stream socket.
 
 SC::SocketServer and SC::SocketClient do not own another resource. They are short-lived views over a descriptor:
 SC::SocketServer adds bind, listen and accept operations, while SC::SocketClient adds connect, send and receive operations.
@@ -51,9 +53,22 @@ connected peer, or use the unconnected operations described below to exchange da
 
 # Addresses, DNS and process initialization
 
-SC::SocketIPAddress stores the native IPv4 or IPv6 address and port inline in fixed-size aligned storage. Parsing accepts
-numeric ASCII addresses only; it does not resolve a host name. Converting back to text writes into a caller-provided
-buffer of at least SC::SocketIPAddress::MAX_ASCII_STRING_LENGTH bytes and returns a view into that buffer.
+SC::SocketAddress is the family-neutral value accepted by bind, connect, peer reporting, and unconnected datagram
+operations. It stores the native address and its exact length inline without allocation or public system headers.
+Construct one from a SC::SocketIPAddress, use `fromUnixPath` for a filesystem-named Unix-domain endpoint, or use
+`fromUnixAbstractName` for a Linux abstract-namespace byte name. `getIPAddress` and `getUnixName` extract the matching
+representation without changing the value.
+
+SC::SocketIPAddress remains the focused IPv4/IPv6 address-and-port type and its existing operation overloads remain
+available. Parsing accepts numeric ASCII addresses only; it does not resolve a host name. Converting back to text writes
+into a caller-provided buffer of at least SC::SocketIPAddress::MAX_ASCII_STRING_LENGTH bytes and returns a view into that
+buffer.
+
+Unix pathname sockets are supported on macOS and Linux; Linux additionally supports abstract names. Windows and
+Emscripten report Unix-domain socket creation as unsupported. Closing a descriptor never removes a filesystem pathname:
+the caller must remove stale socket nodes before binding and remove finished nodes after closing. Unix-domain sockets in
+Socket are the native socket surface for stream, datagram, and peer-address semantics; [File](@ref library_file)'s named
+pipes remain the higher-level portable local-IPC choice.
 
 Use SC::SocketDNS separately when a name must be resolved:
 
@@ -94,8 +109,9 @@ non-blocking mode does not turn these synchronous wrappers into an event-driven 
 Datagram descriptors use the same ownership model. The synchronous client/server facade supports connected UDP after
 connecting a sender to one peer and binding a receiver. Unconnected datagrams are sent with
 SC::SocketDescriptor::sendTo, which delivers the whole input span as a single datagram to an arbitrary destination, and
-received with SC::SocketDescriptor::receiveFrom, which reports the source address and port of each datagram through a
-caller-provided SC::SocketIPAddress. Both operations work on blocking and non-blocking descriptors: on non-blocking
+received with SC::SocketDescriptor::receiveFrom, which reports the source of each datagram through a caller-provided
+SC::SocketAddress. IP compatibility overloads continue to use SC::SocketIPAddress. The same operations support
+Unix-domain datagrams on macOS and Linux. Both operations work on blocking and non-blocking descriptors: on non-blocking
 descriptors they return an unsuccessful SC::Result when the operation would block or no datagram is immediately
 available. A zero-length datagram is still a successful receive. When a datagram is larger than the receive buffer, the
 datagram is consumed and the operation returns an unsuccessful result consistently across platforms. The buffer may
@@ -125,9 +141,10 @@ For the complete option and method reference, see the [Socket module](@ref group
 
 🟨 MVP
 
-The tested surface covers synchronous IPv4/IPv6 TCP, connected and unconnected UDP with source-address reporting, read
-timeouts, DNS, broadcast and multicast options. The API remains deliberately narrow and still lacks richer timeout and
-partial-I/O status for callers that need to distinguish would-block, timeout and transport failures structurally.
+The tested surface covers synchronous IPv4/IPv6 TCP, connected and unconnected UDP with source-address reporting,
+Unix-domain pathname streams and datagrams on macOS/Linux, Linux abstract datagrams, read timeouts, DNS, broadcast and
+multicast options. The API remains deliberately narrow and still lacks richer timeout and partial-I/O status for callers
+that need to distinguish would-block, timeout and transport failures structurally.
 
 # Blog
 
@@ -141,6 +158,7 @@ Some relevant blog posts are:
 
 🟩 Usable:
 - ~~Add unconnected UDP send/receive operations with peer-address reporting~~ (done)
+- ~~Expose Unix-domain stream and datagram sockets through family-neutral addresses~~ (done; macOS/Linux)
 
 🟦 Complete Features:
 - Define richer timeout and partial-I/O status where callers need to distinguish outcomes

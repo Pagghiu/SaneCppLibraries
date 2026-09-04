@@ -6,13 +6,13 @@ Socket is the synchronous, dependency-free networking library. It must expose na
 
 ## Architectural Shape
 
-The public interface is centered on `SocketDescriptor`, `SocketIPAddress`, `SocketServer`, `SocketClient`, `SocketDNS`, `SocketNetworking`, and typed `SocketFlags`. The descriptor owns native socket lifetime. Server and client wrappers borrow descriptors and provide role-specific operations. Options are named descriptor/server operations rather than hidden policy.
+The public interface is centered on `SocketDescriptor`, family-neutral `SocketAddress`, IP-specific `SocketIPAddress`, `SocketServer`, `SocketClient`, `SocketDNS`, `SocketNetworking`, and typed `SocketFlags`. The descriptor owns native socket lifetime. Server and client wrappers borrow descriptors and provide role-specific operations. Options are named descriptor/server operations rather than hidden policy.
 
 System socket headers and platform constants belong in internal implementation files.
 
 ## Boundaries
 
-Socket owns synchronous socket creation, configuration, connect, bind, listen, accept, read, write, unconnected datagram send/receive with source-address reporting, DNS resolution, and process-level networking init/shutdown where a platform requires it. It does not own event loops, task scheduling, TLS, HTTP, WebSocket, streams, or application protocols.
+Socket owns synchronous IP and Unix-domain socket creation, configuration, connect, bind, listen, accept, read, write, unconnected datagram send/receive with source-address reporting, DNS resolution, and process-level networking init/shutdown where a platform requires it. It does not own event loops, task scheduling, TLS, HTTP, WebSocket, streams, application protocols, or Unix socket-path cleanup.
 
 Timeouts should remain representable without depending on Time. Concurrency should remain caller-owned.
 
@@ -38,7 +38,9 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 
 - Keep Socket synchronous and dependency-free.
 - Keep descriptor lifetime explicit through `SocketDescriptor`.
-- Keep TCP/UDP/address-family choices typed.
+- Keep protocol, socket-type, and address-family choices typed.
+- Use one family-neutral address seam for transport operations while preserving IP compatibility overloads.
+- Keep Unix pathname lifetime caller-owned and expose Linux abstract names explicitly.
 - Keep socket options visible as named operations.
 - Keep unconnected datagram I/O caller-buffered with portable failure semantics.
 - Keep platform networking init explicit.
@@ -60,6 +62,7 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 - [SOCKET-0001 - Keep Socket synchronous and dependency-free](socket-0001-keep-socket-synchronous-and-dependency-free.md)
 - [SOCKET-0002 - Expose Socket options as explicit descriptor operations](socket-0002-expose-socket-options-as-explicit-descriptor-operations.md)
 - [SOCKET-0003 - Expose unconnected datagrams as descriptor operations](socket-0003-expose-unconnected-datagrams-as-descriptor-operations.md)
+- [SOCKET-0004 - Use family-neutral addresses for Unix-domain sockets](socket-0004-use-family-neutral-addresses-for-unix-domain-sockets.md)
 - [SC-0003 - Keep libraries independently consumable](../Global/sc-0003-keep-libraries-independently-consumable.md)
 - [SC-0009 - Isolate platform-specific implementations behind internal code](../Global/sc-0009-isolate-platform-specific-implementations-behind-internal-code.md)
 
@@ -68,3 +71,4 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 - [SOCKET-0001 - Keep Socket synchronous and dependency-free](socket-0001-keep-socket-synchronous-and-dependency-free.md)
 - [SOCKET-0002 - Expose Socket options as explicit descriptor operations](socket-0002-expose-socket-options-as-explicit-descriptor-operations.md)
 - [SOCKET-0003 - Expose unconnected datagrams as descriptor operations](socket-0003-expose-unconnected-datagrams-as-descriptor-operations.md)
+- [SOCKET-0004 - Use family-neutral addresses for Unix-domain sockets](socket-0004-use-family-neutral-addresses-for-unix-domain-sockets.md)

@@ -231,6 +231,7 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
                                         SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
                                         SocketFlags::InheritableType inheritable)
 {
+    SC_TRY_MSG(addressFamily != SocketFlags::AddressFamilyUnix, "Unix-domain sockets are unsupported on this platform");
     SC_TRY(SocketNetworking::isNetworkingInited());
     SC_SOCKET_TRUST_RESULT(close());
 
@@ -249,8 +250,9 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
     return Result(isValid());
 }
 
-SC::Result SC::SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
+SC::Result SC::SocketDescriptor::sendTo(Span<const char> data, const SocketAddress& destination)
 {
+    SC_TRY_MSG(destination.isValid(), "invalid sendTo destination address");
     const int addressSize = static_cast<int>(destination.sizeOfHandle());
     const int sent        = ::sendto(handle, data.data(), static_cast<int>(data.sizeInBytes()), 0,
                                      &destination.handle.reinterpret_as<const struct sockaddr>(), addressSize);
@@ -263,22 +265,41 @@ SC::Result SC::SocketDescriptor::sendTo(Span<const char> data, const SocketIPAdd
     return Result(true);
 }
 
-SC::Result SC::SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData,
-                                             SocketIPAddress& sourceAddress)
+SC::Result SC::SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
 {
-    SocketIPAddress receivedSourceAddress;
-    int             addressSize  = sizeof(struct sockaddr_in6);
-    const int       received     = ::recvfrom(handle, buffer.data(), static_cast<int>(buffer.sizeInBytes()), 0,
-                                              &receivedSourceAddress.handle.reinterpret_as<struct sockaddr>(), &addressSize);
-    const int       receiveError = received == SOCKET_ERROR ? WSAGetLastError() : 0;
+    return sendTo(data, SocketAddress(destination));
+}
+
+SC::Result SC::SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress)
+{
+    SocketAddress receivedSourceAddress;
+    int           addressSize  = sizeof(receivedSourceAddress.handle);
+    const int     received     = ::recvfrom(handle, buffer.data(), static_cast<int>(buffer.sizeInBytes()), 0,
+                                            &receivedSourceAddress.handle.reinterpret_as<struct sockaddr>(), &addressSize);
+    const int     receiveError = received == SOCKET_ERROR ? WSAGetLastError() : 0;
     if (receiveError == WSAEWOULDBLOCK)
     {
         return Result(false);
     }
     SC_TRY_MSG(receiveError != WSAEMSGSIZE, "receiveFrom datagram truncated");
     SC_TRY_MSG(received >= 0, "receiveFrom error");
-    receivedData  = {buffer.data(), static_cast<size_t>(received)};
-    sourceAddress = receivedSourceAddress;
+    receivedSourceAddress.nativeSize = static_cast<uint32_t>(addressSize);
+    receivedData                     = {buffer.data(), static_cast<size_t>(received)};
+    sourceAddress                    = receivedSourceAddress;
+    return Result(true);
+}
+
+SC::Result SC::SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData,
+                                             SocketIPAddress& sourceAddress)
+{
+    Span<char>    stagedReceivedData;
+    SocketAddress stagedSourceAddress;
+    SC_TRY(receiveFrom(buffer, stagedReceivedData, stagedSourceAddress));
+
+    SocketIPAddress stagedIPAddress;
+    SC_TRY(stagedSourceAddress.getIPAddress(stagedIPAddress));
+    receivedData  = stagedReceivedData;
+    sourceAddress = stagedIPAddress;
     return Result(true);
 }
 
