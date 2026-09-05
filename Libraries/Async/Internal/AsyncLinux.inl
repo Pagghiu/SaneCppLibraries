@@ -446,8 +446,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        struct sockaddr* sockAddr = &async.ipAddress.handle.reinterpret_as<struct sockaddr>();
-        AsyncLinuxIOUring::prepConnect(submission, async.handle, sockAddr, async.ipAddress.sizeOfHandle());
+        struct sockaddr* sockAddr = &async.address.handle.reinterpret_as<struct sockaddr>();
+        AsyncLinuxIOUring::prepConnect(submission, async.handle, sockAddr, async.address.sizeOfHandle());
         AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
@@ -517,7 +517,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_cqe& completion       = events[result.eventIndex];
         result.completionData.numBytes = static_cast<size_t>(completion.res);
-        if (completion.res == 0)
+        if (result.getAsync().getType() == AsyncRequest::Type::SocketReceiveFrom)
+        {
+            AsyncSocketReceiveFrom& async = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
+            struct msghdr&          msg   = async.typeErasedMsgHdr.reinterpret_as<struct msghdr>();
+            async.address.nativeSize      = msg.msg_namelen;
+        }
+        if (completion.res == 0 and result.getAsync().getType() != AsyncRequest::Type::SocketReceiveFrom)
         {
             result.completionData.disconnected = true;
         }
@@ -845,7 +851,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
         // Setup message header
         msg.msg_name    = &async.address.handle.reinterpret_as<struct sockaddr>();
-        msg.msg_namelen = async.address.sizeOfHandle();
+        msg.msg_namelen = sizeof(async.address.handle);
 
         // Setup receive buffer
 

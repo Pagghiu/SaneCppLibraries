@@ -97,9 +97,11 @@ API already has its own asynchronous completion mechanism that needs to re-enter
 
 # Socket I/O
 
-The loop can create asynchronous TCP and UDP sockets and operate on `SocketDescriptor` values from the
-[Socket](@ref library_socket) library. TCP accept/connect and stream send/receive are separate request types; UDP uses
-send-to/receive-from requests that carry an address.
+The loop can create asynchronous IP and Unix-domain sockets and operate on `SocketDescriptor` values from the
+[Socket](@ref library_socket) library. Accept/connect and stream send/receive are separate request types; unconnected
+datagrams use send-to/receive-from requests that carry a family-neutral SC::SocketAddress. Existing SC::SocketIPAddress
+overloads remain available for IP callers. Unix pathname streams and datagrams work on macOS and Linux, with Linux
+abstract names supplied by Socket; Windows and Emscripten report Unix-domain creation as unsupported.
 
 A receive request owns no payload memory: the destination buffer in this compiled example remains in scope until the
 callback finishes. The callback may reactivate the request after consuming data to continue the receive loop.

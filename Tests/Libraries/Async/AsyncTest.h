@@ -68,9 +68,11 @@ struct SC::AsyncTest : public SC::TestCase
     void socketTCPSendReceive();
     void socketTCPSendMultiple();
     void socketTCPSendReceiveError();
+    void socketUnixConnectAccept();
 
     // UDP Sockets
     void socketUDPSendReceive();
+    void socketUnixDatagramSendReceive();
 
     // File System Operations
     void fileSystemOperations();

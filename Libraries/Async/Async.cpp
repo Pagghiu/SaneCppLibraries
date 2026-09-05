@@ -361,18 +361,24 @@ SC::Result SC::detail::AsyncSocketAcceptBase::validate(AsyncEventLoop&)
 }
 
 SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
-                                         SocketIPAddress address)
+                                         SocketIPAddress ipAddress)
+{
+    return start(eventLoop, descriptor, SocketAddress(ipAddress));
+}
+
+SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
+                                         SocketAddress socketAddress)
 {
     SC_TRY(checkState());
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
-    ipAddress = address;
+    address = socketAddress;
     return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketConnect::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketConnect - Invalid handle");
-    SC_TRY_MSG(ipAddress.isValid(), "AsyncSocketConnect - Invalid ipaddress");
+    SC_TRY_MSG(address.isValid(), "AsyncSocketConnect - Invalid address");
     return SC::Result(true);
 }
 
@@ -412,26 +418,47 @@ SC::Result SC::AsyncSocketSend::validate(AsyncEventLoop&)
 SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                         SocketIPAddress ipAddress, Span<const char> data)
 {
+    return start(eventLoop, descriptor, SocketAddress(ipAddress), data);
+}
+
+SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
+                                        SocketAddress socketAddress, Span<const char> data)
+{
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer       = data;
     singleBuffer = true;
-    address      = ipAddress;
+    address      = socketAddress;
     return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                         SocketIPAddress ipAddress, Span<Span<const char>> data)
 {
+    return start(eventLoop, descriptor, SocketAddress(ipAddress), data);
+}
+
+SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
+                                        SocketAddress socketAddress, Span<Span<const char>> data)
+{
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffers      = data;
     singleBuffer = false;
-    address      = ipAddress;
+    address      = socketAddress;
     return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketSendTo::validate(AsyncEventLoop& eventLoop)
 {
-    SC_TRY(AsyncSocketSend::validate(eventLoop))
+    if (singleBuffer and buffer.empty())
+    {
+        SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketSendTo - Invalid handle");
+        totalBytesWritten = 0;
+    }
+    else
+    {
+        SC_TRY(AsyncSocketSend::validate(eventLoop))
+    }
+    SC_TRY_MSG(address.isValid(), "AsyncSocketSendTo - Invalid destination address");
     return SC::Result(true);
 }
 
@@ -439,16 +466,28 @@ SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& eventLoop, const Socket
 {
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer = data;
+    if (getType() == Type::SocketReceiveFrom)
+    {
+        AsyncSocketReceiveFrom& receiveFrom = static_cast<AsyncSocketReceiveFrom&>(*this);
+        receiveFrom.address.nativeSize      = sizeof(receiveFrom.address.handle);
+    }
     return eventLoop.start(*this);
 }
 
 SC::SocketIPAddress SC::AsyncSocketReceive::Result::getSourceAddress() const
 {
+    SocketIPAddress ipAddress;
+    (void)getSourceSocketAddress().getIPAddress(ipAddress);
+    return ipAddress;
+}
+
+SC::SocketAddress SC::AsyncSocketReceive::Result::getSourceSocketAddress() const
+{
     if (getAsync().getType() == Type::SocketReceiveFrom)
     {
         return static_cast<const AsyncSocketReceiveFrom&>(getAsync()).address;
     }
-    return SocketIPAddress();
+    return SocketAddress();
 }
 
 SC::Result SC::AsyncSocketReceive::validate(AsyncEventLoop&)
@@ -972,16 +1011,19 @@ void SC::AsyncEventLoop::InternalOpaque::destruct(Object& obj)
 
 SC::Result SC::AsyncEventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
 {
-    auto res = outDescriptor.create(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
-                                    SocketFlags::NonBlocking, SocketFlags::NonInheritable);
-    SC_TRY(res);
-    return associateExternallyCreatedSocket(outDescriptor);
+    return createAsyncSocket(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp, outDescriptor);
 }
 
 SC::Result SC::AsyncEventLoop::createAsyncUDPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
 {
-    auto res = outDescriptor.create(family, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp,
-                                    SocketFlags::NonBlocking, SocketFlags::NonInheritable);
+    return createAsyncSocket(family, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp, outDescriptor);
+}
+
+SC::Result SC::AsyncEventLoop::createAsyncSocket(SocketFlags::AddressFamily family, SocketFlags::SocketType socketType,
+                                                 SocketFlags::ProtocolType protocol, SocketDescriptor& outDescriptor)
+{
+    auto res =
+        outDescriptor.create(family, socketType, protocol, SocketFlags::NonBlocking, SocketFlags::NonInheritable);
     SC_TRY(res);
     return associateExternallyCreatedSocket(outDescriptor);
 }

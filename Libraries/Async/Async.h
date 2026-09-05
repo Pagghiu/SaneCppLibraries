@@ -547,8 +547,8 @@ struct SC_ASYNC_EXPORT AsyncSocketAcceptData
     SocketDescriptor            clientSocket;
     uint8_t                     acceptBuffer[288] = {0};
 #elif SC_PLATFORM_LINUX
-    AlignedStorage<28> sockAddrHandle;
-    uint32_t           sockAddrLen;
+    AlignedStorage<128> sockAddrHandle;
+    uint32_t            sockAddrLen;
 #endif
 };
 
@@ -608,7 +608,7 @@ struct SC_ASYNC_EXPORT AsyncSocketAccept : public detail::AsyncSocketAcceptBase
 };
 
 /// @brief Starts a socket connect operation, connecting to a remote endpoint. @n
-/// Callback will be called when the given socket is connected to ipAddress. @n
+/// Callback will be called when the given socket is connected to the address. @n
 /// @ref library_socket library can be used to create a Socket but the socket should be created with
 /// SC::SocketFlags::NonBlocking and associated to the event loop with
 /// SC::AsyncEventLoop::associateExternallyCreatedSocket. @n
@@ -625,11 +625,12 @@ struct SC_ASYNC_EXPORT AsyncSocketConnect : public AsyncRequest
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketIPAddress address);
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketAddress address);
 
     Function<void(Result&)> callback; ///< Called after socket is finally connected to endpoint
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    SocketIPAddress          ipAddress;
+    SocketAddress            address;
 
   private:
     friend struct AsyncEventLoop;
@@ -699,12 +700,18 @@ struct SC_ASYNC_EXPORT AsyncSocketSendTo : public AsyncSocketSend
 {
     AsyncSocketSendTo() : AsyncSocketSend(Type::SocketSendTo) {}
 
-    SocketIPAddress address;
+    SocketAddress address;
 
     SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketIPAddress ipAddress,
                      Span<const char> data);
 
     SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketIPAddress ipAddress,
+                     Span<Span<const char>> data);
+
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketAddress socketAddress,
+                     Span<const char> data);
+
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketAddress socketAddress,
                      Span<Span<const char>> data);
 
   private:
@@ -752,7 +759,12 @@ struct SC_ASYNC_EXPORT AsyncSocketReceive : public AsyncRequest
             return returnCode;
         }
 
+        /// @brief Returns the source when it is an IPv4 or IPv6 address.
+        /// @note Use getSourceSocketAddress for family-neutral source reporting.
         SocketIPAddress getSourceAddress() const;
+
+        /// @brief Returns the family-neutral source address for receive-from operations.
+        SocketAddress getSourceSocketAddress() const;
     };
     using AsyncRequest::start;
 
@@ -790,11 +802,14 @@ struct SC_ASYNC_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
     using AsyncSocketReceive::start;
 
   private:
-    SocketIPAddress address;
+    SocketAddress address;
     friend struct AsyncSocketReceive;
     friend struct AsyncEventLoop;
 #if SC_PLATFORM_LINUX
     AlignedStorage<56> typeErasedMsgHdr;
+#elif SC_PLATFORM_WINDOWS
+    unsigned long receiveFlags = 0;
+    int           addressSize  = 0;
 #endif
 };
 
@@ -1608,6 +1623,10 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
 
     /// @brief Creates an async UCP (IPV4 / IPV6) socket registered with the eventLoop
     Result createAsyncUDPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
+
+    /// @brief Creates a non-blocking socket registered with the event loop.
+    Result createAsyncSocket(SocketFlags::AddressFamily family, SocketFlags::SocketType socketType,
+                             SocketFlags::ProtocolType protocol, SocketDescriptor& outDescriptor);
 
     /// @brief Associates a previously created TCP / UDP socket with the eventLoop
     Result associateExternallyCreatedSocket(SocketDescriptor& outDescriptor);

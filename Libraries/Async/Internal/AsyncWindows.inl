@@ -401,6 +401,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
         case SocketFlags::AddressFamilyIPV4: af = AF_INET; break;
         case SocketFlags::AddressFamilyIPV6: af = AF_INET6; break;
+        case SocketFlags::AddressFamilyUnix:
+            return Result::Error("Async Unix-domain accept is unsupported on this platform");
         }
         SOCKET clientSocket = ::WSASocketW(af, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, flags);
         SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed");
@@ -494,7 +496,11 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         OVERLAPPED& overlapped = asyncConnect.overlapped.get().overlapped;
         // To allow loading connect function we must first bind the socket
         int bindRes;
-        if (asyncConnect.ipAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
+        if (asyncConnect.address.getAddressFamily() == SocketFlags::AddressFamilyUnix)
+        {
+            return Result::Error("Async Unix-domain connect is unsupported on this platform");
+        }
+        if (asyncConnect.address.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
         {
             struct sockaddr_in addr;
             ZeroMemory(&addr, sizeof(addr));
@@ -519,9 +525,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         }
         SC_TRY(ensureConnectFunction(asyncConnect));
 
-        const struct sockaddr* sockAddr = &asyncConnect.ipAddress.handle.reinterpret_as<const struct sockaddr>();
+        const struct sockaddr* sockAddr = &asyncConnect.address.handle.reinterpret_as<const struct sockaddr>();
 
-        const int sockAddrLen = asyncConnect.ipAddress.sizeOfHandle();
+        const int sockAddrLen = asyncConnect.address.sizeOfHandle();
 
         DWORD dummyTransferred;
         BOOL  connectRes = reinterpret_cast<LPFN_CONNECTEX>(asyncConnect.pConnectEx)(
@@ -682,13 +688,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         buffer.buf = async.buffer.data();
         buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
         DWORD transferred;
-        DWORD flags = 0;
 
-        struct sockaddr* sockAddr    = &async.address.handle.reinterpret_as<struct sockaddr>();
-        int              sockAddrLen = async.address.sizeOfHandle();
-        ::memset(sockAddr, 0, sockAddrLen);
-        const int res =
-            ::WSARecvFrom(async.handle, &buffer, 1, &transferred, &flags, sockAddr, &sockAddrLen, &overlapped, nullptr);
+        struct sockaddr* sockAddr = &async.address.handle.reinterpret_as<struct sockaddr>();
+        async.addressSize         = sizeof(async.address.handle);
+        async.receiveFlags        = 0;
+        ::memset(sockAddr, 0, sizeof(async.address.handle));
+        const int res = ::WSARecvFrom(async.handle, &buffer, 1, &transferred, &async.receiveFlags, sockAddr,
+                                      &async.addressSize, &overlapped, nullptr);
         SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSARecvFrom failed");
         return Result(true);
     }
@@ -764,7 +770,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             result.getAsync().handle, result.getAsync().overlapped.get().overlapped, &result.completionData.numBytes);
         if (res)
         {
-            if (result.completionData.numBytes == 0)
+            if (result.getAsync().getType() == AsyncRequest::Type::SocketReceiveFrom)
+            {
+                AsyncSocketReceiveFrom& receiveFrom = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
+                receiveFrom.address.nativeSize      = static_cast<uint32_t>(receiveFrom.addressSize);
+            }
+            if (result.completionData.numBytes == 0 and
+                result.getAsync().getType() != AsyncRequest::Type::SocketReceiveFrom)
             {
                 result.completionData.disconnected = true;
             }

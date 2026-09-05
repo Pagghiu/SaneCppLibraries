@@ -16,6 +16,10 @@ Every request object is both the public handle and the in-flight storage. Reques
 
 `Async` owns event-loop submission, polling, dispatch, request state, cancellation, native backend selection, and completion delivery. It depends on descriptor-owning libraries such as File, FileSystem, Socket, and Threading where the operation requires their types.
 
+Socket requests preserve Socket's family-neutral address seam: the same connect, send-to, and receive-from request types
+carry IP or Unix-domain addresses. Platform support remains the support exposed by Socket rather than a second Async-only
+address policy.
+
 `Async` does not own byte-stream composition, coroutine scheduling, protocol buffering, descriptor creation policies outside its async helpers, or dynamic storage pools. Those concerns must remain in callers or higher-level modules.
 
 ## Similarities With Other Libraries
@@ -51,6 +55,7 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - Allow unsequenced loop timeouts to be synchronously removed from their userspace schedule without generalizing that
   guarantee to kernel-owned requests.
 - Keep file readiness and external completion as separate request concepts.
+- Keep socket request types family-neutral instead of duplicating IP and Unix-domain operations.
 
 ## Explicitly Excluded Targets
 
@@ -70,6 +75,7 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - [SC-0001 - Library code must not hide dynamic allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0008 - Prefer native OS APIs over third-party dependencies](../Global/sc-0008-prefer-native-os-apis-over-third-party-dependencies.md)
 - [SC-0009 - Isolate platform-specific implementations behind internal code](../Global/sc-0009-isolate-platform-specific-implementations-behind-internal-code.md)
+- [SOCKET-0004 - Use family-neutral addresses for Unix-domain sockets](../Socket/socket-0004-use-family-neutral-addresses-for-unix-domain-sockets.md)
 
 ## Decision Log
 

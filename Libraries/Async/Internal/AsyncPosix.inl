@@ -586,10 +586,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         SocketDescriptor client;
         SC_TRY(client.assign(async.handle));
         auto detach = MakeDeferred([&] { client.detach(); });
-        auto res    = SocketClient(client).connect(async.ipAddress);
+        auto res    = SocketClient(client).connect(async.address);
         if (res)
         {
-            return Result::Error("connect unexpected error");
+            async.flags |= Internal::Flag_ManualCompletion;
+            return Result(true);
         }
         if (errno != EAGAIN and errno != EINPROGRESS)
         {
@@ -603,6 +604,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static Result completeAsync(AsyncSocketConnect::Result& result)
     {
         AsyncSocketConnect& async = result.getAsync();
+
+        if ((async.flags & Internal::Flag_WatcherSet) == 0)
+        {
+            return Result(true);
+        }
 
         int       errorCode;
         socklen_t errorSize = sizeof(errorCode);
@@ -851,7 +857,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
         SC_ASYNC_ASSERT_RELEASE((async.flags & Internal::Flag_ManualCompletion) == 0);
-        if (not posixTryWrite(async, totalBytesToSend, writeApi))
+        const bool zeroLengthWriteFailed =
+            totalBytesToSend == 0 and writeApi.writeSingle(async.handle, async.buffer.data(), 0, 0) < 0;
+        if (zeroLengthWriteFailed or not posixTryWrite(async, totalBytesToSend, writeApi))
         {
             // Not all bytes have been written, so if descriptor supports watching
             // start monitoring it, otherwise just return error
@@ -870,9 +878,25 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     template <typename T, typename WriteApi>
     static Result posixWriteCompleteAsync(typename T::Result& result, WriteApi writeApi)
     {
-        T& async = result.getAsync();
+        T&         async             = result.getAsync();
+        const bool completedManually = (async.flags & Internal::Flag_ManualCompletion) != 0;
         async.flags &= ~Internal::Flag_ManualCompletion;
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
+        if (totalBytesToSend == 0)
+        {
+            if (not completedManually and writeApi.writeSingle(async.handle, async.buffer.data(), 0, 0) < 0)
+            {
+                if (errno == EWOULDBLOCK or errno == EAGAIN)
+                {
+                    result.shouldCallCallback = false;
+                    result.reactivateRequest(true);
+                    return Result(true);
+                }
+                return Result::Error("Zero-length socket send failed");
+            }
+            result.completionData.numBytes = 0;
+            return Result(true);
+        }
         if (not posixTryWrite(async, totalBytesToSend, writeApi))
         {
             const auto writeError = errno;
@@ -984,9 +1008,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             AsyncSocketReceiveFrom& async = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
 
             struct sockaddr* address    = &async.address.handle.reinterpret_as<struct sockaddr>();
-            socklen_t        addressLen = async.address.sizeOfHandle();
+            socklen_t        addressLen = sizeof(async.address.handle);
 
             res = ::recvfrom(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0, address, &addressLen);
+            if (res >= 0)
+            {
+                async.address.nativeSize = addressLen;
+            }
         }
         else
         {
@@ -997,7 +1025,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         SC_TRY_MSG(res >= 0, "error in recv");
         result.completionData.numBytes = static_cast<size_t>(res);
 
-        if (res == 0)
+        if (res == 0 and result.getAsync().getType() != AsyncRequest::Type::SocketReceiveFrom)
         {
             result.completionData.disconnected = true;
         }

@@ -1,8 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/StringBuilder.h"
 
 void SC::AsyncTest::createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client,
                                         SocketDescriptor& serverSideClient)
@@ -179,6 +181,68 @@ void SC::AsyncTest::socketTCPConnect()
     SC_TEST_EXPECT(receiveCalls == 1);
     SC_TEST_EXPECT(context.acceptedClient[0].close());
     SC_TEST_EXPECT(context.acceptedClient[1].close());
+}
+
+void SC::AsyncTest::socketUnixConnectAccept()
+{
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+    StringPath socketPath;
+    SC_TEST_EXPECT(StringBuilder::format(socketPath, "/tmp/sc-async-unix-{0}.sock", report.mapPort(5063)));
+    FileSystem fileSystem;
+    if (fileSystem.exists(socketPath.view()))
+    {
+        SC_TEST_EXPECT(fileSystem.removeFile(socketPath.view()));
+    }
+
+    SocketAddress endpoint;
+    SC_TEST_EXPECT(endpoint.fromUnixPath(socketPath.view()));
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    SocketDescriptor serverSocket;
+    SC_TEST_EXPECT(eventLoop.createAsyncSocket(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream,
+                                               SocketFlags::ProtocolDefault, serverSocket));
+    SC_TEST_EXPECT(SocketServer(serverSocket).bind(endpoint));
+    SC_TEST_EXPECT(SocketServer(serverSocket).listen(1));
+
+    struct Context
+    {
+        SocketDescriptor acceptedSocket;
+        int              acceptCount  = 0;
+        int              connectCount = 0;
+    } context;
+    AsyncSocketAccept accept;
+    Context*          contextPtr = &context;
+    accept.callback              = [this, contextPtr](AsyncSocketAccept::Result& result)
+    {
+        SC_TEST_EXPECT(result.moveTo(contextPtr->acceptedSocket));
+        contextPtr->acceptCount++;
+    };
+    SC_TEST_EXPECT(accept.start(eventLoop, serverSocket));
+
+    SocketDescriptor clientSocket;
+    SC_TEST_EXPECT(eventLoop.createAsyncSocket(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream,
+                                               SocketFlags::ProtocolDefault, clientSocket));
+    AsyncSocketConnect connect;
+    connect.callback = [this, contextPtr](AsyncSocketConnect::Result& result)
+    {
+        SC_TEST_EXPECT(result.isValid());
+        contextPtr->connectCount++;
+    };
+    SC_TEST_EXPECT(connect.start(eventLoop, clientSocket, endpoint));
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(context.connectCount == 1);
+    SC_TEST_EXPECT(context.acceptCount == 1);
+    SC_TEST_EXPECT(context.acceptedSocket.isValid());
+
+    SC_TEST_EXPECT(context.acceptedSocket.close());
+    SC_TEST_EXPECT(clientSocket.close());
+    SC_TEST_EXPECT(serverSocket.close());
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(fileSystem.removeFile(socketPath.view()));
+#endif
 }
 
 void SC::AsyncTest::socketTCPSendReceive()

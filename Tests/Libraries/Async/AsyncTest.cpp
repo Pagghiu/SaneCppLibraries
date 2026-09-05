@@ -172,6 +172,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketTCPConnect();
         }
+        if (test_section("socket Unix connect accept"))
+        {
+            socketUnixConnectAccept();
+        }
         if (test_section("socket TCP send/receive"))
         {
             socketTCPSendReceive();
@@ -187,6 +191,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         if (test_section("socket UDP send/receive"))
         {
             socketUDPSendReceive();
+        }
+        if (test_section("socket Unix datagram send/receive"))
+        {
+            socketUnixDatagramSendReceive();
         }
         if (test_section("file read/write"))
         {
