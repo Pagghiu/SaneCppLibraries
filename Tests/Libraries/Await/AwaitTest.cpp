@@ -7,6 +7,7 @@
 #include "Libraries/Process/Process.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
@@ -120,6 +121,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             socketConnect();
         }
+        if (test_section("socket Unix connect"))
+        {
+            socketUnixConnect();
+        }
         if (test_section("socket send receive"))
         {
             socketSendReceive();
@@ -127,6 +132,10 @@ struct SC::AwaitTest : public SC::TestCase
         if (test_section("socket send to receive from"))
         {
             socketSendToReceiveFrom();
+        }
+        if (test_section("socket Unix send to receive from"))
+        {
+            socketUnixSendToReceiveFrom();
         }
         if (test_section("socket send all"))
         {
@@ -316,6 +325,12 @@ struct SC::AwaitTest : public SC::TestCase
     }
 
     static AwaitTask connectOne(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address)
+    {
+        SC_CO_TRY(co_await await.connect(socket, address));
+        co_return Result(true);
+    }
+
+    static AwaitTask connectOne(AwaitEventLoop& await, const SocketDescriptor& socket, SocketAddress address)
     {
         SC_CO_TRY(co_await await.connect(socket, address));
         co_return Result(true);
@@ -651,6 +666,32 @@ struct SC::AwaitTest : public SC::TestCase
             }
         }
 
+        co_return Result(true);
+    }
+
+    static AwaitTask unixSendToReceiveFromOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                               const SocketDescriptor& receiver, SocketAddress receiverAddress,
+                                               StringSpan expectedSenderPath)
+    {
+        const char payload = 101;
+        SC_CO_TRY(co_await await.sendTo(sender, receiverAddress, {&payload, 1}));
+
+        char                         receiveBuffer[8] = {0};
+        AwaitSocketReceiveFromResult receiveResult;
+        SC_CO_TRY(co_await await.receiveFrom(receiver, receiveBuffer, receiveResult));
+        if (receiveResult.data.sizeInBytes() != 1 or receiveResult.data[0] != payload)
+        {
+            co_return Result::Error("Await Unix receiveFrom data mismatch");
+        }
+
+        Span<const char>             sourceName;
+        SocketAddress::UnixNamespace sourceNamespace = SocketAddress::UnixNamespace::Unnamed;
+        SC_CO_TRY(receiveResult.sourceSocketAddress.getUnixName(sourceName, sourceNamespace));
+        if (sourceNamespace != SocketAddress::UnixNamespace::Pathname or
+            StringView(sourceName, false, StringEncoding::Native) != expectedSenderPath)
+        {
+            co_return Result::Error("Await Unix receiveFrom source mismatch");
+        }
         co_return Result(true);
     }
 
@@ -2500,6 +2541,53 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
+    void socketUnixConnect()
+    {
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+        StringPath socketPath;
+        SC_TEST_EXPECT(StringBuilder::format(socketPath, "/tmp/sc-await-unix-{0}.sock", report.mapPort(5068)));
+        FileSystem fileSystem;
+        if (fileSystem.exists(socketPath.view()))
+        {
+            SC_TEST_EXPECT(fileSystem.removeFile(socketPath.view()));
+        }
+
+        SocketAddress endpoint;
+        SC_TEST_EXPECT(endpoint.fromUnixPath(socketPath.view()));
+
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+        SocketDescriptor serverSocket;
+        SC_TEST_EXPECT(async.createAsyncSocket(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream,
+                                               SocketFlags::ProtocolDefault, serverSocket));
+        SC_TEST_EXPECT(SocketServer(serverSocket).bind(endpoint));
+        SC_TEST_EXPECT(SocketServer(serverSocket).listen(1));
+
+        SocketDescriptor acceptedClient;
+        AwaitTask        acceptTask = acceptOne(await, serverSocket, acceptedClient);
+        SC_TEST_EXPECT(await.spawn(acceptTask));
+
+        SocketDescriptor client;
+        SC_TEST_EXPECT(async.createAsyncSocket(SocketFlags::AddressFamilyUnix, SocketFlags::SocketStream,
+                                               SocketFlags::ProtocolDefault, client));
+        AwaitTask connectTask = connectOne(await, client, endpoint);
+        SC_TEST_EXPECT(await.spawn(connectTask));
+
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(acceptTask.result());
+        SC_TEST_EXPECT(connectTask.result());
+        SC_TEST_EXPECT(acceptedClient.isValid());
+
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(acceptedClient.close());
+        SC_TEST_EXPECT(serverSocket.close());
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(fileSystem.removeFile(socketPath.view()));
+#endif
+    }
+
     void socketSendReceive()
     {
         AsyncEventLoop async;
@@ -2548,6 +2636,55 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(receiver.close());
         SC_TEST_EXPECT(sender.close());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void socketUnixSendToReceiveFrom()
+    {
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+        StringPath receiverPath;
+        StringPath senderPath;
+        SC_TEST_EXPECT(StringBuilder::format(receiverPath, "/tmp/sc-await-dgram-r-{0}.sock", report.mapPort(5066)));
+        SC_TEST_EXPECT(StringBuilder::format(senderPath, "/tmp/sc-await-dgram-s-{0}.sock", report.mapPort(5067)));
+
+        FileSystem fileSystem;
+        if (fileSystem.exists(receiverPath.view()))
+        {
+            SC_TEST_EXPECT(fileSystem.removeFile(receiverPath.view()));
+        }
+        if (fileSystem.exists(senderPath.view()))
+        {
+            SC_TEST_EXPECT(fileSystem.removeFile(senderPath.view()));
+        }
+
+        SocketAddress receiverAddress;
+        SocketAddress senderAddress;
+        SC_TEST_EXPECT(receiverAddress.fromUnixPath(receiverPath.view()));
+        SC_TEST_EXPECT(senderAddress.fromUnixPath(senderPath.view()));
+
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+        SocketDescriptor receiver;
+        SocketDescriptor sender;
+        SC_TEST_EXPECT(async.createAsyncSocket(SocketFlags::AddressFamilyUnix, SocketFlags::SocketDgram,
+                                               SocketFlags::ProtocolDefault, receiver));
+        SC_TEST_EXPECT(async.createAsyncSocket(SocketFlags::AddressFamilyUnix, SocketFlags::SocketDgram,
+                                               SocketFlags::ProtocolDefault, sender));
+        SC_TEST_EXPECT(SocketServer(receiver).bind(receiverAddress));
+        SC_TEST_EXPECT(SocketServer(sender).bind(senderAddress));
+
+        AwaitTask task = unixSendToReceiveFromOnce(await, sender, receiver, receiverAddress, senderPath.view());
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.result());
+
+        SC_TEST_EXPECT(receiver.close());
+        SC_TEST_EXPECT(sender.close());
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(fileSystem.removeFile(senderPath.view()));
+        SC_TEST_EXPECT(fileSystem.removeFile(receiverPath.view()));
+#endif
     }
 
     void socketSendAll()

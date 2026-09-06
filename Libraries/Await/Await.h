@@ -124,7 +124,8 @@ struct AwaitSocketReceiveLineResult
 struct AwaitSocketReceiveFromResult
 {
     Span<char>      data;
-    SocketIPAddress sourceAddress;
+    SocketIPAddress sourceAddress;       ///< IPv4/IPv6 compatibility result
+    SocketAddress   sourceSocketAddress; ///< Family-neutral source address
     bool            disconnected = false;
 };
 
@@ -497,6 +498,7 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitSleepAwaiter         sleep(TimeMs duration);
     AwaitSocketAcceptAwaiter  accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
     AwaitSocketConnectAwaiter connect(const SocketDescriptor& socket, SocketIPAddress address);
+    AwaitSocketConnectAwaiter connect(const SocketDescriptor& socket, SocketAddress address);
     AwaitSocketSendAwaiter    send(const SocketDescriptor& socket, Span<const char> data,
                                    AwaitSocketSendResult* outResult = nullptr);
     AwaitSocketSendAwaiter    send(const SocketDescriptor& socket, Span<Span<const char>> data,
@@ -505,6 +507,10 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                      AwaitSocketSendResult* outResult = nullptr);
     AwaitSocketSendToAwaiter  sendTo(const SocketDescriptor& socket, SocketIPAddress address,
                                      Span<Span<const char>> data, AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendToAwaiter  sendTo(const SocketDescriptor& socket, SocketAddress address, Span<const char> data,
+                                     AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendToAwaiter  sendTo(const SocketDescriptor& socket, SocketAddress address, Span<Span<const char>> data,
+                                     AwaitSocketSendResult* outResult = nullptr);
     AwaitSocketSendAllAwaiter sendAll(const SocketDescriptor& socket, Span<const char> data,
                                       AwaitSocketSendResult* outResult = nullptr);
     AwaitSocketSendAllBuffersAwaiter sendAll(const SocketDescriptor& socket, Span<Span<const char>> data,
@@ -656,10 +662,11 @@ struct SC_AWAIT_EXPORT AwaitSocketAcceptAwaiter
 struct SC_AWAIT_EXPORT AwaitSocketConnectAwaiter
 {
     AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address);
+    AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketAddress address);
 
     AwaitEventLoop&         await;
     const SocketDescriptor& socket;
-    SocketIPAddress         address;
+    SocketAddress           address;
     AsyncSocketConnect      request;
     Result                  operationResult = Result(true);
 
@@ -713,10 +720,14 @@ struct SC_AWAIT_EXPORT AwaitSocketSendToAwaiter
                              Span<const char> data, AwaitSocketSendResult* outResult);
     AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address,
                              Span<Span<const char>> data, AwaitSocketSendResult* outResult);
+    AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketAddress address,
+                             Span<const char> data, AwaitSocketSendResult* outResult);
+    AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketAddress address,
+                             Span<Span<const char>> data, AwaitSocketSendResult* outResult);
 
     AwaitEventLoop&         await;
     const SocketDescriptor& socket;
-    SocketIPAddress         address;
+    SocketAddress           address;
     Span<const char>        data;
     Span<Span<const char>>  buffers;
     AwaitSocketSendResult*  outResult = nullptr;

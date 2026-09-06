@@ -932,6 +932,11 @@ AwaitSocketAcceptAwaiter AwaitEventLoop::accept(const SocketDescriptor& serverSo
 
 AwaitSocketConnectAwaiter AwaitEventLoop::connect(const SocketDescriptor& socket, SocketIPAddress address)
 {
+    return AwaitSocketConnectAwaiter(*this, socket, SocketAddress(address));
+}
+
+AwaitSocketConnectAwaiter AwaitEventLoop::connect(const SocketDescriptor& socket, SocketAddress address)
+{
     return AwaitSocketConnectAwaiter(*this, socket, address);
 }
 
@@ -950,10 +955,22 @@ AwaitSocketSendAwaiter AwaitEventLoop::send(const SocketDescriptor& socket, Span
 AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketIPAddress address,
                                                 Span<const char> data, AwaitSocketSendResult* outResult)
 {
-    return AwaitSocketSendToAwaiter(*this, socket, address, data, outResult);
+    return AwaitSocketSendToAwaiter(*this, socket, SocketAddress(address), data, outResult);
 }
 
 AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketIPAddress address,
+                                                Span<Span<const char>> data, AwaitSocketSendResult* outResult)
+{
+    return AwaitSocketSendToAwaiter(*this, socket, SocketAddress(address), data, outResult);
+}
+
+AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketAddress address,
+                                                Span<const char> data, AwaitSocketSendResult* outResult)
+{
+    return AwaitSocketSendToAwaiter(*this, socket, address, data, outResult);
+}
+
+AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketAddress address,
                                                 Span<Span<const char>> data, AwaitSocketSendResult* outResult)
 {
     return AwaitSocketSendToAwaiter(*this, socket, address, data, outResult);
@@ -1231,6 +1248,11 @@ Result AwaitSocketAcceptAwaiter::cancel(AwaitEventLoop& eventLoop)
 
 AwaitSocketConnectAwaiter::AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
                                                      SocketIPAddress address)
+    : AwaitSocketConnectAwaiter(await, socket, SocketAddress(address))
+{}
+
+AwaitSocketConnectAwaiter::AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                     SocketAddress address)
     : await(await), socket(socket), address(address)
 {}
 
@@ -1322,11 +1344,23 @@ Result AwaitSocketSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
                                                    SocketIPAddress address, Span<const char> data,
                                                    AwaitSocketSendResult* outResult)
+    : AwaitSocketSendToAwaiter(await, socket, SocketAddress(address), data, outResult)
+{}
+
+AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                   SocketAddress address, Span<const char> data,
+                                                   AwaitSocketSendResult* outResult)
     : await(await), socket(socket), address(address), data(data), outResult(outResult)
 {}
 
 AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
                                                    SocketIPAddress address, Span<Span<const char>> data,
+                                                   AwaitSocketSendResult* outResult)
+    : AwaitSocketSendToAwaiter(await, socket, SocketAddress(address), data, outResult)
+{}
+
+AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                   SocketAddress address, Span<Span<const char>> data,
                                                    AwaitSocketSendResult* outResult)
     : await(await), socket(socket), address(address), buffers(data), outResult(outResult), singleBuffer(false)
 {}
@@ -1842,9 +1876,10 @@ bool AwaitSocketReceiveFromAwaiter::await_suspend(AwaitTask::Handle newContinuat
     outResult        = {};
     request.callback = [this](AsyncSocketReceiveFrom::Result& result)
     {
-        operationResult         = result.get(outResult.data);
-        outResult.sourceAddress = result.getSourceAddress();
-        outResult.disconnected  = result.completionData.disconnected;
+        operationResult               = result.get(outResult.data);
+        outResult.sourceSocketAddress = result.getSourceSocketAddress();
+        (void)outResult.sourceSocketAddress.getIPAddress(outResult.sourceAddress);
+        outResult.disconnected = result.completionData.disconnected;
         continuation.resume();
     };
 

@@ -16,6 +16,9 @@ Helpers on `AwaitEventLoop` should be thin awaiter factories for one `Async` ope
 
 `Await` owns coroutine frame allocation policy, coroutine task state, awaiter wrappers, cooperative cancellation hooks, task groups, task registries, and coroutine-friendly wrappers for selected `Async` operations.
 
+Socket awaiters preserve the family-neutral addresses and request shapes supplied by Socket and Async. Unix-domain
+support therefore does not introduce separate coroutine operations or lifetime policy.
+
 `Await` does not own the underlying event loop, descriptors, buffers, long-lived watcher streams, protocol parsers, hidden task schedulers, or heap-backed task registries. File and filesystem awaiters that need blocking work require caller-provided `ThreadPool` storage.
 
 ## Similarities With Other Libraries
@@ -63,6 +66,7 @@ Inferred negative target: avoid promise/future APIs where task start, allocation
 - [SC-0001 - Library code must not hide dynamic allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0006 - Use explicit result-based error propagation](../Global/sc-0006-use-explicit-result-based-error-propagation.md)
 - [SC-0011 - Make allocation-capable facilities explicit and optional](../Global/sc-0011-make-allocation-capable-facilities-explicit-and-optional.md)
+- [SOCKET-0004 - Use family-neutral addresses for Unix-domain sockets](../Socket/socket-0004-use-family-neutral-addresses-for-unix-domain-sockets.md)
 
 ## Decision Log
 

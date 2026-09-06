@@ -120,7 +120,7 @@ fixed buffer and trims a preceding `\r`, and `fileReadUntilFullOrEOF()` fills a 
 `fileWrite()` already writes its supplied single or scatter/gather buffers fully. For portable offset-write examples,
 prefer one contiguous buffer; scatter/gather writes combined with explicit offsets remain backend-sensitive.
 
-The current surface covers timers; TCP and UDP sockets; loop wake-ups; files and POSIX file readiness; selected
+The current surface covers timers; IP and Unix-domain stream and datagram sockets; loop wake-ups; files and POSIX file readiness; selected
 thread-pool filesystem operations; process exit and one-shot signals; thread-pool work; child tasks, groups, registries,
 and timeouts. `SerialDescriptor` can use the file awaiters because `Async` models serial I/O as file reads and writes.
 
