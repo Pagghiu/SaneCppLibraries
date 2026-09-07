@@ -93,8 +93,11 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
         }
         else
         {
-            this->getBuffersPool().unrefBuffer(bufferID);
-            bufferID = {};
+            if (bufferID.isValid())
+            {
+                this->getBuffersPool().unrefBuffer(bufferID);
+                bufferID = {};
+            }
             this->emitError(result.isValid());
         }
     }

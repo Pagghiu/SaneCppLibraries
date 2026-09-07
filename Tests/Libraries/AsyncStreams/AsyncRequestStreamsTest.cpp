@@ -34,6 +34,11 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
     AsyncEventLoop::Options options;
     AsyncRequestStreamsTest(SC::TestReport& report) : TestCase(report, "AsyncRequestStreamsTest")
     {
+        if (test_section("failed read without an assigned buffer"))
+        {
+            failedReadWithoutAssignedBuffer();
+        }
+
         int numTestsToRun = 1;
         if (AsyncEventLoop::tryProbingIOUring())
         {
@@ -148,6 +153,7 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
                                         bool blocking);
 
     void fileToFile();
+    void failedReadWithoutAssignedBuffer();
 
     template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename ZLIB_STREAM_TYPE, typename DESCRIPTOR_TYPE>
     void fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide, DESCRIPTOR_TYPE& readSide,
@@ -163,6 +169,55 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
     void setThreadPoolFor(SyncZLibTransformStream&, AsyncEventLoop&, ThreadPool&, const char*) {}
 };
+
+void SC::AsyncRequestStreamsTest::failedReadWithoutAssignedBuffer()
+{
+    static char storage[16];
+
+    static AsyncBufferView buffers[] = {Span<char>(storage)};
+    buffers[0].setReusable(true);
+
+    static AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    struct TestReadableSocketStream : public ReadableSocketStream
+    {
+        Result initForTest(AsyncBuffersPool& buffersPool) { return AsyncReadableStream::init(buffersPool); }
+
+        void completeFailedRead(AsyncEventLoop& loop, SC::Result error)
+        {
+            AsyncSocketReceive::Result result(loop, request, error);
+            afterRead(result);
+        }
+    };
+    static TestReadableSocketStream readable;
+
+    static AsyncReadableStream::Request readRequests[2];
+    readable.setReadQueue(readRequests);
+    SC_TEST_EXPECT(readable.initForTest(pool));
+
+    static constexpr char ErrorMessage[] = "simulated read failure";
+    struct ErrorContext
+    {
+        const char* expectedMessage = ErrorMessage;
+        int         errors          = 0;
+        bool        messageMatches  = false;
+    };
+    static ErrorContext context;
+    SC_TEST_EXPECT(readable.eventError.addListener(
+        [](Result error)
+        {
+            context.errors++;
+            context.messageMatches = error.message == context.expectedMessage;
+        }));
+
+    static AsyncEventLoop eventLoop;
+    readable.completeFailedRead(eventLoop, Result::Error(ErrorMessage));
+
+    SC_TEST_EXPECT(context.errors == 1);
+    SC_TEST_EXPECT(context.messageMatches);
+    SC_TEST_EXPECT(pool.getBuffer(AsyncBufferView::ID(0)) != nullptr);
+}
 
 void SC::AsyncRequestStreamsTest::createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& writeSide,
                                                               SocketDescriptor& readSide)
