@@ -24,15 +24,21 @@ namespace SC
 {
 struct AsyncWebServerExample
 {
-    String  directory;
-    String  interface     = "127.0.0.1";
-    int32_t port          = 8090;
-    int32_t maxClients    = 400; // Max number of concurrent connections
-    int32_t numThreads    = 4;   // Number of threads for async file stream operations
-    int32_t maxUploadMiB  = 0;   // Zero means unlimited
-    bool    useSendFile   = true;
-    bool    useEpoll      = false;
-    bool    enableUploads = true;
+    String directory;
+    String interface = "127.0.0.1";
+
+    int32_t port = 8090;
+
+    int32_t maxClients = 400; // Max number of concurrent connections
+
+    int32_t maxWebSocketClients = 0; // Zero uses maxClients
+
+    int32_t numThreads   = 4; // Number of threads for async file stream operations
+    int32_t maxUploadMiB = 0; // Zero means unlimited
+
+    bool useSendFile   = true;
+    bool useEpoll      = false;
+    bool enableUploads = true;
 
     HttpConnectionsPool::Configuration asyncConfiguration;
 
@@ -161,6 +167,8 @@ struct AsyncWebServerExample
             globalConsole->print("Max upload size: {} MiB\n", maxUploadMiB);
         }
         globalConsole->print("Max clients: {}\n", maxClients);
+        globalConsole->print("Max WebSocket clients: {}\n",
+                             maxWebSocketClients == 0 ? maxClients : maxWebSocketClients);
 #if SC_PLATFORM_LINUX
         globalConsole->print("Using {}\n", useEpoll ? "epoll" : "io_uring");
 #endif
@@ -169,7 +177,18 @@ struct AsyncWebServerExample
             HttpRequestTargetView target;
             if (target.parse(connection.request.getRequestTarget()) and target.path == "/ws")
             {
-                SC_ASSERT_RELEASE(handleWebSocketRequest(connection));
+                const Result result = handleWebSocketRequest(connection);
+                if (not result)
+                {
+                    globalConsole->printError("AsyncWebServer WebSocket upgrade failed: {}\n", result.message);
+                    connection.response.reset();
+                    const Result responseResult = connection.sendTextCopy(500, "WebSocket upgrade failed\n");
+                    if (not responseResult)
+                    {
+                        globalConsole->printError("AsyncWebServer WebSocket error response failed: {}\n",
+                                                  responseResult.message);
+                    }
+                }
                 return;
             }
             HttpAsyncFileServer::Stream& stream = fileStreams.toSpan()[connection.getConnectionID().getIndex()];
@@ -198,16 +217,41 @@ struct AsyncWebServerExample
             return HttpWebSocketHandshake::rejectServerConnection(connection.response, validation);
         }
 
-        SC_TRY(HttpWebSocketHandshake::acceptServerConnection(connection, transport, acceptStorage));
-        SC_TRY(webSocketHub.join(transport, runtime.hubIndex));
-        return runtime.pump.attach(transport, HttpWebSocketEndpointRole::Server);
+        transport.readableStream = &connection.getReadableTransportStream();
+        transport.writableStream = &connection.getWritableTransportStream();
+        transport.buffersPool    = &connection.buffersPool;
+
+        Result result = webSocketHub.join(transport, runtime.hubIndex);
+        if (not result)
+        {
+            return result;
+        }
+
+        result = runtime.pump.attach(transport, HttpWebSocketEndpointRole::Server);
+        if (not result)
+        {
+            (void)webSocketHub.leave(runtime.hubIndex);
+            runtime.hubIndex = size_t(-1);
+            return result;
+        }
+
+        result = HttpWebSocketHandshake::acceptServerConnection(connection, transport, acceptStorage);
+        if (not result)
+        {
+            runtime.pump.detach();
+            (void)webSocketHub.leave(runtime.hubIndex);
+            runtime.hubIndex = size_t(-1);
+        }
+        return result;
     }
 
     Result assignConnectionMemory(size_t numClients)
     {
         SC_TRY(clients.resize(numClients));
         SC_TRY(fileStreams.resize(numClients));
-        SC_TRY(webSocketHubClients.resize(numClients));
+        const size_t numWebSocketClients =
+            maxWebSocketClients == 0 ? numClients : min(numClients, static_cast<size_t>(maxWebSocketClients));
+        SC_TRY(webSocketHubClients.resize(numWebSocketClients));
         SC_TRY(webSocketRuntimes.resize(numClients));
         SC_TRY(allReadQueues.resize(numClients * asyncConfiguration.readQueueSize));
         SC_TRY(allWriteQueues.resize(numClients * asyncConfiguration.writeQueueSize));
@@ -247,7 +291,7 @@ Result saneMain(Span<const StringSpan> args)
     uint16_t   port = static_cast<uint16_t>(sample.port);
 
     globalConsole = &console;
-    CommandLineOption cmdOptions[9];
+    CommandLineOption cmdOptions[10];
     cmdOptions[0].longName  = "directory";
     cmdOptions[0].help      = "Directory to serve (defaults to current working directory)";
     cmdOptions[0].valueName = "PATH";
@@ -270,33 +314,38 @@ Result saneMain(Span<const StringSpan> args)
     cmdOptions[3].shortName = 'c';
     cmdOptions[3].value     = CommandLineValue::int32(sample.maxClients);
 
-    cmdOptions[4].longName  = "threads";
-    cmdOptions[4].help      = "Number of worker threads for file operations";
+    cmdOptions[4].longName  = "websocket-clients";
+    cmdOptions[4].help      = "Maximum WebSocket clients (0 uses the connection limit)";
     cmdOptions[4].valueName = "NUM";
-    cmdOptions[4].shortName = 't';
-    cmdOptions[4].value     = CommandLineValue::int32(sample.numThreads);
+    cmdOptions[4].value     = CommandLineValue::int32(sample.maxWebSocketClients);
 
-    cmdOptions[5].longName  = "port";
-    cmdOptions[5].help      = "Port to listen on";
-    cmdOptions[5].valueName = "PORT";
-    cmdOptions[5].shortName = 'p';
-    cmdOptions[5].value     = CommandLineValue::uint16(port);
+    cmdOptions[5].longName  = "threads";
+    cmdOptions[5].help      = "Number of worker threads for file operations";
+    cmdOptions[5].valueName = "NUM";
+    cmdOptions[5].shortName = 't';
+    cmdOptions[5].value     = CommandLineValue::int32(sample.numThreads);
 
-    cmdOptions[6].longName  = "interface";
-    cmdOptions[6].help      = "Interface to listen on (for LAN use 0.0.0.0)";
-    cmdOptions[6].valueName = "ADDRESS";
-    cmdOptions[6].shortName = 'i';
-    cmdOptions[6].value     = CommandLineValue::stringView(interface);
+    cmdOptions[6].longName  = "port";
+    cmdOptions[6].help      = "Port to listen on";
+    cmdOptions[6].valueName = "PORT";
+    cmdOptions[6].shortName = 'p';
+    cmdOptions[6].value     = CommandLineValue::uint16(port);
 
-    cmdOptions[7].longName         = "uploads";
-    cmdOptions[7].negativeLongName = "no-uploads";
-    cmdOptions[7].help             = "Enable or disable PUT and multipart uploads";
-    cmdOptions[7].value            = CommandLineValue::boolean(sample.enableUploads);
+    cmdOptions[7].longName  = "interface";
+    cmdOptions[7].help      = "Interface to listen on (for LAN use 0.0.0.0)";
+    cmdOptions[7].valueName = "ADDRESS";
+    cmdOptions[7].shortName = 'i';
+    cmdOptions[7].value     = CommandLineValue::stringView(interface);
 
-    cmdOptions[8].longName  = "max-upload-mb";
-    cmdOptions[8].help      = "Maximum upload size in MiB (0 means unlimited)";
-    cmdOptions[8].valueName = "MIB";
-    cmdOptions[8].value     = CommandLineValue::int32(sample.maxUploadMiB);
+    cmdOptions[8].longName         = "uploads";
+    cmdOptions[8].negativeLongName = "no-uploads";
+    cmdOptions[8].help             = "Enable or disable PUT and multipart uploads";
+    cmdOptions[8].value            = CommandLineValue::boolean(sample.enableUploads);
+
+    cmdOptions[9].longName  = "max-upload-mb";
+    cmdOptions[9].help      = "Maximum upload size in MiB (0 means unlimited)";
+    cmdOptions[9].valueName = "MIB";
+    cmdOptions[9].value     = CommandLineValue::int32(sample.maxUploadMiB);
 
     CommandLineSpec spec;
     spec.programName = "AsyncWebServer";
@@ -327,6 +376,11 @@ Result saneMain(Span<const StringSpan> args)
     if (sample.maxUploadMiB < 0)
     {
         console.printError("Invalid max upload size: {}\n", sample.maxUploadMiB);
+        return Result(false);
+    }
+    if (sample.maxWebSocketClients < 0)
+    {
+        console.printError("Invalid maximum WebSocket clients: {}\n", sample.maxWebSocketClients);
         return Result(false);
     }
     sample.port = static_cast<int32_t>(port);
@@ -365,9 +419,10 @@ template <typename CharType>
 static int asyncWebServerMain(int argc, CharType** argv)
 {
     using namespace SC;
-    static constexpr size_t MAX_COMMAND_LINE_ARGUMENTS = 13; // 6 valued options + 3 boolean flags
-    StringSpan              argsStorage[MAX_COMMAND_LINE_ARGUMENTS];
-    CommandLineArguments    args;
+    static constexpr size_t MAX_COMMAND_LINE_ARGUMENTS = 15; // 7 valued options + 3 boolean flags
+
+    StringSpan           argsStorage[MAX_COMMAND_LINE_ARGUMENTS];
+    CommandLineArguments args;
     if (not args.setFromMainArguments(argc, argv, argsStorage))
     {
         return -1;
