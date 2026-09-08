@@ -13,8 +13,23 @@
 namespace SC
 {
 struct HttpWebSocketHandshakeTest;
-void runHttpWebSocketHandshakeTest(TestReport& report);
+void   runHttpWebSocketHandshakeTest(TestReport& report);
+void   httpWebSocketTestForceSha1ProvidersUnavailable(bool platformUnavailable, bool libCryptoUnavailable);
+Result httpWebSocketTestSha1(HttpWebSocketSha1Mode mode, Span<const uint8_t> data, Span<uint8_t> digest,
+                             size_t selfContainedChunkSize);
+Result httpWebSocketTestSelfContainedSha1RepeatedByte(uint8_t value, size_t count, Span<uint8_t> digest);
 } // namespace SC
+
+static bool sha1DigestEquals(const SC::uint8_t actual[20], const SC::uint8_t expected[20])
+{
+    return ::memcmp(actual, expected, 20) == 0;
+}
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    return not result and result.message != nullptr and
+           SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 
 struct SC::HttpWebSocketHandshakeTest : public SC::TestCase
 {
@@ -24,6 +39,24 @@ struct SC::HttpWebSocketHandshakeTest : public SC::TestCase
         {
             clientKeyAndAcceptGeneration();
         }
+        if (test_section("SHA1 provider policies"))
+        {
+            sha1ProviderPolicies();
+        }
+        if (test_section("self-contained SHA1 standard vectors"))
+        {
+            selfContainedSha1StandardVectors();
+        }
+        if (test_section("SHA1 providers agree across block boundaries"))
+        {
+            sha1ProvidersAgreeAcrossBlockBoundaries();
+        }
+#if SC_PLATFORM_LINUX
+        if (test_section("Linux SHA1 tries AF_ALG after libcrypto"))
+        {
+            linuxSha1Fallback();
+        }
+#endif
         if (test_section("server request validation"))
         {
             serverRequestValidation();
@@ -55,6 +88,12 @@ struct SC::HttpWebSocketHandshakeTest : public SC::TestCase
     }
 
     void clientKeyAndAcceptGeneration();
+    void sha1ProviderPolicies();
+    void selfContainedSha1StandardVectors();
+    void sha1ProvidersAgreeAcrossBlockBoundaries();
+#if SC_PLATFORM_LINUX
+    void linuxSha1Fallback();
+#endif
     void serverRequestValidation();
     void clientResponseValidation();
     void asyncServerAcceptIntegration();
@@ -63,6 +102,109 @@ struct SC::HttpWebSocketHandshakeTest : public SC::TestCase
     void asyncServerReleasesUpgradedConnectionOnClientClose();
     void asyncServerBroadcastReachesUpgradedClient();
 };
+
+void SC::HttpWebSocketHandshakeTest::sha1ProviderPolicies()
+{
+    char       platformStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
+    StringSpan platformAccept;
+    SC_TEST_EXPECT(HttpWebSocketHandshake::computeAccept("dGhlIHNhbXBsZSBub25jZQ==", platformStorage, platformAccept,
+                                                         HttpWebSocketSha1Mode::Platform));
+    SC_TEST_EXPECT(platformAccept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+
+    char       selfContainedStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
+    StringSpan selfContainedAccept;
+    SC_TEST_EXPECT(HttpWebSocketHandshake::computeAccept("dGhlIHNhbXBsZSBub25jZQ==", selfContainedStorage,
+                                                         selfContainedAccept, HttpWebSocketSha1Mode::SelfContained));
+    SC_TEST_EXPECT(selfContainedAccept == platformAccept);
+
+    httpWebSocketTestForceSha1ProvidersUnavailable(true, true);
+    const Result unavailable   = HttpWebSocketHandshake::computeAccept("dGhlIHNhbXBsZSBub25jZQ==", platformStorage,
+                                                                       platformAccept, HttpWebSocketSha1Mode::Platform);
+    const Result selfContained = HttpWebSocketHandshake::computeAccept(
+        "dGhlIHNhbXBsZSBub25jZQ==", selfContainedStorage, selfContainedAccept, HttpWebSocketSha1Mode::SelfContained);
+    httpWebSocketTestForceSha1ProvidersUnavailable(false, false);
+
+    SC_TEST_EXPECT(resultMessageEquals(unavailable, "HttpWebSocketHandshake platform SHA1 provider unavailable"));
+    SC_TEST_EXPECT(selfContained);
+    SC_TEST_EXPECT(selfContainedAccept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+
+    const Result invalidMode = HttpWebSocketHandshake::computeAccept(
+        "dGhlIHNhbXBsZSBub25jZQ==", selfContainedStorage, selfContainedAccept, static_cast<HttpWebSocketSha1Mode>(255));
+    SC_TEST_EXPECT(resultMessageEquals(invalidMode, "HttpWebSocketHandshake SHA1 mode invalid"));
+}
+
+void SC::HttpWebSocketHandshakeTest::selfContainedSha1StandardVectors()
+{
+    static constexpr uint8_t EmptyDigest[20]    = {0xDA, 0x39, 0xA3, 0xEE, 0x5E, 0x6B, 0x4B, 0x0D, 0x32, 0x55,
+                                                   0xBF, 0xEF, 0x95, 0x60, 0x18, 0x90, 0xAF, 0xD8, 0x07, 0x09};
+    static constexpr uint8_t AbcDigest[20]      = {0xA9, 0x99, 0x3E, 0x36, 0x47, 0x06, 0x81, 0x6A, 0xBA, 0x3E,
+                                                   0x25, 0x71, 0x78, 0x50, 0xC2, 0x6C, 0x9C, 0xD0, 0xD8, 0x9D};
+    static constexpr uint8_t LongDigest[20]     = {0x84, 0x98, 0x3E, 0x44, 0x1C, 0x3B, 0xD2, 0x6E, 0xBA, 0xAE,
+                                                   0x4A, 0xA1, 0xF9, 0x51, 0x29, 0xE5, 0xE5, 0x46, 0x70, 0xF1};
+    static constexpr uint8_t MillionADigest[20] = {0x34, 0xAA, 0x97, 0x3C, 0xD4, 0xC4, 0xDA, 0xA4, 0xF6, 0x1E,
+                                                   0xEB, 0x2B, 0xDB, 0xAD, 0x27, 0x31, 0x65, 0x34, 0x01, 0x6F};
+    static constexpr char    LongMessage[]      = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+
+    uint8_t digest[20] = {};
+    SC_TEST_EXPECT(httpWebSocketTestSha1(HttpWebSocketSha1Mode::SelfContained, {}, digest, 1));
+    SC_TEST_EXPECT(sha1DigestEquals(digest, EmptyDigest));
+
+    SC_TEST_EXPECT(httpWebSocketTestSha1(HttpWebSocketSha1Mode::SelfContained,
+                                         Span<const uint8_t>::reinterpret_bytes("abc", 3), digest, 1));
+    SC_TEST_EXPECT(sha1DigestEquals(digest, AbcDigest));
+
+    const auto   longMessage  = Span<const uint8_t>::reinterpret_bytes(LongMessage, sizeof(LongMessage) - 1);
+    const size_t chunkSizes[] = {1, 7, 55, 56, 64};
+    for (size_t chunkSize : chunkSizes)
+    {
+        SC_TEST_EXPECT(httpWebSocketTestSha1(HttpWebSocketSha1Mode::SelfContained, longMessage, digest, chunkSize));
+        SC_TEST_EXPECT(sha1DigestEquals(digest, LongDigest));
+    }
+
+    SC_TEST_EXPECT(httpWebSocketTestSelfContainedSha1RepeatedByte('a', 1000000, digest));
+    SC_TEST_EXPECT(sha1DigestEquals(digest, MillionADigest));
+}
+
+void SC::HttpWebSocketHandshakeTest::sha1ProvidersAgreeAcrossBlockBoundaries()
+{
+    uint8_t input[129];
+    for (size_t idx = 0; idx < sizeof(input); ++idx)
+    {
+        input[idx] = static_cast<uint8_t>(idx * 37 + 11);
+    }
+
+    for (size_t length = 0; length <= sizeof(input); ++length)
+    {
+        uint8_t platformDigest[20]      = {};
+        uint8_t selfContainedDigest[20] = {};
+        SC_TEST_EXPECT(httpWebSocketTestSha1(HttpWebSocketSha1Mode::Platform, {input, length}, platformDigest, 0));
+        SC_TEST_EXPECT(httpWebSocketTestSha1(HttpWebSocketSha1Mode::SelfContained, {input, length}, selfContainedDigest,
+                                             length % 17 + 1));
+        SC_TEST_EXPECT(sha1DigestEquals(platformDigest, selfContainedDigest));
+    }
+}
+
+#if SC_PLATFORM_LINUX
+void SC::HttpWebSocketHandshakeTest::linuxSha1Fallback()
+{
+    char       acceptStorage[HttpWebSocketHandshake::AcceptKeyLength] = {};
+    StringSpan accept;
+
+    httpWebSocketTestForceSha1ProvidersUnavailable(false, true);
+    const Result result = HttpWebSocketHandshake::computeAccept("dGhlIHNhbXBsZSBub25jZQ==", acceptStorage, accept,
+                                                                HttpWebSocketSha1Mode::Platform);
+    httpWebSocketTestForceSha1ProvidersUnavailable(false, false);
+
+    if (result)
+    {
+        SC_TEST_EXPECT(accept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+    }
+    else
+    {
+        SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketHandshake platform SHA1 provider unavailable"));
+    }
+}
+#endif
 
 void SC::HttpWebSocketHandshakeTest::clientKeyAndAcceptGeneration()
 {

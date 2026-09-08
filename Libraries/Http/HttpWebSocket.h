@@ -40,6 +40,15 @@ enum class HttpWebSocketEndpointRole : uint8_t
     Server,
 };
 
+/// @brief Selects the SHA-1 implementation used by the RFC 6455 opening handshake.
+enum class HttpWebSocketSha1Mode : uint8_t
+{
+    /// Use the platform provider, returning an error when no provider is available.
+    Platform,
+    /// Use the allocation-free SHA-1 implementation embedded in Http.
+    SelfContained,
+};
+
 /// @brief Parsed or to-be-written WebSocket frame header
 struct SC_HTTP_EXPORT HttpWebSocketFrameHeaderView
 {
@@ -115,7 +124,8 @@ struct SC_HTTP_EXPORT HttpWebSocketHandshake
 
     static Result createClientKey(Span<const uint8_t> nonce, Span<char> storage, StringSpan& key);
     static Result validateClientKey(StringSpan key);
-    static Result computeAccept(StringSpan clientKey, Span<char> storage, StringSpan& accept);
+    static Result computeAccept(StringSpan clientKey, Span<char> storage, StringSpan& accept,
+                                HttpWebSocketSha1Mode sha1Mode = HttpWebSocketSha1Mode::Platform);
 
     static bool headerContainsToken(StringSpan headerValue, StringSpan token);
 
@@ -124,14 +134,18 @@ struct SC_HTTP_EXPORT HttpWebSocketHandshake
                                                               HttpWebSocketServerHandshakeRequestView* view = nullptr);
 
     static Result validateClientResponse(const HttpWebSocketClientHandshakeResponseView& response,
-                                         StringSpan                                      expectedClientKey);
-    static Result validateClientResponse(const HttpAsyncClientResponse& response, StringSpan expectedClientKey);
+                                         StringSpan                                      expectedClientKey,
+                                         HttpWebSocketSha1Mode sha1Mode = HttpWebSocketSha1Mode::Platform);
+    static Result validateClientResponse(const HttpAsyncClientResponse& response, StringSpan expectedClientKey,
+                                         HttpWebSocketSha1Mode sha1Mode = HttpWebSocketSha1Mode::Platform);
 
     static Result prepareClientRequest(HttpAsyncClientRequest& request, StringSpan clientKey);
     static Result writeServerAccept(HttpResponse& response, StringSpan clientKey, Span<char> acceptStorage,
-                                    StringSpan& accept);
+                                    StringSpan&           accept,
+                                    HttpWebSocketSha1Mode sha1Mode = HttpWebSocketSha1Mode::Platform);
     static Result acceptServerConnection(HttpConnection& connection, HttpWebSocketTransportView& transport,
-                                         Span<char> acceptStorage);
+                                         Span<char>            acceptStorage,
+                                         HttpWebSocketSha1Mode sha1Mode = HttpWebSocketSha1Mode::Platform);
     static Result rejectServerConnection(HttpResponse& response, const HttpWebSocketHandshakeResult& result);
 };
 
@@ -142,7 +156,8 @@ struct SC_HTTP_EXPORT HttpWebSocketClientHandshake
     Function<void(Result)>                      onError;
 
     Result connect(HttpAsyncClient& client, AsyncEventLoop& loop, StringSpan url, StringSpan clientKey,
-                   HttpWebSocketTransportView& transport);
+                   HttpWebSocketTransportView& transport,
+                   HttpWebSocketSha1Mode       sha1Mode = HttpWebSocketSha1Mode::Platform);
 
   private:
     void onPrepareRequest(HttpAsyncClientRequest& request);
@@ -153,6 +168,8 @@ struct SC_HTTP_EXPORT HttpWebSocketClientHandshake
     HttpAsyncClient*            client    = nullptr;
     HttpWebSocketTransportView* transport = nullptr;
     StringSpan                  clientKey;
+
+    HttpWebSocketSha1Mode sha1Mode = HttpWebSocketSha1Mode::Platform;
 };
 
 /// @brief Incremental WebSocket frame reader operating on caller-owned mutable byte slices

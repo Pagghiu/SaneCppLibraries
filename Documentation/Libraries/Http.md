@@ -129,6 +129,33 @@ TLS belongs to `Https`; DNS and sockets belong to `Socket`; asynchronous byte ow
 `AsyncStreams`. Keeping those seams visible avoids pulling transport and policy concerns into the HTTP message layer,
 but it also means an application integrates more pieces itself.
 
+## Choosing the WebSocket SHA-1 provider
+
+RFC 6455 requires SHA-1 to derive `Sec-WebSocket-Accept`. This use proves that the server received the client's opening
+key; it does not make SHA-1 suitable for passwords, signatures, certificates, or other security decisions.
+
+Handshake helpers default to `HttpWebSocketSha1Mode::Platform`. A caller can explicitly select the allocation-free
+self-contained implementation instead:
+
+```cpp
+char acceptStorage[SC::HttpWebSocketHandshake::AcceptKeyLength];
+SC::StringSpan accept;
+SC_TRY(SC::HttpWebSocketHandshake::computeAccept(clientKey, acceptStorage, accept,
+                                                  SC::HttpWebSocketSha1Mode::SelfContained));
+```
+
+| Platform | `Platform` provider order | Behavior when unavailable |
+|---|---|---|
+| Windows | CNG from `bcrypt.dll` | Returns an error |
+| macOS | CommonCrypto | Returns an error |
+| Linux | Dynamically loaded OpenSSL EVP, then AF_ALG | Returns an error when both are unavailable |
+
+`Platform` adds no link-time dependency. Linux probes `libcrypto.so.3` and then `libcrypto.so.1.1`; if neither exposes
+the required public EVP functions, it tries AF_ALG. `SelfContained` never loads a provider and is useful for deployments
+that prefer one predictable binary over provider updates. Its implementation is tested against standard SHA-1 vectors,
+padding/block boundaries, chunked input, and the independent platform result. The known-answer cases come from
+[FIPS PUB 180-4](https://doi.org/10.6028/NIST.FIPS.180-4).
+
 # Operational notes
 
 `HttpAsyncServer::stop()` begins asynchronous shutdown; `close()` waits for outstanding work and releases references to

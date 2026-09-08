@@ -10,8 +10,9 @@
 #elif SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <wincrypt.h>
+#include <bcrypt.h>
 #elif SC_PLATFORM_LINUX
+#include <dlfcn.h>
 #if defined(__has_include)
 #if __has_include(<linux/if_alg.h>)
 #include <linux/if_alg.h>
@@ -215,144 +216,347 @@ static SC::Result scHttpWebSocketBase64Decode(SC::StringSpan value, SC::Span<uin
     return SC::Result(true);
 }
 
-struct HttpWebSocketSha1
+static bool scHttpWebSocketForcePlatformSha1Unavailable  = false;
+static bool scHttpWebSocketForceLibCryptoSha1Unavailable = false;
+
+static uint32_t scHttpWebSocketRotateLeft(uint32_t value, uint32_t bits)
 {
+    return (value << bits) | (value >> (32 - bits));
+}
+
+struct HttpWebSocketSelfContainedSha1
+{
+    uint32_t state[5]   = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
+    uint64_t totalBytes = 0;
+
+    uint8_t block[64] = {0};
+    size_t  blockSize = 0;
+
+    void transform(const uint8_t* input)
+    {
+        uint32_t words[80];
+        for (size_t idx = 0; idx < 16; ++idx)
+        {
+            const size_t offset = idx * 4;
+            words[idx]          = (static_cast<uint32_t>(input[offset]) << 24) |
+                         (static_cast<uint32_t>(input[offset + 1]) << 16) |
+                         (static_cast<uint32_t>(input[offset + 2]) << 8) | static_cast<uint32_t>(input[offset + 3]);
+        }
+        for (size_t idx = 16; idx < 80; ++idx)
+        {
+            words[idx] =
+                scHttpWebSocketRotateLeft(words[idx - 3] ^ words[idx - 8] ^ words[idx - 14] ^ words[idx - 16], 1);
+        }
+
+        uint32_t a = state[0];
+        uint32_t b = state[1];
+        uint32_t c = state[2];
+        uint32_t d = state[3];
+        uint32_t e = state[4];
+        for (size_t idx = 0; idx < 80; ++idx)
+        {
+            uint32_t function;
+            uint32_t constant;
+            if (idx < 20)
+            {
+                function = (b & c) | ((~b) & d);
+                constant = 0x5A827999;
+            }
+            else if (idx < 40)
+            {
+                function = b ^ c ^ d;
+                constant = 0x6ED9EBA1;
+            }
+            else if (idx < 60)
+            {
+                function = (b & c) | (b & d) | (c & d);
+                constant = 0x8F1BBCDC;
+            }
+            else
+            {
+                function = b ^ c ^ d;
+                constant = 0xCA62C1D6;
+            }
+            const uint32_t temporary = scHttpWebSocketRotateLeft(a, 5) + function + e + constant + words[idx];
+            e                        = d;
+            d                        = c;
+            c                        = scHttpWebSocketRotateLeft(b, 30);
+            b                        = a;
+            a                        = temporary;
+        }
+        state[0] += a;
+        state[1] += b;
+        state[2] += c;
+        state[3] += d;
+        state[4] += e;
+    }
+
+    void add(SC::Span<const uint8_t> data)
+    {
+        totalBytes += data.sizeInBytes();
+        size_t offset = 0;
+        while (offset < data.sizeInBytes())
+        {
+            const size_t available = sizeof(block) - blockSize;
+            const size_t remaining = data.sizeInBytes() - offset;
+            const size_t toCopy    = remaining < available ? remaining : available;
+            ::memcpy(block + blockSize, data.data() + offset, toCopy);
+            blockSize += toCopy;
+            offset += toCopy;
+            if (blockSize == sizeof(block))
+            {
+                transform(block);
+                blockSize = 0;
+            }
+        }
+    }
+
+    void finish(uint8_t digest[20])
+    {
+        const uint64_t bitLength    = totalBytes * 8;
+        uint8_t        padding[128] = {0x80};
+        const size_t   paddingSize  = blockSize < 56 ? 56 - blockSize : 64 + 56 - blockSize;
+        add({padding, paddingSize});
+
+        uint8_t encodedLength[8];
+        for (size_t idx = 0; idx < sizeof(encodedLength); ++idx)
+        {
+            encodedLength[sizeof(encodedLength) - idx - 1] = static_cast<uint8_t>(bitLength >> (idx * 8));
+        }
+        add(encodedLength);
+
+        for (size_t idx = 0; idx < 5; ++idx)
+        {
+            digest[idx * 4]     = static_cast<uint8_t>(state[idx] >> 24);
+            digest[idx * 4 + 1] = static_cast<uint8_t>(state[idx] >> 16);
+            digest[idx * 4 + 2] = static_cast<uint8_t>(state[idx] >> 8);
+            digest[idx * 4 + 3] = static_cast<uint8_t>(state[idx]);
+        }
+    }
+};
+
+static void scHttpWebSocketSelfContainedSha1(SC::Span<const uint8_t> data, uint8_t digest[20], size_t chunkSize)
+{
+    HttpWebSocketSelfContainedSha1 sha1;
+    if (chunkSize == 0)
+    {
+        chunkSize = data.sizeInBytes();
+    }
+    size_t offset = 0;
+    while (offset < data.sizeInBytes())
+    {
+        const size_t remaining = data.sizeInBytes() - offset;
+        const size_t current   = remaining < chunkSize ? remaining : chunkSize;
+        sha1.add({data.data() + offset, current});
+        offset += current;
+    }
+    sha1.finish(digest);
+}
+
 #if SC_PLATFORM_APPLE
 #if SC_COMPILER_CLANG
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
-    CC_SHA1_CTX context;
-
-    HttpWebSocketSha1() { CC_SHA1_Init(&context); }
-    ~HttpWebSocketSha1() {}
-
-    SC::Result add(SC::Span<const uint8_t> data)
+static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
+{
+    if (scHttpWebSocketForcePlatformSha1Unavailable)
     {
-        CC_SHA1_Update(&context, data.data(), static_cast<CC_LONG>(data.sizeInBytes()));
-        return SC::Result(true);
+        return false;
     }
-
-    SC::Result finish(uint8_t digest[20])
-    {
-        CC_SHA1_Final(digest, &context);
-        return SC::Result(true);
-    }
+    const CC_LONG dataSize = static_cast<CC_LONG>(data.sizeInBytes());
+    return static_cast<size_t>(dataSize) == data.sizeInBytes() and CC_SHA1(data.data(), dataSize, digest) != nullptr;
+}
 #if SC_COMPILER_CLANG
 #pragma clang diagnostic pop
 #endif
 #elif SC_PLATFORM_WINDOWS
-    HCRYPTPROV provider = 0;
-    HCRYPTHASH hash     = 0;
+using HttpWebSocketBCryptOpenAlgorithmProvider = NTSTATUS(WINAPI*)(BCRYPT_ALG_HANDLE*, LPCWSTR, LPCWSTR, ULONG);
+using HttpWebSocketBCryptHash = NTSTATUS(WINAPI*)(BCRYPT_ALG_HANDLE, PUCHAR, ULONG, PUCHAR, ULONG, PUCHAR, ULONG);
+using HttpWebSocketBCryptCloseAlgorithmProvider = NTSTATUS(WINAPI*)(BCRYPT_ALG_HANDLE, ULONG);
 
-    HttpWebSocketSha1()
+static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
+{
+    if (scHttpWebSocketForcePlatformSha1Unavailable)
     {
-        if (not CryptAcquireContext(&provider, NULL, MS_ENH_RSA_AES_PROV, PROV_RSA_AES, CRYPT_VERIFYCONTEXT))
-        {
-            return;
-        }
-        if (not CryptCreateHash(provider, CALG_SHA1, 0, 0, &hash))
-        {
-            CryptReleaseContext(provider, 0);
-            provider = 0;
-        }
+        return false;
+    }
+    const ULONG dataSize = static_cast<ULONG>(data.sizeInBytes());
+    if (static_cast<size_t>(dataSize) != data.sizeInBytes())
+    {
+        return false;
     }
 
-    ~HttpWebSocketSha1()
+    HMODULE library = LoadLibraryW(L"bcrypt.dll");
+    if (library == nullptr)
     {
-        if (hash != 0)
-        {
-            CryptDestroyHash(hash);
-        }
-        if (provider != 0)
-        {
-            CryptReleaseContext(provider, 0);
-        }
+        return false;
     }
+    const auto openAlgorithm = reinterpret_cast<HttpWebSocketBCryptOpenAlgorithmProvider>(
+        GetProcAddress(library, "BCryptOpenAlgorithmProvider"));
+    const auto hash           = reinterpret_cast<HttpWebSocketBCryptHash>(GetProcAddress(library, "BCryptHash"));
+    const auto closeAlgorithm = reinterpret_cast<HttpWebSocketBCryptCloseAlgorithmProvider>(
+        GetProcAddress(library, "BCryptCloseAlgorithmProvider"));
 
-    SC::Result add(SC::Span<const uint8_t> data)
+    bool success = false;
+    if (openAlgorithm != nullptr and hash != nullptr and closeAlgorithm != nullptr)
     {
-        SC_TRY_MSG(hash != 0, "HttpWebSocketHandshake SHA1 init failed");
-        SC_TRY_MSG(CryptHashData(hash, data.data(), static_cast<DWORD>(data.sizeInBytes()), 0),
-                   "HttpWebSocketHandshake SHA1 update failed");
-        return SC::Result(true);
+        BCRYPT_ALG_HANDLE algorithm = nullptr;
+        if (openAlgorithm(&algorithm, BCRYPT_SHA1_ALGORITHM, nullptr, 0) >= 0)
+        {
+            success = hash(algorithm, nullptr, 0, const_cast<PUCHAR>(data.data()), dataSize, digest, 20) >= 0;
+            (void)closeAlgorithm(algorithm, 0);
+        }
     }
-
-    SC::Result finish(uint8_t digest[20])
-    {
-        SC_TRY_MSG(hash != 0, "HttpWebSocketHandshake SHA1 init failed");
-        DWORD hashSize = 20;
-        SC_TRY_MSG(CryptGetHashParam(hash, HP_HASHVAL, digest, &hashSize, 0),
-                   "HttpWebSocketHandshake SHA1 final failed");
-        SC_TRY_MSG(hashSize == 20, "HttpWebSocketHandshake SHA1 digest size invalid");
-        return SC::Result(true);
-    }
+    FreeLibrary(library);
+    return success;
+}
 #elif SC_PLATFORM_LINUX
-    int mainSocket = -1;
-    int hashSocket = -1;
+using HttpWebSocketEVPSha1Function   = const void* (*)();
+using HttpWebSocketEVPDigestFunction = int (*)(const void*, size_t, unsigned char*, unsigned int*, const void*, void*);
 
-    HttpWebSocketSha1()
+template <typename Function>
+static Function scHttpWebSocketLoadFunction(void* library, const char* name)
+{
+    Function function = nullptr;
+    void*    symbol   = ::dlsym(library, name);
+    static_assert(sizeof(function) == sizeof(symbol), "Function pointer size must match data pointer size");
+    ::memcpy(&function, &symbol, sizeof(function));
+    return function;
+}
+
+static bool scHttpWebSocketLibCryptoSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
+{
+    if (scHttpWebSocketForceLibCryptoSha1Unavailable)
     {
-        SCHttpWebSocketSockAddrAlg sa = {};
-        sa.salg_family                = AF_ALG;
-        ::memcpy(sa.salg_type, "hash", sizeof("hash"));
-        ::memcpy(sa.salg_name, "sha1", sizeof("sha1"));
+        return false;
+    }
+    static constexpr const char* LibraryNames[] = {"libcrypto.so.3", "libcrypto.so.1.1"};
+    for (const char* libraryName : LibraryNames)
+    {
+        void* library = ::dlopen(libraryName, RTLD_LAZY | RTLD_LOCAL);
+        if (library == nullptr)
+        {
+            continue;
+        }
+        const auto evpSha1   = scHttpWebSocketLoadFunction<HttpWebSocketEVPSha1Function>(library, "EVP_sha1");
+        const auto evpDigest = scHttpWebSocketLoadFunction<HttpWebSocketEVPDigestFunction>(library, "EVP_Digest");
 
-        mainSocket = ::socket(AF_ALG, SOCK_SEQPACKET, 0);
-        if (mainSocket == -1)
+        bool success = false;
+        if (evpSha1 != nullptr and evpDigest != nullptr)
         {
-            return;
+            unsigned int digestSize = 0;
+            const void*  digestType = evpSha1();
+            success                 = digestType != nullptr and
+                      evpDigest(data.data(), data.sizeInBytes(), digest, &digestSize, digestType, nullptr) == 1 and
+                      digestSize == 20;
         }
-        if (::bind(mainSocket, reinterpret_cast<struct sockaddr*>(&sa), sizeof(sa)) == -1)
+        ::dlclose(library);
+        if (success)
         {
-            ::close(mainSocket);
-            mainSocket = -1;
-            return;
-        }
-        hashSocket = ::accept(mainSocket, NULL, 0);
-        if (hashSocket == -1)
-        {
-            ::close(mainSocket);
-            mainSocket = -1;
+            return true;
         }
     }
+    return false;
+}
 
-    ~HttpWebSocketSha1()
+static bool scHttpWebSocketAFAlgSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
+{
+    SCHttpWebSocketSockAddrAlg sa = {};
+    sa.salg_family                = AF_ALG;
+    ::memcpy(sa.salg_type, "hash", sizeof("hash"));
+    ::memcpy(sa.salg_name, "sha1", sizeof("sha1"));
+
+    int mainSocket = ::socket(AF_ALG, SOCK_SEQPACKET, 0);
+    if (mainSocket == -1)
     {
-        if (hashSocket != -1)
-        {
-            ::close(hashSocket);
-        }
-        if (mainSocket != -1)
-        {
-            ::close(mainSocket);
-        }
+        return false;
+    }
+    if (::bind(mainSocket, reinterpret_cast<struct sockaddr*>(&sa), sizeof(sa)) == -1)
+    {
+        ::close(mainSocket);
+        return false;
+    }
+    const int hashSocket = ::accept(mainSocket, nullptr, nullptr);
+    if (hashSocket == -1)
+    {
+        ::close(mainSocket);
+        return false;
     }
 
-    SC::Result add(SC::Span<const uint8_t> data)
-    {
-        SC_TRY_MSG(hashSocket != -1, "HttpWebSocketHandshake SHA1 init failed");
-        const ssize_t written = ::send(hashSocket, data.data(), data.sizeInBytes(), MSG_MORE);
-        SC_TRY_MSG(written == static_cast<ssize_t>(data.sizeInBytes()), "HttpWebSocketHandshake SHA1 update failed");
-        return SC::Result(true);
-    }
+    const ssize_t written = ::send(hashSocket, data.data(), data.sizeInBytes(), 0);
+    const ssize_t readBytes =
+        written == static_cast<ssize_t>(data.sizeInBytes()) ? ::recv(hashSocket, digest, 20, 0) : -1;
+    ::close(hashSocket);
+    ::close(mainSocket);
+    return readBytes == 20;
+}
 
-    SC::Result finish(uint8_t digest[20])
+static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
+{
+    if (scHttpWebSocketForcePlatformSha1Unavailable)
     {
-        SC_TRY_MSG(hashSocket != -1, "HttpWebSocketHandshake SHA1 init failed");
-        const ssize_t readBytes = ::recv(hashSocket, digest, 20, 0);
-        SC_TRY_MSG(readBytes == 20, "HttpWebSocketHandshake SHA1 final failed");
-        return SC::Result(true);
+        return false;
     }
+    return scHttpWebSocketLibCryptoSha1(data, digest) or scHttpWebSocketAFAlgSha1(data, digest);
+}
 #else
-    SC::Result add(SC::Span<const uint8_t>) { return SC::Result::Error("HttpWebSocketHandshake SHA1 unsupported"); }
-    SC::Result finish(uint8_t[20]) { return SC::Result::Error("HttpWebSocketHandshake SHA1 unsupported"); }
+static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t>, uint8_t[20]) { return false; }
 #endif
-};
+
+static SC::Result scHttpWebSocketSha1(SC::HttpWebSocketSha1Mode mode, SC::Span<const uint8_t> data, uint8_t digest[20],
+                                      size_t selfContainedChunkSize = 0)
+{
+    switch (mode)
+    {
+    case SC::HttpWebSocketSha1Mode::Platform:
+        SC_TRY_MSG(scHttpWebSocketPlatformSha1(data, digest),
+                   "HttpWebSocketHandshake platform SHA1 provider unavailable");
+        return SC::Result(true);
+    case SC::HttpWebSocketSha1Mode::SelfContained:
+        scHttpWebSocketSelfContainedSha1(data, digest, selfContainedChunkSize);
+        return SC::Result(true);
+    }
+    return SC::Result::Error("HttpWebSocketHandshake SHA1 mode invalid");
+}
+
+static void scHttpWebSocketSelfContainedSha1RepeatedByte(uint8_t value, size_t count, uint8_t digest[20])
+{
+    HttpWebSocketSelfContainedSha1 sha1;
+    uint8_t                        input[1000];
+    ::memset(input, value, sizeof(input));
+    while (count > 0)
+    {
+        const size_t current = count < sizeof(input) ? count : sizeof(input);
+        sha1.add({input, current});
+        count -= current;
+    }
+    sha1.finish(digest);
+}
 } // namespace
 
 namespace SC
 {
+void httpWebSocketTestForceSha1ProvidersUnavailable(bool platformUnavailable, bool libCryptoUnavailable)
+{
+    scHttpWebSocketForcePlatformSha1Unavailable  = platformUnavailable;
+    scHttpWebSocketForceLibCryptoSha1Unavailable = libCryptoUnavailable;
+}
+
+Result httpWebSocketTestSha1(HttpWebSocketSha1Mode mode, Span<const uint8_t> data, Span<uint8_t> digest,
+                             size_t selfContainedChunkSize)
+{
+    SC_TRY_MSG(digest.sizeInBytes() == 20, "HttpWebSocketHandshakeTest SHA1 digest size invalid");
+    return scHttpWebSocketSha1(mode, data, digest.data(), selfContainedChunkSize);
+}
+
+Result httpWebSocketTestSelfContainedSha1RepeatedByte(uint8_t value, size_t count, Span<uint8_t> digest)
+{
+    SC_TRY_MSG(digest.sizeInBytes() == 20, "HttpWebSocketHandshakeTest SHA1 digest size invalid");
+    scHttpWebSocketSelfContainedSha1RepeatedByte(value, count, digest.data());
+    return Result(true);
+}
+
 int HttpWebSocketHandshakeResult::httpStatusCode() const
 {
     switch (status)
@@ -393,17 +597,17 @@ Result HttpWebSocketHandshake::validateClientKey(StringSpan key)
     return Result(true);
 }
 
-Result HttpWebSocketHandshake::computeAccept(StringSpan clientKey, Span<char> storage, StringSpan& accept)
+Result HttpWebSocketHandshake::computeAccept(StringSpan clientKey, Span<char> storage, StringSpan& accept,
+                                             HttpWebSocketSha1Mode sha1Mode)
 {
     SC_TRY(validateClientKey(clientKey));
 
-    HttpWebSocketSha1 sha1;
-    SC_TRY(
-        sha1.add(Span<const uint8_t>::reinterpret_bytes(clientKey.bytesWithoutTerminator(), clientKey.sizeInBytes())));
-    SC_TRY(sha1.add({reinterpret_cast<const uint8_t*>(SC_HTTP_WEBSOCKET_GUID), sizeof(SC_HTTP_WEBSOCKET_GUID) - 1}));
+    uint8_t input[ClientKeyLength + sizeof(SC_HTTP_WEBSOCKET_GUID) - 1];
+    ::memcpy(input, clientKey.bytesWithoutTerminator(), clientKey.sizeInBytes());
+    ::memcpy(input + clientKey.sizeInBytes(), SC_HTTP_WEBSOCKET_GUID, sizeof(SC_HTTP_WEBSOCKET_GUID) - 1);
 
     uint8_t digest[20] = {0};
-    SC_TRY(sha1.finish(digest));
+    SC_TRY(scHttpWebSocketSha1(sha1Mode, input, digest));
     return scHttpWebSocketBase64Encode({digest, sizeof(digest)}, storage, accept);
 }
 
@@ -488,7 +692,7 @@ HttpWebSocketHandshakeResult HttpWebSocketHandshake::validateServerRequest(
 }
 
 Result HttpWebSocketHandshake::validateClientResponse(const HttpWebSocketClientHandshakeResponseView& response,
-                                                      StringSpan                                      expectedClientKey)
+                                                      StringSpan expectedClientKey, HttpWebSocketSha1Mode sha1Mode)
 {
     SC_TRY_MSG(response.statusCode == 101, "HttpWebSocketHandshake expected 101 Switching Protocols");
     SC_TRY_MSG(scHttpWebSocketEqualsIgnoreCase(scHttpWebSocketTrim(response.upgrade), "websocket"),
@@ -498,21 +702,21 @@ Result HttpWebSocketHandshake::validateClientResponse(const HttpWebSocketClientH
 
     char       acceptStorage[AcceptKeyLength] = {0};
     StringSpan expectedAccept;
-    SC_TRY(computeAccept(expectedClientKey, acceptStorage, expectedAccept));
+    SC_TRY(computeAccept(expectedClientKey, acceptStorage, expectedAccept, sha1Mode));
     SC_TRY_MSG(scHttpWebSocketEqualsIgnoreCase(scHttpWebSocketTrim(response.secWebSocketAccept), expectedAccept),
                "HttpWebSocketHandshake response Sec-WebSocket-Accept invalid");
     return Result(true);
 }
 
 Result HttpWebSocketHandshake::validateClientResponse(const HttpAsyncClientResponse& response,
-                                                      StringSpan                     expectedClientKey)
+                                                      StringSpan expectedClientKey, HttpWebSocketSha1Mode sha1Mode)
 {
     HttpWebSocketClientHandshakeResponseView view;
     view.statusCode = response.getParser().statusCode;
     (void)response.getHeader("Upgrade", view.upgrade);
     (void)response.getHeader("Connection", view.connection);
     (void)response.getHeader("Sec-WebSocket-Accept", view.secWebSocketAccept);
-    return validateClientResponse(view, expectedClientKey);
+    return validateClientResponse(view, expectedClientKey, sha1Mode);
 }
 
 Result HttpWebSocketHandshake::prepareClientRequest(HttpAsyncClientRequest& request, StringSpan clientKey)
@@ -526,9 +730,9 @@ Result HttpWebSocketHandshake::prepareClientRequest(HttpAsyncClientRequest& requ
 }
 
 Result HttpWebSocketHandshake::writeServerAccept(HttpResponse& response, StringSpan clientKey, Span<char> acceptStorage,
-                                                 StringSpan& accept)
+                                                 StringSpan& accept, HttpWebSocketSha1Mode sha1Mode)
 {
-    SC_TRY(computeAccept(clientKey, acceptStorage, accept));
+    SC_TRY(computeAccept(clientKey, acceptStorage, accept, sha1Mode));
     SC_TRY(response.startResponse(101));
     SC_TRY(response.addHeader("Upgrade", "websocket"));
     SC_TRY(response.addHeader("Connection", "Upgrade"));
@@ -537,26 +741,27 @@ Result HttpWebSocketHandshake::writeServerAccept(HttpResponse& response, StringS
 }
 
 Result HttpWebSocketHandshake::acceptServerConnection(HttpConnection& connection, HttpWebSocketTransportView& transport,
-                                                      Span<char> acceptStorage)
+                                                      Span<char> acceptStorage, HttpWebSocketSha1Mode sha1Mode)
 {
     HttpWebSocketServerHandshakeRequestView request;
     const HttpWebSocketHandshakeResult      validation = validateServerRequest(connection.request, &request);
     SC_TRY_MSG(validation.accepted(), "HttpWebSocketHandshake server request is not acceptable");
 
     StringSpan accept;
-    SC_TRY(computeAccept(request.secWebSocketKey, acceptStorage, accept));
+    SC_TRY(computeAccept(request.secWebSocketKey, acceptStorage, accept, sha1Mode));
     SC_TRY(connection.response.startResponse(101));
     SC_TRY(connection.response.addHeader("Upgrade", "websocket"));
     SC_TRY(connection.response.addHeader("Connection", "Upgrade"));
     SC_TRY(connection.response.addHeader("Sec-WebSocket-Accept", accept));
 
-    connection.markWebSocketUpgraded();
     transport.readableStream = &connection.getReadableTransportStream();
     transport.writableStream = &connection.getWritableTransportStream();
     transport.buffersPool    = &connection.buffersPool;
 
-    return connection.response.sendHeaders(
-        {[&connection](AsyncBufferView::ID) { connection.getReadableTransportStream().resumeReading(); }});
+    SC_TRY(connection.response.sendHeaders(
+        {[&connection](AsyncBufferView::ID) { connection.getReadableTransportStream().resumeReading(); }}));
+    connection.markWebSocketUpgraded();
+    return Result(true);
 }
 
 Result HttpWebSocketHandshake::rejectServerConnection(HttpResponse&                       response,
@@ -576,12 +781,14 @@ Result HttpWebSocketHandshake::rejectServerConnection(HttpResponse&             
 }
 
 Result HttpWebSocketClientHandshake::connect(HttpAsyncClient& newClient, AsyncEventLoop& loop, StringSpan url,
-                                             StringSpan newClientKey, HttpWebSocketTransportView& newTransport)
+                                             StringSpan newClientKey, HttpWebSocketTransportView& newTransport,
+                                             HttpWebSocketSha1Mode newSha1Mode)
 {
     SC_TRY(HttpWebSocketHandshake::validateClientKey(newClientKey));
     client    = &newClient;
     transport = &newTransport;
     clientKey = newClientKey;
+    sha1Mode  = newSha1Mode;
     transport->reset();
 
     client->onPrepareRequest.bind<HttpWebSocketClientHandshake, &HttpWebSocketClientHandshake::onPrepareRequest>(*this);
@@ -604,7 +811,7 @@ void HttpWebSocketClientHandshake::onResponse(HttpAsyncClientResponse& response)
     SC_HTTP_ASSERT_RELEASE(client != nullptr);
     SC_HTTP_ASSERT_RELEASE(transport != nullptr);
 
-    Result result = HttpWebSocketHandshake::validateClientResponse(response, clientKey);
+    Result result = HttpWebSocketHandshake::validateClientResponse(response, clientKey, sha1Mode);
     if (result)
     {
         result = client->detachWebSocketTransport(*transport);
