@@ -460,6 +460,8 @@ struct SC_ASYNC_STREAMS_EXPORT AsyncWritableStream
     /// @brief Function that MUST be called by re-implementations of asyncDestroyWritable once they're done
     void finishedDestroyingWritable();
 
+    [[nodiscard]] bool isEndingWritable() const { return state == State::Ending; }
+
     void stop() { state = State::Stopped; }
 
   private:

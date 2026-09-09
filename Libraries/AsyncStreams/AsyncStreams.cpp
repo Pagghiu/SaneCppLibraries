@@ -731,6 +731,7 @@ void AsyncWritableStream::resumeWriting()
         if (canEndWritable())
         {
             state = State::Ended;
+            eventFinish.emit();
             if (autoDestroy)
             {
                 destroy();

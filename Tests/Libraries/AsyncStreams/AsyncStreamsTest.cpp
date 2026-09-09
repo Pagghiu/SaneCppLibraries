@@ -403,6 +403,34 @@ void SC::AsyncStreamsTest::writableStream()
     SC_TEST_EXPECT(writable.numAsyncWrites == 7);
     writable.end();
     SC_TEST_EXPECT(writable.concatenated == "1234567");
+
+    struct DeferredEndWritable : public AsyncWritableStream
+    {
+        bool allowEnd = false;
+
+        virtual Result asyncWrite(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>) override
+        {
+            return Result::Error("DeferredEndWritable does not accept writes");
+        }
+
+        virtual bool canEndWritable() override { return allowEnd; }
+    } deferred;
+
+    AsyncWritableStream::Request deferredRequests[2];
+    deferred.setWriteQueue(deferredRequests);
+    deferred.setAutoDestroy(false);
+    SC_TEST_EXPECT(deferred.init(pool));
+
+    int finishEvents = 0;
+    SC_TEST_EXPECT(deferred.eventFinish.addListener([&finishEvents] { finishEvents++; }));
+    deferred.end();
+    SC_TEST_EXPECT(finishEvents == 0);
+    deferred.allowEnd = true;
+    deferred.resumeWriting();
+    SC_TEST_EXPECT(finishEvents == 1);
+    deferred.resumeWriting();
+    SC_TEST_EXPECT(finishEvents == 1);
+    deferred.destroy();
 }
 
 void SC::AsyncStreamsTest::createChildView()
