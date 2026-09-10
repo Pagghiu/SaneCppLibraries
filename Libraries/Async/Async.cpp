@@ -1723,8 +1723,16 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& eventLoop,
         // We may have some manualCompletions queued (for SocketClose for example) but no active handles
         SC_LOG_MESSAGE("Active Requests Before Poll = {}\n", getTotalNumberOfActiveHandle());
 
-        // If there are manual completions the loop can't block waiting for I/O, to dispatch them immediately
-        const bool canBlockForIO = numberOfManualCompletions == 0;
+        // Userspace completions must be dispatched before waiting for unrelated I/O or timers.
+        bool canBlockForIO = numberOfManualCompletions == 0;
+        for (AsyncRequest* async = cancellations.front; async != nullptr; async = async->next)
+        {
+            if ((async->flags & Flag_WaitingKernelCancel) == 0)
+            {
+                canBlockForIO = false;
+                break;
+            }
+        }
         SC_TRY(kernelEvents.syncWithKernel(eventLoop, canBlockForIO ? syncMode : SyncMode::NoWait));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }

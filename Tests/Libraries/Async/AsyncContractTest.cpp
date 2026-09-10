@@ -55,6 +55,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 latestCloseCallbackWinsWhileCancelling();
             }
+            if (test_section("cancellation callbacks precede future timers"))
+            {
+                cancellationCallbacksPrecedeFutureTimers();
+            }
             if (test_section("reactivation keeps request owned"))
             {
                 reactivationKeepsRequestOwned();
@@ -190,6 +194,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void stopSubmittedRequestSuppressesNormalCallback();
     void unschedulingTimeoutDoesNotDispatchCallbacks();
     void latestCloseCallbackWinsWhileCancelling();
+    void cancellationCallbacksPrecedeFutureTimers();
     void reactivationKeepsRequestOwned();
     void reactivatedRequestCanBeStoppedFromCallback();
     void lastReactivationDecisionWins();
@@ -470,6 +475,39 @@ void SC::AsyncContractTest::latestCloseCallbackWinsWhileCancelling()
     SC_TEST_EXPECT(secondCloseCallbacks == 1);
     SC_TEST_EXPECT(normalCallbacks == 0);
     SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::cancellationCallbacksPrecedeFutureTimers()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    AsyncLoopWakeUp  wakeUp;
+    AsyncLoopTimeout futureTimer;
+
+    int closeCallbacks = 0;
+    int timerCallbacks = 0;
+
+    Function<void(AsyncResult&)> afterStopped;
+    afterStopped = [&](AsyncResult&) { closeCallbacks++; };
+
+    wakeUp.callback = [](AsyncLoopWakeUp::Result&) {};
+
+    futureTimer.callback = [&](AsyncLoopTimeout::Result&) { timerCallbacks++; };
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(futureTimer.start(eventLoop, TimeMs{100}));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.stop(eventLoop, &afterStopped));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+
+    SC_TEST_EXPECT(closeCallbacks == 1);
+    SC_TEST_EXPECT(timerCallbacks == 0);
+    if (not futureTimer.isFree())
+    {
+        SC_TEST_EXPECT(futureTimer.unschedule(eventLoop));
+    }
     SC_TEST_EXPECT(eventLoop.close());
 }
 
