@@ -95,6 +95,10 @@ struct TestReport
     /// @param testName Name of test case to evaluate
     [[nodiscard]] bool isTestExplicitlySelected(StringSpan testName) const;
 
+    /// @brief Returns true when @p testName is enabled by the current test selection
+    /// @param testName Name of test case to evaluate
+    [[nodiscard]] bool isTestEnabled(StringSpan testName) const;
+
     template <typename Statistics>
     void runGlobalMemoryReport(Statistics stats, bool reportFailure = true)
     {
@@ -116,7 +120,6 @@ struct TestReport
     /// @brief Runs a report for the Global Memory Allocator and prints its results
     void internalRunGlobalMemoryReport(MemoryStatistics stats, bool reportFailure);
 
-    [[nodiscard]] bool isTestEnabled(StringSpan testName) const;
     [[nodiscard]] bool isSectionEnabled(StringSpan sectionName) const;
 
     void testCaseFinished(TestCase& testCase);
