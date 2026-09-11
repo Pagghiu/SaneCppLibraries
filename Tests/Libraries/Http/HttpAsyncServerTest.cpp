@@ -237,6 +237,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             httpAsyncServerTest();
         }
+        if (test_section("external listener injects accepted streams"))
+        {
+            externalListenerInjectsAcceptedStreams();
+        }
         if (test_section("custom response status"))
         {
             customResponseStatus();
@@ -287,6 +291,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         }
     }
     void httpAsyncServerTest();
+    void externalListenerInjectsAcceptedStreams();
     void customResponseStatus();
     void standardResponseStatuses();
     void emptyResponseHelper();
@@ -300,6 +305,115 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void chunkedResponseWriting();
     void chunkedClientRequestWriting();
 };
+
+void SC::HttpAsyncServerTest::externalListenerInjectsAcceptedStreams()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    using ServerConnection = HttpAsyncConnection<3, 3, 8 * 1024, 8 * 1024>;
+    ServerConnection connections[1];
+    HttpAsyncServer  server;
+    SC_TEST_EXPECT(server.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(server.startExternal(loop));
+    SC_TEST_EXPECT(server.isStarted());
+
+    const uint16_t   port = report.mapPort(6154);
+    SocketIPAddress  address;
+    SocketDescriptor listenerSocket;
+    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", port));
+    SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), listenerSocket));
+    {
+        SocketServer listener(listenerSocket);
+        SC_TEST_EXPECT(listener.bind(address));
+        SC_TEST_EXPECT(listener.listen(1));
+    }
+
+    ResponseCollector collector;
+    struct Context
+    {
+        HttpAsyncServerTest* test       = nullptr;
+        HttpAsyncServer*     server     = nullptr;
+        ServerConnection*    connection = nullptr;
+        AsyncEventLoop*      loop       = nullptr;
+        ResponseCollector*   collector  = nullptr;
+
+        bool accepted     = false;
+        bool slotRejected = false;
+
+        void onAccept(AsyncSocketAccept::Result& result)
+        {
+            test->recordExpectation("external accept socket", result.moveTo(connection->socket));
+            test->recordExpectation(
+                "external accept readable",
+                connection->readableSocketStream.init(connection->buffersPool, *loop, connection->socket));
+            test->recordExpectation(
+                "external accept writable",
+                connection->writableSocketStream.init(connection->buffersPool, *loop, connection->socket));
+            connection->readableSocketStream.setAutoDestroy(true);
+            connection->writableSocketStream.setAutoDestroy(false);
+            accepted = server->acceptExternalConnection(*connection, connection->readableSocketStream,
+                                                        connection->writableSocketStream);
+            slotRejected =
+                resultMessageEquals(server->acceptExternalConnection(*connection, connection->readableSocketStream,
+                                                                     connection->writableSocketStream),
+                                    "HttpAsyncServer::acceptExternalConnection slot unavailable");
+        }
+
+        void onResponse(HttpAsyncClientResponse& response)
+        {
+            Function<void(HttpAsyncClientResponse&)> onEnd;
+            onEnd.bind<Context, &Context::onBodyEnd>(*this);
+            collector->attach(response, move(onEnd));
+        }
+
+        void onBodyEnd(HttpAsyncClientResponse& completedResponse)
+        {
+            collector->detach();
+            test->recordExpectation("external response status", completedResponse.getParser().statusCode == 200);
+            test->recordExpectation("external response body", StringView(collector->view()) == "injected");
+            test->recordExpectation("external server stop", server->stop());
+        }
+    } context;
+    context.test       = this;
+    context.server     = &server;
+    context.connection = &connections[0];
+    context.loop       = &loop;
+    context.collector  = &collector;
+
+    AsyncSocketAccept accept;
+    accept.callback.bind<Context, &Context::onAccept>(context);
+    SC_TEST_EXPECT(accept.start(loop, listenerSocket));
+
+    server.onRequest = [this](HttpConnection& client)
+    {
+        SC_TEST_EXPECT(client.response.startResponse(200));
+        SC_TEST_EXPECT(client.response.addHeader("Content-Length", "8"));
+        SC_TEST_EXPECT(client.response.sendHeaders());
+        SC_TEST_EXPECT(client.response.getWritableStream().write("injected"));
+        SC_TEST_EXPECT(client.response.end());
+    };
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    TimeoutGuard     timeout;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/external", port));
+    client.onResponse.bind<Context, &Context::onResponse>(context);
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(context.accepted);
+    SC_TEST_EXPECT(context.slotRejected);
+    SC_TEST_EXPECT(server.close());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(listenerSocket.close());
+    SC_TEST_EXPECT(loop.close());
+}
 
 void SC::HttpAsyncServerTest::httpAsyncServerTest()
 {

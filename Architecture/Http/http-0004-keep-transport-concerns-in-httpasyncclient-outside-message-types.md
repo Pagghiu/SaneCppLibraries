@@ -9,7 +9,7 @@ The async client must parse URLs, open sockets, decide connection reuse, inject 
 
 ## Decision
 
-`HttpAsyncClient` owns async-client transport concerns. Message types such as `HttpAsyncClientRequest`, `HttpAsyncClientResponse`, `HttpIncomingMessage`, and `HttpOutgoingMessage` remain HTTP message surfaces. Transport setup hooks, TLS readiness checks, origin reuse, DNS/connect lifecycle, and WebSocket transport detach stay in `HttpAsyncClient` or adjacent transport-owner code.
+`HttpAsyncClient` owns async-client transport concerns. Message types such as `HttpAsyncClientRequest`, `HttpAsyncClientResponse`, `HttpIncomingMessage`, and `HttpOutgoingMessage` remain HTTP message surfaces. A generic transport preflight hook may validate the parsed URL before DNS or socket activity. Transport setup hooks, TLS readiness checks, origin reuse, DNS/connect lifecycle, and WebSocket transport detach stay in `HttpAsyncClient` or adjacent transport-owner code.
 
 ## Consequences
 

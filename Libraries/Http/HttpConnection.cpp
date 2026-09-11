@@ -1416,29 +1416,43 @@ bool HttpConnectionsPool::activateNew(HttpConnection::ID& connectionID)
     for (size_t idx = 0; idx < connections.sizeInElements(); ++idx)
     {
         HttpConnection& connection = connections[idx];
-        if (connection.state == HttpConnection::State::Inactive)
+        if (connection.state == HttpConnection::State::Inactive and activate(connection, connectionID))
         {
-            connection.state        = HttpConnection::State::Active;
-            connectionID.index      = idx;
-            connection.connectionID = connectionID;
-
-            if (idx > highestActiveConnection)
-            {
-                highestActiveConnection = idx;
-            }
-            connection.request.setHeaderMemory(connection.getHeaderMemory());
-            connection.response.setHeaderMemory(connection.getHeaderMemory());
-            numConnections++;
-            if (numConnections == connections.sizeInElements())
-            {
-                // avoid deadlock by force disabling keep-alive if this is the last connection
-                // TODO: Consider some criteria that will disable keep alive after a threshold of active connections
-                connection.response.forceDisableKeepAlive = true;
-            }
             return true;
         }
     }
     return false;
+}
+
+bool HttpConnectionsPool::activate(HttpConnection& connection, HttpConnection::ID& connectionID)
+{
+    size_t idx = 0;
+    while (idx < connections.sizeInElements() and &connections[idx] != &connection)
+    {
+        idx += 1;
+    }
+    if (idx == connections.sizeInElements() or connection.state != HttpConnection::State::Inactive)
+    {
+        return false;
+    }
+
+    connection.state        = HttpConnection::State::Active;
+    connectionID.index      = idx;
+    connection.connectionID = connectionID;
+
+    if (idx > highestActiveConnection)
+    {
+        highestActiveConnection = idx;
+    }
+    connection.request.setHeaderMemory(connection.getHeaderMemory());
+    connection.response.setHeaderMemory(connection.getHeaderMemory());
+    numConnections++;
+    if (numConnections == connections.sizeInElements())
+    {
+        // Avoid deadlock by force disabling keep-alive if this is the last connection.
+        connection.response.forceDisableKeepAlive = true;
+    }
+    return true;
 }
 
 bool HttpConnectionsPool::deactivate(HttpConnection::ID connectionID)

@@ -39,6 +39,7 @@ Do not model `Http` after heap-backed web frameworks, full-message AST parsers, 
 - Preserve incoming/outgoing message symmetry across server and async-client wrappers.
 - Keep transport concerns in `HttpAsyncClient` and related transport views, outside message types.
 - Keep file serving layered on `HttpAsyncServer` with explicit options, stream storage, and upload policy.
+- Keep the RFC 6455 SHA-1 choice explicit between platform providers and Http's self-contained implementation.
 - Reject unsupported protocol features explicitly through stable `Result` diagnostics where practical.
 
 ## Explicitly Excluded Targets
@@ -59,6 +60,8 @@ Do not model `Http` after heap-backed web frameworks, full-message AST parsers, 
 - [HTTP-0002 - Share incoming/outgoing message cores across server and async client](http-0002-share-incoming-outgoing-message-cores-across-server-and-async-client.md)
 - [HTTP-0003 - Keep HTTP parser and body framing incremental, not AST-based](http-0003-keep-http-parser-and-body-framing-incremental-not-ast-based.md)
 - [HTTP-0004 - Keep transport concerns in HttpAsyncClient, outside message types](http-0004-keep-transport-concerns-in-httpasyncclient-outside-message-types.md)
+- [HTTP-0005 - Allow externally owned async transports](http-0005-allow-external-async-transports.md)
+- [HTTP-0006 - Make WebSocket SHA-1 provider policy explicit](http-0006-make-websocket-sha1-provider-policy-explicit.md)
 - [SC-0001 - Library Code Must Not Hide Dynamic Allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0003 - Keep Libraries Independently Consumable](../Global/sc-0003-keep-libraries-independently-consumable.md)
 - [SC-0009 - Isolate Platform-Specific Implementations Behind Internal Code](../Global/sc-0009-isolate-platform-specific-implementations-behind-internal-code.md)
@@ -72,3 +75,5 @@ Do not model `Http` after heap-backed web frameworks, full-message AST parsers, 
 - [HTTP-0002 - Share incoming/outgoing message cores across server and async client](http-0002-share-incoming-outgoing-message-cores-across-server-and-async-client.md)
 - [HTTP-0003 - Keep HTTP parser and body framing incremental, not AST-based](http-0003-keep-http-parser-and-body-framing-incremental-not-ast-based.md)
 - [HTTP-0004 - Keep transport concerns in HttpAsyncClient, outside message types](http-0004-keep-transport-concerns-in-httpasyncclient-outside-message-types.md)
+- [HTTP-0005 - Allow externally owned async transports](http-0005-allow-external-async-transports.md)
+- [HTTP-0006 - Make WebSocket SHA-1 provider policy explicit](http-0006-make-websocket-sha1-provider-policy-explicit.md)

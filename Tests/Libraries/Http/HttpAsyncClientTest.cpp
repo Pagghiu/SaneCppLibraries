@@ -252,6 +252,18 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             transportSetupHookDefersRequest();
         }
+        if (test_section("transport preflight rejects before DNS"))
+        {
+            transportPreflightRejectsBeforeDNS();
+        }
+        if (test_section("external connector owns connection establishment"))
+        {
+            externalConnectorOwnsConnectionEstablishment();
+        }
+        if (test_section("external connector synchronous failure is reusable"))
+        {
+            externalConnectorSynchronousFailureIsReusable();
+        }
         if (test_section("HTTPS transport setup hook dispatch"))
         {
             httpsTransportSetupHookDispatch();
@@ -259,6 +271,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         if (test_section("HTTPS transport setup reports TLS backend errors"))
         {
             httpsTransportSetupReportsTlsBackendError();
+        }
+        if (test_section("HTTPS transport failure after setup"))
+        {
+            httpsTransportFailureAfterSetup();
         }
         if (test_section("HTTPS requires transport adapter"))
         {
@@ -318,8 +334,12 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void putWritableBody();
     void keepAliveAndReconnect();
     void transportSetupHookDefersRequest();
+    void transportPreflightRejectsBeforeDNS();
+    void externalConnectorOwnsConnectionEstablishment();
+    void externalConnectorSynchronousFailureIsReusable();
     void httpsTransportSetupHookDispatch();
     void httpsTransportSetupReportsTlsBackendError();
+    void httpsTransportFailureAfterSetup();
     void httpsRequiresTransportAdapter();
     void zeroLengthResponse();
     void chunkedResponse();
@@ -1253,7 +1273,36 @@ void SC::HttpAsyncClientTest::keepAliveAndReconnect()
 
     int server1Requests = 0;
     int server2Requests = 0;
-    server1.onRequest   = [this, &server1Requests](HttpConnection& connection)
+
+    struct TransportShutdown
+    {
+        AsyncEventLoop&        loop;
+        int&                   secondOriginRequests;
+        AsyncLoopTimeout       step;
+        Function<void(Result)> complete;
+
+        uint32_t calls                       = 0;
+        bool     completed                   = false;
+        bool     reconnectedBeforeCompletion = false;
+
+        Result start(Function<void(Result)> callback)
+        {
+            calls++;
+            complete = move(callback);
+            step.callback.bind<TransportShutdown, &TransportShutdown::onStep>(*this);
+            return step.start(loop, TimeMs{0});
+        }
+
+        void onStep(AsyncLoopTimeout::Result&)
+        {
+            reconnectedBeforeCompletion     = secondOriginRequests != 0;
+            completed                       = true;
+            Function<void(Result)> callback = move(complete);
+            callback(Result(true));
+        }
+    } transportShutdown{loop, server2Requests, {}, {}};
+
+    server1.onRequest = [this, &server1Requests](HttpConnection& connection)
     {
         server1Requests++;
         SC_TEST_EXPECT(connection.response.startResponse(200));
@@ -1336,6 +1385,8 @@ void SC::HttpAsyncClientTest::keepAliveAndReconnect()
              completions, server1Requests, server2Requests, loop,    deferredStep};
 
     SC_TEST_EXPECT(client.init(clientStorage));
+    client.setTransportShutdown({[&transportShutdown](Function<void(Result)> complete) -> Result
+                                 { return transportShutdown.start(move(complete)); }});
     SC_TEST_EXPECT(StringBuilder::format(url1, "http://127.0.0.1:{}/first", port1));
     SC_TEST_EXPECT(StringBuilder::format(url2, "http://127.0.0.1:{}/second", port2));
 
@@ -1373,6 +1424,9 @@ void SC::HttpAsyncClientTest::keepAliveAndReconnect()
     SC_TEST_EXPECT(loop.run());
     SC_TEST_EXPECT(server1.close());
     SC_TEST_EXPECT(server2.close());
+    SC_TEST_EXPECT(transportShutdown.calls == 1);
+    SC_TEST_EXPECT(transportShutdown.completed);
+    SC_TEST_EXPECT(not transportShutdown.reconnectedBeforeCompletion);
     SC_TEST_EXPECT(loop.close());
 }
 
@@ -1416,6 +1470,7 @@ void SC::HttpAsyncClientTest::transportSetupHookDefersRequest()
             test->recordExpectation("transport setup url", setup.url != nullptr and setup.url->protocol == "http");
             test->recordExpectation("transport setup native socket", setup.nativeSocket != SocketDescriptor::Invalid);
             test->recordExpectation("transport setup complete", setup.complete.isValid());
+            test->recordExpectation("transport setup fail", setup.fail.isValid());
 
             setupCalled       = true;
             completeTransport = setup.complete;
@@ -1473,6 +1528,210 @@ void SC::HttpAsyncClientTest::transportSetupHookDefersRequest()
     SC_TEST_EXPECT(loop.close());
 }
 
+void SC::HttpAsyncClientTest::transportPreflightRejectsBeforeDNS()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    bool preflightCalled = false;
+    bool setupCalled     = false;
+    client.setTransportPreflight({[&preflightCalled](const HttpURLParser& url) -> Result
+                                  {
+                                      preflightCalled = true;
+                                      SC_TRY_MSG(url.hostname == "not-resolvable.invalid",
+                                                 "unexpected transport preflight URL");
+                                      return Result::Error("transport policy rejected URL");
+                                  }});
+    client.setTransportSetup({[&setupCalled](HttpAsyncClientTransportSetup&) -> Result
+                              {
+                                  setupCalled = true;
+                                  return Result::Error("transport setup must not run");
+                              }});
+
+    const Result result = client.get(loop, "https://not-resolvable.invalid/");
+    SC_TEST_EXPECT(resultMessageEquals(result, "transport policy rejected URL"));
+    SC_TEST_EXPECT(preflightCalled);
+    SC_TEST_EXPECT(not setupCalled);
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::externalConnectorOwnsConnectionEstablishment()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26130);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+
+    struct Context
+    {
+        HttpAsyncClientTest* test      = nullptr;
+        ResponseCollector*   collector = nullptr;
+        HttpAsyncServer*     server    = nullptr;
+
+        HttpConnectionBase* connection = nullptr;
+        AsyncEventLoop*     loop       = nullptr;
+        AsyncSocketConnect  connect;
+
+        Function<void(Result)> complete;
+        Function<void(Result)> fail;
+
+        bool connectorCalled = false;
+        bool connected       = false;
+        bool setupCalled     = false;
+
+        Result onConnect(HttpAsyncClientExternalConnection& request)
+        {
+            test->recordExpectation("external connector connection", request.connection != nullptr);
+            test->recordExpectation("external connector loop", request.eventLoop != nullptr);
+            test->recordExpectation("external connector URL",
+                                    request.url != nullptr and request.url->hostname == "not-resolvable.invalid");
+            test->recordExpectation("external connector complete", request.complete.isValid());
+            test->recordExpectation("external connector fail", request.fail.isValid());
+
+            connectorCalled = true;
+            connection      = request.connection;
+            loop            = request.eventLoop;
+            complete        = move(request.complete);
+            fail            = move(request.fail);
+
+            SocketIPAddress address;
+            SC_TRY(address.fromAddressPort("127.0.0.1", request.url->port));
+            SC_TRY(loop->createAsyncTCPSocket(address.getAddressFamily(), connection->socket));
+            connect.callback.bind<Context, &Context::onConnected>(*this);
+            return connect.start(*loop, connection->socket, address);
+        }
+
+        void onConnected(AsyncSocketConnect::Result& result)
+        {
+            if (not result.isValid())
+            {
+                fail(result.isValid());
+                return;
+            }
+            Result initialized =
+                connection->readableSocketStream.init(connection->buffersPool, *loop, connection->socket);
+            if (initialized)
+            {
+                initialized = connection->writableSocketStream.init(connection->buffersPool, *loop, connection->socket);
+            }
+            if (not initialized)
+            {
+                fail(initialized);
+                return;
+            }
+            connection->resetTransportStreams();
+            connected = true;
+            complete(Result(true));
+        }
+    } context;
+
+    context.test      = this;
+    context.collector = &collector;
+    context.server    = &httpServer;
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "8"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("external"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    client.setExternalConnector(
+        {[&context](HttpAsyncClientExternalConnection& request) -> Result { return context.onConnect(request); }});
+    client.setTransportSetup({[&context](HttpAsyncClientTransportSetup&) -> Result
+                              {
+                                  context.setupCalled = true;
+                                  return Result::Error("post-connect setup must not run for external connector");
+                              }});
+
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://not-resolvable.invalid:{}/external", port));
+    client.onResponse = [this, &context](HttpAsyncClientResponse& response)
+    {
+        context.collector->attach(response,
+                                  [this, &context](HttpAsyncClientResponse& completedResponse)
+                                  {
+                                      context.collector->detach();
+                                      SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                      SC_TEST_EXPECT(StringView(context.collector->view()) == "external");
+                                      SC_TEST_EXPECT(context.connectorCalled);
+                                      SC_TEST_EXPECT(context.connected);
+                                      SC_TEST_EXPECT(not context.setupCalled);
+                                      SC_TEST_EXPECT(context.server->stop());
+                                  });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::externalConnectorSynchronousFailureIsReusable()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    uint32_t connectorCalls  = 0;
+    uint32_t errorCallbacks  = 0;
+    uint32_t transportCloses = 0;
+    bool     transportOwned  = false;
+    client.setExternalConnector({[&connectorCalls, &transportOwned](HttpAsyncClientExternalConnection&) -> Result
+                                 {
+                                     connectorCalls++;
+                                     transportOwned = true;
+                                     return Result::Error("external connector rejected request");
+                                 }});
+    client.setTransportClose({[&transportCloses, &transportOwned]
+                              {
+                                  if (transportOwned)
+                                  {
+                                      transportCloses++;
+                                      transportOwned = false;
+                                  }
+                              }});
+    client.onError = [&errorCallbacks](Result) { errorCallbacks++; };
+
+    const Result first = client.get(loop, "http://example.invalid/first");
+    SC_TEST_EXPECT(resultMessageEquals(first, "external connector rejected request"));
+    SC_TEST_EXPECT(not transportOwned);
+    SC_TEST_EXPECT(transportCloses == 1);
+
+    const Result second = client.get(loop, "http://example.invalid/second");
+    SC_TEST_EXPECT(resultMessageEquals(second, "external connector rejected request"));
+    SC_TEST_EXPECT(connectorCalls == 2);
+    SC_TEST_EXPECT(not transportOwned);
+    SC_TEST_EXPECT(transportCloses == 2);
+    SC_TEST_EXPECT(errorCallbacks == 0);
+
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
 void SC::HttpAsyncClientTest::httpsTransportSetupHookDispatch()
 {
     AsyncEventLoop loop;
@@ -1509,6 +1768,7 @@ void SC::HttpAsyncClientTest::httpsTransportSetupHookDispatch()
             test->recordExpectation("https transport setup native socket",
                                     setup.nativeSocket != SocketDescriptor::Invalid);
             test->recordExpectation("https transport setup complete", setup.complete.isValid());
+            test->recordExpectation("https transport setup fail", setup.fail.isValid());
 
             setupCalled = true;
             setup.complete(Result(true));
@@ -1590,6 +1850,7 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
             test->recordExpectation("https tls error setup native socket",
                                     setup.nativeSocket != SocketDescriptor::Invalid);
             test->recordExpectation("https tls error setup complete", setup.complete.isValid());
+            test->recordExpectation("https tls error setup fail", setup.fail.isValid());
 
             setupCalled = true;
             return Result::Error("HttpAsyncClient TLS backend unavailable");
@@ -1619,6 +1880,77 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
     SC_TEST_EXPECT(ctx.setupCalled);
     SC_TEST_EXPECT(ctx.errorCalled);
     SC_TEST_EXPECT(ctx.errorMessageMatched);
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::httpsTransportFailureAfterSetup()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26127);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    TimeoutGuard     timeout;
+
+    struct Context
+    {
+        HttpAsyncClientTest* test   = nullptr;
+        HttpAsyncServer*     server = nullptr;
+
+        AsyncLoopTimeout       failDelay;
+        Function<void(Result)> failTransport;
+
+        bool setupCalled = false;
+        bool errorCalled = false;
+
+        Result onSetup(HttpAsyncClientTransportSetup& setup)
+        {
+            test->recordExpectation("terminal transport failure callback", setup.fail.isValid());
+            setupCalled   = true;
+            failTransport = move(setup.fail);
+            setup.complete(Result(true));
+            failDelay.callback.bind<Context, &Context::onFailDelay>(*this);
+            return failDelay.start(*setup.eventLoop, TimeMs{1});
+        }
+
+        void onFailDelay(AsyncLoopTimeout::Result&)
+        {
+            failTransport(Result::Error("HttpAsyncClient terminal transport failure"));
+        }
+    } context;
+
+    context.test   = this;
+    context.server = &httpServer;
+
+    httpServer.onRequest = [](HttpConnection&) {};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    client.setTransportSetup(
+        {[&context](HttpAsyncClientTransportSetup& setup) -> Result { return context.onSetup(setup); }});
+
+    client.onResponse = [this](HttpAsyncClientResponse&) { SC_TEST_EXPECT(false); };
+    client.onError    = [this, &context](Result result)
+    {
+        context.errorCalled = true;
+        SC_TEST_EXPECT(resultMessageEquals(result, "HttpAsyncClient terminal transport failure"));
+        SC_TEST_EXPECT(context.server->stop());
+    };
+
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "https://127.0.0.1:{}/terminal-transport-failure", port));
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(context.setupCalled);
+    SC_TEST_EXPECT(context.errorCalled);
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(loop.close());

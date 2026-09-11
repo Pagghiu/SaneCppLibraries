@@ -104,6 +104,10 @@ supported. Redirect handling is application policy. Plain `http` uses the socket
 rejected unless a transport setup adapter is installed; the neighboring `Https` library supplies
 the TLS composition without putting TLS inside the HTTP message layer.
 
+A transport adapter can also install a preflight hook. It runs after URL parsing but before DNS resolution or socket
+activity, allowing transport-specific URL policy to fail without opening a connection. The later setup hook still owns
+stream replacement and asynchronous transport readiness after TCP connects.
+
 Optional gzip/deflate response decoding is also a composition: the client inserts AsyncStreams transform streams when
 enabled, while the caller still consumes the decoded readable stream and provides the fixed storage used by the
 connection.

@@ -636,6 +636,9 @@ struct SC_HTTP_EXPORT HttpConnectionsPool
     /// @brief Finds an available connection (if any), activates it and returns its ID to use with getConnection(id)
     [[nodiscard]] bool activateNew(HttpConnection::ID& connectionID);
 
+    /// @brief Activates a specific inactive connection owned by this pool.
+    [[nodiscard]] bool activate(HttpConnection& connection, HttpConnection::ID& connectionID);
+
     /// @brief De-activates a connection previously returned by activateNew
     [[nodiscard]] bool deactivate(HttpConnection::ID connectionID);
 

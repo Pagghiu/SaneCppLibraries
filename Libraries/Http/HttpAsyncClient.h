@@ -15,7 +15,10 @@ struct HttpWebSocketTransportView;
 ///
 /// The default setup keeps `connection` using its socket streams. A custom setup can install alternate active streams
 /// with `HttpConnectionBase::setTransportStreams()` and must call `complete` when the transport is ready for HTTP. The
-/// setup also exposes the connected socket handle for transport adapters.
+/// setup also exposes the connected socket handle for transport adapters. After successful setup, the transport calls
+/// `fail` at most once if a terminal transport error must fail the active request and close the connection. The
+/// callback is valid only until the transport close hook runs; the adapter must discard it from that hook and never
+/// invoke it after client close or connection reuse.
 struct SC_HTTP_EXPORT HttpAsyncClientTransportSetup
 {
     HttpConnectionBase* connection = nullptr;
@@ -26,6 +29,23 @@ struct SC_HTTP_EXPORT HttpAsyncClientTransportSetup
     SocketDescriptor::Handle nativeSocket = SocketDescriptor::Invalid;
 
     Function<void(Result)> complete;
+    Function<void(Result)> fail;
+};
+
+/// @brief Connection request offered to an external transport before Http performs DNS or creates a socket.
+///
+/// The connector installs ready plaintext streams through `connection->setTransportStreams()` and calls `complete`.
+/// It calls `fail` if the established transport later fails. Both callbacks become invalid when the transport close
+/// hook runs. The connector and installed streams remain caller-owned.
+struct SC_HTTP_EXPORT HttpAsyncClientExternalConnection
+{
+    HttpConnectionBase* connection = nullptr;
+    AsyncEventLoop*     eventLoop  = nullptr;
+
+    const HttpURLParser* url = nullptr;
+
+    Function<void(Result)> complete;
+    Function<void(Result)> fail;
 };
 
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
@@ -180,16 +200,46 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     /// later. This keeps TLS and other transport adapters outside the core Http library.
     void setTransportSetup(Function<Result(HttpAsyncClientTransportSetup&)>&& setup) { transportSetup = move(setup); }
 
+    /// @brief Sets an optional transport policy hook invoked after URL parsing and before DNS or socket activity.
+    ///
+    /// This hook can reject URL forms that a transport adapter cannot represent safely. It must not retain the parser.
+    void setTransportPreflight(Function<Result(const HttpURLParser&)>&& preflight)
+    {
+        transportPreflight = move(preflight);
+    }
+
+    /// @brief Sets an optional connector that owns DNS and connection establishment for future requests.
+    ///
+    /// When configured, Http invokes it after URL parsing and before any socket activity. The connector must install
+    /// ready plaintext streams and complete the request asynchronously or synchronously.
+    void setExternalConnector(Function<Result(HttpAsyncClientExternalConnection&)>&& connector)
+    {
+        externalConnector = move(connector);
+    }
+
     /// @brief Sets an optional transport teardown hook invoked before HTTP destroys the connected socket streams.
     ///
     /// An adapter that installs alternate transport streams must release its listeners and state from this hook.
     void setTransportClose(Function<void()>&& close) { transportClose = move(close); }
 
+    /// @brief Sets an optional asynchronous hook that drains a transport before reconnecting to another origin.
+    ///
+    /// The hook must call `complete` exactly once after pending transport output has reached the underlying stream.
+    /// Returning an error rejects the reconnect synchronously and means `complete` will not be called. The completion
+    /// callback becomes invalid when the transport close hook runs and must then be discarded without invocation.
+    void setTransportShutdown(Function<Result(Function<void(Result)>)>&& shutdown)
+    {
+        transportShutdown = move(shutdown);
+    }
+
     /// @brief Clears the optional transport setup hook and restores default socket transport setup.
     void clearTransportSetup()
     {
-        transportSetup = {};
-        transportClose = {};
+        transportPreflight = {};
+        externalConnector  = {};
+        transportSetup     = {};
+        transportShutdown  = {};
+        transportClose     = {};
     }
 
     /// @brief Hands the connected socket streams to a WebSocket owner after a validated `101` response.
@@ -294,6 +344,11 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     Result prepareRequest(const RequestPreset& preset);
     Result startPreparedRequest(const RequestPreset& preset);
     Result ensureConnected();
+    Result closeConnectionForReconnect();
+    Result beginReconnectClose();
+    Result continueReconnectAfterClose();
+    void   clearReconnectCloseListeners();
+    Result beginExternalConnection();
     Result beginSocketConnection();
     Result beginResponseRead();
     Result beginRequestSend();
@@ -304,9 +359,15 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     [[nodiscard]] Result rememberConnectedOrigin();
 
     void finalizeResponse(bool finishBodyStream);
-    void closeConnection();
+    void closeConnection(bool preserveReconnectListeners = false);
     void finishResponse();
     void fail(Result error);
+
+    void onReconnectReadableClosed();
+    void onReconnectWritableClosed();
+    void onReconnectSocketReadableClosed();
+    void onReconnectSocketWritableClosed();
+    void onReconnectTransportShutdown(Result result);
 
     void onConnected(AsyncSocketConnect::Result& result);
     void onReadableError(Result result);
@@ -341,8 +402,11 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     SyncZLibTransformStream* responseDecoder       = nullptr;
     bool                     responseDecoderActive = false;
 
-    Function<Result(HttpAsyncClientTransportSetup&)> transportSetup;
-    Function<void()>                                 transportClose;
+    Function<Result(const HttpURLParser&)>               transportPreflight;
+    Function<Result(HttpAsyncClientExternalConnection&)> externalConnector;
+    Function<Result(HttpAsyncClientTransportSetup&)>     transportSetup;
+    Function<Result(Function<void(Result)>)>             transportShutdown;
+    Function<void()>                                     transportClose;
 
     State state = State::Idle;
 
@@ -360,6 +424,16 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     bool responseDelivered = false;
     bool responseFinalized = false;
     bool webSocketUpgraded = false;
+
+    uint8_t reconnectClosuresPending = 0;
+    bool    reconnectCloseInProgress = false;
+    bool    reconnectPending         = false;
+
+    AsyncReadableStream* reconnectReadableStream = nullptr;
+    AsyncWritableStream* reconnectWritableStream = nullptr;
+
+    AsyncReadableStream* reconnectSocketReadableStream = nullptr;
+    AsyncWritableStream* reconnectSocketWritableStream = nullptr;
 };
 
 //! @}

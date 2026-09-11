@@ -28,12 +28,14 @@ struct SC_HTTP_EXPORT HttpAsyncConnection
 ///
 /// The default setup keeps `connection` using its socket streams. A custom setup can install alternate active streams
 /// with `HttpConnectionBase::setTransportStreams()` and must call `complete` when the transport is ready for HTTP.
+/// After successful setup, the transport calls `fail` once if a terminal transport error must close the connection.
 struct SC_HTTP_EXPORT HttpAsyncServerTransportSetup
 {
     HttpConnection* connection = nullptr;
     AsyncEventLoop* eventLoop  = nullptr;
 
     Function<void(Result)> complete;
+    Function<void(Result)> fail;
 };
 
 /// @brief Async Http Server
@@ -76,6 +78,18 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @return Valid Result if http listening has been started successfully
     Result start(AsyncEventLoop& loop, StringSpan address, uint16_t port);
 
+    /// @brief Starts the HTTP state machine without creating a native listener.
+    ///
+    /// An external listener must inject accepted plaintext streams with `acceptExternalConnection()`.
+    Result startExternal(AsyncEventLoop& loop);
+
+    /// @brief Activates a specific connection slot for externally accepted plaintext streams.
+    ///
+    /// This must be called on the server event-loop thread. Both streams and the connection storage remain
+    /// caller-owned until Http has destroyed the streams and deactivated the slot.
+    Result acceptExternalConnection(HttpConnection& connection, AsyncReadableStream& readable,
+                                    AsyncWritableStream& writable);
+
     /// @brief Stops http server asynchronously pushing cancel and close requests to the event loop
     /// @warning Consider calling HttpAsyncServer::close before reclaiming memory used by this class
     Result stop();
@@ -90,14 +104,26 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @brief Sets an optional transport setup hook invoked after accepting TCP and before HTTP reads request bytes.
     void setTransportSetup(Function<Result(HttpAsyncServerTransportSetup&)>&& setup) { transportSetup = move(setup); }
 
-    /// @brief Sets an optional transport teardown hook invoked before HTTP destroys an accepted socket's streams.
+    /// @brief Sets an optional transport teardown hook invoked before HTTP destroys the installed transport streams.
+    /// The hook may start asynchronous stream destruction but must not reset the connection's transport streams.
     void setTransportClose(Function<void(HttpConnection&)>&& close) { transportClose = move(close); }
 
-    /// @brief Clears optional transport setup and teardown hooks.
+    /// @brief Sets an optional hook that reopens an alternate writable transport for the next keep-alive response.
+    void setTransportReuse(Function<Result(HttpConnection&)>&& reuse) { transportReuse = move(reuse); }
+
+    /// @brief Sets an optional asynchronous hook that drains a terminal response before closing its socket.
+    void setTransportShutdown(Function<Result(HttpConnection&, Function<void(Result)>)>&& shutdown)
+    {
+        transportShutdown = move(shutdown);
+    }
+
+    /// @brief Clears optional transport setup, reuse, shutdown, and teardown hooks.
     void clearTransportSetup()
     {
-        transportSetup = {};
-        transportClose = {};
+        transportSetup    = {};
+        transportReuse    = {};
+        transportShutdown = {};
+        transportClose    = {};
     }
 
     /// @brief Returns true if the server has been started
@@ -131,8 +157,10 @@ struct SC_HTTP_EXPORT HttpAsyncServer
 
     uint32_t maxHeaderSize = 8 * 1024;
 
-    Function<Result(HttpAsyncServerTransportSetup&)> transportSetup;
-    Function<void(HttpConnection&)>                  transportClose;
+    Function<Result(HttpAsyncServerTransportSetup&)>          transportSetup;
+    Function<Result(HttpConnection&)>                         transportReuse;
+    Function<Result(HttpConnection&, Function<void(Result)>)> transportShutdown;
+    Function<void(HttpConnection&)>                           transportClose;
 
     enum class State
     {
@@ -148,6 +176,8 @@ struct SC_HTTP_EXPORT HttpAsyncServer
 
     void   onNewClient(AsyncSocketAccept::Result& result);
     void   closeAsync(HttpConnection& requestClient);
+    void   shutdownTransport(HttpConnection& requestClient);
+    void   tryDeactivateConnection(HttpConnection& requestClient);
     void   deactivateConnection(HttpConnection& requestClient);
     Result beginHttpConnection(HttpConnection& client);
     Result beginTransportConnection(HttpConnection& client);
@@ -162,6 +192,7 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;
     AsyncSocketAccept asyncServerAccept;
+    bool              externalListener = false;
 
     struct EventDataListener;
     struct EventBodyDataListener;

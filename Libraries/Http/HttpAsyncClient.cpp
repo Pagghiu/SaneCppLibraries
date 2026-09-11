@@ -225,6 +225,10 @@ Result HttpAsyncClient::prepareRequest(const RequestPreset& preset)
     SC_TRY_MSG(isHttp or isHttps, "HttpAsyncClient only supports http and https URLs");
     SC_TRY_MSG(currentURL.username.isEmpty() and currentURL.password.isEmpty(),
                "HttpAsyncClient userinfo not supported");
+    if (transportPreflight.isValid())
+    {
+        SC_TRY(transportPreflight(currentURL));
+    }
     return Result(true);
 }
 
@@ -235,6 +239,10 @@ bool HttpAsyncClient::canReuseConnectionFor(StringSpan protocol, StringSpan host
 
 Result HttpAsyncClient::ensureConnected()
 {
+    if (not hasOpenConnection)
+    {
+        return externalConnector.isValid() ? beginExternalConnection() : beginSocketConnection();
+    }
     if (canReuseConnectionFor(currentURL.protocol, currentURL.host, currentURL.port))
     {
         if (&connection->getWritableTransportStream() == &connection->writableSocketStream)
@@ -245,8 +253,262 @@ Result HttpAsyncClient::ensureConnected()
         return beginRequestSend();
     }
 
-    closeConnection();
-    return beginSocketConnection();
+    return closeConnectionForReconnect();
+}
+
+Result HttpAsyncClient::closeConnectionForReconnect()
+{
+    reconnectPending = true;
+    state            = State::Connecting;
+
+    if (transportShutdown.isValid())
+    {
+        Function<void(Result)> complete = {[this](Result result) { onReconnectTransportShutdown(result); }};
+        Result                 shutdown = transportShutdown(move(complete));
+        if (not shutdown)
+        {
+            reconnectPending = false;
+            state            = State::Idle;
+        }
+        return shutdown;
+    }
+    return beginReconnectClose();
+}
+
+Result HttpAsyncClient::beginReconnectClose()
+{
+    SC_TRY_MSG(reconnectPending, "HttpAsyncClient reconnect is not pending");
+    reconnectCloseInProgress = true;
+    reconnectClosuresPending = 0;
+
+    reconnectReadableStream = &connection->getReadableTransportStream();
+    reconnectWritableStream = &connection->getWritableTransportStream();
+    reconnectSocketReadableStream =
+        reconnectReadableStream != &connection->readableSocketStream ? &connection->readableSocketStream : nullptr;
+    reconnectSocketWritableStream =
+        reconnectWritableStream != &connection->writableSocketStream ? &connection->writableSocketStream : nullptr;
+
+    if (not reconnectReadableStream->hasBeenDestroyed())
+    {
+        const bool added = reconnectReadableStream->eventClose
+                               .addListener<HttpAsyncClient, &HttpAsyncClient::onReconnectReadableClosed>(*this);
+        if (not added)
+        {
+            clearReconnectCloseListeners();
+            return Result::Error("HttpAsyncClient reconnect readable close listener unavailable");
+        }
+        reconnectClosuresPending++;
+    }
+    if (not reconnectWritableStream->hasBeenDestroyed())
+    {
+        const bool added = reconnectWritableStream->eventClose
+                               .addListener<HttpAsyncClient, &HttpAsyncClient::onReconnectWritableClosed>(*this);
+        if (not added)
+        {
+            clearReconnectCloseListeners();
+            return Result::Error("HttpAsyncClient reconnect writable close listener unavailable");
+        }
+        reconnectClosuresPending++;
+    }
+    if (reconnectSocketReadableStream != nullptr and not reconnectSocketReadableStream->hasBeenDestroyed())
+    {
+        const bool added = reconnectSocketReadableStream->eventClose
+                               .addListener<HttpAsyncClient, &HttpAsyncClient::onReconnectSocketReadableClosed>(*this);
+        if (not added)
+        {
+            clearReconnectCloseListeners();
+            return Result::Error("HttpAsyncClient reconnect socket readable close listener unavailable");
+        }
+        reconnectClosuresPending++;
+    }
+    if (reconnectSocketWritableStream != nullptr and not reconnectSocketWritableStream->hasBeenDestroyed())
+    {
+        const bool added = reconnectSocketWritableStream->eventClose
+                               .addListener<HttpAsyncClient, &HttpAsyncClient::onReconnectSocketWritableClosed>(*this);
+        if (not added)
+        {
+            clearReconnectCloseListeners();
+            return Result::Error("HttpAsyncClient reconnect socket writable close listener unavailable");
+        }
+        reconnectClosuresPending++;
+    }
+
+    closeConnection(true);
+    reconnectCloseInProgress = false;
+    return continueReconnectAfterClose();
+}
+
+void HttpAsyncClient::onReconnectTransportShutdown(Result result)
+{
+    if (not reconnectPending)
+    {
+        return;
+    }
+    if (not result)
+    {
+        fail(result);
+        return;
+    }
+
+    Result closeResult = beginReconnectClose();
+    if (not closeResult)
+    {
+        fail(closeResult);
+    }
+}
+
+Result HttpAsyncClient::continueReconnectAfterClose()
+{
+    if (not reconnectPending or reconnectClosuresPending != 0)
+    {
+        return Result(true);
+    }
+    reconnectPending              = false;
+    reconnectReadableStream       = nullptr;
+    reconnectWritableStream       = nullptr;
+    reconnectSocketReadableStream = nullptr;
+    reconnectSocketWritableStream = nullptr;
+    return externalConnector.isValid() ? beginExternalConnection() : beginSocketConnection();
+}
+
+void HttpAsyncClient::clearReconnectCloseListeners()
+{
+    if (reconnectReadableStream != nullptr)
+    {
+        (void)reconnectReadableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectReadableClosed>(*this);
+    }
+    if (reconnectWritableStream != nullptr)
+    {
+        (void)reconnectWritableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectWritableClosed>(*this);
+    }
+    if (reconnectSocketReadableStream != nullptr)
+    {
+        (void)reconnectSocketReadableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectSocketReadableClosed>(*this);
+    }
+    if (reconnectSocketWritableStream != nullptr)
+    {
+        (void)reconnectSocketWritableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectSocketWritableClosed>(*this);
+    }
+    reconnectClosuresPending      = 0;
+    reconnectCloseInProgress      = false;
+    reconnectPending              = false;
+    reconnectReadableStream       = nullptr;
+    reconnectWritableStream       = nullptr;
+    reconnectSocketReadableStream = nullptr;
+    reconnectSocketWritableStream = nullptr;
+}
+
+void HttpAsyncClient::onReconnectReadableClosed()
+{
+    if (reconnectReadableStream != nullptr)
+    {
+        (void)reconnectReadableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectReadableClosed>(*this);
+    }
+    if (reconnectClosuresPending > 0)
+    {
+        reconnectClosuresPending--;
+    }
+    if (not reconnectCloseInProgress)
+    {
+        Result result = continueReconnectAfterClose();
+        if (not result)
+        {
+            fail(result);
+        }
+    }
+}
+
+void HttpAsyncClient::onReconnectWritableClosed()
+{
+    if (reconnectWritableStream != nullptr)
+    {
+        (void)reconnectWritableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectWritableClosed>(*this);
+    }
+    if (reconnectClosuresPending > 0)
+    {
+        reconnectClosuresPending--;
+    }
+    if (not reconnectCloseInProgress)
+    {
+        Result result = continueReconnectAfterClose();
+        if (not result)
+        {
+            fail(result);
+        }
+    }
+}
+
+void HttpAsyncClient::onReconnectSocketReadableClosed()
+{
+    if (reconnectSocketReadableStream != nullptr)
+    {
+        (void)reconnectSocketReadableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectSocketReadableClosed>(*this);
+        reconnectSocketReadableStream = nullptr;
+    }
+    if (reconnectClosuresPending > 0)
+    {
+        reconnectClosuresPending--;
+    }
+    if (not reconnectCloseInProgress)
+    {
+        Result result = continueReconnectAfterClose();
+        if (not result)
+        {
+            fail(result);
+        }
+    }
+}
+
+void HttpAsyncClient::onReconnectSocketWritableClosed()
+{
+    if (reconnectSocketWritableStream != nullptr)
+    {
+        (void)reconnectSocketWritableStream->eventClose
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onReconnectSocketWritableClosed>(*this);
+        reconnectSocketWritableStream = nullptr;
+    }
+    if (reconnectClosuresPending > 0)
+    {
+        reconnectClosuresPending--;
+    }
+    if (not reconnectCloseInProgress)
+    {
+        Result result = continueReconnectAfterClose();
+        if (not result)
+        {
+            fail(result);
+        }
+    }
+}
+
+Result HttpAsyncClient::beginExternalConnection()
+{
+    state = State::Connecting;
+
+    HttpAsyncClientExternalConnection externalConnection;
+    externalConnection.connection = connection;
+    externalConnection.eventLoop  = eventLoop;
+    externalConnection.url        = &currentURL;
+    externalConnection.complete   = {[this](Result result) { completeTransportSetup(result); }};
+    externalConnection.fail       = {[this](Result result) { fail(result); }};
+
+    Result result = externalConnector(externalConnection);
+    if (not result)
+    {
+        response.abortBodyStream();
+        closeConnection();
+        state          = State::Idle;
+        currentRequest = nullptr;
+        request.reset();
+    }
+    return result;
 }
 
 Result HttpAsyncClient::beginSocketConnection()
@@ -292,6 +554,7 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
         setup.eventLoop  = eventLoop;
         setup.url        = &currentURL;
         setup.complete   = {[this](Result setupResult) { completeTransportSetup(setupResult); }};
+        setup.fail       = {[this](Result transportError) { fail(transportError); }};
 
         Result nativeSocket =
             connection->socket.get(setup.nativeSocket, Result::Error("HttpAsyncClient invalid socket"));
@@ -908,11 +1171,15 @@ void HttpAsyncClient::finalizeResponse(bool shouldFinishBodyStream)
     }
 }
 
-void HttpAsyncClient::closeConnection()
+void HttpAsyncClient::closeConnection(bool preserveReconnectListeners)
 {
     if (connection == nullptr)
     {
         return;
+    }
+    if (not preserveReconnectListeners)
+    {
+        clearReconnectCloseListeners();
     }
     (void)connection->getReadableTransportStream()
         .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);

@@ -50,7 +50,38 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     asyncServerAccept.setDebugName("HttpConnectionsPool");
     asyncServerAccept.callback.bind<HttpAsyncServer, &HttpAsyncServer::onNewClient>(*this);
     SC_TRY(asyncServerAccept.start(*eventLoop, serverSocket));
-    state = State::Started;
+    externalListener = false;
+    state            = State::Started;
+    return Result(true);
+}
+
+Result HttpAsyncServer::startExternal(AsyncEventLoop& loop)
+{
+    SC_TRY_MSG(state == State::Stopped, "HttpAsyncServer::startExternal requires stopped state");
+    SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::startExternal - init not called");
+    eventLoop        = &loop;
+    externalListener = true;
+    state            = State::Started;
+    return Result(true);
+}
+
+Result HttpAsyncServer::acceptExternalConnection(HttpConnection& connection, AsyncReadableStream& readable,
+                                                 AsyncWritableStream& writable)
+{
+    SC_TRY_MSG(state == State::Started and externalListener,
+               "HttpAsyncServer::acceptExternalConnection requires an external listener");
+    HttpConnection::ID connectionID;
+    SC_TRY_MSG(connections.activate(connection, connectionID),
+               "HttpAsyncServer::acceptExternalConnection slot unavailable");
+
+    connection.resetTransportStreams();
+    connection.setTransportStreams(readable, writable);
+    Result setup = beginTransportConnection(connection);
+    if (not setup)
+    {
+        closeAsync(connection);
+        return setup;
+    }
     return Result(true);
 }
 
@@ -59,6 +90,8 @@ Result HttpAsyncServer::close()
     SC_TRY_MSG(state == State::Stopping, "HttpAsyncServer::close requires stop before close");
     SC_TRY(waitForStopToFinish());
     SC_TRY(connections.close());
+    externalListener = false;
+    eventLoop        = nullptr;
     return Result(true);
 }
 
@@ -67,7 +100,7 @@ Result HttpAsyncServer::stop()
     SC_TRY_MSG(state == State::Started, "HttpAsyncServer::stop requires started state");
 
     state = State::Stopping;
-    if (not asyncServerAccept.isFree())
+    if (not externalListener and not asyncServerAccept.isFree())
     {
         SC_TRY(asyncServerAccept.stop(*eventLoop));
     }
@@ -225,6 +258,14 @@ Result HttpAsyncServer::beginTransportConnection(HttpConnection& client)
     setup.connection = &client;
     setup.eventLoop  = eventLoop;
     setup.complete   = {[this, &client](Result result) { onTransportSetupComplete(client, result); }};
+    setup.fail       = {[this, &client](Result result)
+                        {
+                      if (onError.isValid())
+                      {
+                          onError(result);
+                      }
+                      closeAsync(client);
+                  }};
     return transportSetup(setup);
 }
 
@@ -339,7 +380,6 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
 
                 if (shouldKeepAlive and pself.state == State::Started) // We may get some after-writes after server stop
                 {
-                    SC_HTTP_ASSERT_RELEASE(client.socket.isValid());
                     // Increment request count
                     client.requestCount++;
 
@@ -349,9 +389,23 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
 
                     if (&client.getWritableTransportStream() == &client.writableSocketStream)
                     {
+                        SC_HTTP_ASSERT_RELEASE(client.socket.isValid());
                         Result writableRes =
                             client.writableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
                         SC_HTTP_TRUST_RESULT(writableRes);
+                    }
+                    else if (pself.transportReuse.isValid())
+                    {
+                        Result reuseResult = pself.transportReuse(client);
+                        if (not reuseResult)
+                        {
+                            if (pself.onError.isValid())
+                            {
+                                pself.onError(reuseResult);
+                            }
+                            pself.closeAsync(client);
+                            return;
+                        }
                     }
 
                     // Resume reading in any case to avoid deadlocking
@@ -365,7 +419,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                 }
                 else
                 {
-                    pself.closeAsync(client);
+                    pself.shutdownTransport(client);
                 }
             }
         };
@@ -417,6 +471,33 @@ void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView:
     }
 }
 
+void HttpAsyncServer::shutdownTransport(HttpConnection& client)
+{
+    if (not transportShutdown.isValid())
+    {
+        closeAsync(client);
+        return;
+    }
+
+    Function<void(Result)> complete = {[this, &client](Result result)
+                                       {
+                                           if (not result and onError.isValid())
+                                           {
+                                               onError(result);
+                                           }
+                                           closeAsync(client);
+                                       }};
+    Result                 shutdown = transportShutdown(client, move(complete));
+    if (not shutdown)
+    {
+        if (onError.isValid())
+        {
+            onError(shutdown);
+        }
+        closeAsync(client);
+    }
+}
+
 void HttpAsyncServer::closeAsync(HttpConnection& client)
 {
     if (client.state == HttpConnection::State::Inactive)
@@ -435,14 +516,42 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
     EventCloseListener closeListener{*this, client};
     (void)client.getReadableTransportStream().eventClose.removeListener(closeListener);
 
-    if (transportClose.isValid())
+    AsyncReadableStream* readable = &client.getReadableTransportStream();
+    AsyncWritableStream* writable = &client.getWritableTransportStream();
+
+    struct OnCloseDeactivateReadableTransport
     {
-        transportClose(client);
+        HttpAsyncServer& pself;
+        HttpConnection&  client;
+
+        void operator()()
+        {
+            SC_HTTP_ASSERT_RELEASE(client.getReadableTransportStream().eventClose.removeListener(*this));
+            pself.tryDeactivateConnection(client);
+        }
+    };
+    if (not readable->hasBeenDestroyed())
+    {
+        SC_HTTP_ASSERT_RELEASE(readable->eventClose.addListener(OnCloseDeactivateReadableTransport{*this, client}));
     }
 
-    const bool readWasDestroyed  = client.readableSocketStream.hasBeenDestroyed();
-    const bool writeWasDestroyed = client.writableSocketStream.hasBeenDestroyed();
-    struct OnCloseDeactivateReadable
+    struct OnCloseDeactivateWritableTransport
+    {
+        HttpAsyncServer& pself;
+        HttpConnection&  client;
+
+        void operator()()
+        {
+            SC_HTTP_ASSERT_RELEASE(client.getWritableTransportStream().eventClose.removeListener(*this));
+            pself.tryDeactivateConnection(client);
+        }
+    };
+    if (not writable->hasBeenDestroyed())
+    {
+        SC_HTTP_ASSERT_RELEASE(writable->eventClose.addListener(OnCloseDeactivateWritableTransport{*this, client}));
+    }
+
+    struct OnCloseDeactivateReadableSocket
     {
         HttpAsyncServer& pself;
         HttpConnection&  client;
@@ -450,23 +559,16 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
         void operator()()
         {
             SC_HTTP_ASSERT_RELEASE(client.readableSocketStream.eventClose.removeListener(*this));
-            if (client.writableSocketStream.hasBeenDestroyed())
-            {
-                if (client.state != HttpConnection::State::Inactive)
-                {
-                    pself.deactivateConnection(client);
-                }
-            }
+            pself.tryDeactivateConnection(client);
         }
     };
-    if (not readWasDestroyed)
+    if (readable != &client.readableSocketStream and not client.readableSocketStream.hasBeenDestroyed())
     {
         SC_HTTP_ASSERT_RELEASE(
-            client.readableSocketStream.eventClose.addListener(OnCloseDeactivateReadable{*this, client}));
-        client.readableSocketStream.destroy();
+            client.readableSocketStream.eventClose.addListener(OnCloseDeactivateReadableSocket{*this, client}));
     }
 
-    struct OnCloseDeactivateWritable
+    struct OnCloseDeactivateWritableSocket
     {
         HttpAsyncServer& pself;
         HttpConnection&  client;
@@ -474,23 +576,44 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
         void operator()()
         {
             SC_HTTP_ASSERT_RELEASE(client.writableSocketStream.eventClose.removeListener(*this));
-            if (client.readableSocketStream.hasBeenDestroyed())
-            {
-                if (client.state != HttpConnection::State::Inactive)
-                {
-                    pself.deactivateConnection(client);
-                }
-            }
+            pself.tryDeactivateConnection(client);
         }
     };
-    if (not writeWasDestroyed)
+    if (writable != &client.writableSocketStream and not client.writableSocketStream.hasBeenDestroyed())
     {
         SC_HTTP_ASSERT_RELEASE(
-            client.writableSocketStream.eventClose.addListener(OnCloseDeactivateWritable{*this, client}));
+            client.writableSocketStream.eventClose.addListener(OnCloseDeactivateWritableSocket{*this, client}));
+    }
+
+    if (transportClose.isValid())
+    {
+        transportClose(client);
+    }
+    if (not readable->hasBeenDestroyed())
+    {
+        readable->destroy();
+    }
+    if (not writable->hasBeenDestroyed())
+    {
+        writable->destroy();
+    }
+    if (readable != &client.readableSocketStream and not client.readableSocketStream.hasBeenDestroyed())
+    {
+        client.readableSocketStream.destroy();
+    }
+    if (writable != &client.writableSocketStream and not client.writableSocketStream.hasBeenDestroyed())
+    {
         client.writableSocketStream.destroy();
     }
 
-    if (readWasDestroyed and writeWasDestroyed)
+    tryDeactivateConnection(client);
+}
+
+void HttpAsyncServer::tryDeactivateConnection(HttpConnection& client)
+{
+    if (client.state != HttpConnection::State::Inactive and client.getReadableTransportStream().hasBeenDestroyed() and
+        client.getWritableTransportStream().hasBeenDestroyed() and client.readableSocketStream.hasBeenDestroyed() and
+        client.writableSocketStream.hasBeenDestroyed())
     {
         deactivateConnection(client);
     }
@@ -502,7 +625,7 @@ void HttpAsyncServer::deactivateConnection(HttpConnection& client)
     client.resetTransportStreams();
     const bool wasFull = connections.getNumActiveConnections() == connections.getNumTotalConnections();
     SC_HTTP_TRUST_RESULT(connections.deactivate(client.getConnectionID()));
-    if (wasFull and state == State::Started)
+    if (wasFull and state == State::Started and not externalListener)
     {
         // onNewClient has paused asyncAccept (by avoiding reactivation) for lack of available clients.
         // Now a client has just been made available so it's possible to start accepting again.
