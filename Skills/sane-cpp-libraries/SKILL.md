@@ -1,24 +1,34 @@
 ---
 name: sane-cpp-libraries
-description: Unified guidance for Sane C++ Libraries. Use when the user is adopting Sane C++ Libraries, choosing the right Sane library, looking for examples or tests, or working with Foundation, Memory, Strings, Containers, Async, Await, Socket, Http, File, FileSystem, Process, Time, Threading, Reflection, Serialization, Plugin, Build, Tools, or Testing.
+description: Use when adopting, integrating, debugging, or composing Sane C++ Libraries APIs. Covers selecting a Sane library, single-file or repo integration, and correct use of Foundation, Memory, Containers, Async, File, Process, networking, serialization, plugins, build tools, and tests. Do not use for general C++ design that does not require Sane APIs; use Sane C++ Style for that.
 ---
 
 # Sane C++ Libraries
 
-Use this as the single installed skill for every Sane C++ Libraries request.
+Help users compose the APIs that exist in this checkout, rather than translating them into STL-shaped abstractions or guessing overloads. This is an adoption skill, not a requirement to adopt all Sane libraries.
 
 ## Start Here
 
-- Read [references/getting-started.md](references/getting-started.md) first.
-- Then read the smallest matching topic guide under `references/*/guide.md`.
-- Use [references/topic-map.md](references/topic-map.md) when the request is broad, ambiguous, or spans multiple libraries.
+- For integration or library selection, read [getting started](references/getting-started.md), then [adoption](references/adoption/guide.md) if needed.
+- For one library, read only its matching `references/<topic>/guide.md`; use [the topic map](references/topic-map.md) for ambiguous requests.
+- For an async process with pipe capture, read [the composition recipe](references/async-process-composition.md) as well as `async`, `file`, and `process`.
+- Before emitting code, verify the selected public header and the cited test or example in the local checkout. The source locations behind the composition guidance are in [source anchors](references/source-anchors.md).
 
-## Discovery Workflow
+## Composition rules that prevent real mistakes
 
-1. Ground the answer in the repo-wide rules from `getting-started`.
-2. Pick one primary topic guide and at most one or two companion guides.
-3. Inspect the linked public headers, tests, examples, docs, or tools before answering.
-4. Prefer repo-specific guidance over generic C++ advice.
+- Treat a `Result` as an obligation: check it and propagate or classify it at the boundary. Do not infer successful I/O from EOF or ignore setup failures.
+- Storage, descriptors, request objects, callback captures, and input views must outlive each active operation. The event loop does not own or move `AsyncRequest` objects.
+- Define the completion predicate before writing callbacks. For a process with stdout and stderr capture, process exit alone is insufficient: wait for process completion and EOF/error handling on each stream before reuse or destruction.
+- A recurring `AsyncFileRead` is reactivated only after its result is handled. Continue reading after a bounded capture buffer fills when draining is required; retain a prefix separately from the byte total.
+- `PipeOptions::blocking` applies to pipe creation, not just the parent read end. Check the platform behavior and child contract before using a pipe as child stdout/stderr. Make inheritance deliberate: an extra inherited writer can suppress EOF.
+- Pass the descriptors expected by `Process::launch`; inspect the overload and the process tests rather than constructing its nested redirection types from guessed handles.
+- For a capacity-bounded scheduler, make slots—not merely counters—reusable. Reset a slot only after its request/descriptors and completion predicate make reuse safe.
+
+## Integration and verification
+
+Use the smallest distribution route that meets the request: a single-file library for a narrow dependency footprint, or `SC.cpp` plus public library headers for multi-library work. Follow the selected guide for platform link requirements; do not include `Internal` or test headers in an application.
+
+When changing Sane code, follow the repository's `AGENTS.md`, build the affected target before running it, run focused tests, and preserve independence checks where a new dependency could be introduced. When answering without changing code, say which header/test establishes any non-obvious claim.
 
 ## Topic Guides
 

@@ -1,0 +1,13 @@
+{
+  "baseline": {
+    "name": "original",
+    "git_revision": "e2594fc43fb9b4cbee5d308b41a270e84833e0e6",
+    "path": "Skills/sane-cpp-libraries",
+    "skill_md_sha256": "269358d00028ffea1ff009f153289506e124cbd3e1b524f162f53fea8ad5fed9"
+  },
+  "candidate": {
+    "api_skill_path": "Skills/sane-cpp-libraries",
+    "style_skill_path": "Skills/sane-cpp-style",
+    "version_rule": "Each trial records the current Git revision, dirty state, and staged skill tree hash. Committed revisions are recovered with Git rather than duplicated here."
+  }
+}

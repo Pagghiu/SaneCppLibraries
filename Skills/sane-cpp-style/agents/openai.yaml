@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane C++ Style"
+  short_description: "Design and review explicit-resource C++ libraries"
+  default_prompt: "Use $sane-cpp-style to design, implement, or review this C++ component's ownership, capacity, error, lifetime, and boundary policies."
