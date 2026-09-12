@@ -33,6 +33,8 @@ Run executable acceptance tests first. Then do a blinded source review against t
 
 Full-task success means every required executable check passes and no blocking source-review obligation remains. Report individual-check rates separately from full-task success. Report denominators, `n`, and uncertainty; for small samples use “descriptive only”, not a reliability claim.
 
+For a task that launches children and requires reaping, predeclare a direct-child reaping acceptance check before subjects run. Keep the runner alive with one slow child while another direct child exits; after a bounded grace period, inspect the exited child's PID, parent PID, and process state during that interval. On POSIX, a persistent `Z`/defunct child whose parent is the live runner fails the reaping requirement. Check ordinary completion as well as timeout/cancellation when required by the task. Absence of the PID after the runner exits is not proof that the runner reaped it. If the platform cannot observe process state, mark reaping unverified rather than inferring success, and clean up probe children on every evaluator exit path.
+
 ## Launch template
 
 ```sh
