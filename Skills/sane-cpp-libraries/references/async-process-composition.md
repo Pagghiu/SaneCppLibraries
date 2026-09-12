@@ -26,6 +26,11 @@ application boundary because `PipeOptions::blocking` configures both endpoints.
 
 The exact order can vary with the failure-cleanup design, but every successful setup step needs a cleanup owner before the next fallible step. If partial setup fails, stop/retire active requests as their API requires, close descriptors, and reap a launched child before returning a setup error.
 
+A failed launch can finish a logical job immediately, without posting an async completion. If that transition frees a slot
+while work remains queued, keep scheduling until capacity is filled or the queue is empty before calling a blocking
+`runOnce()`. Otherwise a quiet loop can strand the queue until its batch deadline fires. Keep this progress rule separate
+from the deadline, which bounds waiting but does not launch work.
+
 ## Define completion, reuse, and cancellation
 
 For independent stdout and stderr, the normal completion predicate is:
@@ -46,4 +51,4 @@ include the normal (not only failure/cancellation) path in source review or a zo
 
 ## Verify before committing
 
-Read the relevant source anchors, build before running tests, and use a workload larger than a pipe buffer so a short smoke test cannot hide backpressure. Use a quiet child whose lifetime exceeds the deadline so continuous output cannot accidentally wake the loop. If testing request reuse, use fewer slots than logical jobs, vary executable paths/outcomes across generations, and record an observable slot-generation or reuse assertion.
+Read the relevant source anchors, build before running tests, and use a workload larger than a pipe buffer so a short smoke test cannot hide backpressure. Use a quiet child whose lifetime exceeds the deadline so continuous output cannot accidentally wake the loop. Put a missing or nonexecutable job before successful queued jobs to verify that synchronous launch failure does not stall them. If testing request reuse, use fewer slots than logical jobs, vary executable paths/outcomes across generations, and record an observable slot-generation or reuse assertion.

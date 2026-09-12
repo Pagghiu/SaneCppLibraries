@@ -9,7 +9,7 @@ The original API skill is recovered on demand from the Git revision recorded in 
 
 ## Initial stopping point
 
-The repository contains a ready-to-run pilot: three API-skill conditions, a separate Style transfer task, predeclared acceptance checks, source-review criteria, staging, and result validation. No subject has run this in-repository pilot (`n=0`). A later external rerun of the original process task is summarized in [historical evidence](reports/historical-evidence.md); neither submission completed the task.
+The repository contains a ready-to-run pilot: three API-skill conditions, a separate Style transfer task, predeclared acceptance checks, source-review criteria, staging, and result validation. No subject has run this in-repository pilot (`n=0`). External in-sample reruns of the original process task are summarized in [historical evidence](reports/historical-evidence.md); their detailed reports remain outside this repository. None achieved full-task success.
 
 Run `python3 scripts/validate_benchmark.py` to validate metadata, the recoverable Git baseline, task manifests, condition isolation rules, local skill links, and absence of committed binaries. The Style reference, timer-slot, and file-copy protocol fixtures under `fixtures/` smoke-test the independent harness; the protocol fixtures only exercise evaluator input/output contracts. All staged trials, submissions, test output, and executables live under `_Build/SkillEvaluation`. Use the command template in [protocol](protocol.md) to launch a bounded pilot once fresh subject capacity is available.
 

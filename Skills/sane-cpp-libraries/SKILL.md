@@ -25,6 +25,7 @@ Help users compose the APIs that exist in this checkout, rather than translating
 - Moving a blocking descriptor operation to `AsyncTaskSequence` or a shared `ThreadPool` keeps the loop responsive, but the OS read remains blocking. Do not use that route when the task forbids blocking reads.
 - Pass the descriptors expected by `Process::launch`; inspect the overload and the process tests rather than constructing its nested redirection types from guessed handles.
 - For a capacity-bounded scheduler, make slots—not merely counters—reusable. Reset a slot only after its request/descriptors and completion predicate make reuse safe; separately reset or reconstruct stateful resources such as `Process` before the next logical operation.
+- In a queued async workflow, a launch or setup failure may complete synchronously without a callback. If it frees capacity, schedule the next queued item before entering a blocking loop wait; a deadline wake-up is not a substitute for queue progress.
 - Treat exit notification and OS resource reclamation as separate obligations until the selected backend/API proves otherwise. If the contract requires reaping, verify the normal completion path actually performs it.
 
 ## Integration and verification
