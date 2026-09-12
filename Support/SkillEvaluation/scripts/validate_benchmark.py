@@ -46,6 +46,10 @@ def main() -> int:
             failures.append(f"missing review rubric for {path.parent}")
     if not (EVALUATION / "fixtures" / "style-bounded-log-acceptance.cpp").is_file():
         failures.append("missing independent Style acceptance fixture")
+    if not (EVALUATION / "fixtures" / "slot-protocol" / "slots.py").is_file():
+        failures.append("missing timer-slot acceptance protocol fixture")
+    if not (EVALUATION / "fixtures" / "file-copy-protocol" / "copy.py").is_file():
+        failures.append("missing file-copy acceptance protocol fixture")
     for path in SKILLS.glob("*/SKILL.md"):
         text = path.read_text()
         for target in re.findall(r"\]\(([^)#]+)", text):

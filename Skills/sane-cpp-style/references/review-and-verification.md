@@ -11,6 +11,9 @@ Make tests exercise observable contracts: correct normal result; capacity exhaus
 - Can any callback, thread, descriptor, or request outlive the object it references?
 - Does every successful setup step have cleanup on every later failure path?
 - Does a completion predicate include all required sub-operations?
+- Can every promised deadline wake the exact wait that could otherwise block indefinitely?
+- Is work described as nonblocking actually nonblocking, or merely moved to a worker thread?
+- Does notification also reclaim the underlying resource, or is a separate join/reap/close step required?
 - Is storage movement/reallocation impossible or synchronized while borrowed?
 - Are bounds and allocation/dependency policies visible and honored?
 - Are public headers and transitive dependencies consistent with the intended adoption boundary?

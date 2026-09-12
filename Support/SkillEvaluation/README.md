@@ -9,9 +9,9 @@ The original API skill is recovered on demand from the Git revision recorded in 
 
 ## Initial stopping point
 
-The repository contains a ready-to-run pilot: three API-skill conditions, a separate Style transfer task, predeclared acceptance checks, source-review criteria, staging, and result validation. No new subject trial has run (`n=0`); the available subject-agent quota ended before launch. This is an honest stopping point, not a zero-pass measurement.
+The repository contains a ready-to-run pilot: three API-skill conditions, a separate Style transfer task, predeclared acceptance checks, source-review criteria, staging, and result validation. No subject has run this in-repository pilot (`n=0`). A later external rerun of the original process task is summarized in [historical evidence](reports/historical-evidence.md); neither submission completed the task.
 
-Run `python3 scripts/validate_benchmark.py` to validate metadata, the recoverable Git baseline, task manifests, condition isolation rules, local skill links, and absence of committed binaries. The Style acceptance fixture has a conforming reference implementation under `fixtures/style-reference`, used only to smoke-test the independent harness. All staged trials, submissions, test output, and executables live under `_Build/SkillEvaluation`. Use the command template in [protocol](protocol.md) to launch a bounded pilot once fresh subject capacity is available.
+Run `python3 scripts/validate_benchmark.py` to validate metadata, the recoverable Git baseline, task manifests, condition isolation rules, local skill links, and absence of committed binaries. The Style reference, timer-slot, and file-copy protocol fixtures under `fixtures/` smoke-test the independent harness; the protocol fixtures only exercise evaluator input/output contracts. All staged trials, submissions, test output, and executables live under `_Build/SkillEvaluation`. Use the command template in [protocol](protocol.md) to launch a bounded pilot once fresh subject capacity is available.
 
 ## Layout
 
@@ -22,4 +22,4 @@ Run `python3 scripts/validate_benchmark.py` to validate metadata, the recoverabl
 - `_Build/SkillEvaluation`: generated trial records, submissions, acceptance output, and binaries; not committed.
 - `reports`: method, historical evidence, and presentation-ready factual summary.
 
-The initial proposed pilot is one fresh Luna High attempt per API condition on one development task after the harness is smoke-validated. A useful next bounded batch is three fresh attempts per condition on the frozen held-out API task; Style is evaluated separately with three fresh attempts. Expand only after reviewing variance, harness defects, and failures.
+The proposed pilot is one fresh Luna High attempt per API condition on one development task after the harness is smoke-validated. A useful next bounded batch is three fresh attempts per condition on the held-out file-copy task; Style is evaluated separately with three fresh attempts. The timer-slot task was revised after the external rerun and therefore moved to development; record the task hash in future trials. Expand only after reviewing variance, harness defects, and failures.

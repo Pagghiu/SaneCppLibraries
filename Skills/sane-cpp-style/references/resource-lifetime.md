@@ -20,4 +20,8 @@ When output must be limited but a producer can block, distinguish retained bytes
 
 For each setup step, identify what has become live and how it is cleaned up if the next step fails. For asynchronous operations, cancellation changes intent; it does not necessarily make OS requests, callbacks, descriptors, or child processes disappear. Define how callbacks quiesce, handles close, and work is reaped/drained before state is released.
 
+A deadline must be represented in the primitive that can otherwise block: a timer in the wait set, a bounded wait, or an
+explicit wake-up. Polling the clock only before or after an unbounded wait cannot guarantee timely cancellation. Likewise,
+a completion notification may precede required reclamation such as joining a thread or reaping a child; model both states.
+
 Use RAII where the project allows it for local scope cleanup, but do not let an RAII wrapper hide the externally observable lifetime of asynchronous or shared work. A destructor is not a substitute for a documented cancellation/completion protocol.

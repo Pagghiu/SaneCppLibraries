@@ -88,6 +88,7 @@ def main() -> int:
         "run_id": args.run_id,
         "condition": args.condition,
         "task": args.task,
+        "task_sha256": hashlib.sha256((matches[0] / "task.md").read_bytes()).hexdigest(),
         "source_revision": revision,
         "source_skills_dirty": dirty,
         "skill_tree_sha256": tree_sha256(selected_skill) if selected_skill else None,

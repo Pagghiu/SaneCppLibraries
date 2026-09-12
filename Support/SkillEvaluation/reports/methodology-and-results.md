@@ -16,7 +16,9 @@ For every trial, save the first submission and acceptance JSON before any extern
 
 ## Initial result
 
-There are zero newly executed comparison trials (`n=0`). The statement “the optimized skill improves outcomes” is therefore unsupported. The initial iteration completed the skills, Git-addressed API baseline, staged-condition runner, task contracts, acceptance dispatch, review rubrics, and validation. The independent Style acceptance harness was smoke-tested against its private conforming fixture; that validates the harness only, not either skill. It stops here until fresh subject capacity is available.
+The in-repository controlled pilot still has zero executed trials (`n=0`). External evaluation 2 of the original runner yielded 3/6 suites for the old API skill and 4/6 for updated API plus Style skills, with full-task failure in both. The outcome is summarized in [historical evidence](historical-evidence.md); detailed results remain in the external `AgentBenchmark` workspace. One attempt per condition, combined skills in the updated condition, and a disclosed old-condition source-exposure deviation prevent a measured skill-effect claim. Runtime tokens and cost are unavailable.
+
+The skill revision after that rerun adds source-backed guidance for a deadline that wakes `runOnce`, distinguishing worker-thread blocking reads from native nonblocking reads, resetting stateful process objects on slot reuse, and verifying OS reaping. The timer-slot task now has an independently defined quiet-deadline case and a failure-continuation case, so it is a development regression rather than a held-out task. A separate bounded file-copy task is held out for generalization, which remains unmeasured.
 
 ## Planned bounded continuation
 

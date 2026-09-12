@@ -20,6 +20,10 @@
 - `runNoWait` for polling without blocking.
 - `submitRequests`, `blockingPoll`, and `dispatchCompletions` for explicit control.
 
+`runOnce` can wait indefinitely when active requests are quiet. If a deadline must bound that wait, start an
+`AsyncLoopTimeout` on the same loop before entering `runOnce`, or arrange a loop wake-up from the deadline owner. Merely
+checking a monotonic clock between calls does not provide a bound.
+
 ## Request Families
 
 - Socket connect, accept, send, receive, send-to, receive-from.
@@ -33,6 +37,7 @@
 - Keep request objects in stable storage until callback completion.
 - Close or stop resources explicitly before destruction.
 - Use the matching request family for the descriptor type you already own.
+- Check the `Result` returned by every run mode; a poll/dispatch failure is not loop completion.
 
 ## Best Sources
 

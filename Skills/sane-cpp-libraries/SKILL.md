@@ -21,8 +21,11 @@ Help users compose the APIs that exist in this checkout, rather than translating
 - Define the completion predicate before writing callbacks. For a process with stdout and stderr capture, process exit alone is insufficient: wait for process completion and EOF/error handling on each stream before reuse or destruction.
 - A recurring `AsyncFileRead` is reactivated only after its result is handled. Continue reading after a bounded capture buffer fills when draining is required; retain a prefix separately from the byte total.
 - `PipeOptions::blocking` applies to pipe creation, not just the parent read end. Check the platform behavior and child contract before using a pipe as child stdout/stderr. Make inheritance deliberate: an extra inherited writer can suppress EOF.
+- A deadline must participate in the event loop's blocking wait. Checking a clock before or after `runOnce()` does not bound a quiet wait; start an `AsyncLoopTimeout` or arrange an explicit wake-up before blocking.
+- Moving a blocking descriptor operation to `AsyncTaskSequence` or a shared `ThreadPool` keeps the loop responsive, but the OS read remains blocking. Do not use that route when the task forbids blocking reads.
 - Pass the descriptors expected by `Process::launch`; inspect the overload and the process tests rather than constructing its nested redirection types from guessed handles.
-- For a capacity-bounded scheduler, make slots—not merely counters—reusable. Reset a slot only after its request/descriptors and completion predicate make reuse safe.
+- For a capacity-bounded scheduler, make slots—not merely counters—reusable. Reset a slot only after its request/descriptors and completion predicate make reuse safe; separately reset or reconstruct stateful resources such as `Process` before the next logical operation.
+- Treat exit notification and OS resource reclamation as separate obligations until the selected backend/API proves otherwise. If the contract requires reaping, verify the normal completion path actually performs it.
 
 ## Integration and verification
 

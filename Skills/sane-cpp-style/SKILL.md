@@ -27,6 +27,10 @@ Use bounded capacity when predictable resource use matters. Return or report exh
 
 Check every fallible boundary. A partial initialization path needs an owner and cleanup plan before the next fallible step. Do not redefine a read error as EOF, cancellation as success, or a child exit as full pipeline completion without an explicit contract.
 
+Put deadlines into the wait mechanism they must bound. A clock check outside an indefinitely blocking poll is not a
+deadline, and moving blocking work to a bounded worker pool does not make the work nonblocking. Distinguish completion
+notification from resource reclamation; both need an owner and a verifiable terminal condition.
+
 ## Library-facing defaults
 
 For portable, independently consumable libraries, keep public headers light: avoid system headers and avoid implementation-heavy code or templates when a `.cpp` boundary works. Keep dependencies intentional and minimal; a convenient sibling dependency is a design decision, not a reflex. Prefer simple concrete APIs over hidden global state, implicit allocation, shared ownership, or framework capture.

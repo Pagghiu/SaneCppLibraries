@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -15,9 +16,30 @@ ROOT = Path(__file__).resolve().parents[3]
 EVALUATION = ROOT / "Support" / "SkillEvaluation"
 
 
-def command(args: list[str], cwd: Path, environment=None) -> dict:
-    result = subprocess.run(args, cwd=cwd, env=environment, capture_output=True, text=True, timeout=60)
-    return {"argv": args, "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+def command(args: list[str], cwd: Path, environment=None, timeout_seconds: float = 60) -> dict:
+    started = time.monotonic()
+    try:
+        result = subprocess.run(args, cwd=cwd, env=environment, capture_output=True, text=True, timeout=timeout_seconds)
+        return {
+            "argv": args,
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "elapsed_seconds": time.monotonic() - started,
+            "timed_out": False,
+        }
+    except subprocess.TimeoutExpired as error:
+        def output_text(value: bytes | str | None) -> str:
+            return value.decode(errors="replace") if isinstance(value, bytes) else (value or "")
+
+        return {
+            "argv": args,
+            "returncode": None,
+            "stdout": output_text(error.stdout),
+            "stderr": output_text(error.stderr),
+            "elapsed_seconds": time.monotonic() - started,
+            "timed_out": True,
+        }
 
 
 def build(submission: Path, build_directory: Path) -> tuple[bool, dict]:
@@ -65,23 +87,96 @@ def slot_reuse(submission: Path, build_directory: Path) -> list[dict]:
     executable = build_directory / "slots"
     if not executable.is_file():
         return [{"name": "slots-produced", "passed": False, "evidence": f"build did not produce {executable}"}]
-    outcome = command([str(executable), "9", "2"], submission)
-    try:
-        records = [json.loads(line) for line in outcome["stdout"].splitlines() if line]
-    except json.JSONDecodeError as error:
-        return [{"name": "json-output", "passed": False, "evidence": str(error)}]
-    valid = outcome["returncode"] == 0 and len(records) == 9 and [record.get("item") for record in records] == list(range(9))
-    slots = {record.get("slot") for record in records}
-    reused = len(slots) <= 2 and len(slots) > 0 and max(record.get("generation", -1) for record in records) >= 2
+    outcome = command([str(executable), "9", "2", "5", "2000", "--fail-index", "2"], submission, timeout_seconds=3)
+    quiet = command([str(executable), "4", "2", "1500", "50"], submission, timeout_seconds=3)
+
+    def parse_records(result: dict) -> list[dict] | None:
+        try:
+            records = [json.loads(line) for line in result["stdout"].splitlines() if line]
+            return records if all(isinstance(record, dict) for record in records) else None
+        except json.JSONDecodeError:
+            return None
+
+    records = parse_records(outcome)
+    quiet_records = parse_records(quiet)
+    valid = (
+        outcome["returncode"] == 1
+        and records is not None
+        and len(records) == 9
+        and [record.get("item") for record in records] == list(range(9))
+        and [record.get("status") for record in records] == ["failed" if index == 2 else "ok" for index in range(9)]
+    )
+    generations: dict[int, list[int]] = {}
+    if records is not None:
+        for record in records:
+            slot = record.get("slot")
+            generation = record.get("generation")
+            if type(slot) is int and slot in (0, 1) and type(generation) is int and generation >= 0:
+                generations.setdefault(slot, []).append(generation)
+    reused = (
+        valid
+        and sum(len(values) for values in generations.values()) == 9
+        and len(generations) == 2
+        and all(values == list(range(values[0], values[0] + len(values))) for values in generations.values())
+        and any(len(values) > 1 for values in generations.values())
+    )
+    deadline = (
+        quiet["returncode"] == 1
+        and quiet["elapsed_seconds"] < 2
+        and quiet_records is not None
+        and len(quiet_records) == 4
+        and [record.get("item") for record in quiet_records] == list(range(4))
+        and [record.get("status") for record in quiet_records] == ["timed_out", "timed_out", "cancelled", "cancelled"]
+        and all(record.get("slot") is None and record.get("generation") is None for record in quiet_records[2:])
+    )
+    invalid = command([str(executable), "2", "0", "5", "50"], submission, timeout_seconds=3)
     return [
-        {"name": "all-items-terminal", "passed": valid, "evidence": {"returncode": outcome["returncode"], "records": records}},
-        {"name": "physical-slot-reuse", "passed": reused, "evidence": {"slots": sorted(slots)}},
+        {"name": "failure-continues", "passed": valid, "evidence": {"run": outcome, "records": records}},
+        {"name": "physical-slot-reuse", "passed": reused, "evidence": {"generations": generations}},
+        {"name": "quiet-deadline", "passed": deadline, "evidence": {"run": quiet, "records": quiet_records}},
         {
             "name": "invalid-slots",
-            "passed": command([str(executable), "2", "0"], submission)["returncode"] != 0,
-            "evidence": "SLOTS=0 must fail",
+            "passed": invalid["returncode"] == 2 and bool(invalid["stderr"].strip()),
+            "evidence": invalid,
         },
     ]
+
+
+def bounded_file_copy(submission: Path, build_directory: Path) -> list[dict]:
+    executable = build_directory / "copy"
+    if not executable.is_file():
+        return [{"name": "copy-produced", "passed": False, "evidence": f"build did not produce {executable}"}]
+    with tempfile.TemporaryDirectory(dir=build_directory, prefix="file-copy-input-") as temporary:
+        root = Path(temporary)
+        source = root / "source binary.bin"
+        destination = root / "destination binary.bin"
+        payload = bytes(range(256)) * 257 + b"\x00\xff\x00"
+        source.write_bytes(payload)
+        checks = []
+        for capacity in (1, 127, 4096):
+            destination.write_bytes(b"stale" * (len(payload) + 1) if capacity == 4096 else b"stale")
+            outcome = command([str(executable), str(source), str(destination), str(capacity)], submission, timeout_seconds=15)
+            copied = destination.read_bytes()
+            checks.append({
+                "name": f"exact-binary-copy-{capacity}",
+                "passed": outcome["returncode"] == 0 and copied == payload,
+                "evidence": {"run": outcome, "bytes_copied": len(copied), "matches": copied == payload},
+            })
+        for capacity in ("0", "4097", "abc"):
+            outcome = command([str(executable), str(source), str(destination), capacity], submission)
+            checks.append({
+                "name": f"invalid-capacity-{capacity}",
+                "passed": outcome["returncode"] == 2 and bool(outcome["stderr"].strip()),
+                "evidence": outcome,
+            })
+        destination.write_bytes(b"preserve me")
+        missing = command([str(executable), str(root / "missing.bin"), str(destination), "127"], submission)
+        checks.append({
+            "name": "missing-source-preserves-destination",
+            "passed": missing["returncode"] == 1 and bool(missing["stderr"].strip()) and destination.read_bytes() == b"preserve me",
+            "evidence": missing,
+        })
+        return checks
 
 
 def style_log(submission: Path, build_directory: Path) -> list[dict]:
@@ -141,6 +236,7 @@ def main() -> int:
     if ok:
         dispatch = {
             "api-bounded-traversal": bounded_traversal,
+            "api-bounded-file-copy": bounded_file_copy,
             "api-request-slot-reuse": slot_reuse,
             "style-bounded-log": style_log,
         }
