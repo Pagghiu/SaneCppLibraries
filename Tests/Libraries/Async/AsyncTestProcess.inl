@@ -4,6 +4,10 @@
 #include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
 #include "Libraries/Strings/StringBuilder.h"
+#if not SC_PLATFORM_WINDOWS
+#include <errno.h>
+#include <sys/wait.h>
+#endif
 
 namespace
 {
@@ -60,6 +64,12 @@ void SC::AsyncTest::processExit()
     SC_TEST_EXPECT(outParams1.exitStatus == 0); // Status == Ok
     SC_TEST_EXPECT(outParams2.numCallbackCalled == 1);
     SC_TEST_EXPECT(outParams2.exitStatus != 0); // Status == Not OK
+#if not SC_PLATFORM_WINDOWS
+    // A successful exit callback owns the POSIX reap on every backend.
+    int status = 0;
+    SC_TEST_EXPECT(::waitpid(processSuccess.processID.pid, &status, WNOHANG) == -1 and errno == ECHILD);
+    SC_TEST_EXPECT(::waitpid(processFailure.processID.pid, &status, WNOHANG) == -1 and errno == ECHILD);
+#endif
 }
 
 void SC::AsyncTest::processExitStopBeforeCompletion()

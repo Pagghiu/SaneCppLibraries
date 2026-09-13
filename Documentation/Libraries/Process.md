@@ -41,6 +41,11 @@ and any descriptors used for redirection. Configure it, call `exec` for the simp
 later `waitForExitSync` when work must happen between those operations. SC::Result reports launch, pipe, and wait errors;
 after a successful wait, SC::Process::getExitStatus returns the child's own status code.
 
+When an `AsyncProcessExit` request observes a launched child, its successful callback performs the POSIX wait and
+reap. Do not call `waitForExitSync` afterward. If the async request fails to start or is stopped before completion,
+the caller must still wait for the child. The process exit code from an async wait comes from the callback result;
+`Process::getExitStatus` is updated only by `Process::waitForExitSync`.
+
 This compiled example shows the basic `launch`, application-work, and `waitForExitSync` lifecycle:
 
 \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet3

@@ -1412,11 +1412,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
-    // Used by kevent backend when Process exits too fast (EV_ERROR / ESRCH) and by the io-uring backend
+    // Used by kqueue on exit and by the Linux epoll and io_uring backends.
     static Result completeProcessExitWaitPid(AsyncProcessExit::Result& result)
     {
         int   status = -1;
         pid_t waitPid;
+        result.completionData.exitStatus = -1;
         do
         {
             waitPid = ::waitpid(result.getAsync().handle, &status, 0);
@@ -1487,12 +1488,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         else if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
         {
-            const uint32_t data = static_cast<uint32_t>(event.data);
-            if (WIFEXITED(data) != 0)
-            {
-                result.completionData.exitStatus = WEXITSTATUS(data);
-            }
-            return Result(true);
+            return completeProcessExitWaitPid(result);
         }
         return Result(false);
     }

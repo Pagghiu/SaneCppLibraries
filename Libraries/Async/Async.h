@@ -417,8 +417,12 @@ struct SC_ASYNC_EXPORT AsyncLoopWakeUp : public AsyncRequest
     Atomic<int32_t>        pendingWakeUps = 0;
 };
 
-/// @brief Starts monitoring a process, notifying about its termination.
+/// @brief Waits for a child process to exit and reports its exit status.
 /// @ref library_process library can be used to start a process and obtain the native process handle.
+/// On POSIX, successful completion reaps the child before the callback. Do not also call
+/// Process::waitForExitSync for that child. If start fails or the request is stopped before
+/// completion, the caller remains responsible for waiting for the child.
+/// Only one exit request may wait for a given child process.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncProcessSnippet
 struct SC_ASYNC_EXPORT AsyncProcessExit : public AsyncRequest

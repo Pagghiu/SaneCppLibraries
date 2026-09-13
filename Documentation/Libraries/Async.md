@@ -53,6 +53,17 @@ A completion callback may call `result.reactivateRequest(true)` to submit the sa
 repeating timer, a receive loop, or another long-lived operation, but it also extends the request and buffer lifetime to
 the next completion.
 
+# Process Exit
+
+`AsyncProcessExit` waits for one child process. On macOS and Linux, a successful exit callback has already reaped the
+child, so do not call `Process::waitForExitSync` afterward. A failed start or a request stopped before its exit callback
+leaves waiting and reaping with the caller. Register only one exit request for each child; two waiters can race to
+consume the same exit status. On Windows, the callback reads the process exit code from the native handle; the caller
+still owns that handle through its `Process` object.
+
+For a process with redirected output, keep its storage alive until the exit callback and both output streams have
+finished. A canceled exit request does not terminate or reap the child.
+
 # Driving The Event Loop
 
 The smallest complete shape is: create a loop, create caller-owned requests, start them, and run until no work remains.
