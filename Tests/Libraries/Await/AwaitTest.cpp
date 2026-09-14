@@ -57,6 +57,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             immediateTask();
         }
+        if (test_section("SC_CO_TRY structured propagation"))
+        {
+            coTryStructuredPropagation();
+        }
         if (test_section("move task"))
         {
             moveTask();
@@ -258,6 +262,13 @@ struct SC::AwaitTest : public SC::TestCase
     static AwaitTask immediate(AwaitEventLoop& await)
     {
         (void)await;
+        co_return Result(true);
+    }
+
+    static AwaitTask propagateStructuredError(AwaitEventLoop& await)
+    {
+        (void)await;
+        SC_CO_TRY(Result::Error(ResultCategory(0x7fffffffu), 42));
         co_return Result(true);
     }
 
@@ -1599,6 +1610,19 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(task.isCompleted());
         SC_TEST_EXPECT(not task.isActive());
         SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void coTryStructuredPropagation()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+        AwaitTask task = propagateStructuredError(await);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(task.result().isError(ResultCategory(0x7fffffffu), 42));
         SC_TEST_EXPECT(async.close());
     }
 
