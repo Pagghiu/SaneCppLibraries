@@ -67,6 +67,8 @@ jobs:
           libxcursor-dev
     - name: Check Dependencies
       run: python3 Support/Dependencies/update_dependencies.py --check
+    - name: Check Result error categories
+      run: python3 Support/Scripts/CheckResultErrorCategories.py
     - name: Generate Dependencies
       run: python3 Support/Dependencies/update_dependencies.py
     - name: Check if Single File Libs are equal

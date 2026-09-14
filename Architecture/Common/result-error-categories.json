@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "externalCategoryRange": {
+    "first": 2147483648,
+    "last": 4294967295
+  },
+  "categories": [
+    {
+      "value": 0,
+      "owner": "Common",
+      "declaration": "Libraries/Common/Result.h",
+      "constant": "UncategorizedValue"
+    },
+    {
+      "value": 1,
+      "owner": "Threading",
+      "declaration": "Libraries/Threading/Threading.h",
+      "constant": "ThreadingResultCategory"
+    },
+    {
+      "value": 2,
+      "owner": "Strings",
+      "declaration": "Libraries/Strings/StringsError.h",
+      "constant": "StringsResultCategory"
+    }
+  ]
+}
