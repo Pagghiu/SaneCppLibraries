@@ -75,6 +75,9 @@ Inferred anti-inspirations: it avoids the STL-style model where reusable primiti
 The [Result error category registry](result-error-categories.md) assigns stable built-in category values without
 moving library-owned error enums into Common.
 
+The [Result error formatting contract](result-error-formatting.md) defines optional canonical messages, caller-owned
+output, translation, sizing, and wording behavior.
+
 - [COMMON-0001 - Split foundational primitives into Common fragments](common-0001-split-foundational-primitives-into-common-fragments.md)
 - [COMMON-0002 - Use guarded headers for shared public definitions](common-0002-use-guarded-headers-for-shared-public-definitions.md)
 - [COMMON-0003 - Use unguarded inl files as per-consumer implementation source](common-0003-use-unguarded-inl-files-as-per-consumer-implementation-source.md)

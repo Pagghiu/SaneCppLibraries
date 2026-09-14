@@ -37,9 +37,10 @@ deliberately discards additional context. Enriched results target at most 16 byt
 library-specific ADR and supported-platform ABI evidence.
 
 Canonical English messages and variable formatting are presentation facilities, not result state. Mandatory library
-headers contain no error-message literals. Optional library-owned formatters write to caller-provided storage and may
-be replaced by applications that translate the public category, error, and context fields. The formatter packaging is
-selected only after static, shared, and single-file binary-elision experiments on supported platforms.
+headers contain no error-message literals. Optional library-owned formatters follow the
+[Result error formatting contract](result-error-formatting.md), write to caller-provided storage, and may be replaced by
+applications that translate the public category, error, and context fields. Formatter packaging is finalized after
+static, shared, and single-file binary-elision experiments on supported platforms.
 
 Migration uses a temporary unreleased bridge representation containing both the legacy message pointer and the new
 structured identity. Legacy and converted libraries may coexist and remain testable. After every producer, consumer,

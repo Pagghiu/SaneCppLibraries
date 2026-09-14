@@ -3,11 +3,22 @@
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Atomic.h"
+#include "Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
 struct ThreadingTest;
+
+static bool areEqual(const char* first, const char* second)
+{
+    while (*first != '\0' and *first == *second)
+    {
+        ++first;
+        ++second;
+    }
+    return *first == *second;
 }
+} // namespace SC
 
 struct SC::ThreadingTest : public SC::TestCase
 {
@@ -17,6 +28,7 @@ struct SC::ThreadingTest : public SC::TestCase
     inline void testRWLock();
     inline void testBarrier();
     inline void testSemaphore();
+    inline void testErrorFormatter();
 
     ThreadingTest(SC::TestReport& report) : TestCase(report, "ThreadingTest")
     {
@@ -43,6 +55,10 @@ struct SC::ThreadingTest : public SC::TestCase
         if (test_section("Semaphore"))
         {
             testSemaphore();
+        }
+        if (test_section("Error formatter"))
+        {
+            testErrorFormatter();
         }
     }
 };
@@ -298,6 +314,46 @@ void SC::ThreadingTest::testSemaphore()
     // Verify final state
     SC_TEST_EXPECT(ctx.sharedResource == 0);
     //! [semaphoreSnippet]
+}
+
+void SC::ThreadingTest::testErrorFormatter()
+{
+    constexpr char expected[] = "Thread has not been started";
+
+    ResultErrorFormat formatted = formatThreadingError(ThreadingError::ThreadNotStarted, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+
+    char undersized[4] = {'x', 'x', 'x', '\0'};
+    formatted          = formatThreadingError(ThreadingError::ThreadNotStarted, undersized);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    SC_TEST_EXPECT(undersized[0] == '\0');
+
+    char exact[sizeof(expected)];
+    formatted = formatThreadingError(Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted), exact);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(exact));
+    SC_TEST_EXPECT(areEqual(exact, expected));
+
+    exact[0]  = 'x';
+    formatted = formatThreadingError(Result(true), exact);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatted.requiredCapacity == 0);
+    SC_TEST_EXPECT(exact[0] == '\0');
+
+    formatted = formatThreadingError(Result::Error(ResultCategory(1234), 1), exact);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(exact[0] == '\0');
+
+    formatted = formatThreadingError(Result::Error(ThreadingResultCategory, 9999), exact);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(exact[0] == '\0');
+
+    char translated[64];
+    formatted = ResultErrorFormatter::formatMessage("Il thread non è stato avviato", translated);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(areEqual(translated, "Il thread non è stato avviato"));
 }
 
 namespace SC
