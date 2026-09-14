@@ -128,7 +128,17 @@ struct SC::CommandLineTest : public SC::TestCase
             const char*          argv[] = {"sample", "--port", "8080"};
             StringSpan           storage[1];
             CommandLineArguments arguments;
-            SC_TEST_EXPECT(not arguments.setFromMainArguments(3, argv, storage));
+            const Result         result = arguments.setFromMainArguments(3, argv, storage);
+            SC_TEST_EXPECT(result.isError(StringsResultCategory, StringsError::InsufficientArgumentStorage));
+        }
+
+        if (test_section("main argument adapter invalid count"))
+        {
+            const char*          argv[] = {"sample"};
+            StringSpan           storage[1];
+            CommandLineArguments arguments;
+            const Result         result = arguments.setFromMainArguments(-1, argv, storage);
+            SC_TEST_EXPECT(result.isError(StringsResultCategory, StringsError::InvalidArgumentCount));
         }
 
         if (test_section("parse long short inline and positionals"))

@@ -7,6 +7,7 @@ uncategorized errors. Error enums and their optional formatters remain in the li
 |------:|-----------|-----------------------------------|
 | 0     | Common    | Reserved: uncategorized           |
 | 1     | Threading | `Libraries/Threading/Threading.h` |
+| 2     | Strings   | `Libraries/Strings/StringsError.h` |
 
 Values from `0x80000000` through `0xffffffff` are reserved for applications and external libraries. Built-in
 categories must be added at the end of this table and must never be renumbered or reused.

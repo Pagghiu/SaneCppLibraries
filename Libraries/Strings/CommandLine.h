@@ -3,6 +3,7 @@
 #pragma once
 #include "../Common/Result.h"
 #include "../Strings/StringView.h"
+#include "StringsError.h"
 #include "StringsExport.h"
 
 namespace SC

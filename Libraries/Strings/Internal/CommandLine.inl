@@ -483,9 +483,11 @@ static SC::Result commandLineSetMainArgumentsImpl(int argc, const CharType* cons
                                                   SC::Span<SC::StringSpan> storage, SC::CommandLineArguments& arguments,
                                                   SC::StringEncoding encoding)
 {
-    SC_TRY_MSG(argc >= 0, "CommandLine argc cannot be negative");
+    if (argc < 0)
+        return SC::Result::Error(SC::StringsResultCategory, SC::StringsError::InvalidArgumentCount);
     const SC::size_t numArgs = argc > 0 ? static_cast<SC::size_t>(argc - 1) : 0;
-    SC_TRY_MSG(storage.sizeInElements() >= numArgs, "CommandLine insufficient argument storage");
+    if (storage.sizeInElements() < numArgs)
+        return SC::Result::Error(SC::StringsResultCategory, SC::StringsError::InsufficientArgumentStorage);
     for (SC::size_t idx = 0; idx < numArgs; ++idx)
     {
         storage[idx] = SC::StringSpan::fromNullTerminated(argv[idx + 1], encoding);
