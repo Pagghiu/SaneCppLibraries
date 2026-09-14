@@ -42,7 +42,7 @@ struct SC::Thread::Internal
         threadHandle         = ::CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
         if (threadHandle == nullptr)
         {
-            return Result::Error("Thread::create - CreateThread failed");
+            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadCreationFailed);
         }
         ResumeThread(threadHandle);
         return Result(true);

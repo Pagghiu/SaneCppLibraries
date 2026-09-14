@@ -38,7 +38,7 @@ struct SC::Thread::Internal
         const int res = pthread_create(&opaqueThread.reinterpret_as<pthread_t>(), 0, threadFunc, &self);
         if (res != 0)
         {
-            return Result::Error("Thread::create - pthread_create failed");
+            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadCreationFailed);
         }
         return Result(true);
     }
@@ -57,7 +57,7 @@ struct SC::Thread::Internal
         int res = pthread_join(threadNative.reinterpret_as<pthread_t>(), 0);
         if (res != 0)
         {
-            return Result::Error("phread_join error");
+            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadJoinFailed);
         }
         return Result(true);
     }
@@ -67,7 +67,7 @@ struct SC::Thread::Internal
         int res = pthread_detach(threadNative.reinterpret_as<pthread_t>());
         if (res != 0)
         {
-            return Result::Error("pthread_detach error");
+            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadDetachFailed);
         }
         return Result(true);
     }

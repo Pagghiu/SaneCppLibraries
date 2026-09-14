@@ -90,9 +90,21 @@ void SC::ThreadPoolTest::testThreadPoolErrors()
     SC::ThreadPool::Task tasks[numTasks];
 
     SC::ThreadPool threadPool;
+    Result         result = threadPool.create(0);
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::InvalidWorkerThreadCount));
+
     SC_TEST_EXPECT(threadPool.create(2));
+    result = threadPool.create(2);
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadPoolAlreadyCreated));
+
     SC::ThreadPool threadPool2;
     SC_TEST_EXPECT(threadPool2.create(1));
+
+    SC::ThreadPool uninitializedThreadPool;
+    result = uninitializedThreadPool.queueTask(tasks[0]);
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
+    result = uninitializedThreadPool.waitForTask(tasks[0]);
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
 
     for (size_t idx = 0; idx < numTasks; idx++)
     {
@@ -101,9 +113,11 @@ void SC::ThreadPoolTest::testThreadPoolErrors()
         SC_TEST_EXPECT(threadPool.queueTask(tasks[idx]));
     }
     // Expect error if trying to add a task to another threadpool
-    SC_TEST_EXPECT(not threadPool2.queueTask(tasks[1]));
+    result = threadPool2.queueTask(tasks[1]);
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::TaskInUseByAnotherThreadPool));
     // Expect error if trying to queue a task again
-    SC_TEST_EXPECT(not threadPool.queueTask(tasks[1]));
+    result = threadPool.queueTask(tasks[1]);
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::TaskAlreadyQueued));
 }
 
 namespace SC

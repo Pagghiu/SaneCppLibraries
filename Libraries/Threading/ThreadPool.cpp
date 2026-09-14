@@ -102,8 +102,10 @@ struct SC::ThreadPool::WorkerThread
 
 SC::Result SC::ThreadPool::create(size_t workerThreads)
 {
-    SC_TRY_MSG(numWorkerThreads == 0, "Cannot create already inited threadpool");
-    SC_TRY_MSG(workerThreads > 0, "Cannot create threadpool with 0 worker threads");
+    if (numWorkerThreads != 0)
+        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolAlreadyCreated);
+    if (workerThreads == 0)
+        return Result::Error(ThreadingResultCategory, ThreadingError::InvalidWorkerThreadCount);
 
     // Creating threads and detaching them, as they will take care themselves of monitoring the incoming tasks.
     for (size_t idx = 0; idx < workerThreads; idx++)
@@ -114,7 +116,7 @@ SC::Result SC::ThreadPool::create(size_t workerThreads)
         HANDLE thread = ::CreateThread(0, 512 * 1024, &WorkerThread::execute, this, CREATE_SUSPENDED, &threadID);
         if (thread == nullptr)
         {
-            return Result::Error("ThreadPool::create - CreateThread failed");
+            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolThreadCreationFailed);
         }
         ::ResumeThread(thread);
         ::CloseHandle(thread);
@@ -123,7 +125,7 @@ SC::Result SC::ThreadPool::create(size_t workerThreads)
         const int res = ::pthread_create(&thread, nullptr, &WorkerThread::execute, this);
         if (res != 0)
         {
-            return Result::Error("ThreadPool::create - pthread_create failed");
+            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolThreadCreationFailed);
         }
         ::pthread_detach(thread);
 #endif
@@ -191,7 +193,8 @@ SC::Result SC::ThreadPool::waitForAllTasks()
 
 SC::Result SC::ThreadPool::waitForTask(Task& task)
 {
-    SC_TRY_MSG(numWorkerThreads > 0, "Cannot wait for tasks on an uninitialized threadpool");
+    if (numWorkerThreads == 0)
+        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated);
 
     // Function is entirely protected by the mutex
     poolMutex.lock();
@@ -217,14 +220,17 @@ SC::Result SC::ThreadPool::waitForTask(Task& task)
 
 SC::Result SC::ThreadPool::queueTask(Task& task)
 {
-    SC_TRY_MSG(numWorkerThreads > 0, "Cannot queue tasks on an uninitialized threadpool");
+    if (numWorkerThreads == 0)
+        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated);
 
     // Function is entirely protected by the mutex
     poolMutex.lock();
     auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
 
-    SC_TRY_MSG(task.threadPool != this, "Trying to queue a task that has already been queued");
-    SC_TRY_MSG(task.threadPool == nullptr, "Trying to queue a task that is already in use by another threadpool");
+    if (task.threadPool == this)
+        return Result::Error(ThreadingResultCategory, ThreadingError::TaskAlreadyQueued);
+    if (task.threadPool != nullptr)
+        return Result::Error(ThreadingResultCategory, ThreadingError::TaskInUseByAnotherThreadPool);
 
     task.threadPool = this;
     if (taskHead == nullptr)

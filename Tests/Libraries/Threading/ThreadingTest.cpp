@@ -51,8 +51,15 @@ void SC::ThreadingTest::testThread()
 {
     bool   threadCalled = false;
     Thread defaultInit;
-    SC_TEST_EXPECT(not defaultInit.join());
-    SC_TEST_EXPECT(not defaultInit.detach());
+    Result result = defaultInit.join();
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadNotStarted));
+    result = defaultInit.detach();
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadNotStarted));
+
+    Function<void(Thread&)> invalidFunction;
+    result = defaultInit.start(move(invalidFunction));
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::InvalidThreadFunction));
+
     Thread thread;
     auto   lambda = [&](Thread& thread)
     {
@@ -60,10 +67,14 @@ void SC::ThreadingTest::testThread()
         threadCalled = true;
     };
     SC_TEST_EXPECT(thread.start(lambda));
+    Function<void(Thread&)> secondStart = [](Thread&) {};
+    result                              = thread.start(move(secondStart));
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadAlreadyStarted));
     SC_TEST_EXPECT(thread.threadID() != 0);
     SC_TEST_EXPECT(thread.join());
     SC_TEST_EXPECT(thread.threadID() == 0);
-    SC_TEST_EXPECT(not thread.detach());
+    result = thread.detach();
+    SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadNotStarted));
     SC_TEST_EXPECT(threadCalled);
 
     Atomic<int> atomicInt(0);

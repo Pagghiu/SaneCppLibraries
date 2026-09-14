@@ -29,6 +29,26 @@ SC_DECLARE_ASSERT_PROVIDER(ThreadingAssert, SC_THREADING_EXPORT);
 //! @addtogroup group_threading
 //! @{
 
+/// @brief Stable error codes returned by the Threading library.
+enum class ThreadingError : uint32_t
+{
+    InvalidThreadFunction = 1,
+    ThreadAlreadyStarted,
+    ThreadNotStarted,
+    ThreadCreationFailed,
+    ThreadJoinFailed,
+    ThreadDetachFailed,
+    ThreadPoolAlreadyCreated,
+    InvalidWorkerThreadCount,
+    ThreadPoolNotCreated,
+    TaskAlreadyQueued,
+    TaskInUseByAnotherThreadPool,
+    ThreadPoolThreadCreationFailed,
+};
+
+/// @brief Stable category assigned to errors owned by the Threading library.
+static constexpr ResultCategory ThreadingResultCategory = ResultCategory(1);
+
 /// @brief A native OS mutex to synchronize access to shared resources.
 ///
 /// Example:

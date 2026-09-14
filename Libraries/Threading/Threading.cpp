@@ -18,9 +18,10 @@ SC::Thread::~Thread() { SC_THREADING_ASSERT_DEBUG(not thread.hasValue() && "Forg
 
 SC::Result SC::Thread::start(Function<void(Thread&)>&& func)
 {
-    SC_TRY(func.isValid());
+    if (not func.isValid())
+        return Result::Error(ThreadingResultCategory, ThreadingError::InvalidThreadFunction);
     if (thread.hasValue())
-        return Result::Error("Error thread already started");
+        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadAlreadyStarted);
 
     OpaqueThread opaqueThread;
     userFunction = move(func);
@@ -34,7 +35,8 @@ void SC::Thread::setThreadName(const native_char_t* name) { Internal::setThreadN
 SC::Result SC::Thread::join()
 {
     OpaqueThread* threadNative;
-    SC_TRY(thread.get(threadNative));
+    if (not thread.get(threadNative))
+        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted);
     SC_TRY(Internal::joinThread(*threadNative));
     thread.clear();
     return Result(true);
@@ -43,7 +45,8 @@ SC::Result SC::Thread::join()
 SC::Result SC::Thread::detach()
 {
     OpaqueThread* threadNative;
-    SC_TRY(thread.get(threadNative));
+    if (not thread.get(threadNative))
+        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted);
     SC_TRY(Internal::detachThread(*threadNative));
     thread.clear();
     return Result(true);
