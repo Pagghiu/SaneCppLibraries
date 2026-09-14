@@ -6,7 +6,7 @@
 
 ## Architectural Shape
 
-The library exposes `FileSystemIterator`, `Entry`, `Options`, and caller-provided `FolderState` storage. Callers initialize the iterator with a directory and a bounded recursion stack, then pull entries with `enumerateNext`. Automatic recursion and manual `recurseSubdirectory` are both supported, and callers must call `checkErrors` after iteration to distinguish normal completion from traversal failure.
+The library exposes `FileSystemIterator`, `Entry`, `Options`, and caller-provided `FolderState` storage. Callers initialize the iterator with a directory and a bounded recursion stack, then pull entries with `enumerateNext`. Automatic recursion and manual `recurseSubdirectory` are both supported. `enumerateNext` returns whether an entry was produced; normal exhaustion is not an error. Callers must call `checkErrors` after iteration to distinguish successful exhaustion from a retained traversal failure.
 
 Returned path strings are platform-native: Windows outputs UTF-16 logical paths, POSIX outputs UTF-8 paths. The implementation may use transport prefixes or native handles internally, but public entries should remain stable Sane string views valid only until the next iterator movement.
 
@@ -32,7 +32,7 @@ Inference: this library should not mimic allocation-heavy recursive directory li
 
 ## Architectural Choices
 
-Keep recursion caller-bounded through `Span<FolderState>`. Keep enumeration pull-based and synchronous. Preserve manual recursion as the mechanism for caller-side filtering. Preserve platform-native path encoding and avoid returning Windows transport prefixes. Report traversal errors through `Result` and `checkErrors` rather than exceptions or hidden state.
+Keep recursion caller-bounded through `Span<FolderState>`. Keep enumeration pull-based and synchronous. Preserve manual recursion as the mechanism for caller-side filtering. Preserve platform-native path encoding and avoid returning Windows transport prefixes. Report traversal errors through the library-owned structured result and `checkErrors` rather than exceptions. Keep normal exhaustion as boolean iteration state and retain the first actual traversal failure until the next `init`.
 
 ## Explicitly Excluded Targets
 
@@ -55,3 +55,4 @@ Do not add hidden allocation, full-tree materialization, globbing, path expressi
 
 - [FILESYSTEMITERATOR-0001 - Make recursive enumeration caller-bounded](filesystemiterator-0001-make-recursive-enumeration-caller-bounded.md)
 - [FILESYSTEMITERATOR-0002 - Keep iterator path encoding platform-native](filesystemiterator-0002-keep-iterator-path-encoding-platform-native.md)
+- [FILESYSTEMITERATOR-0003 - Separate exhaustion from errors](filesystemiterator-0003-separate-exhaustion-from-errors.md)
