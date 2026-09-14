@@ -33,11 +33,14 @@ struct AsyncFiberStartState
 
 struct AsyncFiberStopState
 {
-    AsyncFiberIO*                 asyncFiber   = nullptr;
-    FiberCounter*                 counter      = nullptr;
-    AsyncRequest*                 request      = nullptr;
+    AsyncFiberIO* asyncFiber = nullptr;
+    FiberCounter* counter    = nullptr;
+    AsyncRequest* request    = nullptr;
+
     Function<void(AsyncResult&)>* stopCallback = nullptr;
-    Result*                       stopResult   = nullptr;
+
+    // Both the owner command and the waiting fiber access this only while counter is non-zero.
+    Result stopResult = Result(true);
 };
 
 struct AsyncFiberSendAllState
@@ -976,7 +979,6 @@ Result AsyncFiberIO::waitForOperation(FiberCounter& counter, AsyncRequest& reque
     AsyncFiberStartState* startState = static_cast<AsyncFiberStartState*>(startStatePointer);
     if (scheduler.isCurrentTaskCancellationRequested())
     {
-        operationResult = AsyncFiberTaskCancelled();
         if (startState != nullptr)
         {
             startState->cancelBeforeStart.store(1);
@@ -988,6 +990,7 @@ Result AsyncFiberIO::waitForOperation(FiberCounter& counter, AsyncRequest& reque
             }
         }
         SC_TRY(stopOperation(counter, request));
+        operationResult = AsyncFiberTaskCancelled();
         return operationResult;
     }
 
@@ -996,27 +999,31 @@ Result AsyncFiberIO::waitForOperation(FiberCounter& counter, AsyncRequest& reque
     {
         return operationResult;
     }
-    if (scheduler.isCurrentTaskCancellationRequested())
+    // An interruptible counter wait fails only when this fiber has been cancelled. Re-checking the current worker's
+    // task is racy with worker migration, so use the wait result itself as the cancellation decision.
+    if (startState != nullptr)
     {
-        operationResult = AsyncFiberTaskCancelled();
-        if (startState != nullptr)
+        startState->cancelBeforeStart.store(1);
+        SC_TRY(scheduler.waitUninterruptible(startState->startCounter));
+        if (startState->requestStarted.load() == 0)
         {
-            startState->cancelBeforeStart.store(1);
-            SC_TRY(scheduler.waitUninterruptible(startState->startCounter));
-            if (startState->requestStarted.load() == 0)
-            {
-                SC_TRY(scheduler.waitUninterruptible(counter));
-                return operationResult;
-            }
+            SC_TRY(scheduler.waitUninterruptible(counter));
+            return operationResult;
         }
-        SC_TRY(stopOperation(counter, request));
-        return operationResult;
     }
-    return waitResult;
+    SC_TRY(stopOperation(counter, request));
+    // Cancellation wins after the request and its completion callback have quiesced.
+    operationResult = AsyncFiberTaskCancelled();
+    return operationResult;
 }
 
 Result AsyncFiberIO::stopOperation(FiberCounter& operationCounter, AsyncRequest& request)
 {
+    if (isOwnerThread() and request.isFree())
+    {
+        return Result(true);
+    }
+
     FiberCounter        counter;
     AsyncFiberStopState state;
 
@@ -1033,33 +1040,43 @@ Result AsyncFiberIO::stopOperation(FiberCounter& operationCounter, AsyncRequest&
     };
     state.stopCallback = &stopCallback;
 
-    Result stopResult = Result(true);
-    state.stopResult  = &stopResult;
-
     if (isOwnerThread())
     {
-        stopResult = request.stop(eventLoop, &stopCallback);
+        state.stopResult = request.stop(eventLoop, &stopCallback);
+        if (not state.stopResult)
+        {
+            SC_ASYNC_FIBERS_TRUST_RESULT(scheduler.done(counter));
+            return state.stopResult;
+        }
     }
     else
     {
         AsyncFiberCommand command;
         command.execute = AsyncFiberCommand::Procedure([this, &state]() { return executeStopCommand(&state); });
-        stopResult      = enqueueCommand(command);
-        if (not stopResult)
+        // Keep enqueue errors separate: the owner command exclusively writes state.stopResult.
+        const Result enqueueResult = enqueueCommand(command);
+        if (not enqueueResult)
         {
             SC_TRY(scheduler.waitUninterruptible(operationCounter));
-            return stopResult;
+            return enqueueResult;
         }
     }
-    SC_TRY(stopResult);
-    return scheduler.waitUninterruptible(counter);
+    SC_TRY(scheduler.waitUninterruptible(counter));
+    return state.stopResult;
 }
 
 Result AsyncFiberIO::executeStopCommand(void* stopStatePointer)
 {
     AsyncFiberStopState& stopState = *static_cast<AsyncFiberStopState*>(stopStatePointer);
-    *stopState.stopResult          = stopState.request->stop(eventLoop, stopState.stopCallback);
-    if (not *stopState.stopResult)
+    if (stopState.request->isFree())
+    {
+        // Completion won the owner-thread race before this stop command was drained.
+        SC_ASYNC_FIBERS_TRUST_RESULT(scheduler.done(*stopState.counter));
+        return Result(true);
+    }
+
+    stopState.stopResult = stopState.request->stop(eventLoop, stopState.stopCallback);
+    if (not stopState.stopResult)
     {
         SC_ASYNC_FIBERS_TRUST_RESULT(scheduler.done(*stopState.counter));
     }
