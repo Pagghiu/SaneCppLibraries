@@ -32,15 +32,15 @@ struct SC::Thread::Internal
         return 0;
     }
 
-    [[nodiscard]] static Result createThread(Thread& self, OpaqueThread& opaqueThread,
-                                             void* (*threadFunc)(void* argument))
+    [[nodiscard]] static ResultThreading createThread(Thread& self, OpaqueThread& opaqueThread,
+                                                      void* (*threadFunc)(void* argument))
     {
         const int res = pthread_create(&opaqueThread.reinterpret_as<pthread_t>(), 0, threadFunc, &self);
         if (res != 0)
         {
-            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadCreationFailed);
+            return ResultThreading(ThreadingError::ThreadCreationFailed, static_cast<uint32_t>(res));
         }
-        return Result(true);
+        return ResultThreading(true);
     }
 
     static void setThreadName(const char* nameNullTerminated)
@@ -52,24 +52,24 @@ struct SC::Thread::Internal
 #endif
     }
 
-    [[nodiscard]] static Result joinThread(OpaqueThread& threadNative)
+    [[nodiscard]] static ResultThreading joinThread(OpaqueThread& threadNative)
     {
         int res = pthread_join(threadNative.reinterpret_as<pthread_t>(), 0);
         if (res != 0)
         {
-            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadJoinFailed);
+            return ResultThreading(ThreadingError::ThreadJoinFailed, static_cast<uint32_t>(res));
         }
-        return Result(true);
+        return ResultThreading(true);
     }
 
-    [[nodiscard]] static Result detachThread(OpaqueThread& threadNative)
+    [[nodiscard]] static ResultThreading detachThread(OpaqueThread& threadNative)
     {
         int res = pthread_detach(threadNative.reinterpret_as<pthread_t>());
         if (res != 0)
         {
-            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadDetachFailed);
+            return ResultThreading(ThreadingError::ThreadDetachFailed, static_cast<uint32_t>(res));
         }
-        return Result(true);
+        return ResultThreading(true);
     }
 };
 

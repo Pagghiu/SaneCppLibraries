@@ -49,6 +49,32 @@ enum class ThreadingError : uint32_t
 /// @brief Stable category assigned to errors owned by the Threading library.
 static constexpr ResultCategory ThreadingResultCategory = ResultCategory(1);
 
+/// @brief Threading result retaining an optional native platform error number.
+/// @details nativeError is zero when unavailable or irrelevant. Converting to Result preserves the portable error
+/// identity and deliberately discards the native detail.
+struct [[nodiscard]] ResultThreading
+{
+    Result   result;
+    uint32_t nativeError = 0;
+
+    explicit constexpr ResultThreading(bool valid = true) : result(valid) {}
+    constexpr ResultThreading(ThreadingError error, uint32_t nativeError = 0)
+        : result(Result::Error(ThreadingResultCategory, error)), nativeError(nativeError)
+    {}
+    constexpr ResultThreading(Result result) : result(result) {}
+
+    template <typename ResultLike>
+    constexpr ResultThreading(const ResultLike& other) : result(other.toResult())
+    {}
+
+    explicit constexpr operator bool() const { return static_cast<bool>(result); }
+
+    constexpr operator Result() const { return result; }
+
+    constexpr Result toResult() const { return result; }
+    constexpr bool   isError(ThreadingError error) const { return result.isError(ThreadingResultCategory, error); }
+};
+
 /// @brief A native OS mutex to synchronize access to shared resources.
 ///
 /// Example:
@@ -163,7 +189,7 @@ struct SC_THREADING_EXPORT Thread
 
     /// @brief Starts the new thread with given name and func
     /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
-    Result start(Function<void(Thread&)>&& func);
+    ResultThreading start(Function<void(Thread&)>&& func);
 
     /// @brief Sets current thread name ONLY if called from inside the thread.
     /// @param name The name of the thread
@@ -172,12 +198,12 @@ struct SC_THREADING_EXPORT Thread
 
     /// @brief Waits for thread to finish and releases its resources
     /// @return Valid Result if thread has finished
-    Result join();
+    ResultThreading join();
 
     /// @brief Detaches the thread so that its resources are automatically released back to the system without
     /// Thread::join
     /// @return Valid Result if thread has been detached
-    Result detach();
+    ResultThreading detach();
 
     /// @brief Check if thread has been started
     /// @return `true` if thread has been started

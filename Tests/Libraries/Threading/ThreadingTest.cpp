@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Threading/Threading.h"
+#include "Libraries/Common/TypeTraits.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Atomic.h"
 #include "Libraries/Threading/ThreadingErrorFormatter.h"
@@ -318,6 +319,12 @@ void SC::ThreadingTest::testSemaphore()
 
 void SC::ThreadingTest::testErrorFormatter()
 {
+    static_assert(sizeof(void*) != 8 or sizeof(ResultThreading) == 24,
+                  "The migration bridge temporarily expands ResultThreading");
+    static_assert(__is_standard_layout(ResultThreading), "ResultThreading must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultThreading>::value,
+                  "ResultThreading must remain trivially copyable");
+
     constexpr char expected[] = "Thread has not been started";
 
     ResultErrorFormat formatted = formatThreadingError(ThreadingError::ThreadNotStarted, {});
@@ -350,10 +357,31 @@ void SC::ThreadingTest::testErrorFormatter()
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
     SC_TEST_EXPECT(exact[0] == '\0');
 
-    char translated[64];
-    formatted = ResultErrorFormatter::formatMessage("Il thread non è stato avviato", translated);
+    constexpr char  expectedNative[] = "Failed to create thread (native error: 12345)";
+    ResultThreading detailed(ThreadingError::ThreadCreationFailed, 12345);
+    char            nativeMessage[sizeof(expectedNative)];
+    formatted = formatThreadingError(detailed, nativeMessage);
     SC_TEST_EXPECT(formatted);
-    SC_TEST_EXPECT(areEqual(translated, "Il thread non è stato avviato"));
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedNative));
+    SC_TEST_EXPECT(areEqual(nativeMessage, expectedNative));
+    SC_TEST_EXPECT(detailed.isError(ThreadingError::ThreadCreationFailed));
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(ThreadingResultCategory, ThreadingError::ThreadCreationFailed));
+
+    const ResultThreading foreign(Result::Error(ResultCategory(1234), 7));
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.nativeError == 0);
+    formatted = formatThreadingError(foreign, nativeMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
+
+    char                 translated[64];
+    ResultErrorFormatter translatedFormatter(translated);
+    translatedFormatter.append("Errore nativo del thread: ");
+    translatedFormatter.append(static_cast<uint64_t>(12345));
+    formatted = translatedFormatter.finish();
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(areEqual(translated, "Errore nativo del thread: 12345"));
 }
 
 namespace SC

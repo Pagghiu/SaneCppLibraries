@@ -34,18 +34,18 @@ struct SC::Thread::Internal
         return 0;
     }
 
-    [[nodiscard]] static Result createThread(Thread& self, OpaqueThread& opaqueThread,
-                                             DWORD(WINAPI* threadFunc)(void* argument))
+    [[nodiscard]] static ResultThreading createThread(Thread& self, OpaqueThread& opaqueThread,
+                                                      DWORD(WINAPI* threadFunc)(void* argument))
     {
         DWORD   threadID;
         HANDLE& threadHandle = opaqueThread.reinterpret_as<HANDLE>();
         threadHandle         = ::CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
         if (threadHandle == nullptr)
         {
-            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadCreationFailed);
+            return ResultThreading(ThreadingError::ThreadCreationFailed, static_cast<uint32_t>(::GetLastError()));
         }
         ResumeThread(threadHandle);
-        return Result(true);
+        return ResultThreading(true);
     }
 
     static void setThreadName(const wchar_t* nameNullTerminated)
@@ -53,17 +53,25 @@ struct SC::Thread::Internal
         ::SetThreadDescription(::GetCurrentThread(), nameNullTerminated);
     }
 
-    [[nodiscard]] static Result joinThread(OpaqueThread& threadNative)
+    [[nodiscard]] static ResultThreading joinThread(OpaqueThread& threadNative)
     {
-        ::WaitForSingleObject(threadNative.reinterpret_as<HANDLE>(), INFINITE);
-        ::CloseHandle(threadNative.reinterpret_as<HANDLE>());
-        return Result(true);
+        const DWORD waitResult = ::WaitForSingleObject(threadNative.reinterpret_as<HANDLE>(), INFINITE);
+        if (waitResult == WAIT_FAILED)
+        {
+            const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+            ::CloseHandle(threadNative.reinterpret_as<HANDLE>());
+            return ResultThreading(ThreadingError::ThreadJoinFailed, nativeError);
+        }
+        if (not ::CloseHandle(threadNative.reinterpret_as<HANDLE>()))
+            return ResultThreading(ThreadingError::ThreadJoinFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultThreading(true);
     }
 
-    [[nodiscard]] static Result detachThread(OpaqueThread& threadNative)
+    [[nodiscard]] static ResultThreading detachThread(OpaqueThread& threadNative)
     {
-        CloseHandle(threadNative.reinterpret_as<HANDLE>());
-        return Result(true);
+        if (not ::CloseHandle(threadNative.reinterpret_as<HANDLE>()))
+            return ResultThreading(ThreadingError::ThreadDetachFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultThreading(true);
     }
 };
 

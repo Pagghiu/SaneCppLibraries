@@ -16,40 +16,40 @@
 //-------------------------------------------------------------------------------------------------------
 SC::Thread::~Thread() { SC_THREADING_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
-SC::Result SC::Thread::start(Function<void(Thread&)>&& func)
+SC::ResultThreading SC::Thread::start(Function<void(Thread&)>&& func)
 {
     if (not func.isValid())
-        return Result::Error(ThreadingResultCategory, ThreadingError::InvalidThreadFunction);
+        return ResultThreading(ThreadingError::InvalidThreadFunction);
     if (thread.hasValue())
-        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadAlreadyStarted);
+        return ResultThreading(ThreadingError::ThreadAlreadyStarted);
 
     OpaqueThread opaqueThread;
     userFunction = move(func);
     SC_TRY(Internal::createThread(*this, opaqueThread, &Internal::threadFunc));
     thread.assign(move(opaqueThread));
-    return Result(true);
+    return ResultThreading(true);
 }
 
 void SC::Thread::setThreadName(const native_char_t* name) { Internal::setThreadName(name); }
 
-SC::Result SC::Thread::join()
+SC::ResultThreading SC::Thread::join()
 {
     OpaqueThread* threadNative;
     if (not thread.get(threadNative))
-        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted);
+        return ResultThreading(ThreadingError::ThreadNotStarted);
     SC_TRY(Internal::joinThread(*threadNative));
     thread.clear();
-    return Result(true);
+    return ResultThreading(true);
 }
 
-SC::Result SC::Thread::detach()
+SC::ResultThreading SC::Thread::detach()
 {
     OpaqueThread* threadNative;
     if (not thread.get(threadNative))
-        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted);
+        return ResultThreading(ThreadingError::ThreadNotStarted);
     SC_TRY(Internal::detachThread(*threadNative));
     thread.clear();
-    return Result(true);
+    return ResultThreading(true);
 }
 
 bool SC::Thread::wasStarted() const { return thread.hasValue(); }

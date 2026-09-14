@@ -100,12 +100,12 @@ struct SC::ThreadPool::WorkerThread
     }
 };
 
-SC::Result SC::ThreadPool::create(size_t workerThreads)
+SC::ResultThreading SC::ThreadPool::create(size_t workerThreads)
 {
     if (numWorkerThreads != 0)
-        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolAlreadyCreated);
+        return ResultThreading(ThreadingError::ThreadPoolAlreadyCreated);
     if (workerThreads == 0)
-        return Result::Error(ThreadingResultCategory, ThreadingError::InvalidWorkerThreadCount);
+        return ResultThreading(ThreadingError::InvalidWorkerThreadCount);
 
     // Creating threads and detaching them, as they will take care themselves of monitoring the incoming tasks.
     for (size_t idx = 0; idx < workerThreads; idx++)
@@ -116,7 +116,8 @@ SC::Result SC::ThreadPool::create(size_t workerThreads)
         HANDLE thread = ::CreateThread(0, 512 * 1024, &WorkerThread::execute, this, CREATE_SUSPENDED, &threadID);
         if (thread == nullptr)
         {
-            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolThreadCreationFailed);
+            return ResultThreading(ThreadingError::ThreadPoolThreadCreationFailed,
+                                   static_cast<uint32_t>(::GetLastError()));
         }
         ::ResumeThread(thread);
         ::CloseHandle(thread);
@@ -125,23 +126,23 @@ SC::Result SC::ThreadPool::create(size_t workerThreads)
         const int res = ::pthread_create(&thread, nullptr, &WorkerThread::execute, this);
         if (res != 0)
         {
-            return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolThreadCreationFailed);
+            return ResultThreading(ThreadingError::ThreadPoolThreadCreationFailed, static_cast<uint32_t>(res));
         }
         ::pthread_detach(thread);
 #endif
     }
     numWorkerThreads = workerThreads;
-    return Result(true);
+    return ResultThreading(true);
 }
 
-SC::Result SC::ThreadPool::destroy()
+SC::ResultThreading SC::ThreadPool::destroy()
 {
     {
         poolMutex.lock();
         auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
         if (numWorkerThreads == 0)
         {
-            return Result(true); // this was already destroyed
+            return ResultThreading(true); // this was already destroyed
         }
         // 1. Free tasks that have not been executed yet
         while (taskHead)
@@ -159,21 +160,21 @@ SC::Result SC::ThreadPool::destroy()
     }
 
     // 3. Wait for all tasks to stop
-    Result res = waitForAllTasks();
+    ResultThreading res = waitForAllTasks();
 
     // 4. Reset the stop flag
     stopRequested = false;
     return res;
 }
 
-SC::Result SC::ThreadPool::waitForAllTasks()
+SC::ResultThreading SC::ThreadPool::waitForAllTasks()
 {
     // Function is entirely protected by the mutex
     poolMutex.lock();
     auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
     if (numWorkerThreads == 0)
     {
-        return Result(true);
+        return ResultThreading(true);
     }
     for (;;)
     {
@@ -188,13 +189,13 @@ SC::Result SC::ThreadPool::waitForAllTasks()
             break;
         }
     }
-    return Result(true);
+    return ResultThreading(true);
 }
 
-SC::Result SC::ThreadPool::waitForTask(Task& task)
+SC::ResultThreading SC::ThreadPool::waitForTask(Task& task)
 {
     if (numWorkerThreads == 0)
-        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated);
+        return ResultThreading(ThreadingError::ThreadPoolNotCreated);
 
     // Function is entirely protected by the mutex
     poolMutex.lock();
@@ -215,22 +216,22 @@ SC::Result SC::ThreadPool::waitForTask(Task& task)
             break; // all tasks have completed (including the task being waited)
         }
     }
-    return Result(true);
+    return ResultThreading(true);
 }
 
-SC::Result SC::ThreadPool::queueTask(Task& task)
+SC::ResultThreading SC::ThreadPool::queueTask(Task& task)
 {
     if (numWorkerThreads == 0)
-        return Result::Error(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated);
+        return ResultThreading(ThreadingError::ThreadPoolNotCreated);
 
     // Function is entirely protected by the mutex
     poolMutex.lock();
     auto deferUnlock = MakeDeferred([this] { poolMutex.unlock(); });
 
     if (task.threadPool == this)
-        return Result::Error(ThreadingResultCategory, ThreadingError::TaskAlreadyQueued);
+        return ResultThreading(ThreadingError::TaskAlreadyQueued);
     if (task.threadPool != nullptr)
-        return Result::Error(ThreadingResultCategory, ThreadingError::TaskInUseByAnotherThreadPool);
+        return ResultThreading(ThreadingError::TaskInUseByAnotherThreadPool);
 
     task.threadPool = this;
     if (taskHead == nullptr)
@@ -246,5 +247,5 @@ SC::Result SC::ThreadPool::queueTask(Task& task)
         taskTail       = &task;
     }
     taskAvailable.broadcast();
-    return Result(true);
+    return ResultThreading(true);
 }

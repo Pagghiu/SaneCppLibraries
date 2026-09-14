@@ -10,6 +10,9 @@ The public interface includes `Thread`, `Mutex`, `ConditionVariable`, `EventObje
 
 Thread and ThreadPool lifetimes must remain explicit. Started threads are joined or detached. ThreadPool tasks are caller-owned nodes with stable addresses.
 
+Native execution failures return `ResultThreading`, retaining a portable category/error identity and an optional copied
+native error number without ownership or allocation.
+
 ## Boundaries
 
 Threading owns local user-space synchronization primitives, native thread start/join/detach, thread sleep, a simple fixed-worker pool, and minimal atomic wrappers. It does not own async event loops, coroutine scheduling, futures/promises, work-stealing schedulers, or allocation-backed task ownership.
@@ -56,6 +59,7 @@ Inferred anti-inspirations include `std::thread`/`std::atomic` as mandatory depe
 - [ThreadPool tests](../../Tests/Libraries/Threading/ThreadPoolTest.cpp)
 - [THREADING-0001 - Keep Threading as a dependency-free native primitive layer](threading-0001-keep-threading-as-a-dependency-free-native-primitive-layer.md)
 - [THREADING-0002 - Require explicit Thread and ThreadPool lifetimes](threading-0002-require-explicit-thread-and-threadpool-lifetimes.md)
+- [THREADING-0003 - Preserve native error details](threading-0003-preserve-native-error-details.md)
 - [SC-0001 - Library code must not hide dynamic allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0008 - Prefer native OS APIs over third-party dependencies](../Global/sc-0008-prefer-native-os-apis-over-third-party-dependencies.md)
 
@@ -63,3 +67,4 @@ Inferred anti-inspirations include `std::thread`/`std::atomic` as mandatory depe
 
 - [THREADING-0001 - Keep Threading as a dependency-free native primitive layer](threading-0001-keep-threading-as-a-dependency-free-native-primitive-layer.md)
 - [THREADING-0002 - Require explicit Thread and ThreadPool lifetimes](threading-0002-require-explicit-thread-and-threadpool-lifetimes.md)
+- [THREADING-0003 - Preserve native error details](threading-0003-preserve-native-error-details.md)

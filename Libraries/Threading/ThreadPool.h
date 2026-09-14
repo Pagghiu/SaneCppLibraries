@@ -42,20 +42,20 @@ struct SC_THREADING_EXPORT ThreadPool
     ~ThreadPool() { (void)destroy(); }
 
     /// @brief Create a thread pool with the requested number of worker threads
-    Result create(size_t workerThreads);
+    ResultThreading create(size_t workerThreads);
 
     /// @brief Destroy the thread pool created previously with ThreadPool::create
     /// @warning Tasks that are queued will NOT be executed (but you can use ThreadPool::waitForAllTasks for that)
-    Result destroy();
+    ResultThreading destroy();
 
     /// @brief Queue a task (that should not be already in use)
-    Result queueTask(Task& task);
+    ResultThreading queueTask(Task& task);
 
     /// @brief Blocks execution until all queued and pending tasks will be fully completed
-    Result waitForAllTasks();
+    ResultThreading waitForAllTasks();
 
     /// @brief Blocks execution until all queued and pending tasks will be fully completed
-    Result waitForTask(Task& task);
+    ResultThreading waitForTask(Task& task);
 
   private:
     Task* taskHead = nullptr; // Head of the FIFO linked list containing all threads
