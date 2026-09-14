@@ -39,7 +39,7 @@ static bool isUnprefixedComPath(const wchar_t* path)
     return true;
 }
 
-static Result setTimeouts(HANDLE serialHandle, bool blocking)
+static ResultSerialPort setTimeouts(HANDLE serialHandle, bool blocking)
 {
     COMMTIMEOUTS timeouts;
     ::ZeroMemory(&timeouts, sizeof(timeouts));
@@ -59,14 +59,16 @@ static Result setTimeouts(HANDLE serialHandle, bool blocking)
         timeouts.WriteTotalTimeoutMultiplier = 0;
         timeouts.WriteTotalTimeoutConstant   = 0;
     }
-    SC_TRY_MSG(::SetCommTimeouts(serialHandle, &timeouts) != FALSE, "SerialDescriptor::open - SetCommTimeouts failed");
-    return Result(true);
+    if (::SetCommTimeouts(serialHandle, &timeouts) == FALSE)
+        return ResultSerialPort(SerialPortError::SetTimeoutsFailed, static_cast<uint32_t>(::GetLastError()));
+    return ResultSerialPort(true);
 }
 
-Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileDescriptor::Handle& outHandle)
+ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileDescriptor::Handle& outHandle)
 {
     StringPath nullTerminatedPath;
-    SC_TRY_MSG(nullTerminatedPath.assign(path), "SerialDescriptor::open - Invalid path");
+    if (not nullTerminatedPath.assign(path))
+        return ResultSerialPort(SerialPortError::InvalidPath);
     const wchar_t* nativePath = nullTerminatedPath.view().getNullTerminatedNative();
 
     SECURITY_ATTRIBUTES securityAttributes  = {};
@@ -86,7 +88,8 @@ Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileD
         wchar_t prefixedPath[StringPath::StorageCapacity] = {};
 
         const size_t pathLen = ::wcslen(nativePath);
-        SC_TRY_MSG(pathLen + 4 <= StringPath::MaxPath, "SerialDescriptor::open - Path too long");
+        if (pathLen + 4 > StringPath::MaxPath)
+            return ResultSerialPort(SerialPortError::PathTooLong);
         prefixedPath[0] = L'\\';
         prefixedPath[1] = L'\\';
         prefixedPath[2] = L'.';
@@ -96,18 +99,20 @@ Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileD
         serialHandle = ::CreateFileW(prefixedPath, desiredAccess, shareMode, &securityAttributes, creationMode,
                                      flagsAndAttrs, nullptr);
     }
-    SC_TRY_MSG(serialHandle != INVALID_HANDLE_VALUE, "SerialDescriptor::open - CreateFileW failed");
+    if (serialHandle == INVALID_HANDLE_VALUE)
+        return ResultSerialPort(SerialPortError::OpenFailed, static_cast<uint32_t>(::GetLastError()));
     SC_TRY(setTimeouts(serialHandle, options.blocking));
     outHandle = serialHandle;
-    return Result(true);
+    return ResultSerialPort(true);
 }
 
-Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& settings)
+ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& settings)
 {
     DCB dcb;
     ::ZeroMemory(&dcb, sizeof(dcb));
     dcb.DCBlength = sizeof(dcb);
-    SC_TRY_MSG(::GetCommState(handle, &dcb) != FALSE, "SerialDescriptor::setSettings - GetCommState failed");
+    if (::GetCommState(handle, &dcb) == FALSE)
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(::GetLastError()));
 
     dcb.fBinary  = TRUE;
     dcb.BaudRate = settings.baudRate;
@@ -154,16 +159,18 @@ Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& se
         break;
     }
 
-    SC_TRY_MSG(::SetCommState(handle, &dcb) != FALSE, "SerialDescriptor::setSettings - SetCommState failed");
-    return Result(true);
+    if (::SetCommState(handle, &dcb) == FALSE)
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(::GetLastError()));
+    return ResultSerialPort(true);
 }
 
-Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings)
+ResultSerialPort getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings)
 {
     DCB dcb;
     ::ZeroMemory(&dcb, sizeof(dcb));
     dcb.DCBlength = sizeof(dcb);
-    SC_TRY_MSG(::GetCommState(handle, &dcb) != FALSE, "SerialDescriptor::getSettings - GetCommState failed");
+    if (::GetCommState(handle, &dcb) == FALSE)
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(::GetLastError()));
 
     settings.baudRate = dcb.BaudRate;
     switch (dcb.ByteSize)
@@ -172,7 +179,7 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
     case 6: settings.dataBits = SerialSettings::DataBits::Bits6; break;
     case 7: settings.dataBits = SerialSettings::DataBits::Bits7; break;
     case 8: settings.dataBits = SerialSettings::DataBits::Bits8; break;
-    default: return Result::Error("SerialDescriptor::getSettings - Unsupported dataBits");
+    default: return ResultSerialPort(SerialPortError::UnsupportedDataBits);
     }
 
     switch (dcb.Parity)
@@ -180,14 +187,14 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
     case NOPARITY: settings.parity = SerialSettings::Parity::None; break;
     case ODDPARITY: settings.parity = SerialSettings::Parity::Odd; break;
     case EVENPARITY: settings.parity = SerialSettings::Parity::Even; break;
-    default: return Result::Error("SerialDescriptor::getSettings - Unsupported parity");
+    default: return ResultSerialPort(SerialPortError::UnsupportedParity);
     }
 
     switch (dcb.StopBits)
     {
     case ONESTOPBIT: settings.stopBits = SerialSettings::StopBits::One; break;
     case TWOSTOPBITS: settings.stopBits = SerialSettings::StopBits::Two; break;
-    default: return Result::Error("SerialDescriptor::getSettings - Unsupported stopBits");
+    default: return ResultSerialPort(SerialPortError::UnsupportedStopBits);
     }
 
     if (dcb.fOutX or dcb.fInX)
@@ -203,7 +210,7 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
         settings.flowControl = SerialSettings::FlowControl::None;
     }
 
-    return Result(true);
+    return ResultSerialPort(true);
 }
 } // namespace detail
 } // namespace SC

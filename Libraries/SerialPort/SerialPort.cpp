@@ -7,43 +7,44 @@ namespace SC
 {
 namespace detail
 {
-static Result validateSerialSettings(const SerialSettings& settings)
+static ResultSerialPort validateSerialSettings(const SerialSettings& settings)
 {
-    SC_TRY_MSG(settings.baudRate > 0, "SerialDescriptor::open - baudRate must be greater than zero");
+    if (settings.baudRate == 0)
+        return ResultSerialPort(SerialPortError::InvalidBaudRate);
     switch (settings.dataBits)
     {
     case SerialSettings::DataBits::Bits5:
     case SerialSettings::DataBits::Bits6:
     case SerialSettings::DataBits::Bits7:
     case SerialSettings::DataBits::Bits8: break;
-    default: return Result::Error("SerialDescriptor::open - invalid dataBits");
+    default: return ResultSerialPort(SerialPortError::InvalidDataBits);
     }
     switch (settings.parity)
     {
     case SerialSettings::Parity::None:
     case SerialSettings::Parity::Odd:
     case SerialSettings::Parity::Even: break;
-    default: return Result::Error("SerialDescriptor::open - invalid parity");
+    default: return ResultSerialPort(SerialPortError::InvalidParity);
     }
     switch (settings.stopBits)
     {
     case SerialSettings::StopBits::One:
     case SerialSettings::StopBits::Two: break;
-    default: return Result::Error("SerialDescriptor::open - invalid stopBits");
+    default: return ResultSerialPort(SerialPortError::InvalidStopBits);
     }
     switch (settings.flowControl)
     {
     case SerialSettings::FlowControl::None:
     case SerialSettings::FlowControl::Software:
     case SerialSettings::FlowControl::Hardware: break;
-    default: return Result::Error("SerialDescriptor::open - invalid flowControl");
+    default: return ResultSerialPort(SerialPortError::InvalidFlowControl);
     }
-    return Result(true);
+    return ResultSerialPort(true);
 }
 
-Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileDescriptor::Handle& outHandle);
-Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& settings);
-Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings);
+ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileDescriptor::Handle& outHandle);
+ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& settings);
+ResultSerialPort getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings);
 
 } // namespace detail
 } // namespace SC
@@ -54,14 +55,14 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
 #include "../SerialPort/Internal/SerialPortPosix.inl"
 #endif
 
-SC::Result SC::SerialDescriptor::open(StringSpan path, const SerialOpenOptions& options)
+SC::ResultSerialPort SC::SerialDescriptor::open(StringSpan path, const SerialOpenOptions& options)
 {
     SC_TRY(detail::validateSerialSettings(options.settings));
     FileDescriptor::Handle nativeHandle = FileDescriptor::Invalid;
     SC_TRY(detail::openSerialHandle(path, options, nativeHandle));
     SC_TRY(close());
     SC_TRY(assign(nativeHandle));
-    const Result setRes = setSettings(options.settings);
+    const ResultSerialPort setRes = setSettings(options.settings);
     if (not setRes)
     {
         (void)close();
@@ -69,17 +70,19 @@ SC::Result SC::SerialDescriptor::open(StringSpan path, const SerialOpenOptions& 
     return setRes;
 }
 
-SC::Result SC::SerialDescriptor::setSettings(const SerialSettings& settings)
+SC::ResultSerialPort SC::SerialDescriptor::setSettings(const SerialSettings& settings)
 {
     SC_TRY(detail::validateSerialSettings(settings));
     FileDescriptor::Handle nativeHandle = FileDescriptor::Invalid;
-    SC_TRY(get(nativeHandle, Result::Error("SerialDescriptor::setSettings - Invalid handle")));
+    if (not get(nativeHandle, Result::Error("SerialDescriptor::setSettings - Invalid handle")))
+        return ResultSerialPort(SerialPortError::InvalidHandle);
     return detail::setSerialSettings(nativeHandle, settings);
 }
 
-SC::Result SC::SerialDescriptor::getSettings(SerialSettings& settings) const
+SC::ResultSerialPort SC::SerialDescriptor::getSettings(SerialSettings& settings) const
 {
     FileDescriptor::Handle nativeHandle = FileDescriptor::Invalid;
-    SC_TRY(get(nativeHandle, Result::Error("SerialDescriptor::getSettings - Invalid handle")));
+    if (not get(nativeHandle, Result::Error("SerialDescriptor::getSettings - Invalid handle")))
+        return ResultSerialPort(SerialPortError::InvalidHandle);
     return detail::getSerialSettings(nativeHandle, settings);
 }

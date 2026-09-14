@@ -164,14 +164,16 @@ static bool mapNativeToBaud(speed_t nativeBaud, uint32_t& outBaud)
     return false;
 }
 
-Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileDescriptor::Handle& outHandle)
+ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileDescriptor::Handle& outHandle)
 {
-    SC_TRY_MSG(path.getEncoding() != StringEncoding::Utf16,
-               "SerialDescriptor::open - Posix supports only UTF8 and ASCII");
+    if (path.getEncoding() == StringEncoding::Utf16)
+        return ResultSerialPort(SerialPortError::UnsupportedPathEncoding);
     StringPath nullTerminatedPath;
-    SC_TRY_MSG(nullTerminatedPath.assign(path), "SerialDescriptor::open - Invalid path");
+    if (not nullTerminatedPath.assign(path))
+        return ResultSerialPort(SerialPortError::InvalidPath);
     const char* nativePath = nullTerminatedPath.view().getNullTerminatedNative();
-    SC_TRY_MSG(nativePath[0] == '/', "SerialDescriptor::open - Path must be absolute");
+    if (nativePath[0] != '/')
+        return ResultSerialPort(SerialPortError::PathMustBeAbsolute);
 
     int flags = O_RDWR | O_NOCTTY;
     if (not options.blocking)
@@ -196,7 +198,8 @@ Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileD
     {
         serialFd = ::open(nativePath, flags, 0);
     } while (serialFd == -1 and errno == EINTR);
-    SC_TRY_MSG(serialFd != -1, "SerialDescriptor::open - open failed");
+    if (serialFd == -1)
+        return ResultSerialPort(SerialPortError::OpenFailed, static_cast<uint32_t>(errno));
 
     if (not options.inheritable)
     {
@@ -207,8 +210,9 @@ Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileD
         } while (descriptorFlags == -1 and errno == EINTR);
         if (descriptorFlags == -1)
         {
+            const uint32_t nativeError = static_cast<uint32_t>(errno);
             (void)::close(serialFd);
-            return Result::Error("SerialDescriptor::open - fcntl(F_GETFD) failed");
+            return ResultSerialPort(SerialPortError::ReadDescriptorFlagsFailed, nativeError);
         }
         if ((descriptorFlags & FD_CLOEXEC) == 0)
         {
@@ -219,17 +223,18 @@ Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileD
             } while (setFlags == -1 and errno == EINTR);
             if (setFlags == -1)
             {
+                const uint32_t nativeError = static_cast<uint32_t>(errno);
                 (void)::close(serialFd);
-                return Result::Error("SerialDescriptor::open - fcntl(F_SETFD) failed");
+                return ResultSerialPort(SerialPortError::SetDescriptorFlagsFailed, nativeError);
             }
         }
     }
 
     outHandle = serialFd;
-    return Result(true);
+    return ResultSerialPort(true);
 }
 
-Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& settings)
+ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& settings)
 {
     struct termios tty;
 
@@ -238,7 +243,8 @@ Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& se
     {
         result = ::tcgetattr(handle, &tty);
     } while (result == -1 and errno == EINTR);
-    SC_TRY_MSG(result == 0, "SerialDescriptor::setSettings - tcgetattr failed");
+    if (result != 0)
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(errno));
 
 #if defined(CFMAKE_RAW)
     ::cfmakeraw(&tty);
@@ -292,15 +298,18 @@ Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& se
 #ifdef CRTSCTS
         tty.c_cflag |= CRTSCTS;
 #else
-        return Result::Error("SerialDescriptor::setSettings - Hardware flow control not supported");
+        return ResultSerialPort(SerialPortError::UnsupportedHardwareFlowControl);
 #endif
         break;
     }
 
     speed_t nativeBaud = B9600;
-    SC_TRY_MSG(mapBaudToNative(settings.baudRate, nativeBaud), "SerialDescriptor::setSettings - Unsupported baudRate");
-    SC_TRY_MSG(::cfsetispeed(&tty, nativeBaud) == 0, "SerialDescriptor::setSettings - cfsetispeed failed");
-    SC_TRY_MSG(::cfsetospeed(&tty, nativeBaud) == 0, "SerialDescriptor::setSettings - cfsetospeed failed");
+    if (not mapBaudToNative(settings.baudRate, nativeBaud))
+        return ResultSerialPort(SerialPortError::UnsupportedBaudRate);
+    if (::cfsetispeed(&tty, nativeBaud) != 0)
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(errno));
+    if (::cfsetospeed(&tty, nativeBaud) != 0)
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(errno));
 
     tty.c_cc[VMIN]  = 0;
     tty.c_cc[VTIME] = 0;
@@ -309,12 +318,13 @@ Result setSerialSettings(FileDescriptor::Handle handle, const SerialSettings& se
     {
         result = ::tcsetattr(handle, TCSANOW, &tty);
     } while (result == -1 and errno == EINTR);
-    SC_TRY_MSG(result == 0, "SerialDescriptor::setSettings - tcsetattr failed");
+    if (result != 0)
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(errno));
 
-    return Result(true);
+    return ResultSerialPort(true);
 }
 
-Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings)
+ResultSerialPort getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings)
 {
     struct termios tty;
     int            result;
@@ -322,10 +332,12 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
     {
         result = ::tcgetattr(handle, &tty);
     } while (result == -1 and errno == EINTR);
-    SC_TRY_MSG(result == 0, "SerialDescriptor::getSettings - tcgetattr failed");
+    if (result != 0)
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(errno));
 
     const speed_t inputBaud = ::cfgetispeed(&tty);
-    SC_TRY_MSG(mapNativeToBaud(inputBaud, settings.baudRate), "SerialDescriptor::getSettings - Unsupported baudRate");
+    if (not mapNativeToBaud(inputBaud, settings.baudRate))
+        return ResultSerialPort(SerialPortError::UnsupportedBaudRate);
 
     switch (tty.c_cflag & CSIZE)
     {
@@ -333,7 +345,7 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
     case CS6: settings.dataBits = SerialSettings::DataBits::Bits6; break;
     case CS7: settings.dataBits = SerialSettings::DataBits::Bits7; break;
     case CS8: settings.dataBits = SerialSettings::DataBits::Bits8; break;
-    default: return Result::Error("SerialDescriptor::getSettings - Unsupported dataBits");
+    default: return ResultSerialPort(SerialPortError::UnsupportedDataBits);
     }
 
     if ((tty.c_cflag & PARENB) == 0)
@@ -364,7 +376,7 @@ Result getSerialSettings(FileDescriptor::Handle handle, SerialSettings& settings
         settings.flowControl = SerialSettings::FlowControl::None;
 #endif
     }
-    return Result(true);
+    return ResultSerialPort(true);
 }
 } // namespace detail
 } // namespace SC

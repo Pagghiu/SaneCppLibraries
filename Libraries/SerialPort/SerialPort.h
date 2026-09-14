@@ -9,6 +9,7 @@
 #define SC_SERIAL_PORT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIAL_PORT)
 
 #include "../File/File.h"
+#include "SerialPortError.h"
 
 namespace SC
 {
@@ -75,17 +76,17 @@ struct SC_SERIAL_PORT_EXPORT SerialDescriptor : public FileDescriptor
     /// @param path Serial device path (`/dev/tty*` on Posix, `COM*` on Windows)
     /// @param options Open and configuration options.
     /// @return Valid Result if open/configuration succeeded.
-    Result open(StringSpan path, const SerialOpenOptions& options = SerialOpenOptions());
+    ResultSerialPort open(StringSpan path, const SerialOpenOptions& options = SerialOpenOptions());
 
     /// @brief Applies settings to an already opened serial descriptor.
     /// @param settings Settings to apply.
     /// @return Valid Result if settings have been applied.
-    Result setSettings(const SerialSettings& settings);
+    ResultSerialPort setSettings(const SerialSettings& settings);
 
     /// @brief Reads current settings from an opened serial descriptor.
     /// @param settings Output settings.
     /// @return Valid Result if settings have been read.
-    Result getSettings(SerialSettings& settings) const;
+    ResultSerialPort getSettings(SerialSettings& settings) const;
 };
 
 //! @}

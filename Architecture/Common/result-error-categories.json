@@ -22,6 +22,12 @@
       "owner": "Strings",
       "declaration": "Libraries/Strings/StringsError.h",
       "constant": "StringsResultCategory"
+    },
+    {
+      "value": 3,
+      "owner": "SerialPort",
+      "declaration": "Libraries/SerialPort/SerialPortError.h",
+      "constant": "SerialPortResultCategory"
     }
   ]
 }
