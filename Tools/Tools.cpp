@@ -119,7 +119,14 @@ int main(int argc, const char* argv[])
     console.print(gFormatString.view());
     if (not result)
     {
-        console.printLine(StringView::fromNullTerminated(result.message, StringEncoding::Ascii));
+        if (result.hasMessage())
+        {
+            console.printLine(StringView::fromNullTerminated(result.message, StringEncoding::Ascii));
+        }
+        else
+        {
+            console.print("Error category {}, code {}\n", result.category().value, result.errorValue());
+        }
         return -1;
     }
     return 0;

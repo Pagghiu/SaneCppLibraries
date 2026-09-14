@@ -91,14 +91,15 @@ SC_AWAIT_EXPORT bool        AwaitIsWrongEventLoop(Result result);
 
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
 #define SC_CO_TRY(expression)                                                                                          \
+    do                                                                                                                 \
     {                                                                                                                  \
-        if (auto _exprResConv = SC::Result(expression))                                                                \
+        if (auto _exprResConv = SC::Result::Explicit(expression))                                                      \
             SC_LANGUAGE_LIKELY { (void)0; }                                                                            \
         else                                                                                                           \
         {                                                                                                              \
             co_return _exprResConv;                                                                                    \
         }                                                                                                              \
-    }
+    } while (false);
 
 struct AwaitSocketSendResult
 {

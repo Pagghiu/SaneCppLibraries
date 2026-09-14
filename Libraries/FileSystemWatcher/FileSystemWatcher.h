@@ -65,7 +65,8 @@ struct FileSystemWatcher
     struct InternalDefinition
     {
         static constexpr int Windows = 3 * sizeof(void*);
-        static constexpr int Apple   = 42 * sizeof(void*);
+        // One extra pointer is temporary while Result carries the legacy message and structured identity.
+        static constexpr int Apple   = 43 * sizeof(void*);
         static constexpr int Linux   = sizeof(void*) * 4;
         static constexpr int Default = Linux;
 

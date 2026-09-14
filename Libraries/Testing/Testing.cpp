@@ -782,9 +782,20 @@ bool SC::TestCase::recordExpectation(StringSpan expression, bool status, StringS
 
 bool SC::TestCase::recordExpectation(StringSpan expression, Result status)
 {
-    return recordExpectation(
-        expression, status,
-        StringSpan({status.message, status.message ? ::strlen(status.message) : 0}, true, StringEncoding::Ascii));
+    if (status.hasMessage())
+    {
+        return recordExpectation(expression, status,
+                                 StringSpan({status.message, ::strlen(status.message)}, true, StringEncoding::Ascii));
+    }
+
+    char      errorIdentity[64];
+    const int length =
+        ::snprintf(errorIdentity, sizeof(errorIdentity), "Error category %u, code %u",
+                   static_cast<unsigned int>(status.category().value), static_cast<unsigned int>(status.errorValue()));
+    const size_t validLength = length > 0 and static_cast<size_t>(length) < sizeof(errorIdentity)
+                                   ? static_cast<size_t>(length)
+                                   : sizeof(errorIdentity) - 1;
+    return recordExpectation(expression, status, StringSpan({errorIdentity, validLength}, true, StringEncoding::Ascii));
 }
 
 bool SC::TestCase::test_section(StringSpan sectionName, Execute execution)

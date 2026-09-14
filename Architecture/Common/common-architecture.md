@@ -72,6 +72,9 @@ Inferred anti-inspirations: it avoids the STL-style model where reusable primiti
 
 ## Decision Log
 
+The [Result error category registry](result-error-categories.md) assigns stable built-in category values without
+moving library-owned error enums into Common.
+
 - [COMMON-0001 - Split foundational primitives into Common fragments](common-0001-split-foundational-primitives-into-common-fragments.md)
 - [COMMON-0002 - Use guarded headers for shared public definitions](common-0002-use-guarded-headers-for-shared-public-definitions.md)
 - [COMMON-0003 - Use unguarded inl files as per-consumer implementation source](common-0003-use-unguarded-inl-files-as-per-consumer-implementation-source.md)
@@ -80,3 +83,4 @@ Inferred anti-inspirations: it avoids the STL-style model where reusable primiti
 - [COMMON-0006 - Treat Common public layouts as cross-library API surface](common-0006-treat-common-public-layouts-as-cross-library-api-surface.md)
 - [COMMON-0007 - Keep IGrowableBuffer as the minimal output-growth adapter](common-0007-keep-igrowablebuffer-as-the-minimal-output-growth-adapter.md)
 - [COMMON-0008 - Keep StringSpan and StringPath in Common](common-0008-keep-stringspan-and-stringpath-in-common.md)
+- [COMMON-0009 - Use library-owned structured Result errors](common-0009-use-library-owned-structured-result-errors.md)

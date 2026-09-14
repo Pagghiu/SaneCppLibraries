@@ -380,7 +380,14 @@ static Result printPackageDoctorForEntry(Console& console, StringView packagesIn
     console.print("  receipt: ");
     console.printLine(receiptPath.view());
     console.print("  reason: ");
-    console.printLine(StringView::fromNullTerminated(validation.message, StringEncoding::Ascii));
+    if (validation.hasMessage())
+    {
+        console.printLine(StringView::fromNullTerminated(validation.message, StringEncoding::Ascii));
+    }
+    else
+    {
+        console.print("Error category {}, code {}\n", validation.category().value, validation.errorValue());
+    }
     console.printLine("  suggested action: re-run install or remove the stale package directory before reinstalling");
     return Result(true);
 }

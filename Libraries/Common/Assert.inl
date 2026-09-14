@@ -154,12 +154,25 @@ void SC_ASSERT_PROVIDER::printBacktrace(const char* expression, Result result, c
 #else
 #define NATIVE_PRINT_SPECIFIER "%s"
 #endif
-    ::snprintf(buffer, sizeof(buffer),
-               "Assertion failed: (%s)\n"
-               "Reason: %s\n"
-               "File: " NATIVE_PRINT_SPECIFIER "\n"
-               "Function: %s\nLine: %d\n",
-               expression, result.message, filename, function, line);
+    if (result.hasMessage())
+    {
+        ::snprintf(buffer, sizeof(buffer),
+                   "Assertion failed: (%s)\n"
+                   "Reason: %s\n"
+                   "File: " NATIVE_PRINT_SPECIFIER "\n"
+                   "Function: %s\nLine: %d\n",
+                   expression, result.message, filename, function, line);
+    }
+    else
+    {
+        ::snprintf(buffer, sizeof(buffer),
+                   "Assertion failed: (%s)\n"
+                   "Reason: error category %u, code %u\n"
+                   "File: " NATIVE_PRINT_SPECIFIER "\n"
+                   "Function: %s\nLine: %d\n",
+                   expression, static_cast<unsigned int>(result.category().value),
+                   static_cast<unsigned int>(result.errorValue()), filename, function, line);
+    }
 #undef NATIVE_PRINT_SPECIFIER
     Internal::printAscii(buffer);
     void* backtraceBuffer[256];
