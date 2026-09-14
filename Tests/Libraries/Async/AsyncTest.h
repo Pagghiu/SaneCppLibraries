@@ -27,6 +27,7 @@ struct SC::AsyncTest : public SC::TestCase
 
     // Timeouts
     void loopTimeout();
+    void loopTimeoutCallbackLifetime();
 
     // Loop WakeUp
     void loopWakeUpFromExternalThread();

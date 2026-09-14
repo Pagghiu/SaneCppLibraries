@@ -97,6 +97,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopTimeout();
         }
+        if (test_section("loop timeout callback lifetime"))
+        {
+            loopTimeoutCallbackLifetime();
+        }
         if (test_section("loop wakeUpFromExternalThread"))
         {
             loopWakeUpFromExternalThread();

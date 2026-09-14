@@ -1383,35 +1383,22 @@ SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() co
 
 void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncEventLoop& eventLoop, TimeMs currentTime)
 {
-    AsyncLoopTimeout* async = activeLoopTimeouts.front;
-    while (async != nullptr)
+    // A callback can remove or destroy any timer, so never retain list pointers across callback invocation.
+    while (AsyncLoopTimeout* current = activeLoopTimeouts.front)
     {
-        AsyncLoopTimeout* current = async;
-        async                     = static_cast<AsyncLoopTimeout*>(async->next);
-        if (currentTime.milliseconds >= current->expirationTime.milliseconds)
+        if (currentTime.milliseconds < current->expirationTime.milliseconds)
         {
-            removeActiveHandle(*current);
-            Result                   res(true);
-            AsyncLoopTimeout::Result result(eventLoop, *current, res);
-            if (current->callback.isValid())
-            {
-                current->callback(result);
-            }
-
-            if (async != nullptr and not async->isActive())
-            {
-                // Our "next" timeout to check could have been Cancelled during the callback
-                // and it could be in the submission queue now.
-                // It's possible detecting this case by checking the active state.
-                // In this case it makes sense to re-check the entire active timers list.
-                async = activeLoopTimeouts.front;
-                SC_ASYNC_ASSERT_DEBUG(async == nullptr or async->isActive()); // Should not be possible
-            }
-        }
-        else
-        {
-            // Timers are ordered by expirationTime so we can safely break out of this loop
             break;
+        }
+
+        // Invoke a local copy because waking another thread can release the request before the callback returns.
+        Function<void(AsyncLoopTimeout::Result&)> callback = current->callback;
+        removeActiveHandle(*current);
+        Result                   res(true);
+        AsyncLoopTimeout::Result result(eventLoop, *current, res);
+        if (callback.isValid())
+        {
+            callback(result);
         }
     }
 }

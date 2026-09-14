@@ -92,3 +92,49 @@ void SC::AsyncTest::loopTimeout()
     SC_TEST_EXPECT(context.callbackOrder[1] == 2);
     SC_TEST_EXPECT(context.callbackOrder[2] == 2);
 }
+
+void SC::AsyncTest::loopTimeoutCallbackLifetime()
+{
+    struct Context
+    {
+        AsyncLoopTimeout* timeout           = nullptr;
+        int               storedGeneration  = 0;
+        int               invokedGeneration = 0;
+    } context;
+
+    struct ReleaseTimeout
+    {
+        Context* context    = nullptr;
+        int      generation = 0;
+
+        explicit ReleaseTimeout(Context& context) : context(&context) {}
+        ReleaseTimeout(const ReleaseTimeout& other) : context(other.context), generation(other.generation + 1) {}
+        ReleaseTimeout(ReleaseTimeout&& other) : context(other.context), generation(other.generation + 1) {}
+
+        void operator()(AsyncLoopTimeout::Result&)
+        {
+            context->invokedGeneration = generation;
+            dtor(*context->timeout);
+            context->timeout = nullptr;
+        }
+    };
+
+    alignas(AsyncLoopTimeout) char timeoutStorage[sizeof(AsyncLoopTimeout)];
+    AsyncLoopTimeout*              timeout = reinterpret_cast<AsyncLoopTimeout*>(timeoutStorage);
+    placementNew(*timeout);
+    context.timeout = timeout;
+
+    ReleaseTimeout callback(context);
+    timeout->callback              = callback;
+    ReleaseTimeout* storedCallback = timeout->callback.dynamicCastTo<ReleaseTimeout>();
+    SC_TEST_EXPECT(storedCallback != nullptr);
+    context.storedGeneration = storedCallback->generation;
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SC_TEST_EXPECT(timeout->start(eventLoop, TimeMs{0}));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(context.timeout == nullptr);
+    SC_TEST_EXPECT(context.invokedGeneration > context.storedGeneration);
+    SC_TEST_EXPECT(eventLoop.close());
+}
