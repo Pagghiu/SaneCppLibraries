@@ -93,6 +93,7 @@ void SC::FileSystemIteratorTest::walkNotEnough()
     const ResultFileSystemIterator traversalResult = fsIterator.checkErrors();
     SC_TEST_EXPECT(traversalResult.isError(FileSystemIteratorError::RecursionLimitExceeded));
     SC_TEST_EXPECT(traversalResult.depth == 1);
+    SC_TEST_EXPECT(traversalResult.detail == FileSystemIteratorErrorDetail::PushRecursionState);
     SC_TEST_EXPECT(fsIterator.checkErrors().isError(FileSystemIteratorError::RecursionLimitExceeded));
     SC_TEST_EXPECT(fs.removeEmptyDirectory("test"));
     //! [walkNotEnoughSnippet]
@@ -127,6 +128,11 @@ void SC::FileSystemIteratorTest::completionAndStickyErrors()
     const ResultFileSystemIterator openFailure = failedInit.init(missingPath.view(), entries);
     SC_TEST_EXPECT(openFailure.isError(FileSystemIteratorError::OpenDirectoryFailed));
     SC_TEST_EXPECT(openFailure.nativeError != 0);
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(openFailure.detail == FileSystemIteratorErrorDetail::WindowsFindFirstFile);
+#else
+    SC_TEST_EXPECT(openFailure.detail == FileSystemIteratorErrorDetail::PosixOpen);
+#endif
     SC_TEST_EXPECT(failedInit.checkErrors().isError(FileSystemIteratorError::OpenDirectoryFailed));
 
     SC_TEST_EXPECT(failedInit.init(emptyPath.view(), entries));
@@ -149,13 +155,16 @@ void SC::FileSystemIteratorTest::structuredErrorsAndFormatter()
 {
     static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemIterator) == 24,
                   "The migration bridge temporarily expands ResultFileSystemIterator");
+    static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemIterator) == sizeof(Result) + 8,
+                  "ResultFileSystemIterator detail must fit the final 16-byte target");
     static_assert(__is_standard_layout(ResultFileSystemIterator),
                   "ResultFileSystemIterator must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystemIterator>::value,
                   "ResultFileSystemIterator must remain trivially copyable");
 
-    constexpr char           expected[] = "Failed to open directory (native error: 2, depth: 3)";
-    ResultFileSystemIterator detailed(FileSystemIteratorError::OpenDirectoryFailed, 2, 3);
+    constexpr char expected[] = "Failed to open directory (detail: POSIX open directory, native error: 2, depth: 3)";
+    ResultFileSystemIterator detailed(FileSystemIteratorError::OpenDirectoryFailed,
+                                      FileSystemIteratorErrorDetail::PosixOpen, 2, 3);
     char                     message[sizeof(expected)];
     ResultErrorFormat        formatted = formatFileSystemIteratorError(detailed, message);
     SC_TEST_EXPECT(formatted);
@@ -164,11 +173,28 @@ void SC::FileSystemIteratorTest::structuredErrorsAndFormatter()
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(FileSystemIteratorResultCategory, FileSystemIteratorError::OpenDirectoryFailed));
+    SC_TEST_EXPECT(detailed.detail == FileSystemIteratorErrorDetail::PosixOpen);
+
+    constexpr char           expectedRoot[] = "Directory path is too long (detail: build traversal path, depth: 0)";
+    ResultFileSystemIterator rootFailure(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                         0, 0);
+    char                     rootMessage[sizeof(expectedRoot)];
+    formatted = formatFileSystemIteratorError(rootFailure, rootMessage);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedRoot));
+    SC_TEST_EXPECT(::memcmp(rootMessage, expectedRoot, sizeof(expectedRoot)) == 0);
+
+    ResultFileSystemIterator unknownDetail(FileSystemIteratorError::PathTooLong,
+                                           static_cast<FileSystemIteratorErrorDetail>(999), 0, 0);
+    formatted = formatFileSystemIteratorError(unknownDetail, rootMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(rootMessage[0] == '\0');
 
     const ResultFileSystemIterator legacy(Result::Error("legacy iterator result"));
     SC_TEST_EXPECT(not legacy);
     SC_TEST_EXPECT(legacy.nativeError == 0);
     SC_TEST_EXPECT(legacy.depth == 0);
+    SC_TEST_EXPECT(legacy.detail == FileSystemIteratorErrorDetail::None);
     SC_TEST_EXPECT(legacy.result.hasLegacyError());
     formatted = formatFileSystemIteratorError(legacy, message);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);

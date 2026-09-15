@@ -44,6 +44,8 @@ SC_DECLARE_ASSERT_PROVIDER(FileSystemIteratorAssert, SC_FILE_SYSTEM_ITERATOR_EXP
 /// \snippet Tests/Libraries/FileSystemIterator/FileSystemIteratorTest.cpp walkRecursiveManualSnippet
 struct FileSystemIterator
 {
+    static_assert(StringPath::MaxPath <= 65535, "ResultFileSystemIterator depth must fit in uint16_t");
+
     /// Entry type (File or Directory)
     enum class Type
     {

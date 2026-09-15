@@ -34,6 +34,7 @@ struct SC::FileSystemIterator::Internal
         if (INVALID_HANDLE_VALUE == entry.fileDescriptor)
         {
             return ResultFileSystemIterator(FileSystemIteratorError::OpenDirectoryFailed,
+                                            FileSystemIteratorErrorDetail::WindowsFindFirstFile,
                                             static_cast<uint32_t>(::GetLastError()), depth);
         }
         return ResultFileSystemIterator(true);
@@ -64,18 +65,21 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::initInternal(StringSpan    
     recurseStack.currentEntry     = -1;
 
     if (not FileSystemIteratorWindowsDetail::WindowsPath::makeAbsoluteLogicalPath(directory, {}, currentPath))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathResolutionFailed);
+        return ResultFileSystemIterator(FileSystemIteratorError::PathResolutionFailed,
+                                        FileSystemIteratorErrorDetail::WindowsResolveLogicalPath, 0, 0);
     const size_t dirLen = currentPath.view().sizeInBytes() / sizeof(wchar_t);
 
     StringPath searchPath = currentPath;
     if (not searchPath.append(L"\\*.*"))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong);
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, 0);
     FileSystemIteratorWindowsDetail::WindowsPath::TransportString transportPath;
     const wchar_t* searchPattern = searchPath.view().getNullTerminatedNative();
     if (fileSystemIteratorNeedsWindowsLongPathTransport(searchPath.view()))
     {
         if (not FileSystemIteratorWindowsDetail::WindowsPath::appendTransportPrefix(searchPath.view(), transportPath))
-            return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong);
+            return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong,
+                                            FileSystemIteratorErrorDetail::BuildPath, 0, 0);
         searchPattern = transportPath.view().getNullTerminatedNative();
     }
     {
@@ -91,6 +95,7 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::initInternal(StringSpan    
     if (INVALID_HANDLE_VALUE == currentFolder.fileDescriptor)
     {
         return ResultFileSystemIterator(FileSystemIteratorError::OpenDirectoryFailed,
+                                        FileSystemIteratorErrorDetail::WindowsFindFirstFile,
                                         static_cast<uint32_t>(::GetLastError()), 0);
     }
 
@@ -143,8 +148,8 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::enumerateNextInternal(Entry
 
     (void)currentPath.resize(dirLen);
     if (not currentPath.append(L"\\") or not currentPath.append(entry.name))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
-                                        static_cast<uint32_t>(recurseStack.size() - 1));
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, static_cast<uint32_t>(recurseStack.size() - 1));
 
     entry.parentFileDescriptor = parent.fileDescriptor;
     if (dirEnumerator.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -189,8 +194,8 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectoryInternal
     recursePath = currentPath;
     (void)recursePath.resize(recurseStack.back().textLengthInBytes / sizeof(wchar_t));
     if (not recursePath.append(L"\\") or not recursePath.append(entry.name))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
-                                        static_cast<uint32_t>(recurseStack.size()));
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, static_cast<uint32_t>(recurseStack.size()));
 
     {
         // Store the length of the sub directory without the trailing \*.* added later
@@ -200,14 +205,15 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectoryInternal
     }
     StringPath searchPath = recursePath;
     if (not searchPath.append(L"\\*.*"))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
-                                        static_cast<uint32_t>(recurseStack.size() - 1));
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, static_cast<uint32_t>(recurseStack.size() - 1));
     FileSystemIteratorWindowsDetail::WindowsPath::TransportString transportPath;
     const wchar_t* searchPattern = searchPath.view().getNullTerminatedNative();
     if (fileSystemIteratorNeedsWindowsLongPathTransport(searchPath.view()))
     {
         if (not FileSystemIteratorWindowsDetail::WindowsPath::appendTransportPrefix(searchPath.view(), transportPath))
-            return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
+            return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong,
+                                            FileSystemIteratorErrorDetail::BuildPath, 0,
                                             static_cast<uint32_t>(recurseStack.size() - 1));
         searchPattern = transportPath.view().getNullTerminatedNative();
     }
@@ -217,9 +223,9 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectoryInternal
     currentFolder.fileDescriptor    = ::FindFirstFileW(searchPattern, &dirEnumerator);
     if (INVALID_HANDLE_VALUE == currentFolder.fileDescriptor)
     {
-        return ResultFileSystemIterator(FileSystemIteratorError::OpenDirectoryFailed,
-                                        static_cast<uint32_t>(::GetLastError()),
-                                        static_cast<uint32_t>(recurseStack.size() - 1));
+        return ResultFileSystemIterator(
+            FileSystemIteratorError::OpenDirectoryFailed, FileSystemIteratorErrorDetail::WindowsFindFirstFile,
+            static_cast<uint32_t>(::GetLastError()), static_cast<uint32_t>(recurseStack.size() - 1));
     }
 
     expectDotDirectories = true;

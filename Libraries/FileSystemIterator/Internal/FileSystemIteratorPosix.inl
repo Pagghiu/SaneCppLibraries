@@ -24,16 +24,18 @@
 struct SC::FileSystemIterator::Internal
 {
 
-    static ResultFileSystemIterator nativeError(FileSystemIteratorError error, int errorCode, uint32_t depth)
+    static ResultFileSystemIterator nativeError(FileSystemIteratorError error, FileSystemIteratorErrorDetail detail,
+                                                int errorCode, uint32_t depth)
     {
-        return ResultFileSystemIterator(error, static_cast<uint32_t>(errorCode), depth);
+        return ResultFileSystemIterator(error, detail, static_cast<uint32_t>(errorCode), depth);
     }
     static ResultFileSystemIterator initFolderState(FolderState& entry, int fd, uint32_t depth)
     {
         entry.fileDescriptor = fd;
         if (entry.fileDescriptor == -1)
         {
-            return nativeError(FileSystemIteratorError::OpenDirectoryFailed, errno, depth);
+            return nativeError(FileSystemIteratorError::OpenDirectoryFailed, FileSystemIteratorErrorDetail::PosixOpen,
+                               errno, depth);
         }
         entry.dirEnumerator = ::fdopendir(entry.fileDescriptor);
         if (entry.dirEnumerator == nullptr)
@@ -41,7 +43,8 @@ struct SC::FileSystemIterator::Internal
             const int nativeError = errno;
             ::close(entry.fileDescriptor);
             entry.fileDescriptor = -1; // Reset file descriptor on error
-            return Internal::nativeError(FileSystemIteratorError::OpenDirectoryFailed, nativeError, depth);
+            return Internal::nativeError(FileSystemIteratorError::OpenDirectoryFailed,
+                                         FileSystemIteratorErrorDetail::PosixFdOpenDir, nativeError, depth);
         }
         return ResultFileSystemIterator(true);
     }
@@ -81,7 +84,8 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::initInternal(StringSpan    
     }
 
     if (not currentPath.assign(directory))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong);
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, 0);
 
     entry.textLengthInBytes = directory.sizeInBytes();
 
@@ -138,8 +142,8 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::enumerateNextInternal(Entry
     (void)currentPath.resize(recurseStack.back().textLengthInBytes);
 
     if (not currentPath.append("/") or not currentPath.append(entry.name))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
-                                        static_cast<uint32_t>(recurseStack.size() - 1));
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, static_cast<uint32_t>(recurseStack.size() - 1));
 
     entry.path  = currentPath.view();
     entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
@@ -166,11 +170,12 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectoryInternal
     FolderState newParent;
     (void)currentPath.resize(recurseStack.back().textLengthInBytes);
     if (not currentPath.append("/") or not currentPath.append(entry.name))
-        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
-                                        static_cast<uint32_t>(recurseStack.size()));
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, FileSystemIteratorErrorDetail::BuildPath,
+                                        0, static_cast<uint32_t>(recurseStack.size()));
     newParent.textLengthInBytes = currentPath.view().sizeInBytes();
     if (not entry.name.isNullTerminated())
-        return ResultFileSystemIterator(FileSystemIteratorError::InvalidRecursionState, 0,
+        return ResultFileSystemIterator(FileSystemIteratorError::InvalidRecursionState,
+                                        FileSystemIteratorErrorDetail::PushRecursionState, 0,
                                         static_cast<uint32_t>(recurseStack.size()));
     SC_TRY(recurseStack.push_back(newParent));
     const int fd = ::openat(entry.parentFileDescriptor, entry.name.getNullTerminatedNative(), O_DIRECTORY);

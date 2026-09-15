@@ -15,8 +15,8 @@ Normal completion is control flow, not an error. Giving it an error identity wou
 localized or optional diagnostics part of program logic. At the same time, changing every compact
 `while (iterator.enumerateNext())` loop to manage an output status would add substantial client churn.
 
-Traversal errors can carry useful fixed-size context. In particular, native platform error values and the affected
-directory depth can distinguish failures without allocating or retaining path strings.
+Traversal errors can carry useful fixed-size context. In particular, native platform error values, the affected
+directory depth, and the backend stage can distinguish failures without allocating or retaining path strings.
 
 ## Decision
 
@@ -32,10 +32,13 @@ native traversal state. `init()` starts a new traversal and resets the retained 
 itself retained. Manual recursion failures are retained by the public wrapper. Early loop termination remains valid,
 and `checkErrors()` reports only failures encountered so far.
 
-FileSystemIterator owns its error category, error enum, enriched result, and optional English formatter. The enriched
-result contains only the plain `Result`, a native error number, and the affected directory depth. It is allocation-free,
-standard-layout, and trivially copyable. Conversion to plain `Result` preserves category and error identity while
-deliberately discarding the additional context.
+FileSystemIterator owns its error category, primary error enum, backend/API-stage detail enum, enriched result, and
+optional English formatter. The enriched result contains only the plain `Result`, a native error number, the affected
+directory depth, and the backend/API stage. Depth and detail are 16-bit fixed-width values: successful path growth is
+bounded by `StringPath::MaxPath`, which is currently at most 4096 and statically constrained to fit in `uint16_t`. This
+keeps the allocation-free, standard-layout, trivially copyable result at 16 bytes after the legacy Result message
+pointer is removed.
+Conversion to plain `Result` preserves category and error identity while deliberately discarding the additional context.
 
 On current 64-bit targets the temporary 16-byte compatibility bridge makes the enriched result 24 bytes. Removing the
 legacy pointer returns plain `Result` to eight bytes and this enriched type to the 16-byte target. The temporary size is

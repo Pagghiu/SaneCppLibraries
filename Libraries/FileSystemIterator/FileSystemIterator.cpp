@@ -76,7 +76,8 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectory()
     if (options.recursive or finished or not entryAvailable or not currentEntry.isDirectory())
     {
         const uint32_t depth = recurseStack.isEmpty() ? 0 : static_cast<uint32_t>(recurseStack.size() - 1);
-        errorResult          = ResultFileSystemIterator(FileSystemIteratorError::InvalidRecursionState, 0, depth);
+        errorResult          = ResultFileSystemIterator(FileSystemIteratorError::InvalidRecursionState,
+                                                        FileSystemIteratorErrorDetail::PushRecursionState, 0, depth);
         finished             = true;
         return errorResult;
     }
@@ -106,7 +107,8 @@ void SC::FileSystemIterator::RecurseStack::pop_back()
 SC::ResultFileSystemIterator SC::FileSystemIterator::RecurseStack::push_back(const FolderState& other)
 {
     if (size_t(currentEntry + 1) >= recursiveEntries.sizeInElements())
-        return ResultFileSystemIterator(FileSystemIteratorError::RecursionLimitExceeded, 0,
+        return ResultFileSystemIterator(FileSystemIteratorError::RecursionLimitExceeded,
+                                        FileSystemIteratorErrorDetail::PushRecursionState, 0,
                                         static_cast<uint32_t>(size()));
     currentEntry += 1;
     recursiveEntries.data()[currentEntry] = other;

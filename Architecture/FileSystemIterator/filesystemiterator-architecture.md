@@ -36,7 +36,7 @@ Keep recursion caller-bounded through `Span<FolderState>`. Keep enumeration pull
 
 ## Explicitly Excluded Targets
 
-Do not add hidden allocation, full-tree materialization, globbing, path expression filtering, filesystem mutation, file watching, or dependency on FileSystem. Do not make returned `StringSpan` values outlive the next `enumerateNext`, `recurseSubdirectory`, or `init` call.
+Do not add hidden allocation, full-tree materialization, globbing, path expression filtering, filesystem mutation, file watching, or dependency on FileSystem. Do not make returned `StringSpan` values outlive the next `enumerateNext`, `recurseSubdirectory`, or `init` call. Keep backend stages in the enriched result detail field, not in the portable primary error identity.
 
 ## Sources
 
