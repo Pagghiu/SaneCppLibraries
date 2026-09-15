@@ -1,5 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include <memory.h>
+
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Async/Async.h"
 #include "Libraries/Common/Deferred.h"
@@ -9,6 +11,7 @@
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Plugin/Internal/PluginString.h"
+#include "Libraries/Plugin/PluginErrorFormatter.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -54,6 +57,10 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(definition.dependencies[1].view() == "TestPlugin02");
             SC_TEST_EXPECT(definition.build[0] == "libc");
             SC_TEST_EXPECT(definition.build[1] == "libc++");
+        }
+        if (test_section("Plugin structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
@@ -309,6 +316,82 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
             SC_TEST_EXPECT(compiler.compile(definitions[0], sysroot, environment, compilerLog));
 #endif
         }
+    }
+
+    void structuredErrorsAndFormatter()
+    {
+        static_assert(PluginResultCategory.value == 7, "Plugin category is registry value 7");
+        static_assert(static_cast<uint32_t>(PluginError::PathNotNullTerminated) == 1,
+                      "Plugin error values are append-only");
+        static_assert(static_cast<uint16_t>(PluginErrorDetail::None) == 0,
+                      "Plugin detail zero is reserved for no detail");
+        static_assert(static_cast<uint16_t>(PluginErrorContextKind::None) == 0,
+                      "Plugin context kind zero is reserved for no context");
+        static_assert(sizeof(Result) != 16 or sizeof(ResultPlugin) == 24,
+                      "ResultPlugin bridge layout must retain its 24-byte size");
+        static_assert(sizeof(Result) != 8 or sizeof(ResultPlugin) == 16,
+                      "ResultPlugin must meet the final 16-byte target");
+        static_assert(__is_standard_layout(ResultPlugin), "ResultPlugin must remain standard-layout");
+        static_assert(TypeTraits::IsTriviallyCopyable<ResultPlugin>::value,
+                      "ResultPlugin must remain trivially copyable");
+
+        const ResultPlugin detailed =
+            ResultPlugin::withNativeError(PluginError::FileOpenFailed, PluginErrorDetail::PosixFileOpen, 12345);
+        const ResultPlugin copied = detailed;
+        SC_TEST_EXPECT(copied.isError(PluginError::FileOpenFailed));
+        SC_TEST_EXPECT(copied.detail == PluginErrorDetail::PosixFileOpen);
+        SC_TEST_EXPECT(copied.contextKind == PluginErrorContextKind::NativeError);
+        SC_TEST_EXPECT(copied.context.nativeError == 12345);
+
+        const Result plain = detailed;
+        SC_TEST_EXPECT(plain.isError(PluginResultCategory, PluginError::FileOpenFailed));
+        const ResultPlugin fromPlain(plain);
+        SC_TEST_EXPECT(fromPlain.detail == PluginErrorDetail::None);
+        SC_TEST_EXPECT(fromPlain.contextKind == PluginErrorContextKind::None);
+        SC_TEST_EXPECT(fromPlain.context.nativeError == 0);
+
+        const Result       foreignResult = Result::Error(ResultCategory(5), 1);
+        const ResultPlugin foreign(foreignResult);
+        SC_TEST_EXPECT(not foreign);
+        SC_TEST_EXPECT(foreign.toResult().isError(ResultCategory(5), 1));
+        SC_TEST_EXPECT(foreign.detail == PluginErrorDetail::None);
+        SC_TEST_EXPECT(foreign.contextKind == PluginErrorContextKind::None);
+
+        constexpr char    expected[] = "Failed to open file (detail: POSIX open file) (native error: 12345)";
+        char              message[sizeof(expected)];
+        ResultErrorFormat formatted = formatPluginError(detailed, message);
+        SC_TEST_EXPECT(formatted);
+        SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+        SC_TEST_EXPECT(::memcmp(message, expected, sizeof(expected)) == 0);
+
+        const ResultPlugin exit = ResultPlugin::withExitCode(PluginError::CompilerExitedWithFailure,
+                                                             PluginErrorDetail::CompilerBuildArguments, -42);
+        constexpr char     expectedExit[] =
+            "Compiler exited unsuccessfully (detail: build compiler arguments) (exit code: -42)";
+        char exitMessage[sizeof(expectedExit)];
+        formatted = formatPluginError(exit, exitMessage);
+        SC_TEST_EXPECT(formatted);
+        SC_TEST_EXPECT(::memcmp(exitMessage, expectedExit, sizeof(expectedExit)) == 0);
+
+        formatted = formatPluginError(PluginError::PathCapacityExceeded, {});
+        SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+        SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Path capacity exceeded"));
+        char tooSmall[2] = {'x', 0};
+        formatted        = formatPluginError(PluginError::PathCapacityExceeded, tooSmall);
+        SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+        SC_TEST_EXPECT(tooSmall[0] == 0);
+        SC_TEST_EXPECT(formatPluginError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+        SC_TEST_EXPECT(formatPluginError(Result::Error(ResultCategory(99), 1), message).status ==
+                       ResultErrorFormatStatus::ForeignCategory);
+        SC_TEST_EXPECT(formatPluginError(Result::Error(PluginResultCategory, 999), message).status ==
+                       ResultErrorFormatStatus::UnknownError);
+        SC_TEST_EXPECT(
+            formatPluginError(ResultPlugin(PluginError::FileOpenFailed, static_cast<PluginErrorDetail>(999)), message)
+                .status == ResultErrorFormatStatus::UnknownError);
+        SC_TEST_EXPECT(formatPluginError(ResultPlugin(PluginError::FileOpenFailed, PluginErrorDetail::None,
+                                                      static_cast<PluginErrorContextKind>(999), {}),
+                                         message)
+                           .status == ResultErrorFormatStatus::UnknownError);
     }
 };
 

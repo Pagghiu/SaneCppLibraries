@@ -46,6 +46,12 @@
       "owner": "FileSystemWatcher",
       "declaration": "Libraries/FileSystemWatcher/FileSystemWatcherError.h",
       "constant": "FileSystemWatcherResultCategory"
+    },
+    {
+      "value": 7,
+      "owner": "Plugin",
+      "declaration": "Libraries/Plugin/PluginError.h",
+      "constant": "PluginResultCategory"
     }
   ]
 }

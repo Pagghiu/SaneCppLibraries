@@ -13,6 +13,7 @@
 #include "../Common/PlatformMacrosType.h"
 #include "../Common/PrimitiveDefinitions.h"
 #include "Internal/DynamicLibrary.h"
+#include "PluginError.h"
 namespace SC
 {
 SC_DECLARE_ASSERT_PROVIDER(PluginAssert, SC_PLUGIN_LIBRARY_EXPORT);
