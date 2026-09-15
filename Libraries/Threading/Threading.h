@@ -46,20 +46,35 @@ enum class ThreadingError : uint32_t
     ThreadPoolThreadCreationFailed,
 };
 
+/// @brief Stable detail identifying the native/backend stage of a Threading failure.
+enum class ThreadingErrorDetail : uint32_t
+{
+    None = 0,
+    PosixPthreadCreate,
+    PosixPthreadJoin,
+    PosixPthreadDetach,
+    WindowsCreateThread,
+    WindowsWaitForSingleObject,
+    WindowsCloseHandle,
+};
+
 /// @brief Stable category assigned to errors owned by the Threading library.
 static constexpr ResultCategory ThreadingResultCategory = ResultCategory(1);
 
-/// @brief Threading result retaining an optional native platform error number.
-/// @details nativeError is zero when unavailable or irrelevant. Converting to Result preserves the portable error
-/// identity and deliberately discards the native detail.
+/// @brief Threading result retaining optional native and backend-stage details.
+/// @details nativeError is zero when unavailable or irrelevant. detail is None when no lower-level stage is relevant.
+/// Converting to Result preserves the portable error identity and deliberately discards both details. The two detail
+/// fields occupy eight bytes so this type is 16 bytes after the legacy Result message pointer is removed.
 struct [[nodiscard]] ResultThreading
 {
-    Result   result;
-    uint32_t nativeError = 0;
+    Result               result;
+    uint32_t             nativeError = 0;
+    ThreadingErrorDetail detail      = ThreadingErrorDetail::None;
 
     explicit constexpr ResultThreading(bool valid = true) : result(valid) {}
-    constexpr ResultThreading(ThreadingError error, uint32_t nativeError = 0)
-        : result(Result::Error(ThreadingResultCategory, error)), nativeError(nativeError)
+    constexpr ResultThreading(ThreadingError error, ThreadingErrorDetail detail = ThreadingErrorDetail::None,
+                              uint32_t nativeError = 0)
+        : result(Result::Error(ThreadingResultCategory, error)), nativeError(nativeError), detail(detail)
     {}
     constexpr ResultThreading(Result result) : result(result) {}
 

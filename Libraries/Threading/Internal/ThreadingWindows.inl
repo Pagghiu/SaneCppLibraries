@@ -42,7 +42,8 @@ struct SC::Thread::Internal
         threadHandle         = ::CreateThread(0, 512 * 1024, threadFunc, &self, CREATE_SUSPENDED, &threadID);
         if (threadHandle == nullptr)
         {
-            return ResultThreading(ThreadingError::ThreadCreationFailed, static_cast<uint32_t>(::GetLastError()));
+            return ResultThreading(ThreadingError::ThreadCreationFailed, ThreadingErrorDetail::WindowsCreateThread,
+                                   static_cast<uint32_t>(::GetLastError()));
         }
         ResumeThread(threadHandle);
         return ResultThreading(true);
@@ -60,17 +61,20 @@ struct SC::Thread::Internal
         {
             const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
             ::CloseHandle(threadNative.reinterpret_as<HANDLE>());
-            return ResultThreading(ThreadingError::ThreadJoinFailed, nativeError);
+            return ResultThreading(ThreadingError::ThreadJoinFailed, ThreadingErrorDetail::WindowsWaitForSingleObject,
+                                   nativeError);
         }
         if (not ::CloseHandle(threadNative.reinterpret_as<HANDLE>()))
-            return ResultThreading(ThreadingError::ThreadJoinFailed, static_cast<uint32_t>(::GetLastError()));
+            return ResultThreading(ThreadingError::ThreadJoinFailed, ThreadingErrorDetail::WindowsCloseHandle,
+                                   static_cast<uint32_t>(::GetLastError()));
         return ResultThreading(true);
     }
 
     [[nodiscard]] static ResultThreading detachThread(OpaqueThread& threadNative)
     {
         if (not ::CloseHandle(threadNative.reinterpret_as<HANDLE>()))
-            return ResultThreading(ThreadingError::ThreadDetachFailed, static_cast<uint32_t>(::GetLastError()));
+            return ResultThreading(ThreadingError::ThreadDetachFailed, ThreadingErrorDetail::WindowsCloseHandle,
+                                   static_cast<uint32_t>(::GetLastError()));
         return ResultThreading(true);
     }
 };

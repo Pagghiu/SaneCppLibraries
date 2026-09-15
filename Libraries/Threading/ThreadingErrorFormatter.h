@@ -11,8 +11,8 @@ namespace SC
 
 namespace detail
 {
-inline ResultErrorFormat formatThreadingErrorWithNativeCode(ThreadingError error, uint32_t nativeError,
-                                                            Span<char> output)
+inline ResultErrorFormat formatThreadingErrorWithContext(ThreadingError error, ThreadingErrorDetail errorDetail,
+                                                         uint32_t nativeError, Span<char> output)
 {
     ResultErrorFormatter formatter(output);
     switch (error)
@@ -34,9 +34,29 @@ inline ResultErrorFormat formatThreadingErrorWithNativeCode(ThreadingError error
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 
-    if (nativeError != 0 and
-        (error == ThreadingError::ThreadCreationFailed or error == ThreadingError::ThreadJoinFailed or
-         error == ThreadingError::ThreadDetachFailed or error == ThreadingError::ThreadPoolThreadCreationFailed))
+    if (errorDetail != ThreadingErrorDetail::None)
+    {
+        formatter.append(" (detail: ");
+        switch (errorDetail)
+        {
+        case ThreadingErrorDetail::PosixPthreadCreate: formatter.append("POSIX create thread"); break;
+        case ThreadingErrorDetail::PosixPthreadJoin: formatter.append("POSIX join thread"); break;
+        case ThreadingErrorDetail::PosixPthreadDetach: formatter.append("POSIX detach thread"); break;
+        case ThreadingErrorDetail::WindowsCreateThread: formatter.append("Windows create thread"); break;
+        case ThreadingErrorDetail::WindowsWaitForSingleObject: formatter.append("Windows wait for thread"); break;
+        case ThreadingErrorDetail::WindowsCloseHandle: formatter.append("Windows close thread handle"); break;
+        default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+        }
+        if (nativeError != 0)
+        {
+            formatter.append(", native error: ");
+            formatter.append(static_cast<uint64_t>(nativeError));
+        }
+        formatter.append(")");
+    }
+    else if (nativeError != 0 and
+             (error == ThreadingError::ThreadCreationFailed or error == ThreadingError::ThreadJoinFailed or
+              error == ThreadingError::ThreadDetachFailed or error == ThreadingError::ThreadPoolThreadCreationFailed))
     {
         formatter.append(" (native error: ");
         formatter.append(static_cast<uint64_t>(nativeError));
@@ -51,7 +71,7 @@ inline ResultErrorFormat formatThreadingErrorWithNativeCode(ThreadingError error
 /// ResultErrorFormatter with their own translated text.
 inline ResultErrorFormat formatThreadingError(ThreadingError error, Span<char> output)
 {
-    return detail::formatThreadingErrorWithNativeCode(error, 0, output);
+    return detail::formatThreadingErrorWithContext(error, ThreadingErrorDetail::None, 0, output);
 }
 
 /// @brief Formats a plain Result when it contains a Threading error.
@@ -71,8 +91,8 @@ inline ResultErrorFormat formatThreadingError(ResultThreading result, Span<char>
         return ResultErrorFormatter::failure(ResultErrorFormatStatus::NotAnError, output);
     if (result.result.category() != ThreadingResultCategory)
         return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
-    return detail::formatThreadingErrorWithNativeCode(static_cast<ThreadingError>(result.result.errorValue()),
-                                                      result.nativeError, output);
+    return detail::formatThreadingErrorWithContext(static_cast<ThreadingError>(result.result.errorValue()),
+                                                   result.detail, result.nativeError, output);
 }
 
 //! @}

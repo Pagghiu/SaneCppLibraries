@@ -38,7 +38,8 @@ struct SC::Thread::Internal
         const int res = pthread_create(&opaqueThread.reinterpret_as<pthread_t>(), 0, threadFunc, &self);
         if (res != 0)
         {
-            return ResultThreading(ThreadingError::ThreadCreationFailed, static_cast<uint32_t>(res));
+            return ResultThreading(ThreadingError::ThreadCreationFailed, ThreadingErrorDetail::PosixPthreadCreate,
+                                   static_cast<uint32_t>(res));
         }
         return ResultThreading(true);
     }
@@ -57,7 +58,8 @@ struct SC::Thread::Internal
         int res = pthread_join(threadNative.reinterpret_as<pthread_t>(), 0);
         if (res != 0)
         {
-            return ResultThreading(ThreadingError::ThreadJoinFailed, static_cast<uint32_t>(res));
+            return ResultThreading(ThreadingError::ThreadJoinFailed, ThreadingErrorDetail::PosixPthreadJoin,
+                                   static_cast<uint32_t>(res));
         }
         return ResultThreading(true);
     }
@@ -67,7 +69,8 @@ struct SC::Thread::Internal
         int res = pthread_detach(threadNative.reinterpret_as<pthread_t>());
         if (res != 0)
         {
-            return ResultThreading(ThreadingError::ThreadDetachFailed, static_cast<uint32_t>(res));
+            return ResultThreading(ThreadingError::ThreadDetachFailed, ThreadingErrorDetail::PosixPthreadDetach,
+                                   static_cast<uint32_t>(res));
         }
         return ResultThreading(true);
     }

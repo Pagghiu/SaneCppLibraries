@@ -6,23 +6,26 @@ Date: 2026-09-12
 ## Context
 
 Portable Threading error codes let callers identify the failed operation, but native thread creation, join, and detach
-failures often require the platform error number for diagnosis. Putting that number in plain `Result` would charge
-every library for Threading-specific context, while keeping only canonical prose would lose machine-readable detail.
+failures often require both the platform error number and the lower-level stage for diagnosis. Putting that context in
+plain `Result` would charge every library for Threading-specific data, while keeping only canonical prose would lose
+machine-readable detail.
 
 ## Decision
 
-Threading APIs return the composed `ResultThreading` type. Its authoritative `Result` member carries the stable
-Threading category and error code, while `nativeError` optionally carries the copied POSIX error value or Windows
-`GetLastError()` value. Zero means unavailable or irrelevant. The type owns no memory, allocates nothing, remains
-standard-layout and trivially copyable, and will be 16 bytes after the temporary Result migration bridge is removed.
+Threading APIs return the composed `ResultThreading` type. Its authoritative `Result` member carries the stable,
+platform-agnostic Threading category and error code. `nativeError` optionally carries the copied POSIX error value or
+Windows `GetLastError()` value, and `detail` identifies the concrete backend/API stage (`pthread_*`, `CreateThread`,
+`WaitForSingleObject`, or `CloseHandle`) when that distinction is useful. Zero/None means unavailable or irrelevant.
+The type owns no memory, allocates nothing, remains standard-layout and trivially copyable, and will be 16 bytes after
+the temporary Result migration bridge is removed.
 
-Conversion to plain `Result` is implicit and deliberately discards `nativeError`. Conversion to `bool` is explicit so
+Conversion to plain `Result` is implicit and deliberately discards `nativeError` and `detail`. Conversion to `bool` is explicit so
 generic overload sets cannot become ambiguous between boolean and plain-result consumers; contextual boolean checks
 remain supported. Same-domain `SC_TRY` propagation retains the complete `ResultThreading`, while construction from a
 plain or foreign result preserves its error identity and clears native context.
 
-The opt-in Threading formatter appends a labelled decimal native error number when it is available. Applications may
-instead consume the public fields and produce translated diagnostics.
+The opt-in Threading formatter appends the backend/API stage and labelled decimal native error number when available.
+Applications may instead consume the public fields and produce translated diagnostics.
 
 ## Consequences
 

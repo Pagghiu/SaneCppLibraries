@@ -117,7 +117,7 @@ SC::ResultThreading SC::ThreadPool::create(size_t workerThreads)
         if (thread == nullptr)
         {
             return ResultThreading(ThreadingError::ThreadPoolThreadCreationFailed,
-                                   static_cast<uint32_t>(::GetLastError()));
+                                   ThreadingErrorDetail::WindowsCreateThread, static_cast<uint32_t>(::GetLastError()));
         }
         ::ResumeThread(thread);
         ::CloseHandle(thread);
@@ -126,7 +126,8 @@ SC::ResultThreading SC::ThreadPool::create(size_t workerThreads)
         const int res = ::pthread_create(&thread, nullptr, &WorkerThread::execute, this);
         if (res != 0)
         {
-            return ResultThreading(ThreadingError::ThreadPoolThreadCreationFailed, static_cast<uint32_t>(res));
+            return ResultThreading(ThreadingError::ThreadPoolThreadCreationFailed,
+                                   ThreadingErrorDetail::PosixPthreadCreate, static_cast<uint32_t>(res));
         }
         ::pthread_detach(thread);
 #endif

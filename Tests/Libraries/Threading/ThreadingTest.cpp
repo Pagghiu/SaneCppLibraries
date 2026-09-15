@@ -321,6 +321,8 @@ void SC::ThreadingTest::testErrorFormatter()
 {
     static_assert(sizeof(void*) != 8 or sizeof(ResultThreading) == 24,
                   "The migration bridge temporarily expands ResultThreading");
+    static_assert(sizeof(void*) != 8 or sizeof(ResultThreading) == sizeof(Result) + 8,
+                  "ResultThreading detail must fit the final 16-byte target");
     static_assert(__is_standard_layout(ResultThreading), "ResultThreading must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultThreading>::value,
                   "ResultThreading must remain trivially copyable");
@@ -357,14 +359,20 @@ void SC::ThreadingTest::testErrorFormatter()
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
     SC_TEST_EXPECT(exact[0] == '\0');
 
-    constexpr char  expectedNative[] = "Failed to create thread (native error: 12345)";
-    ResultThreading detailed(ThreadingError::ThreadCreationFailed, 12345);
+    constexpr char  expectedNative[] = "Failed to create thread (detail: POSIX create thread, native error: 12345)";
+    ResultThreading detailed(ThreadingError::ThreadCreationFailed, ThreadingErrorDetail::PosixPthreadCreate, 12345);
     char            nativeMessage[sizeof(expectedNative)];
     formatted = formatThreadingError(detailed, nativeMessage);
     SC_TEST_EXPECT(formatted);
     SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedNative));
     SC_TEST_EXPECT(areEqual(nativeMessage, expectedNative));
     SC_TEST_EXPECT(detailed.isError(ThreadingError::ThreadCreationFailed));
+    SC_TEST_EXPECT(detailed.detail == ThreadingErrorDetail::PosixPthreadCreate);
+
+    ResultThreading unknownDetail(ThreadingError::ThreadCreationFailed, static_cast<ThreadingErrorDetail>(999), 12345);
+    formatted = formatThreadingError(unknownDetail, nativeMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(nativeMessage[0] == '\0');
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(ThreadingResultCategory, ThreadingError::ThreadCreationFailed));
@@ -372,6 +380,7 @@ void SC::ThreadingTest::testErrorFormatter()
     const ResultThreading foreign(Result::Error(ResultCategory(1234), 7));
     SC_TEST_EXPECT(not foreign);
     SC_TEST_EXPECT(foreign.nativeError == 0);
+    SC_TEST_EXPECT(foreign.detail == ThreadingErrorDetail::None);
     formatted = formatThreadingError(foreign, nativeMessage);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
 
