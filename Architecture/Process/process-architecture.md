@@ -63,6 +63,7 @@ Inferred anti-inspirations: shell command concatenation, implicit environment al
 - [PROCESS-0001 - Keep Process arguments and environment in explicit arenas](process-0001-keep-process-arguments-and-environment-in-explicit-arenas.md)
 - [PROCESS-0002 - Model Process I/O and chains as explicit File/Pipe handoffs](process-0002-model-process-io-and-chains-as-explicit-file-pipe-handoffs.md)
 - [PROCESS-0003 - Keep ProcessFork as a caveated snapshot primitive](process-0003-keep-processfork-as-a-caveated-snapshot-primitive.md)
+- [PROCESS-0004 - Separate portable Process errors from backend details](process-0004-separate-portable-process-errors-from-backend-details.md)
 - [SC-0001 - Library code must not hide dynamic allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0009 - Isolate platform-specific implementations behind internal code](../Global/sc-0009-isolate-platform-specific-implementations-behind-internal-code.md)
 
@@ -71,3 +72,4 @@ Inferred anti-inspirations: shell command concatenation, implicit environment al
 - [PROCESS-0001 - Keep Process arguments and environment in explicit arenas](process-0001-keep-process-arguments-and-environment-in-explicit-arenas.md)
 - [PROCESS-0002 - Model Process I/O and chains as explicit File/Pipe handoffs](process-0002-model-process-io-and-chains-as-explicit-file-pipe-handoffs.md)
 - [PROCESS-0003 - Keep ProcessFork as a caveated snapshot primitive](process-0003-keep-processfork-as-a-caveated-snapshot-primitive.md)
+- [PROCESS-0004 - Separate portable Process errors from backend details](process-0004-separate-portable-process-errors-from-backend-details.md)

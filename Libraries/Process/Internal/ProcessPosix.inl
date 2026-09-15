@@ -45,7 +45,8 @@ struct SC::Process::Internal
         } while (waitPid == -1 and errno == EINTR);
         if (waitPid == -1)
         {
-            return ResultProcess(ProcessError::WaitFailed, static_cast<uint32_t>(errno));
+            return ResultProcess(ProcessError::WaitFailed, ProcessErrorDetail::PosixWaitPid,
+                                 static_cast<uint32_t>(errno));
         }
         if (WIFEXITED(status) != 0)
         {
@@ -83,7 +84,7 @@ SC::ResultProcess SC::Process::launchImplementation()
     // Fork child from parent here
     processID.pid = ::fork();
     if (processID.pid < 0)
-        return ResultProcess(ProcessError::ForkFailed, static_cast<uint32_t>(errno));
+        return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixFork, static_cast<uint32_t>(errno));
     return processID.pid == 0 ? launchForkChild(pipe) : launchForkParent(pipe, &previousSignals);
 }
 
@@ -106,7 +107,7 @@ SC::ResultProcess SC::Process::launchForkParent(PipeDescriptor& pipe, const void
         int ignoredStatus = -1;
         (void)Internal::waitForPid(processID.pid, ignoredStatus);
         if (actuallyRead.sizeInBytes() != sizeof(childResult))
-            return ResultProcess(ProcessError::ExecFailed);
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixExec);
         return childResult;
     }
     handle = processID.pid;
@@ -119,7 +120,7 @@ SC::ResultProcess SC::Process::launchForkParent(PipeDescriptor& pipe, const void
 SC::ResultProcess SC::Process::formatArguments(Span<const StringSpan> params)
 {
     if (params.sizeInElements() > MAX_NUM_ARGUMENTS - commandArgumentsNumber)
-        return ResultProcess(ProcessError::StringCountCapacityExceeded);
+        return ResultProcess(ProcessError::ArgumentCapacityExceeded);
     StringsArena table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
     for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
     {
@@ -196,7 +197,7 @@ SC::ResultProcess SC::ProcessFork::waitForChild()
     }
     if (processID.pid < 0)
     {
-        return ResultProcess(ProcessError::ForkWaitFailed);
+        return ResultProcess(ProcessError::WaitFailed);
     }
     return Process::Internal::waitForPid(processID.pid, exitStatus.status);
 }
@@ -221,7 +222,7 @@ SC::ResultProcess SC::ProcessFork::fork(State state)
     if (pid < 0)
     {
         processID.pid = pid;
-        return ResultProcess(ProcessError::ForkFailed, static_cast<uint32_t>(errno));
+        return ResultProcess(ProcessError::CloneFailed, ProcessErrorDetail::PosixFork, static_cast<uint32_t>(errno));
     }
 
     // Check parent / child branch

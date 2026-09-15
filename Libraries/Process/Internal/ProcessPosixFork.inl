@@ -30,7 +30,8 @@ struct SC::Process::InternalFork
         SC_TRY(handle.get(nativeFd, ResultProcess(invalidRedirectionError)));
         if (::dup2(nativeFd, fds) == -1)
         {
-            return ResultProcess(ProcessError::DuplicateDescriptorFailed, static_cast<uint32_t>(errno));
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixDuplicateDescriptor,
+                                 static_cast<uint32_t>(errno));
         }
         return ResultProcess(true);
     }
@@ -50,7 +51,8 @@ struct SC::Process::InternalFork
         int res = sigemptyset(&action.sa_mask);
         if (res < 0)
         {
-            return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(errno));
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixResetSignalHandlers,
+                                 static_cast<uint32_t>(errno));
         }
 #ifdef NSIG
         constexpr int numSignals = NSIG;
@@ -65,7 +67,8 @@ struct SC::Process::InternalFork
             res = sigaction(signal, &action, NULL);
             if (res < 0 && errno != EINVAL)
             {
-                return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(errno));
+                return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixResetSignalHandlers,
+                                     static_cast<uint32_t>(errno));
             }
         }
 
@@ -75,13 +78,15 @@ struct SC::Process::InternalFork
         res = sigemptyset(&signalSet);
         if (res < 0)
         {
-            return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(errno));
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixResetSignalHandlers,
+                                 static_cast<uint32_t>(errno));
         }
 
         res = pthread_sigmask(SIG_SETMASK, &signalSet, NULL);
         if (res > 0) // pthread returns > 0 error codes
         {
-            return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(res));
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixResetSignalHandlers,
+                                 static_cast<uint32_t>(res));
         }
 
         return ResultProcess(true);
@@ -93,7 +98,7 @@ SC::ResultProcess SC::Process::launchForkChild(PipeDescriptor& pipe)
 {
     // If execvpe doesn't take control, we exit with failure code on error
     auto          exitDeferred = MakeDeferred([&] { _exit(EXIT_FAILURE); });
-    ResultProcess childResult(ProcessError::ExecFailed);
+    ResultProcess childResult(ProcessError::LaunchFailed, ProcessErrorDetail::PosixExec);
     auto          reportDeferred =
         MakeDeferred([&] { (void)pipe.writePipe.write({reinterpret_cast<char*>(&childResult), sizeof(childResult)}); });
     auto reportFailure = [&](ResultProcess result) -> ResultProcess
@@ -154,8 +159,9 @@ SC::ResultProcess SC::Process::launchForkChild(PipeDescriptor& pipe)
         int res = ::chdir(currentDirectory.view().getNullTerminatedNative());
         if (res < 0)
         {
-            return reportFailure(
-                ResultProcess(ProcessError::ChangeWorkingDirectoryFailed, static_cast<uint32_t>(errno)));
+            return reportFailure(ResultProcess(ProcessError::LaunchFailed,
+                                               ProcessErrorDetail::PosixChangeWorkingDirectory,
+                                               static_cast<uint32_t>(errno)));
         }
     }
 
@@ -236,11 +242,14 @@ SC::ResultProcess SC::Process::launchForkChild(PipeDescriptor& pipe)
                 StringSpan pathComponent({pathStart, pathLen}, false, StringEncoding::Utf8);
                 StringPath finalCommand;
                 if (not finalCommand.append(pathComponent))
-                    return reportFailure(ResultProcess(ProcessError::StringDestinationCapacityExceeded));
+                    return reportFailure(
+                        ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixBuildResolveExecutablePath));
                 if (not finalCommand.append("/"))
-                    return reportFailure(ResultProcess(ProcessError::StringDestinationCapacityExceeded));
+                    return reportFailure(
+                        ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixBuildResolveExecutablePath));
                 if (not finalCommand.append(cmd))
-                    return reportFailure(ResultProcess(ProcessError::StringDestinationCapacityExceeded));
+                    return reportFailure(
+                        ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixBuildResolveExecutablePath));
                 (void)::execve(finalCommand.view().getNullTerminatedNative(), // command
                                const_cast<char* const*>(argv),                // arguments
                                const_cast<char* const*>(environmentArray));   // environment
@@ -255,5 +264,6 @@ SC::ResultProcess SC::Process::launchForkChild(PipeDescriptor& pipe)
     }
 
     // execvp failed, the deferred above will communicate errno back to the parent before _exit(EXIT_FAILURE).
-    return reportFailure(ResultProcess(ProcessError::ExecFailed, static_cast<uint32_t>(errno)));
+    return reportFailure(
+        ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::PosixExec, static_cast<uint32_t>(errno)));
 }

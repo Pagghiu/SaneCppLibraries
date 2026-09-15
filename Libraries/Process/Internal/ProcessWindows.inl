@@ -94,7 +94,8 @@ SC::ResultProcess SC::Process::waitForExitSync()
         exitStatus.status = static_cast<int32_t>(processStatus);
         return ResultProcess(true);
     }
-    return ResultProcess(ProcessError::WaitFailed, static_cast<uint32_t>(::GetLastError()));
+    return ResultProcess(ProcessError::WaitFailed, ProcessErrorDetail::WindowsGetExitCodeProcess,
+                         static_cast<uint32_t>(::GetLastError()));
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
@@ -132,7 +133,8 @@ SC::ResultProcess SC::Process::launchImplementation()
         // Some forgiveness here if the user forgot to set the inheritable flag
         if (::SetHandleInformation(startupInfo.hStdInput, HANDLE_FLAG_INHERIT, TRUE) == FALSE)
         {
-            return ResultProcess(ProcessError::SetHandleInformationFailed, static_cast<uint32_t>(::GetLastError()));
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::WindowsSetHandleInformation,
+                                 static_cast<uint32_t>(::GetLastError()));
         }
     }
     if (stdOutFd.isValid())
@@ -141,7 +143,8 @@ SC::ResultProcess SC::Process::launchImplementation()
         // Some forgiveness here if the user forgot to set the inheritable flag
         if (::SetHandleInformation(startupInfo.hStdOutput, HANDLE_FLAG_INHERIT, TRUE) == FALSE)
         {
-            return ResultProcess(ProcessError::SetHandleInformationFailed, static_cast<uint32_t>(::GetLastError()));
+            return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::WindowsSetHandleInformation,
+                                 static_cast<uint32_t>(::GetLastError()));
         }
     }
     if (stdErrFd.isValid())
@@ -233,7 +236,8 @@ SC::ResultProcess SC::Process::launchImplementation()
 
     if (not success)
     {
-        return ResultProcess(ProcessError::CreateProcessFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultProcess(ProcessError::LaunchFailed, ProcessErrorDetail::WindowsCreateProcess,
+                             static_cast<uint32_t>(::GetLastError()));
     }
     ::CloseHandle(processInfo.hThread);
 
@@ -468,7 +472,8 @@ SC::ResultProcess SC::ProcessFork::waitForChild()
     status = ::NtWaitForSingleObject(processHandle, FALSE, NULL);
     if (!NT_SUCCESS(status))
     {
-        return ResultProcess(ProcessError::ForkWaitFailed, static_cast<uint32_t>(status));
+        return ResultProcess(ProcessError::WaitFailed, ProcessErrorDetail::WindowsNtWaitForSingleObject,
+                             static_cast<uint32_t>(status));
     }
 
     DWORD processStatus = 0;
@@ -543,7 +548,8 @@ SC::ResultProcess SC::ProcessFork::fork(State state)
     {
         if (!NT_SUCCESS(status))
         {
-            return ResultProcess(ProcessError::ForkFailed, static_cast<uint32_t>(status));
+            return ResultProcess(ProcessError::CloneFailed, ProcessErrorDetail::WindowsRtlCloneUserProcess,
+                                 static_cast<uint32_t>(status));
         }
 
         processHandle = processInfo.ProcessHandle;

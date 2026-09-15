@@ -40,34 +40,48 @@ enum class ProcessError : uint32_t
     InvalidOutputRedirection,
     UnsupportedInputRedirection,
     UnsupportedOutputRedirection,
-    StringCountCapacityExceeded,
-    StringDestinationCapacityExceeded,
+    ArgumentCapacityExceeded,
     EnvironmentCapacityExceeded,
     WaitFailed,
-    ForkFailed,
-    ExecFailed,
-    DuplicateDescriptorFailed,
-    ResetSignalHandlersFailed,
-    ChangeWorkingDirectoryFailed,
-    SetHandleInformationFailed,
-    CreateProcessFailed,
-    ForkWaitFailed,
+    LaunchFailed,
+    CloneFailed,
+};
+
+/// @brief Stable diagnostic stages for Process failures.
+/// @details Details are only meaningful on a failing ResultProcess and are deliberately not encoded in Result.
+enum class ProcessErrorDetail : uint32_t
+{
+    None = 0,
+    PosixWaitPid,
+    WindowsGetExitCodeProcess,
+    PosixFork,
+    PosixExec,
+    PosixBuildResolveExecutablePath,
+    PosixDuplicateDescriptor,
+    PosixResetSignalHandlers,
+    PosixChangeWorkingDirectory,
+    WindowsSetHandleInformation,
+    WindowsCreateProcess,
+    WindowsRtlCloneUserProcess,
+    WindowsNtWaitForSingleObject,
 };
 
 /// @brief Stable category assigned to errors owned by the Process library.
 static constexpr ResultCategory ProcessResultCategory = ResultCategory(5);
 
-/// @brief Process result retaining an optional native platform error value.
-/// @details nativeError is zero when unavailable or irrelevant. Converting to Result preserves the portable error
-/// identity and deliberately discards the native detail.
+/// @brief Process result retaining optional backend and native platform details.
+/// @details detail and nativeError are zero when unavailable or irrelevant. Converting to Result preserves the
+/// portable error identity and deliberately discards both diagnostic details.
 struct [[nodiscard]] ResultProcess
 {
-    Result   result;
-    uint32_t nativeError = 0;
+    Result             result;
+    ProcessErrorDetail detail      = ProcessErrorDetail::None;
+    uint32_t           nativeError = 0;
 
     explicit constexpr ResultProcess(bool valid = true) : result(valid) {}
-    constexpr ResultProcess(ProcessError error, uint32_t nativeError = 0)
-        : result(Result::Error(ProcessResultCategory, error)), nativeError(nativeError)
+    constexpr ResultProcess(ProcessError error, ProcessErrorDetail detail = ProcessErrorDetail::None,
+                            uint32_t nativeError = 0)
+        : result(Result::Error(ProcessResultCategory, error)), detail(detail), nativeError(nativeError)
     {}
     constexpr ResultProcess(Result result) : result(result) {}
 

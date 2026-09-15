@@ -135,16 +135,19 @@ void SC::ProcessTest::processError()
     Process             process(commandArena.toSpan(), environmentArena.toSpan());
     const ResultProcess result = process.launch({"DOCTORI", "ASDF"});
     SC_TEST_EXPECT(not result);
-    const ProcessError expectedError =
-        HostPlatform == Platform::Windows ? ProcessError::CreateProcessFailed : ProcessError::ExecFailed;
-    SC_TEST_EXPECT(result.isError(expectedError));
+    SC_TEST_EXPECT(result.isError(ProcessError::LaunchFailed));
+    const ProcessErrorDetail expectedDetail =
+        HostPlatform == Platform::Windows ? ProcessErrorDetail::WindowsCreateProcess : ProcessErrorDetail::PosixExec;
+    SC_TEST_EXPECT(result.detail == expectedDetail);
     SC_TEST_EXPECT(result.nativeError != 0);
 }
 
 void SC::ProcessTest::structuredErrorsAndFormatter()
 {
-    static_assert(sizeof(void*) != 8 or sizeof(ResultProcess) == 24,
-                  "The migration bridge temporarily expands ResultProcess");
+    static_assert(sizeof(Result) != 8 or sizeof(ResultProcess) == 16,
+                  "ResultProcess must meet the final 16-byte enriched-result target");
+    static_assert(sizeof(Result) != 16 or sizeof(ResultProcess) == 24,
+                  "The legacy Result pointer temporarily expands ResultProcess");
     static_assert(__is_standard_layout(ResultProcess), "ResultProcess must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultProcess>::value,
                   "ResultProcess must remain trivially copyable");
@@ -163,35 +166,51 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
         SC_TEST_EXPECT(environmentProcess.setEnvironment("A", "B"));
     }
     const ResultProcess environmentCapacity = environmentProcess.setEnvironment("A", "B");
-    SC_TEST_EXPECT(environmentCapacity.isError(ProcessError::StringCountCapacityExceeded));
+    SC_TEST_EXPECT(environmentCapacity.isError(ProcessError::EnvironmentCapacityExceeded));
 
-    constexpr char    expected[] = "Failed to execute process";
-    ResultErrorFormat formatted  = formatProcessError(ProcessError::ExecFailed, {});
+#if !SC_PLATFORM_WINDOWS
+    StringSpan          arguments[65]    = {};
+    const ResultProcess argumentCapacity = Process().launch({arguments, 65});
+    SC_TEST_EXPECT(argumentCapacity.isError(ProcessError::ArgumentCapacityExceeded));
+#endif
+
+    constexpr char    expected[] = "Failed to launch process";
+    ResultErrorFormat formatted  = formatProcessError(ProcessError::LaunchFailed, {});
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
     SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
 
     char exact[sizeof(expected)];
-    formatted = formatProcessError(Result::Error(ProcessResultCategory, ProcessError::ExecFailed), exact);
+    formatted = formatProcessError(Result::Error(ProcessResultCategory, ProcessError::LaunchFailed), exact);
     SC_TEST_EXPECT(formatted);
     SC_TEST_EXPECT(::memcmp(exact, expected, sizeof(expected)) == 0);
 
-    constexpr char expectedNative[] = "Failed to execute process (native error: 12345)";
-    ResultProcess  detailed(ProcessError::ExecFailed, 12345);
+    constexpr char expectedNative[] = "Failed to launch process (detail: POSIX execute program, native error: 12345)";
+    ResultProcess  detailed(ProcessError::LaunchFailed, ProcessErrorDetail::PosixExec, 12345);
     char           nativeMessage[sizeof(expectedNative)];
     formatted = formatProcessError(detailed, nativeMessage);
     SC_TEST_EXPECT(formatted);
     SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedNative));
     SC_TEST_EXPECT(::memcmp(nativeMessage, expectedNative, sizeof(expectedNative)) == 0);
 
+    constexpr char expectedDetailOnly[] = "Failed to launch process (detail: POSIX execute program)";
+    ResultProcess  detailOnly(ProcessError::LaunchFailed, ProcessErrorDetail::PosixExec);
+    char           detailMessage[sizeof(expectedDetailOnly)];
+    formatted = formatProcessError(detailOnly, detailMessage);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedDetailOnly));
+    SC_TEST_EXPECT(::memcmp(detailMessage, expectedDetailOnly, sizeof(expectedDetailOnly)) == 0);
+
     const ResultProcess propagated = propagateProcessResult(detailed);
-    SC_TEST_EXPECT(propagated.isError(ProcessError::ExecFailed));
+    SC_TEST_EXPECT(propagated.isError(ProcessError::LaunchFailed));
+    SC_TEST_EXPECT(propagated.detail == ProcessErrorDetail::PosixExec);
     SC_TEST_EXPECT(propagated.nativeError == 12345);
 
     const Result plain = detailed;
-    SC_TEST_EXPECT(plain.isError(ProcessResultCategory, ProcessError::ExecFailed));
+    SC_TEST_EXPECT(plain.isError(ProcessResultCategory, ProcessError::LaunchFailed));
 
     const ResultProcess legacy(Result::Error("legacy process result"));
     SC_TEST_EXPECT(not legacy);
+    SC_TEST_EXPECT(legacy.detail == ProcessErrorDetail::None);
     SC_TEST_EXPECT(legacy.nativeError == 0);
     SC_TEST_EXPECT(legacy.result.hasLegacyError());
     formatted = formatProcessError(legacy, nativeMessage);
