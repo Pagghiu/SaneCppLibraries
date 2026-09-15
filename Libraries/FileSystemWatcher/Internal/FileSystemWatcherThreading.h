@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Common/Function.h"
-#include "../../Common/Result.h"
+#include "../FileSystemWatcherError.h"
 
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -21,20 +21,28 @@ struct FSWThread
 {
     HANDLE thread = nullptr;
 
-    Result start(LPTHREAD_START_ROUTINE func, LPVOID param)
+    ResultFileSystemWatcher start(LPTHREAD_START_ROUTINE func, LPVOID param)
     {
         thread = ::CreateThread(nullptr, 0, func, param, 0, nullptr);
-        return thread ? Result(true) : Result::Error("CreateThread failed");
+        if (thread)
+            return ResultFileSystemWatcher(true);
+        const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+        return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                       FileSystemWatcherErrorDetail::WindowsCreateThread, nativeError);
     }
 
-    Result join()
+    ResultFileSystemWatcher join()
     {
         if (!thread)
-            return Result(true);
-        DWORD res = ::WaitForSingleObject(thread, INFINITE);
+            return ResultFileSystemWatcher(true);
+        const DWORD    res         = ::WaitForSingleObject(thread, INFINITE);
+        const uint32_t nativeError = res == WAIT_FAILED ? static_cast<uint32_t>(::GetLastError()) : 0;
         ::CloseHandle(thread);
         thread = nullptr;
-        return res == WAIT_OBJECT_0 ? Result(true) : Result::Error("WaitForSingleObject failed");
+        return res == WAIT_OBJECT_0
+                   ? ResultFileSystemWatcher(true)
+                   : ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
+                                             FileSystemWatcherErrorDetail::WindowsWaitForSingleObject, nativeError);
     }
 
     bool wasStarted() const { return thread != nullptr; }
@@ -128,24 +136,32 @@ struct FSWThread
         return 0;
     }
 
-    Result start(Function<void(FSWThread&)> func)
+    ResultFileSystemWatcher start(Function<void(FSWThread&)> func)
     {
-        SC_TRY_MSG(thread == 0, "Thread already started");
+        if (thread != 0)
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::WorkerAlreadyStarted);
         userFunction  = move(func);
         const int res = pthread_create(&thread, nullptr, &FSWThread::threadFunc, this);
-        SC_TRY_MSG(res == 0, "pthread_create error");
-        return Result(true);
+        if (res != 0)
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::PosixPthreadCreate,
+                                           static_cast<uint32_t>(res));
+        return ResultFileSystemWatcher(true);
     }
 
-    Result join()
+    ResultFileSystemWatcher join()
     {
         if (thread != 0)
         {
             const int res = pthread_join(thread, nullptr);
             thread        = 0;
-            SC_TRY_MSG(res == 0, "pthread_join error");
+            if (res != 0)
+                return ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
+                                               FileSystemWatcherErrorDetail::PosixPthreadJoin,
+                                               static_cast<uint32_t>(res));
         }
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
     bool wasStarted() const { return thread != 0; }

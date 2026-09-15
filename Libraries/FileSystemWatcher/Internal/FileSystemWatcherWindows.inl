@@ -45,23 +45,25 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    Result init(FileSystemWatcher& parent, ThreadRunner& runner)
+    ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
         threadingRunner = &runner.get();
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
-    Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    ResultFileSystemWatcher init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
         eventLoopRunner->internalInit(parent, 0);
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
-    Result close()
+    ResultFileSystemWatcher close()
     {
+        if (self == nullptr)
+            return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
         if (threadingRunner)
         {
             if (threadingRunner->thread.wasStarted())
@@ -81,7 +83,7 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY(stopWatching(*entry));
         }
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
     void signalWatcherEvent(FolderWatcher& watcher)
@@ -104,7 +106,7 @@ struct SC::FileSystemWatcher::Internal
         opaque.fileHandle = INVALID_HANDLE_VALUE;
     }
 
-    Result submitRead(FolderWatcher& entry)
+    ResultFileSystemWatcher submitRead(FolderWatcher& entry)
     {
         FolderWatcherInternal& opaque     = entry.internal.get();
         OVERLAPPED*            overlapped = getOverlapped(entry);
@@ -134,12 +136,17 @@ struct SC::FileSystemWatcher::Internal
                                                      nullptr,                           // lpBytesReturned
                                                      overlapped,                        // lpOverlapped
                                                      nullptr);                          // lpCompletionRoutine
-        SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW");
+        if (success != TRUE)
+        {
+            const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::WindowsSubmitDirectoryChanges, nativeError);
+        }
         clearPending.disarm();
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
-    Result stopWatching(FolderWatcher& folderWatcher)
+    ResultFileSystemWatcher stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
@@ -153,13 +160,13 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY(eventLoopRunner->windowsRequestStopFolderExternalCompletion(folderWatcher));
             closeFileHandle(folderWatcher);
             SC_TRY(eventLoopRunner->windowsWaitFolderExternalCompletionStopped(folderWatcher));
-            return Result(true);
+            return ResultFileSystemWatcher(true);
         }
         closeFileHandle(folderWatcher);
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
-    Result startWatching(FolderWatcher* entry)
+    ResultFileSystemWatcher startWatching(FolderWatcher* entry)
     {
         if (threadingRunner)
         {
@@ -168,8 +175,9 @@ struct SC::FileSystemWatcher::Internal
         // TODO: we should probably check if we are leaking on some partial failure code path...some RAII would help
         if (threadingRunner)
         {
-            SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
-                       "startWatching exceeded MaxWatchablePaths");
+            if (threadingRunner->numEntries >= ThreadRunnerDefinition::MaxWatchablePaths)
+                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
         }
         HANDLE newHandle = ::CreateFileW(entry->path.view().getNullTerminatedNative(),                     //
                                          FILE_LIST_DIRECTORY,                                              //
@@ -178,7 +186,12 @@ struct SC::FileSystemWatcher::Internal
                                          OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
                                          nullptr);
 
-        SC_TRY_MSG(newHandle != INVALID_HANDLE_VALUE, "CreateFileW failed");
+        if (newHandle == INVALID_HANDLE_VALUE)
+        {
+            const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::WindowsOpenDirectory, nativeError);
+        }
         FolderWatcherInternal& opaque = entry->internal.get();
         opaque.fileHandle             = newHandle;
 
@@ -188,6 +201,12 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner)
         {
             overlapped->hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
+            if (overlapped->hEvent == nullptr)
+            {
+                const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+                return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                               FileSystemWatcherErrorDetail::None, nativeError);
+            }
 
             threadingRunner->hEvents[threadingRunner->numEntries] = overlapped->hEvent;
             threadingRunner->entries[threadingRunner->numEntries] = entry;
@@ -205,7 +224,7 @@ struct SC::FileSystemWatcher::Internal
             threadingRunner->shouldStop.exchange(false);
             SC_TRY(threadingRunner->thread.start(&threadDispatch, this));
         }
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
     static DWORD WINAPI threadDispatch(LPVOID arg)
     {
@@ -296,12 +315,12 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
-    SC_TRY_MSG(buffer.assign(basePath), "Buffer too small to hold full path");
-    SC_TRY_MSG(buffer.append(L"\\"), "Buffer too small to hold full path");
-    SC_TRY_MSG(buffer.append(relativePath), "Buffer too small to hold full path");
-    return Result(true);
+    if (not buffer.assign(basePath) or not buffer.append(L"\\") or not buffer.append(relativePath))
+        return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+                                       FileSystemWatcherErrorDetail::BuildFullPath);
+    return ResultFileSystemWatcher(true);
 }
 
 void SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher, size_t bytesTransferred)

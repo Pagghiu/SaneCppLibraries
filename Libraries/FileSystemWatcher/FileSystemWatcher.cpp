@@ -24,24 +24,36 @@ SC::FileSystemWatcher::FolderWatcher::FolderWatcher(Span<char> buffer)
 #endif
 }
 
-SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner) { return internal.get().init(*this, runner); }
-
-SC::Result SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.get().init(*this, runner); }
-
-SC::Result SC::FileSystemWatcher::close() { return internal.get().close(); }
-
-SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringSpan path)
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::init(EventLoopRunner& runner)
 {
-    SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
+    return internal.get().init(*this, runner);
+}
+
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::init(ThreadRunner& runner)
+{
+    return internal.get().init(*this, runner);
+}
+
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::close() { return internal.get().close(); }
+
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringSpan path)
+{
+    if (internal.get().self == nullptr)
+        return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
+    if (watcher.parent != nullptr)
+        return ResultFileSystemWatcher(FileSystemWatcherError::AlreadyWatching);
     watcher.parent = this;
-    SC_TRY_MSG(watcher.path.assign(path), "FileSystemWatcher::watch - Error assigning path");
+    if (not watcher.path.assign(path))
+        return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
+                                       FileSystemWatcherErrorDetail::AssignWatchPath);
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
 }
 
-SC::Result SC::FileSystemWatcher::FolderWatcher::stopWatching()
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::FolderWatcher::stopWatching()
 {
-    SC_TRY_MSG(parent != nullptr, "FolderWatcher already unwatched");
+    if (parent == nullptr)
+        return ResultFileSystemWatcher(FileSystemWatcherError::NotWatching);
     return parent->internal.get().stopWatching(*this);
 }
 

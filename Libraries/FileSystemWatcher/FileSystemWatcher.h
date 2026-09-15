@@ -15,6 +15,7 @@
 #include "../Common/OpaqueObject.h"
 #include "../Common/PlatformMacrosType.h"
 #include "../Common/Result.h"
+#include "FileSystemWatcherError.h"
 
 namespace SC
 {
@@ -65,8 +66,8 @@ struct FileSystemWatcher
     struct InternalDefinition
     {
         static constexpr int Windows = 3 * sizeof(void*);
-        // One extra pointer is temporary while Result carries the legacy message and structured identity.
-        static constexpr int Apple   = 43 * sizeof(void*);
+        // Two extra pointers are temporary while Result and ResultFileSystemWatcher carry migration context.
+        static constexpr int Apple   = 44 * sizeof(void*);
         static constexpr int Linux   = sizeof(void*) * 4;
         static constexpr int Default = Linux;
 
@@ -134,7 +135,7 @@ struct FileSystemWatcher
         /// @brief Get the full path of the file being watched.
         /// @param path StringPath that will hold full (absolute) path
         /// @return Invalid result if it's not possible building the full path
-        SC::Result getFullPath(StringPath& path) const;
+        ResultFileSystemWatcher getFullPath(StringPath& path) const;
 
       private:
         friend struct Internal;
@@ -158,7 +159,7 @@ struct FileSystemWatcher
 
         /// @brief Stop watching this directory. After calling it the FolderWatcher can be reused or released.
         /// @return Valid result if directory was unwatched successfully.
-        Result stopWatching();
+        ResultFileSystemWatcher stopWatching();
 
         /// @brief Sets debug name for AsyncExternalCompletion used on Windows (used only for debug purposes)
         void setDebugName(const char* debugName);
@@ -224,23 +225,23 @@ struct FileSystemWatcher
     /// @brief Setup watcher to receive notifications from a background thread
     /// @param runner Address of a ThreadRunner object that must be valid until close()
     /// @return Valid Result if the watcher has been initialized correctly
-    Result init(ThreadRunner& runner);
+    ResultFileSystemWatcher init(ThreadRunner& runner);
 
     /// @brief Setup watcher to receive async notifications on an event loop
     /// @param runner Address of a EventLoopRunner object that must be valid until close()
     /// @return Valid Result if the watcher has been initialized correctly
-    Result init(EventLoopRunner& runner);
+    ResultFileSystemWatcher init(EventLoopRunner& runner);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
     /// @return Valid Result if resources have been freed successfully
-    Result close();
+    ResultFileSystemWatcher close();
 
     /// @brief Starts watching a single directory, calling FolderWatcher::notifyCallback on file events.
     /// @param watcher Reference to a (not already used) watcher, with a valid FolderWatcher::notifyCallback.
     /// Its address must not change until FolderWatcher::stopWatching or FileSystemWatcher::close
     /// @param path The directory being monitored
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
-    Result watch(FolderWatcher& watcher, StringSpan path);
+    ResultFileSystemWatcher watch(FolderWatcher& watcher, StringSpan path);
 
     void asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
 

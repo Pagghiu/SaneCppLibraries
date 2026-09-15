@@ -1,7 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
+#include <memory.h> // memcmp
+
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
+#include "Libraries/FileSystemWatcher/FileSystemWatcherErrorFormatter.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
@@ -21,6 +24,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         using namespace SC;
         const StringView appDirectory = report.applicationRootDirectory.view();
         initClose();
+        structuredErrorsAndFormatter(appDirectory);
         threadRunner(appDirectory);
     }
 
@@ -34,6 +38,74 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
             SC_TEST_EXPECT(fileEventsWatcher.close());
         }
+    }
+
+    void structuredErrorsAndFormatter(const StringView appDirectory)
+    {
+        if (not test_section("structured errors and formatter"))
+            return;
+
+        static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemWatcher) == 24,
+                      "The migration bridge temporarily expands ResultFileSystemWatcher");
+        static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemWatcher) == sizeof(Result) + 8,
+                      "ResultFileSystemWatcher must fit the final 16-byte target");
+        static_assert(__is_standard_layout(ResultFileSystemWatcher),
+                      "ResultFileSystemWatcher must remain standard-layout");
+        static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystemWatcher>::value,
+                      "ResultFileSystemWatcher must remain trivially copyable");
+        static_assert(static_cast<uint32_t>(FileSystemWatcherError::NotInitialized) == 1,
+                      "FileSystemWatcher error values are append-only");
+        static_assert(static_cast<uint32_t>(FileSystemWatcherErrorDetail::None) == 0,
+                      "FileSystemWatcher detail zero is reserved for no detail");
+        static_assert(FileSystemWatcherResultCategory.value == 6, "FileSystemWatcher category is registry value 6");
+
+        FileSystemWatcher                fileEventsWatcher;
+        FileSystemWatcher::FolderWatcher watcher;
+
+        const ResultFileSystemWatcher notInitialized = fileEventsWatcher.watch(watcher, appDirectory);
+        SC_TEST_EXPECT(notInitialized.isError(FileSystemWatcherError::NotInitialized));
+        SC_TEST_EXPECT(notInitialized.detail == FileSystemWatcherErrorDetail::None);
+        SC_TEST_EXPECT(notInitialized.nativeError == 0);
+
+        const ResultFileSystemWatcher notWatching = watcher.stopWatching();
+        SC_TEST_EXPECT(notWatching.isError(FileSystemWatcherError::NotWatching));
+
+        ResultFileSystemWatcher       detailed(FileSystemWatcherError::WatchSetupFailed,
+                                               FileSystemWatcherErrorDetail::LinuxAddRootWatch, 12345);
+        const ResultFileSystemWatcher copied = detailed;
+        SC_TEST_EXPECT(copied.detail == FileSystemWatcherErrorDetail::LinuxAddRootWatch);
+        SC_TEST_EXPECT(copied.nativeError == 12345);
+        const Result plain = detailed;
+        SC_TEST_EXPECT(plain.isError(FileSystemWatcherResultCategory, FileSystemWatcherError::WatchSetupFailed));
+
+        const ResultFileSystemWatcher fromPlain(plain);
+        SC_TEST_EXPECT(fromPlain.detail == FileSystemWatcherErrorDetail::None);
+        SC_TEST_EXPECT(fromPlain.nativeError == 0);
+
+        const Result                  foreignResult = Result::Error(ResultCategory(99), 17);
+        const ResultFileSystemWatcher foreign(foreignResult);
+        SC_TEST_EXPECT(not foreign);
+        SC_TEST_EXPECT(foreign.toResult().category() == ResultCategory(99));
+        SC_TEST_EXPECT(foreign.detail == FileSystemWatcherErrorDetail::None);
+        SC_TEST_EXPECT(foreign.nativeError == 0);
+
+        constexpr char expected[] =
+            "Failed to set up file system watch (detail: Linux add root watch, native error: 12345)";
+        char                    formattedMessage[sizeof(expected)];
+        const ResultErrorFormat formatted = formatFileSystemWatcherError(detailed, formattedMessage);
+        SC_TEST_EXPECT(formatted);
+        SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+        SC_TEST_EXPECT(::memcmp(formattedMessage, expected, sizeof(expected)) == 0);
+
+        const ResultErrorFormat foreignFormat = formatFileSystemWatcherError(foreignResult, {});
+        SC_TEST_EXPECT(foreignFormat.status == ResultErrorFormatStatus::ForeignCategory);
+
+        FileSystemWatcher::ThreadRunner runner;
+        SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, appDirectory));
+        const ResultFileSystemWatcher alreadyWatching = fileEventsWatcher.watch(watcher, appDirectory);
+        SC_TEST_EXPECT(alreadyWatching.isError(FileSystemWatcherError::AlreadyWatching));
+        SC_TEST_EXPECT(fileEventsWatcher.close());
     }
 
     void threadRunner(const StringView appDirectory)

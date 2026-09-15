@@ -17,15 +17,15 @@
 
 struct SC::FileSystemWatcher::Internal
 {
-    FileSystemWatcher* self          = nullptr;
-    CFRunLoopRef       runLoop       = nullptr;
-    CFRunLoopSourceRef refreshSignal = nullptr;
-    FSEventStreamRef   fsEventStream = nullptr;
-    FSWThread          pollingThread;
-    Result             signalReturnCode = Result(false);
-    FSWEventObject     refreshSignalFinished;
-    FSWMutex           mutex;
-    EventLoopRunner*   eventLoopRunner = nullptr;
+    FileSystemWatcher*      self          = nullptr;
+    CFRunLoopRef            runLoop       = nullptr;
+    CFRunLoopSourceRef      refreshSignal = nullptr;
+    FSEventStreamRef        fsEventStream = nullptr;
+    FSWThread               pollingThread;
+    ResultFileSystemWatcher signalReturnCode = ResultFileSystemWatcher(true);
+    FSWEventObject          refreshSignalFinished;
+    FSWMutex                mutex;
+    EventLoopRunner*        eventLoopRunner = nullptr;
 
     // Used to pass data from thread to async callback
     Notification   notification;
@@ -35,14 +35,14 @@ struct SC::FileSystemWatcher::Internal
     //...
     //! [OpaqueDefinition1Snippet]
 
-    Result init(FileSystemWatcher& parent, ThreadRunner& runner)
+    ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         (void)(runner);
         self = &parent;
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
-    Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    ResultFileSystemWatcher init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
@@ -50,7 +50,7 @@ struct SC::FileSystemWatcher::Internal
         return eventLoopRunner->appleStartWakeUp();
     }
 
-    Result initThread()
+    ResultFileSystemWatcher initThread()
     {
         closing.exchange(false);
         // Create Signal to go from Loop --> CFRunLoop
@@ -60,7 +60,9 @@ struct SC::FileSystemWatcher::Internal
         signalContext.info    = this;
         signalContext.perform = &Internal::threadExecuteRefresh;
         refreshSignal         = CFRunLoopSourceCreate(nullptr, 0, &signalContext);
-        SC_TRY_MSG(refreshSignal != nullptr, "CFRunLoopSourceCreate failed");
+        if (refreshSignal == nullptr)
+            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
+                                           FileSystemWatcherErrorDetail::AppleCreateRunLoopSource);
 
         FSWEventObject eventObject;
 
@@ -73,11 +75,13 @@ struct SC::FileSystemWatcher::Internal
         };
         SC_TRY(pollingThread.start(pollingFunction));
         eventObject.wait();
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
-    Result close()
+    ResultFileSystemWatcher close()
     {
+        if (self == nullptr)
+            return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
         if (pollingThread.wasStarted())
         {
             closing.exchange(true);
@@ -93,7 +97,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY(pollingThread.join());
             releaseResources();
         }
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
     void wakeUpFSEventThread()
@@ -123,13 +127,17 @@ struct SC::FileSystemWatcher::Internal
         CFRunLoopRemoveSource(copyRunLoop, refreshSignal, kCFRunLoopDefaultMode);
     }
 
-    Result threadCreateFSEvent()
+    ResultFileSystemWatcher threadCreateFSEvent()
     {
-        SC_TRY(runLoop != nullptr);
+        if (runLoop == nullptr)
+            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
+                                           FileSystemWatcherErrorDetail::AppleRunLoop);
         CFArrayRef   pathsArray = nullptr;
         CFStringRef* watchedPaths =
             (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerDefinition::MaxWatchablePaths);
-        SC_TRY_MSG(watchedPaths != nullptr, "Cannot allocate paths");
+        if (watchedPaths == nullptr)
+            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
+                                           FileSystemWatcherErrorDetail::AppleAllocateWatchPaths);
         // TODO: Loop to convert paths
         auto   deferFreeMalloc   = MakeDeferred([&] { free(watchedPaths); });
         size_t numAllocatedPaths = 0;
@@ -146,20 +154,23 @@ struct SC::FileSystemWatcher::Internal
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, it->path.view().bytesIncludingTerminator());
             if (not watchedPaths[numAllocatedPaths])
-                return Result::Error("CFStringCreateWithFileSystemRepresentation failed");
+                return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                               FileSystemWatcherErrorDetail::AppleCreateWatchPathString);
             numAllocatedPaths++;
-            SC_TRY_MSG(numAllocatedPaths <= ThreadRunnerDefinition::MaxWatchablePaths,
-                       "Exceeded max size of 1024 paths to watch");
+            if (numAllocatedPaths > ThreadRunnerDefinition::MaxWatchablePaths)
+                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
         }
         if (numAllocatedPaths == 0)
         {
-            return Result(true);
+            return ResultFileSystemWatcher(true);
         }
         pathsArray = CFArrayCreate(nullptr, reinterpret_cast<const void**>(watchedPaths),
                                    static_cast<CFIndex>(numAllocatedPaths), nullptr);
         if (not pathsArray)
         {
-            return Result::Error("CFArrayCreate failed");
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::AppleCreateWatchPathsArray);
         }
         deferDeletePaths.disarm();
         deferFreeMalloc.disarm();
@@ -178,7 +189,9 @@ struct SC::FileSystemWatcher::Internal
                                                   kFSEventStreamEventIdSinceNow, //
                                                   watchLatency,                  //
                                                   watchFlags);
-        SC_TRY_MSG(fsEventStream != nullptr, "FSEventStreamCreate failed");
+        if (fsEventStream == nullptr)
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::AppleCreateEventStream);
 
 #if SC_COMPILER_CLANG
 #pragma clang diagnostic push
@@ -194,9 +207,10 @@ struct SC::FileSystemWatcher::Internal
         {
             FSEventStreamInvalidate(fsEventStream);
             FSEventStreamRelease(fsEventStream);
-            return Result::Error("FSEventStreamStart failed");
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::AppleStartEventStream);
         }
-        return Result(true);
+        return ResultFileSystemWatcher(true);
     }
 
     void threadDestroyFSEvent()
@@ -207,7 +221,7 @@ struct SC::FileSystemWatcher::Internal
         fsEventStream = nullptr;
     }
 
-    Result stopWatching(FolderWatcher& folderWatcher)
+    ResultFileSystemWatcher stopWatching(FolderWatcher& folderWatcher)
     {
         mutex.lock();
         folderWatcher.parent->watchers.remove(folderWatcher);
@@ -216,7 +230,7 @@ struct SC::FileSystemWatcher::Internal
         return startWatching(nullptr);
     }
 
-    Result startWatching(FolderWatcher*)
+    ResultFileSystemWatcher startWatching(FolderWatcher*)
     {
         if (not pollingThread.wasStarted())
         {
@@ -379,9 +393,12 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& path) const
+SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(StringPath& path) const
 {
-    return Result(path.assign(fullPath));
+    if (not path.assign(fullPath))
+        return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+                                       FileSystemWatcherErrorDetail::BuildFullPath);
+    return ResultFileSystemWatcher(true);
 }
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
