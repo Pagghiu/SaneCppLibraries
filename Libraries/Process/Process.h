@@ -201,7 +201,7 @@ struct SC_PROCESS_EXPORT Process
 
         IGrowableBuffer* growableBuffer = nullptr;
 
-        FileDescriptor::Handle fileDescriptor;
+        FileDescriptor::Handle fileDescriptor = ProcessDescriptor::Invalid;
 
         PipeDescriptor* pipeDescriptor;
     };

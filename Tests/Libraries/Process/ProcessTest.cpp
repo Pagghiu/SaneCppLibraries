@@ -153,6 +153,10 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
     const ResultProcess emptyChain = chain.launch();
     SC_TEST_EXPECT(emptyChain.isError(ProcessError::ProcessChainEmpty));
 
+    FileDescriptor      invalidDescriptor;
+    const ResultProcess invalidRedirection = Process().launch({"unused"}, invalidDescriptor);
+    SC_TEST_EXPECT(invalidRedirection.isError(ProcessError::InvalidOutputRedirection));
+
     Process environmentProcess(commandArena.toSpan(), environmentArena.toSpan());
     for (size_t index = 0; index < 256; ++index)
     {
