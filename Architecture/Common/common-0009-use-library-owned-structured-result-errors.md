@@ -21,6 +21,11 @@ error value. Zero/zero represents success. Category zero is reserved for uncateg
 represents uncategorized/unspecified so boolean propagation remains supported. `Result` remains trivially copyable,
 standard-layout, non-owning, allocation-free, and eight bytes.
 
+A library's primary error enum describes failures at the portable public-API or library-operation level. Equivalent
+logical failures use the same primary error on every supported platform; native API names, backend implementation
+steps, and other platform-specific distinctions do not normally belong in the primary identity. This keeps code that
+branches on a plain `Result` independent of the backend that produced it.
+
 `ResultCategory` is an open fixed-width value type defined in Common. Error categories and error enums are declared by
 the library that owns them, not collected in Common. Built-in category numbers are centrally assigned, append-only,
 and collision-checked in the [Result error category registry](result-error-categories.md). A reserved numeric range is
@@ -28,13 +33,23 @@ available for application and external-library categories.
 
 A library may define a composed enriched result when callers benefit from structured context. Its first-class status is
 still represented by `Result`; additional fields contain only copied scalar values, enums, offsets, sizes, or native
-error numbers. The composed `Result` is the only source of truth for success and error identity; a local error enum is
+error numbers. When lower-level failure stages are useful, the library defines a public stable detail enum and stores it
+in the enriched result. Platform-specific detail values explicitly identify their platform where the distinction is
+not portable. Detail is available for programmatic inspection and formatting, but is not part of the plain `Result`
+identity. Once released, primary and detail numeric assignments are append-only; removed values remain reserved. The
+composed `Result` is the only source of truth for success and primary error identity; a local primary error enum is
 derived only when its category matches and is not duplicated as mutable state. Foreign-category failures remain valid
 inside an enriched result with inactive context cleared. Enriched results do not own memory or allocate. Borrowed
 immutable text is prohibited by default and requires a library-specific ADR that identifies the owner and proves the
-lifetime contract. Converting an enriched result to plain `Result` preserves category and error identity and
-deliberately discards additional context. Enriched results target at most 16 bytes; a larger public result needs a
+lifetime contract. Converting an enriched result to plain `Result` preserves category and primary error identity and
+deliberately discards detail and other context. Enriched results target at most 16 bytes; a larger public result needs a
 library-specific ADR and supported-platform ABI evidence.
+
+A platform-specific primary error is allowed only when the platform distinction is itself part of the caller-visible
+semantics and no honest portable operation-level identity exists. Such an error includes the platform name in its enum
+value and requires explicit justification in an ADR. Merely calling a platform-specific API, or wanting to retain the
+stage at which it failed, is not sufficient justification; those facts belong in the enriched detail and native error
+fields.
 
 Canonical English messages and variable formatting are presentation facilities, not result state. Mandatory library
 headers contain no error-message literals. Optional library-owned formatters follow the
@@ -53,10 +68,10 @@ remain an unsuccessful result when callers can identify it through a stable code
 
 ## Consequences
 
-Callers can branch on stable machine-readable errors without parsing or comparing strings. Ordinary `SC_TRY`
-propagation remains concise and retains identity through plain `Result` boundaries, while specialized APIs can expose
-actionable context at an explicit size cost. Default English strings and formatting code can be omitted, and alternate
-languages do not need to replace error identity.
+Callers can branch on stable, platform-independent machine-readable errors without parsing or comparing strings.
+Ordinary `SC_TRY` propagation remains concise and retains primary identity through plain `Result` boundaries, while
+specialized APIs can expose stable backend detail and actionable context at an explicit size cost. Default English
+strings and formatting code can be omitted, and alternate languages do not need to replace error identity.
 
 Changing the representation is an ABI transition and all participating binaries must be rebuilt. Context is lost at
 an intentional enriched-to-plain conversion, automatic nested cause chains are not provided, and category allocation
@@ -66,11 +81,12 @@ explicit review.
 ## Confirmation
 
 Tests assert the size, alignment, trivial copyability, standard layout, success encoding, category/error round trips,
-mixed legacy/structured bridge behavior, enriched-result conversion, and `SC_TRY`/coroutine propagation. CI checks
-built-in category uniqueness and reserved ranges. Binary tests verify the omission guarantees selected for executables,
-static libraries, shared libraries, and single-file artifacts by the formatter packaging experiment. Single-file
-libraries compile both with and without optional diagnostics, and the complete suite passes while the bridge is present
-and after its removal.
+mixed legacy/structured bridge behavior, enriched-result conversion, detail preservation, and `SC_TRY`/coroutine
+propagation. Cross-platform tests assert equivalent backend failures have the same primary error and may assert their
+different detail values. CI checks built-in category uniqueness and reserved ranges. Binary tests verify the omission
+guarantees selected for executables, static libraries, shared libraries, and single-file artifacts by the formatter
+packaging experiment. Single-file libraries compile both with and without optional diagnostics, and the complete suite
+passes while the bridge is present and after its removal.
 
 ## Related
 
