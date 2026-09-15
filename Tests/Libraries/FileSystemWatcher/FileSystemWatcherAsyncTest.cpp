@@ -21,11 +21,37 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     {
         using namespace SC;
         const StringView appDirectory = report.applicationRootDirectory.view();
+        structuredNotInitializedError();
         eventLoopSubdirectory(appDirectory);
         eventLoopWatchClose(appDirectory);
         eventLoopWaitTimeout();
         eventLoopWatchStop(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
+    }
+
+    void structuredNotInitializedError()
+    {
+        if (not test_section("structured not-initialized error"))
+            return;
+
+        struct UninitializedRunner : FileSystemWatcherAsyncT<AsyncEventLoop>
+        {
+            Result startWithoutInitialization()
+            {
+#if SC_PLATFORM_APPLE
+                return appleStartWakeUp();
+#elif SC_PLATFORM_LINUX
+                return linuxStartSharedFileReadiness();
+#else
+                FileSystemWatcher::FolderWatcher watcher;
+                return windowsStartFolderExternalCompletion(watcher, nullptr);
+#endif
+            }
+        } runner;
+
+        const Result result = runner.startWithoutInitialization();
+        SC_TEST_EXPECT(result.isError(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized));
+        SC_TEST_EXPECT(not result.hasLegacyError());
     }
 
     void submitQueuedWatcher(AsyncEventLoop& eventLoop)

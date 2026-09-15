@@ -201,12 +201,6 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner)
         {
             overlapped->hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
-            if (overlapped->hEvent == nullptr)
-            {
-                const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
-                return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                               FileSystemWatcherErrorDetail::None, nativeError);
-            }
 
             threadingRunner->hEvents[threadingRunner->numEntries] = overlapped->hEvent;
             threadingRunner->entries[threadingRunner->numEntries] = entry;
@@ -318,7 +312,7 @@ struct SC::FileSystemWatcher::Internal
 SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
     if (not buffer.assign(basePath) or not buffer.append(L"\\") or not buffer.append(relativePath))
-        return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+        return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                        FileSystemWatcherErrorDetail::BuildFullPath);
     return ResultFileSystemWatcher(true);
 }

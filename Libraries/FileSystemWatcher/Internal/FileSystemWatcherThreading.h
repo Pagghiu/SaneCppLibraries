@@ -41,7 +41,7 @@ struct FSWThread
         thread = nullptr;
         return res == WAIT_OBJECT_0
                    ? ResultFileSystemWatcher(true)
-                   : ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
+                   : ResultFileSystemWatcher(FileSystemWatcherError::CloseFailed,
                                              FileSystemWatcherErrorDetail::WindowsWaitForSingleObject, nativeError);
     }
 
@@ -157,7 +157,7 @@ struct FSWThread
             const int res = pthread_join(thread, nullptr);
             thread        = 0;
             if (res != 0)
-                return ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
+                return ResultFileSystemWatcher(FileSystemWatcherError::CloseFailed,
                                                FileSystemWatcherErrorDetail::PosixPthreadJoin,
                                                static_cast<uint32_t>(res));
         }

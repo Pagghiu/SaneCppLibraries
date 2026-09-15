@@ -33,9 +33,9 @@ and context is deliberately lost when a result crosses into plain `Result`.
 
 ## Confirmation
 
-Tests assert category/error identity, context preservation and clearing, formatting, POD/layout properties, deterministic
-validation failures, and successful Linux duplicate suppression. The category registry validator and single-file build
-must continue to pass.
+Tests assert category/error identity, context preservation and clearing, formatting, POD/layout properties,
+deterministic validation failures, and structured identity at the Async adapter boundary. The category registry
+validator and single-file build must continue to pass.
 
 ## Related
 

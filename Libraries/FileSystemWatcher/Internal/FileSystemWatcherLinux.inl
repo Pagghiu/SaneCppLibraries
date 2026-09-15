@@ -304,8 +304,8 @@ struct SC::FileSystemWatcher::Internal
                         ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
                     if (newHandle == -1)
                     {
-                        (void)stopWatching(*entry);
                         const uint32_t nativeError = static_cast<uint32_t>(errno);
+                        (void)stopWatching(*entry);
                         return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                                        FileSystemWatcherErrorDetail::LinuxAddSubdirectoryWatch,
                                                        nativeError);
@@ -469,7 +469,7 @@ struct SC::FileSystemWatcher::Internal
 
             if (not eventPath.assign(relativeDirectory) or not eventPath.append("/") or
                 not eventPath.append(relativeName))
-                return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+                return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                                FileSystemWatcherErrorDetail::BuildNotificationPath);
 
             notification.relativePath = eventPath.view();
@@ -500,7 +500,7 @@ struct SC::FileSystemWatcher::Internal
 SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
     if (not buffer.assign(basePath) or not buffer.append("/") or not buffer.append(relativePath))
-        return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+        return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                        FileSystemWatcherErrorDetail::BuildFullPath);
     return ResultFileSystemWatcher(true);
 }

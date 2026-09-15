@@ -287,7 +287,8 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 #if SC_PLATFORM_APPLE
     virtual Result appleStartWakeUp() override
     {
-        SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
+        if (eventLoop == nullptr or fileSystemWatcher == nullptr)
+            return Result::Error(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized);
         T_AsyncLoopWakeUp& wakeUp = asyncWakeUp;
         wakeUp.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
         return wakeUp.start(*eventLoop, eventObject);
@@ -313,7 +314,8 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 #elif SC_PLATFORM_LINUX
     virtual Result linuxStartSharedFileReadiness() override
     {
-        SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
+        if (eventLoop == nullptr or fileSystemWatcher == nullptr)
+            return Result::Error(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized);
         SC_TRY(eventLoop->associateExternallyCreatedFileDescriptorHandle(notifyFd));
         asyncPoll.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
         return asyncPoll.start(*eventLoop, notifyFd);
@@ -332,7 +334,8 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
     using FolderWatcher = FileSystemWatcher::FolderWatcher;
     virtual Result windowsStartFolderExternalCompletion(FolderWatcher& watcher, void* handle) override
     {
-        SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
+        if (eventLoop == nullptr or fileSystemWatcher == nullptr)
+            return Result::Error(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized);
         T_AsyncExternalCompletion& completion =
             watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
         placementNew(completion);

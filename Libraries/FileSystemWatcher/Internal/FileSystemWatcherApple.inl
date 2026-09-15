@@ -61,7 +61,7 @@ struct SC::FileSystemWatcher::Internal
         signalContext.perform = &Internal::threadExecuteRefresh;
         refreshSignal         = CFRunLoopSourceCreate(nullptr, 0, &signalContext);
         if (refreshSignal == nullptr)
-            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleCreateRunLoopSource);
 
         FSWEventObject eventObject;
@@ -130,13 +130,13 @@ struct SC::FileSystemWatcher::Internal
     ResultFileSystemWatcher threadCreateFSEvent()
     {
         if (runLoop == nullptr)
-            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleRunLoop);
         CFArrayRef   pathsArray = nullptr;
         CFStringRef* watchedPaths =
             (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerDefinition::MaxWatchablePaths);
         if (watchedPaths == nullptr)
-            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleAllocateWatchPaths);
         // TODO: Loop to convert paths
         auto   deferFreeMalloc   = MakeDeferred([&] { free(watchedPaths); });
@@ -396,7 +396,7 @@ struct SC::FileSystemWatcher::Internal
 SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(StringPath& path) const
 {
     if (not path.assign(fullPath))
-        return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+        return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                        FileSystemWatcherErrorDetail::BuildFullPath);
     return ResultFileSystemWatcher(true);
 }

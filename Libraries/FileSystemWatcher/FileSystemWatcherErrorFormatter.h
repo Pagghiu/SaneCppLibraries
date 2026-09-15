@@ -71,21 +71,17 @@ inline ResultErrorFormat formatFileSystemWatcherErrorWithDetails(FileSystemWatch
     ResultErrorFormatter formatter(output);
     switch (error)
     {
-    case FileSystemWatcherError::NotInitialized: formatter.append("File system watcher is not initialized"); break;
+    case FileSystemWatcherError::NotInitialized: formatter.append("Watcher is not initialized"); break;
     case FileSystemWatcherError::AlreadyWatching: formatter.append("Folder watcher is already watching"); break;
     case FileSystemWatcherError::NotWatching: formatter.append("Folder watcher is not watching"); break;
-    case FileSystemWatcherError::UnsupportedPathEncoding: formatter.append("Watch path encoding is unsupported"); break;
-    case FileSystemWatcherError::PathPreparationFailed: formatter.append("Failed to prepare watch path"); break;
-    case FileSystemWatcherError::WatchLimitExceeded:
-        formatter.append("File system watcher watch limit exceeded");
-        break;
-    case FileSystemWatcherError::BufferTooSmall: formatter.append("File system watcher buffer is too small"); break;
-    case FileSystemWatcherError::InitializationFailed:
-        formatter.append("Failed to initialize file system watcher");
-        break;
-    case FileSystemWatcherError::WatchSetupFailed: formatter.append("Failed to set up file system watch"); break;
-    case FileSystemWatcherError::StopWatchingFailed: formatter.append("Failed to stop file system watch"); break;
-    case FileSystemWatcherError::CloseFailed: formatter.append("Failed to close file system watcher"); break;
+    case FileSystemWatcherError::UnsupportedPathEncoding: formatter.append("Path encoding is not supported"); break;
+    case FileSystemWatcherError::PathPreparationFailed: formatter.append("Failed to prepare path"); break;
+    case FileSystemWatcherError::WatchLimitExceeded: formatter.append("Watch capacity exceeded"); break;
+    case FileSystemWatcherError::BufferTooSmall: formatter.append("Buffer capacity is insufficient"); break;
+    case FileSystemWatcherError::InitializationFailed: formatter.append("Failed to initialize watcher"); break;
+    case FileSystemWatcherError::WatchSetupFailed: formatter.append("Failed to configure watching"); break;
+    case FileSystemWatcherError::StopWatchingFailed: formatter.append("Failed to stop watching"); break;
+    case FileSystemWatcherError::CloseFailed: formatter.append("Failed to close watcher"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 
