@@ -297,27 +297,20 @@ void SC::SerialPortTest::nonSerialHandleContract()
 
     SerialDescriptor serial;
     SC_TEST_EXPECT(serial.assign(nativeHandle));
+#if SC_PLATFORM_WINDOWS
+    constexpr SerialPortErrorDetail readSettingsDetail = SerialPortErrorDetail::WindowsReadSettings;
+#else
+    constexpr SerialPortErrorDetail readSettingsDetail = SerialPortErrorDetail::PosixReadSettings;
+#endif
     const ResultSerialPort setResult = serial.setSettings(SerialSettings());
     SC_TEST_EXPECT(setResult.isError(SerialPortError::ReadSettingsFailed));
-    SC_TEST_EXPECT(setResult.detail ==
-#if SC_PLATFORM_WINDOWS
-                   SerialPortErrorDetail::WindowsReadSettings
-#else
-                   SerialPortErrorDetail::PosixReadSettings
-#endif
-    );
+    SC_TEST_EXPECT(setResult.detail == readSettingsDetail);
     SC_TEST_EXPECT(setResult.nativeError != 0);
 
     SerialSettings         currentSettings;
     const ResultSerialPort getResult = serial.getSettings(currentSettings);
     SC_TEST_EXPECT(getResult.isError(SerialPortError::ReadSettingsFailed));
-    SC_TEST_EXPECT(getResult.detail ==
-#if SC_PLATFORM_WINDOWS
-                   SerialPortErrorDetail::WindowsReadSettings
-#else
-                   SerialPortErrorDetail::PosixReadSettings
-#endif
-    );
+    SC_TEST_EXPECT(getResult.detail == readSettingsDetail);
     SC_TEST_EXPECT(getResult.nativeError != 0);
     SC_TEST_EXPECT(serial.close());
 
