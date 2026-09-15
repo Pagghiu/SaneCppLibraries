@@ -59,3 +59,4 @@ Do not add mandatory polling fallback, caller-owned thread injection, exact nati
 
 - [FILESYSTEMWATCHER-0001 - Keep async integration as a template bridge](filesystemwatcher-0001-keep-async-integration-as-a-template-bridge.md)
 - [FILESYSTEMWATCHER-0002 - Expose coarse portable event classes over native watch APIs](filesystemwatcher-0002-expose-coarse-portable-event-classes-over-native-watch-apis.md)
+- [FILESYSTEMWATCHER-0003 - Use structured watcher errors with backend context](filesystemwatcher-0003-structured-result-errors.md)

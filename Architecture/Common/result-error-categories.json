@@ -40,6 +40,12 @@
       "owner": "Process",
       "declaration": "Libraries/Process/Process.h",
       "constant": "ProcessResultCategory"
+    },
+    {
+      "value": 6,
+      "owner": "FileSystemWatcher",
+      "declaration": "Libraries/FileSystemWatcher/FileSystemWatcherError.h",
+      "constant": "FileSystemWatcherResultCategory"
     }
   ]
 }
