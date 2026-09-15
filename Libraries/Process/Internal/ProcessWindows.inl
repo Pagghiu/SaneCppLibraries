@@ -84,7 +84,7 @@ struct SC::Process::Internal
     static void exit(int code) { _exit(code); }
 };
 
-SC::Result SC::Process::waitForExitSync()
+SC::ResultProcess SC::Process::waitForExitSync()
 {
     HANDLE hProcess = handle;
     WaitForSingleObject(handle, INFINITE);
@@ -92,13 +92,13 @@ SC::Result SC::Process::waitForExitSync()
     if (GetExitCodeProcess(hProcess, &processStatus))
     {
         exitStatus.status = static_cast<int32_t>(processStatus);
-        return Result(true);
+        return ResultProcess(true);
     }
-    return Result::Error("Process::wait - GetExitCodeProcess failed");
+    return ResultProcess(ProcessError::WaitFailed, static_cast<uint32_t>(::GetLastError()));
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-SC::Result SC::Process::launchImplementation()
+SC::ResultProcess SC::Process::launchImplementation()
 {
     STARTUPINFOW startupInfo;
 
@@ -128,25 +128,25 @@ SC::Result SC::Process::launchImplementation()
 
     if (stdInFd.isValid())
     {
-        SC_TRY(stdInFd.get(startupInfo.hStdInput, Result(false)));
+        SC_TRY(stdInFd.get(startupInfo.hStdInput, ResultProcess(ProcessError::InvalidInputRedirection)));
         // Some forgiveness here if the user forgot to set the inheritable flag
         if (::SetHandleInformation(startupInfo.hStdInput, HANDLE_FLAG_INHERIT, TRUE) == FALSE)
         {
-            return Result::Error("Process::launchImplementation() - ::SetHandleInformation stdInput failed");
+            return ResultProcess(ProcessError::SetHandleInformationFailed, static_cast<uint32_t>(::GetLastError()));
         }
     }
     if (stdOutFd.isValid())
     {
-        SC_TRY(stdOutFd.get(startupInfo.hStdOutput, Result(false)));
+        SC_TRY(stdOutFd.get(startupInfo.hStdOutput, ResultProcess(ProcessError::InvalidOutputRedirection)));
         // Some forgiveness here if the user forgot to set the inheritable flag
         if (::SetHandleInformation(startupInfo.hStdOutput, HANDLE_FLAG_INHERIT, TRUE) == FALSE)
         {
-            return Result::Error("Process::launchImplementation() - ::SetHandleInformation stdOut failed");
+            return ResultProcess(ProcessError::SetHandleInformationFailed, static_cast<uint32_t>(::GetLastError()));
         }
     }
     if (stdErrFd.isValid())
     {
-        SC_TRY(stdErrFd.get(startupInfo.hStdError, Result(false)));
+        SC_TRY(stdErrFd.get(startupInfo.hStdError, ResultProcess(ProcessError::InvalidOutputRedirection)));
     }
     if (someRedirection)
     {
@@ -202,19 +202,17 @@ SC::Result SC::Process::launchImplementation()
     StringsArena arena = {environment, environmentNumber, environmentByteOffset};
 
     ProcessEnvironment parentEnv;
-    SC_TRY_MSG(environmentTable.writeTo(environmentArray, inheritEnv, arena, parentEnv),
-               "Process::launchImplementation - environmentTable.writeTo failed");
+    SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, arena, parentEnv));
 
     if (environmentArray != nullptr)
     {
         for (size_t idx = environmentNumber; environmentArray[idx] != nullptr; ++idx)
         {
             const StringSpan environmentString({environmentArray[idx], ::wcslen(environmentArray[idx])}, true);
-            SC_TRY_MSG(arena.appendAsSingleString(environmentString),
-                       "Process::launchImplementation - environment arena exceeded");
+            SC_TRY(arena.appendAsSingleString(environmentString));
         }
         // add final \0 (CreateProcessW requires it to signal end of array)
-        SC_TRY_MSG(arena.appendAsSingleString({"\0"}), "Process::launchImplementation - environment arena exceeded");
+        SC_TRY(arena.appendAsSingleString({"\0"}));
 
         // const_cast is required by CreateProcessW signature unfortunately
         wideEnv = const_cast<LPWSTR>(environment.view().getNullTerminatedNative());
@@ -235,7 +233,7 @@ SC::Result SC::Process::launchImplementation()
 
     if (not success)
     {
-        return Result::Error("Process::launchImplementation - CreateProcessW failed");
+        return ResultProcess(ProcessError::CreateProcessFailed, static_cast<uint32_t>(::GetLastError()));
     }
     ::CloseHandle(processInfo.hThread);
 
@@ -244,10 +242,10 @@ SC::Result SC::Process::launchImplementation()
     SC_TRY(stdInFd.close());
     SC_TRY(stdOutFd.close());
     SC_TRY(stdErrFd.close());
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
+SC::ResultProcess SC::Process::formatArguments(Span<const StringSpan> params)
 {
     bool first = true;
 #if SC_PLATFORM_WINDOWS
@@ -292,7 +290,7 @@ SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
         }
     }
 
-    return Result(true);
+    return ResultProcess(true);
 }
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -459,7 +457,7 @@ SC::FileDescriptor& SC::ProcessFork::getReadPipe()
     return side == ForkChild ? parentToFork.readPipe : forkToParent.readPipe;
 }
 
-SC::Result SC::ProcessFork::waitForChild()
+SC::ResultProcess SC::ProcessFork::waitForChild()
 {
     if (side == ForkChild)
     {
@@ -470,7 +468,7 @@ SC::Result SC::ProcessFork::waitForChild()
     status = ::NtWaitForSingleObject(processHandle, FALSE, NULL);
     if (!NT_SUCCESS(status))
     {
-        return Result::Error("Cannot wait for process");
+        return ResultProcess(ProcessError::ForkWaitFailed, static_cast<uint32_t>(status));
     }
 
     DWORD processStatus = 0;
@@ -481,10 +479,10 @@ SC::Result SC::ProcessFork::waitForChild()
     ::NtClose(processHandle);
     ::NtClose(threadHandle);
     threadHandle = ProcessDescriptor::Invalid;
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::ProcessFork::resumeChildFork()
+SC::ResultProcess SC::ProcessFork::resumeChildFork()
 {
     if (side == ForkChild)
     {
@@ -493,10 +491,10 @@ SC::Result SC::ProcessFork::resumeChildFork()
     }
     char cmd = 0;
     SC_TRY(parentToFork.writePipe.write({&cmd, 1}));
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::ProcessFork::fork(State state)
+SC::ResultProcess SC::ProcessFork::fork(State state)
 {
     // We want this to be inheritable
     PipeOptions options;
@@ -545,7 +543,7 @@ SC::Result SC::ProcessFork::fork(State state)
     {
         if (!NT_SUCCESS(status))
         {
-            return Result::Error("fork failed");
+            return ResultProcess(ProcessError::ForkFailed, static_cast<uint32_t>(status));
         }
 
         processHandle = processInfo.ProcessHandle;
@@ -566,5 +564,5 @@ SC::Result SC::ProcessFork::fork(State state)
         SC_TRY(parentToFork.readPipe.close());
         SC_TRY(forkToParent.writePipe.close());
     }
-    return Result(true);
+    return ResultProcess(true);
 }

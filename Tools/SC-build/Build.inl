@@ -1677,12 +1677,12 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
 
         const auto setMakeEnvironment = [&](Process& processInstance)
         {
-            SC_TRY(processInstance.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
+            SC_TRY(processInstance.setEnvironment("GNUMAKEFLAGS", "--no-print-directory").toResult());
             if (environment.sizeInElements() % 2 == 0)
             {
                 for (size_t idx = 0; idx < environment.sizeInElements(); idx += 2)
                 {
-                    SC_TRY(processInstance.setEnvironment(environment[idx], environment[idx + 1]));
+                    SC_TRY(processInstance.setEnvironment(environment[idx], environment[idx + 1]).toResult());
                 }
             }
             return Result(true);
@@ -1696,11 +1696,11 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             SC_TRY(setMakeEnvironment(buildProcess));
             if (outputMode == OutputMode::Quiet)
             {
-                SC_TRY(buildProcess.exec({arguments, numArgs}, stdOut, {}, stdError));
+                SC_TRY(buildProcess.exec({arguments, numArgs}, stdOut, {}, stdError).toResult());
             }
             else
             {
-                SC_TRY(buildProcess.exec({arguments, numArgs}, {}, {}, stdError));
+                SC_TRY(buildProcess.exec({arguments, numArgs}, {}, {}, stdError).toResult());
             }
             if (not stdError.isEmpty() and outputMode != OutputMode::Quiet)
             {
@@ -1722,13 +1722,13 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
                 arguments[1] = "clean";
                 Process cleanProcess;
                 SC_TRY(setMakeEnvironment(cleanProcess));
-                SC_TRY(cleanProcess.exec({arguments, numArgs}));
+                SC_TRY(cleanProcess.exec({arguments, numArgs}).toResult());
                 if (cleanProcess.getExitStatus() == 0)
                 {
                     arguments[1] = target;
                     Process retryProcess;
                     SC_TRY(setMakeEnvironment(retryProcess));
-                    SC_TRY(retryProcess.exec({arguments, numArgs}));
+                    SC_TRY(retryProcess.exec({arguments, numArgs}).toResult());
                     if (retryProcess.getExitStatus() == 0)
                     {
                         return Result(true);

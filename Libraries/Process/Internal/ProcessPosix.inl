@@ -35,7 +35,7 @@ bool SC::Process::isWindowsEmulatedProcess() { return false; }
 
 struct SC::Process::Internal
 {
-    static Result waitForPid(int pid, int& status)
+    static ResultProcess waitForPid(int pid, int& status)
     {
         status = -1;
         pid_t waitPid;
@@ -45,19 +45,19 @@ struct SC::Process::Internal
         } while (waitPid == -1 and errno == EINTR);
         if (waitPid == -1)
         {
-            return Result::Error("Process::waitForExitSync - waitPid failed");
+            return ResultProcess(ProcessError::WaitFailed, static_cast<uint32_t>(errno));
         }
         if (WIFEXITED(status) != 0)
         {
             status = WEXITSTATUS(status);
         }
-        return Result(true);
+        return ResultProcess(true);
     }
 };
 
-SC::Result SC::Process::waitForExitSync() { return Internal::waitForPid(processID.pid, exitStatus.status); }
+SC::ResultProcess SC::Process::waitForExitSync() { return Internal::waitForPid(processID.pid, exitStatus.status); }
 
-SC::Result SC::Process::launchImplementation()
+SC::ResultProcess SC::Process::launchImplementation()
 {
     (void)(options);
     sigset_t emptySignals;
@@ -82,11 +82,12 @@ SC::Result SC::Process::launchImplementation()
 
     // Fork child from parent here
     processID.pid = ::fork();
-    SC_TRY_MSG(processID.pid >= 0, "fork failed");
+    if (processID.pid < 0)
+        return ResultProcess(ProcessError::ForkFailed, static_cast<uint32_t>(errno));
     return processID.pid == 0 ? launchForkChild(pipe) : launchForkParent(pipe, &previousSignals);
 }
 
-SC::Result SC::Process::launchForkParent(PipeDescriptor& pipe, const void* previousSignals)
+SC::ResultProcess SC::Process::launchForkParent(PipeDescriptor& pipe, const void* previousSignals)
 {
     // Parent branch
     if (pthread_sigmask(SIG_SETMASK, static_cast<const sigset_t*>(previousSignals), NULL) != 0)
@@ -97,31 +98,34 @@ SC::Result SC::Process::launchForkParent(PipeDescriptor& pipe, const void* previ
     // - EOF (good, execvp succeeded)
     // - int (bad, contains the errno after execvp failed)
     SC_TRY(pipe.writePipe.close());
-    int childErrno;
-    SC_TRY(pipe.readPipe.read({reinterpret_cast<char*>(&childErrno), sizeof(childErrno)}, actuallyRead));
+    ResultProcess childResult;
+    SC_TRY(pipe.readPipe.read({reinterpret_cast<char*>(&childResult), sizeof(childResult)}, actuallyRead));
     if (actuallyRead.sizeInBytes() != 0)
     {
-        // Error received inside childErrno
+        // Error received from the child before exec took control.
         int ignoredStatus = -1;
         (void)Internal::waitForPid(processID.pid, ignoredStatus);
-        (void)childErrno;
-        return Result::Error("Process::launchImplementation - execve failed");
+        if (actuallyRead.sizeInBytes() != sizeof(childResult))
+            return ResultProcess(ProcessError::ExecFailed);
+        return childResult;
     }
     handle = processID.pid;
     SC_TRY(stdInFd.close());
     SC_TRY(stdOutFd.close());
     SC_TRY(stdErrFd.close());
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
+SC::ResultProcess SC::Process::formatArguments(Span<const StringSpan> params)
 {
+    if (params.sizeInElements() > MAX_NUM_ARGUMENTS - commandArgumentsNumber)
+        return ResultProcess(ProcessError::StringCountCapacityExceeded);
     StringsArena table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
     for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
     {
         SC_TRY(table.appendAsSingleString(params[idx]));
     }
-    return Result(true);
+    return ResultProcess(true);
 }
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -184,7 +188,7 @@ SC::FileDescriptor& SC::ProcessFork::getReadPipe()
     return side == ForkChild ? parentToFork.readPipe : forkToParent.readPipe;
 }
 
-SC::Result SC::ProcessFork::waitForChild()
+SC::ResultProcess SC::ProcessFork::waitForChild()
 {
     if (side == ForkChild)
     {
@@ -192,12 +196,12 @@ SC::Result SC::ProcessFork::waitForChild()
     }
     if (processID.pid < 0)
     {
-        return Result::Error("waitForChild");
+        return ResultProcess(ProcessError::ForkWaitFailed);
     }
     return Process::Internal::waitForPid(processID.pid, exitStatus.status);
 }
 
-SC::Result SC::ProcessFork::resumeChildFork()
+SC::ResultProcess SC::ProcessFork::resumeChildFork()
 {
     if (side == ForkChild)
     {
@@ -205,10 +209,10 @@ SC::Result SC::ProcessFork::resumeChildFork()
     }
     char cmd = 0;
     SC_TRY(parentToFork.writePipe.write({&cmd, 1}));
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::ProcessFork::fork(State state)
+SC::ResultProcess SC::ProcessFork::fork(State state)
 {
     // Create a CLOSE_ON_EXEC pipe (non-inheritable) to communicate with forked child
     SC_TRY(parentToFork.createPipe());
@@ -217,7 +221,7 @@ SC::Result SC::ProcessFork::fork(State state)
     if (pid < 0)
     {
         processID.pid = pid;
-        return Result::Error("fork failed");
+        return ResultProcess(ProcessError::ForkFailed, static_cast<uint32_t>(errno));
     }
 
     // Check parent / child branch
@@ -242,5 +246,5 @@ SC::Result SC::ProcessFork::fork(State state)
         side = ForkParent;
     }
     processID.pid = pid;
-    return Result(true);
+    return ResultProcess(true);
 }

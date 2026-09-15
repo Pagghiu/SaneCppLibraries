@@ -34,6 +34,12 @@
       "owner": "FileSystemIterator",
       "declaration": "Libraries/FileSystemIterator/FileSystemIteratorError.h",
       "constant": "FileSystemIteratorResultCategory"
+    },
+    {
+      "value": 5,
+      "owner": "Process",
+      "declaration": "Libraries/Process/Process.h",
+      "constant": "ProcessResultCategory"
     }
   ]
 }

@@ -23,23 +23,24 @@ struct SC::Process::InternalFork
     static FileDescriptor::Handle getStandardOutputFDS() { return fileno(stdout); };
     static FileDescriptor::Handle getStandardErrorFDS() { return fileno(stderr); };
 
-    static Result duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds)
+    static ResultProcess duplicateAndReplace(FileDescriptor& handle, FileDescriptor::Handle fds,
+                                             ProcessError invalidRedirectionError)
     {
         FileDescriptor::Handle nativeFd;
-        SC_TRY(handle.get(nativeFd, Result::Error("duplicateAndReplace - Invalid Handle")));
+        SC_TRY(handle.get(nativeFd, ResultProcess(invalidRedirectionError)));
         if (::dup2(nativeFd, fds) == -1)
         {
-            return Result::Error("dup2 failed");
+            return ResultProcess(ProcessError::DuplicateDescriptorFailed, static_cast<uint32_t>(errno));
         }
-        return Result(true);
+        return ResultProcess(true);
     }
 
-    static Result resetInheritedSignalHandlers()
+    static ResultProcess resetInheritedSignalHandlers()
     {
 #if SC_COMPILER_FILC
         // Fil-C currently does not support the full pre-exec signal reset sequence we use on native libc builds.
         // Child processes still exec immediately afterwards, so skip this best-effort cleanup for now.
-        return Result(true);
+        return ResultProcess(true);
 #else
         // For every signal, we restore the default action
         struct sigaction action;
@@ -49,7 +50,7 @@ struct SC::Process::InternalFork
         int res = sigemptyset(&action.sa_mask);
         if (res < 0)
         {
-            return Result::Error("sigemptyset failed");
+            return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(errno));
         }
 #ifdef NSIG
         constexpr int numSignals = NSIG;
@@ -64,7 +65,7 @@ struct SC::Process::InternalFork
             res = sigaction(signal, &action, NULL);
             if (res < 0 && errno != EINVAL)
             {
-                return Result::Error("sigaction failed");
+                return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(errno));
             }
         }
 
@@ -74,42 +75,58 @@ struct SC::Process::InternalFork
         res = sigemptyset(&signalSet);
         if (res < 0)
         {
-            return Result::Error("sigemptyset failed");
+            return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(errno));
         }
 
         res = pthread_sigmask(SIG_SETMASK, &signalSet, NULL);
         if (res > 0) // pthread returns > 0 error codes
         {
-            return Result::Error("signal_mask failed");
+            return ResultProcess(ProcessError::ResetSignalHandlersFailed, static_cast<uint32_t>(res));
         }
 
-        return Result(true);
+        return ResultProcess(true);
 #endif
     }
 };
 
-SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
+SC::ResultProcess SC::Process::launchForkChild(PipeDescriptor& pipe)
 {
     // If execvpe doesn't take control, we exit with failure code on error
-    auto exitDeferred = MakeDeferred([&] { _exit(EXIT_FAILURE); });
-    int  childErrno   = -1;
-    auto reportDeferred =
-        MakeDeferred([&] { (void)pipe.writePipe.write({reinterpret_cast<char*>(&childErrno), sizeof(childErrno)}); });
+    auto          exitDeferred = MakeDeferred([&] { _exit(EXIT_FAILURE); });
+    ResultProcess childResult(ProcessError::ExecFailed);
+    auto          reportDeferred =
+        MakeDeferred([&] { (void)pipe.writePipe.write({reinterpret_cast<char*>(&childResult), sizeof(childResult)}); });
+    auto reportFailure = [&](ResultProcess result) -> ResultProcess
+    {
+        childResult = result;
+        return result;
+    };
 
     // Try restoring default signal handlers
-    SC_TRY(InternalFork::resetInheritedSignalHandlers());
+    ResultProcess result = InternalFork::resetInheritedSignalHandlers();
+    if (not result)
+        return reportFailure(result);
 
     if (stdInFd.isValid())
     {
-        SC_TRY(InternalFork::duplicateAndReplace(stdInFd, InternalFork::getStandardInputFDS()));
+        result = InternalFork::duplicateAndReplace(stdInFd, InternalFork::getStandardInputFDS(),
+                                                   ProcessError::InvalidInputRedirection);
+        if (not result)
+            return reportFailure(result);
     }
     if (stdOutFd.isValid())
     {
-        SC_TRY(InternalFork::duplicateAndReplace(stdOutFd, InternalFork::getStandardOutputFDS()));
+        result = InternalFork::duplicateAndReplace(stdOutFd, InternalFork::getStandardOutputFDS(),
+                                                   ProcessError::InvalidOutputRedirection);
+        if (not result)
+            return reportFailure(result);
     }
     if (stdErrFd.isValid())
     {
-        SC_TRY(InternalFork::duplicateAndReplace(stdErrFd, InternalFork::getStandardErrorFDS()));
+        result = InternalFork::duplicateAndReplace(stdErrFd, InternalFork::getStandardErrorFDS(),
+                                                   ProcessError::InvalidOutputRedirection);
+        if (not result)
+            return reportFailure(result);
     }
     // As std handles have been duplicated / redirected, we can close all of them.
     // We explicitly close them because some may have not been marked as CLOEXEC.
@@ -121,9 +138,15 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
     // still valid between the fork() and the exec() call to do anything needed
     // (like the duplication / redirect we're doing here) without risk of leaking
     // any FD to the newly executed child process.
-    SC_TRY(stdInFd.close());
-    SC_TRY(stdOutFd.close());
-    SC_TRY(stdErrFd.close());
+    result = stdInFd.close();
+    if (not result)
+        return reportFailure(result);
+    result = stdOutFd.close();
+    if (not result)
+        return reportFailure(result);
+    result = stdErrFd.close();
+    if (not result)
+        return reportFailure(result);
 
     // Switch to wanted current directory (if provided)
     if (not currentDirectory.view().isEmpty())
@@ -131,7 +154,8 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
         int res = ::chdir(currentDirectory.view().getNullTerminatedNative());
         if (res < 0)
         {
-            return Result::Error("chdir failed");
+            return reportFailure(
+                ResultProcess(ProcessError::ChangeWorkingDirectoryFailed, static_cast<uint32_t>(errno)));
         }
     }
 
@@ -154,8 +178,9 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
     StringsArena       table = {environment, environmentNumber, environmentByteOffset};
 
     EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
-    SC_TRY_MSG(environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv),
-               "Process::launchImplementation - environmentTable.writeTo failed");
+    result = environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv);
+    if (not result)
+        return reportFailure(result);
     // If execvp succeeds, this fork morphs into the new executable on the next line, and the parent communication
     // pipe, that has the CLOEXEC flags set (as it has been created as Non-inheritable) will see both sides closed,
     // allowing the pipe.readPipe.read to receive an EOF. This works also because the parent is closing the write
@@ -169,19 +194,19 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
     {
         if (cmd.getNullTerminatedNative()[0] == '/')
         {
-            childErrno = ::execv(cmd.getNullTerminatedNative(), const_cast<char* const*>(argv));
+            (void)::execv(cmd.getNullTerminatedNative(), const_cast<char* const*>(argv));
         }
         else
         {
-            childErrno = ::execvp(cmd.getNullTerminatedNative(), const_cast<char* const*>(argv));
+            (void)::execvp(cmd.getNullTerminatedNative(), const_cast<char* const*>(argv));
         }
     }
     else if (cmd.getNullTerminatedNative()[0] == '/')
     {
         // cmd holds an absolute path, let's call execve directly
-        childErrno = ::execve(cmd.getNullTerminatedNative(),               // command
-                              const_cast<char* const*>(argv),              // arguments
-                              const_cast<char* const*>(environmentArray)); // environment
+        (void)::execve(cmd.getNullTerminatedNative(),               // command
+                       const_cast<char* const*>(argv),              // arguments
+                       const_cast<char* const*>(environmentArray)); // environment
     }
     else
     {
@@ -210,12 +235,15 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
             {
                 StringSpan pathComponent({pathStart, pathLen}, false, StringEncoding::Utf8);
                 StringPath finalCommand;
-                SC_TRY_MSG(finalCommand.append(pathComponent), "Process::launchImplementation - finalCommand");
-                SC_TRY_MSG(finalCommand.append("/"), "Process::launchImplementation - finalCommand");
-                SC_TRY_MSG(finalCommand.append(cmd), "Process::launchImplementation - finalCommand");
-                childErrno = ::execve(finalCommand.view().getNullTerminatedNative(), // command
-                                      const_cast<char* const*>(argv),                // arguments
-                                      const_cast<char* const*>(environmentArray));   // environment
+                if (not finalCommand.append(pathComponent))
+                    return reportFailure(ResultProcess(ProcessError::StringDestinationCapacityExceeded));
+                if (not finalCommand.append("/"))
+                    return reportFailure(ResultProcess(ProcessError::StringDestinationCapacityExceeded));
+                if (not finalCommand.append(cmd))
+                    return reportFailure(ResultProcess(ProcessError::StringDestinationCapacityExceeded));
+                (void)::execve(finalCommand.view().getNullTerminatedNative(), // command
+                               const_cast<char* const*>(argv),                // arguments
+                               const_cast<char* const*>(environmentArray));   // environment
             }
 
             // Move to next component
@@ -227,6 +255,5 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
     }
 
     // execvp failed, the deferred above will communicate errno back to the parent before _exit(EXIT_FAILURE).
-    childErrno = errno;
-    return Result::Error("execve failed");
+    return reportFailure(ResultProcess(ProcessError::ExecFailed, static_cast<uint32_t>(errno)));
 }

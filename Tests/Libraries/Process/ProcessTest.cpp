@@ -8,13 +8,22 @@
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Process/ProcessErrorFormatter.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
+
+#include <string.h>
 
 namespace SC
 {
 struct ProcessTest;
+
+static ResultProcess propagateProcessResult(ResultProcess result)
+{
+    SC_TRY(result);
+    return ResultProcess(true);
 }
+} // namespace SC
 
 struct SC::ProcessTest : public SC::TestCase
 {
@@ -29,6 +38,10 @@ struct SC::ProcessTest : public SC::TestCase
         if (test_section("Process error"))
         {
             processError();
+        }
+        if (test_section("Process structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
         }
         if (test_section("Process inherit"))
         {
@@ -92,6 +105,7 @@ struct SC::ProcessTest : public SC::TestCase
     }
 
     void processError();
+    void structuredErrorsAndFormatter();
     void processInheritStdout();
     void processIgnoreStdout();
     void processRedirectStdout();
@@ -118,8 +132,75 @@ struct SC::ProcessTest : public SC::TestCase
 void SC::ProcessTest::processError()
 {
     // Tries to launch a process that doesn't exist (and gets an error)
-    Process process(commandArena.toSpan(), environmentArena.toSpan());
-    SC_TEST_EXPECT(not process.launch({"DOCTORI", "ASDF"}));
+    Process             process(commandArena.toSpan(), environmentArena.toSpan());
+    const ResultProcess result = process.launch({"DOCTORI", "ASDF"});
+    SC_TEST_EXPECT(not result);
+    const ProcessError expectedError =
+        HostPlatform == Platform::Windows ? ProcessError::CreateProcessFailed : ProcessError::ExecFailed;
+    SC_TEST_EXPECT(result.isError(expectedError));
+    SC_TEST_EXPECT(result.nativeError != 0);
+}
+
+void SC::ProcessTest::structuredErrorsAndFormatter()
+{
+    static_assert(sizeof(void*) != 8 or sizeof(ResultProcess) == 24,
+                  "The migration bridge temporarily expands ResultProcess");
+    static_assert(__is_standard_layout(ResultProcess), "ResultProcess must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultProcess>::value,
+                  "ResultProcess must remain trivially copyable");
+
+    ProcessChain        chain;
+    const ResultProcess emptyChain = chain.launch();
+    SC_TEST_EXPECT(emptyChain.isError(ProcessError::ProcessChainEmpty));
+
+    Process environmentProcess(commandArena.toSpan(), environmentArena.toSpan());
+    for (size_t index = 0; index < 256; ++index)
+    {
+        SC_TEST_EXPECT(environmentProcess.setEnvironment("A", "B"));
+    }
+    const ResultProcess environmentCapacity = environmentProcess.setEnvironment("A", "B");
+    SC_TEST_EXPECT(environmentCapacity.isError(ProcessError::StringCountCapacityExceeded));
+
+    constexpr char    expected[] = "Failed to execute process";
+    ResultErrorFormat formatted  = formatProcessError(ProcessError::ExecFailed, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+
+    char exact[sizeof(expected)];
+    formatted = formatProcessError(Result::Error(ProcessResultCategory, ProcessError::ExecFailed), exact);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(::memcmp(exact, expected, sizeof(expected)) == 0);
+
+    constexpr char expectedNative[] = "Failed to execute process (native error: 12345)";
+    ResultProcess  detailed(ProcessError::ExecFailed, 12345);
+    char           nativeMessage[sizeof(expectedNative)];
+    formatted = formatProcessError(detailed, nativeMessage);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedNative));
+    SC_TEST_EXPECT(::memcmp(nativeMessage, expectedNative, sizeof(expectedNative)) == 0);
+
+    const ResultProcess propagated = propagateProcessResult(detailed);
+    SC_TEST_EXPECT(propagated.isError(ProcessError::ExecFailed));
+    SC_TEST_EXPECT(propagated.nativeError == 12345);
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(ProcessResultCategory, ProcessError::ExecFailed));
+
+    const ResultProcess legacy(Result::Error("legacy process result"));
+    SC_TEST_EXPECT(not legacy);
+    SC_TEST_EXPECT(legacy.nativeError == 0);
+    SC_TEST_EXPECT(legacy.result.hasLegacyError());
+    formatted = formatProcessError(legacy, nativeMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
+
+    formatted = formatProcessError(Result(true), nativeMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::NotAnError);
+
+    formatted = formatProcessError(Result::Error(ResultCategory(1234), 1), nativeMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
+
+    formatted = formatProcessError(Result::Error(ProcessResultCategory, 9999), nativeMessage);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
 }
 
 void SC::ProcessTest::processInheritStdout()

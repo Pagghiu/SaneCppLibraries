@@ -17,8 +17,8 @@ struct SC::EnvironmentTable
     using environment_ptr = const native_char_t* const*;
     const native_char_t* childEnvs[MAX_NUM_ENVIRONMENT];
 
-    Result writeTo(environment_ptr& environmentArray, bool inheritEnvironment, const StringsArena& table,
-                   const ProcessEnvironment& parentEnv)
+    ResultProcess writeTo(environment_ptr& environmentArray, bool inheritEnvironment, const StringsArena& table,
+                          const ProcessEnvironment& parentEnv)
     {
         if (table.view().isEmpty())
         {
@@ -78,7 +78,7 @@ struct SC::EnvironmentTable
                     {
                         if (childEnvCount + table.numberOfStrings >= MAX_NUM_ENVIRONMENT)
                         {
-                            return Result::Error("EnvironmentTable::writeTo - MAX_NUM_ENVIRONMENT exceeded");
+                            return ResultProcess(ProcessError::EnvironmentCapacityExceeded);
                         }
                         childEnvs[childEnvCount + table.numberOfStrings] =
                             reinterpret_cast<const native_char_t*>(name.bytesWithoutTerminator());
@@ -91,6 +91,6 @@ struct SC::EnvironmentTable
 
             environmentArray = childEnvs;
         }
-        return Result(true);
+        return ResultProcess(true);
     }
 };

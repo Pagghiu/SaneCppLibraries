@@ -12,6 +12,7 @@
 #include "../Common/Assert.h"
 #include "../Common/IGrowableBufferSpan.h"
 #include "../Common/IGrowableBufferStringPath.h"
+#include "../Common/Result.h"
 #include "../File/File.h"
 
 namespace SC
@@ -28,6 +29,58 @@ struct SC_PROCESS_EXPORT ProcessDescriptor
 {
     using Handle                  = detail::FileDescriptorDefinition::Handle;
     static constexpr auto Invalid = detail::FileDescriptorDefinition::Invalid;
+};
+
+/// @brief Stable error codes returned by the Process library.
+enum class ProcessError : uint32_t
+{
+    ProcessChainEmpty = 1,
+    ProcessAlreadyInChain,
+    InvalidInputRedirection,
+    InvalidOutputRedirection,
+    UnsupportedInputRedirection,
+    UnsupportedOutputRedirection,
+    StringCountCapacityExceeded,
+    StringDestinationCapacityExceeded,
+    EnvironmentCapacityExceeded,
+    WaitFailed,
+    ForkFailed,
+    ExecFailed,
+    DuplicateDescriptorFailed,
+    ResetSignalHandlersFailed,
+    ChangeWorkingDirectoryFailed,
+    SetHandleInformationFailed,
+    CreateProcessFailed,
+    ForkWaitFailed,
+};
+
+/// @brief Stable category assigned to errors owned by the Process library.
+static constexpr ResultCategory ProcessResultCategory = ResultCategory(5);
+
+/// @brief Process result retaining an optional native platform error value.
+/// @details nativeError is zero when unavailable or irrelevant. Converting to Result preserves the portable error
+/// identity and deliberately discards the native detail.
+struct [[nodiscard]] ResultProcess
+{
+    Result   result;
+    uint32_t nativeError = 0;
+
+    explicit constexpr ResultProcess(bool valid = true) : result(valid) {}
+    constexpr ResultProcess(ProcessError error, uint32_t nativeError = 0)
+        : result(Result::Error(ProcessResultCategory, error)), nativeError(nativeError)
+    {}
+    constexpr ResultProcess(Result result) : result(result) {}
+
+    template <typename ResultLike>
+    constexpr ResultProcess(const ResultLike& other) : result(other.toResult())
+    {}
+
+    explicit constexpr operator bool() const { return static_cast<bool>(result); }
+
+    constexpr operator Result() const { return result; }
+
+    constexpr Result toResult() const { return result; }
+    constexpr bool   isError(ProcessError error) const { return result.isError(ProcessResultCategory, error); }
 };
 
 /// @brief Wraps the code returned by a process that has exited
@@ -105,7 +158,8 @@ struct SC_PROCESS_EXPORT Process
         StdStream(GrowableBuffer<FileDescriptor>& file)
         {
             operation = Operation::FileDescriptor;
-            (void)file.content.get(fileDescriptor, Result::Error("Invalid redirection file descriptor"));
+            (void)file.content.get(fileDescriptor,
+                                   Result::Error(ProcessResultCategory, ProcessError::InvalidOutputRedirection));
             file.content.detach();
         }
 
@@ -207,7 +261,7 @@ struct SC_PROCESS_EXPORT Process
     ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
 
     /// @brief Waits (blocking) for process to exit after launch. It can only be called if Process::launch succeeded.
-    Result waitForExitSync();
+    ResultProcess waitForExitSync();
 
     /// @brief Launch child process with the given arguments
     /// @param cmd Process executable path and its arguments (if any)
@@ -217,7 +271,7 @@ struct SC_PROCESS_EXPORT Process
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
     template <typename Out = StdOut, typename In = StdIn, typename Err = StdErr>
-    Result launch(Span<const StringSpan> cmd, Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
+    ResultProcess launch(Span<const StringSpan> cmd, Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         SC_TRY(formatArguments(cmd));
         GrowableBuffer<typename TypeTraits::RemoveReference<Out>::type> gbOut = {stdOut};
@@ -234,7 +288,7 @@ struct SC_PROCESS_EXPORT Process
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
     template <typename Out = StdOut, typename In = StdIn, typename Err = StdErr>
-    Result exec(Span<const StringSpan> cmd, Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
+    ResultProcess exec(Span<const StringSpan> cmd, Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         SC_TRY(launch(cmd, stdOut, stdIn, stdErr));
         return waitForExitSync();
@@ -244,13 +298,13 @@ struct SC_PROCESS_EXPORT Process
     int32_t getExitStatus() const { return exitStatus.status; }
 
     /// @brief Sets the starting working directory of the process that will be launched / executed
-    Result setWorkingDirectory(StringSpan processWorkingDirectory);
+    ResultProcess setWorkingDirectory(StringSpan processWorkingDirectory);
 
     /// @brief Controls if the newly spawned child process will inherit parent process environment variables
     void inheritParentEnvironmentVariables(bool inherit) { inheritEnv = inherit; }
 
     /// @brief Sets the environment variable for the newly spawned child process
-    Result setEnvironment(StringSpan environmentVariable, StringSpan value);
+    ResultProcess setEnvironment(StringSpan environmentVariable, StringSpan value);
 
     /// @brief Returns number of (virtual) processors available
     [[nodiscard]] static size_t getNumberOfProcessors();
@@ -280,9 +334,9 @@ struct SC_PROCESS_EXPORT Process
     FileDescriptor stdOutFd; ///< Descriptor of process stdout
     FileDescriptor stdErrFd; ///< Descriptor of process stderr
 
-    Result launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError);
+    ResultProcess launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError);
 
-    Result formatArguments(Span<const StringSpan> cmd);
+    ResultProcess formatArguments(Span<const StringSpan> cmd);
 
     StringPath currentDirectory;
 #if SC_PLATFORM_WINDOWS
@@ -320,9 +374,9 @@ struct SC_PROCESS_EXPORT Process
     struct Internal;
     struct InternalFork;
     friend struct ProcessFork;
-    Result launchImplementation();
-    Result launchForkChild(PipeDescriptor& pipe);
-    Result launchForkParent(PipeDescriptor& pipe, const void* previousSignals);
+    ResultProcess launchImplementation();
+    ResultProcess launchForkChild(PipeDescriptor& pipe);
+    ResultProcess launchForkParent(PipeDescriptor& pipe, const void* previousSignals);
 };
 
 /// @brief Execute multiple child processes chaining input / output between them.
@@ -348,13 +402,13 @@ struct SC_PROCESS_EXPORT ProcessChain
     /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
     /// @param cmd Path to executable and eventual args for this process
     /// @return Invalid result if given process failed to create pipes for I/O redirection
-    Result pipe(Process& process, const Span<const StringSpan> cmd);
+    ResultProcess pipe(Process& process, const Span<const StringSpan> cmd);
 
     /// @brief Launch the entire chain of processes. Reading from pipes can be done after launching.
     /// You can then call ProcessChain::waitForExitSync to block until the child process is fully finished.
     /// @return Valid result if given process chain has been launched successfully
     template <typename Out = Process::StdOut, typename In = Process::StdIn, typename Err = Process::StdErr>
-    Result launch(Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
+    ResultProcess launch(Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         GrowableBuffer<typename TypeTraits::RemoveReference<Out>::type> gbOut = {stdOut};
         GrowableBuffer<typename TypeTraits::RemoveReference<In>::type>  gbIn  = {stdIn};
@@ -364,19 +418,20 @@ struct SC_PROCESS_EXPORT ProcessChain
 
     /// @brief Waits (blocking) for entire process chain to exit. Can be called only after ProcessChain::launch.
     /// @return Valid result if the given process chain exited normally without aborting
-    Result waitForExitSync();
+    ResultProcess waitForExitSync();
 
     /// @brief Launch the entire chain of processes and waits for the results (calling ProcessChain::waitForExitSync)
     /// @return Valid result if given process chain has been launched and waited for exit successfully
     template <typename Out = Process::StdOut, typename In = Process::StdIn, typename Err = Process::StdErr>
-    Result exec(Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
+    ResultProcess exec(Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         SC_TRY(launch(stdOut, stdIn, stdErr));
         return waitForExitSync();
     }
 
   private:
-    Result internalLaunch(const Process::StdOut& stdOut, const Process::StdIn& stdIn, const Process::StdErr& stdErr);
+    ResultProcess internalLaunch(const Process::StdOut& stdOut, const Process::StdIn& stdIn,
+                                 const Process::StdErr& stdErr);
     // Trimmed duplicate of IntrusiveDoubleLinkedList<T>
     struct ProcessLinkedList
     {
@@ -486,13 +541,13 @@ struct SC_PROCESS_EXPORT ProcessFork
     };
 
     /// @brief Forks current process (use ForkProcess::getType to know the side)
-    Result fork(State state);
+    ResultProcess fork(State state);
 
     /// @brief Sends 1 byte on parentToFork to resume State::Paused child fork
-    Result resumeChildFork();
+    ResultProcess resumeChildFork();
 
     /// @brief Waits for child fork to finish execution
-    Result waitForChild();
+    ResultProcess waitForChild();
 
     /// @brief Gets the return code from the exited child fork
     int32_t getExitStatus() const { return exitStatus.status; }

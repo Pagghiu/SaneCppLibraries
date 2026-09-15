@@ -1965,7 +1965,7 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
         Process process;
         SC_TRY(Path::join(formatExecutable,
                           {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang-format"_a8)}));
-        SC_TRY(process.exec({formatExecutable.view(), "--version"}, result));
+        SC_TRY(process.exec({formatExecutable.view(), "--version"}, result).toResult());
         SC_TRY_MSG(process.getExitStatus() == 0, "clang-format returned error");
         return clangFormatMatchesVersion(result.view(), wantedVersion);
     };
@@ -2114,7 +2114,7 @@ Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packag
         Process process;
         SC_TRY(Path::join(clangExecutable,
                           {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang"_a8)}));
-        SC_TRY(process.exec({clangExecutable.view(), "--version"}, result));
+        SC_TRY(process.exec({clangExecutable.view(), "--version"}, result).toResult());
         SC_TRY_MSG(process.getExitStatus() == 0, "LLVM clang returned error");
         SC_TRY_MSG(StringView(result.view()).containsString("clang version"), "LLVM clang version missing");
         SC_TRY_MSG(StringView(result.view()).containsString(wantedVersion), "LLVM clang version doesn't match");
@@ -2123,7 +2123,7 @@ Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packag
         Process process2;
         SC_TRY(Path::join(llvmArExecutable,
                           {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("llvm-ar"_a8)}));
-        SC_TRY(process2.exec({llvmArExecutable.view(), "--version"}, result));
+        SC_TRY(process2.exec({llvmArExecutable.view(), "--version"}, result).toResult());
         SC_TRY_MSG(process2.getExitStatus() == 0, "LLVM archiver returned error");
         return Result(true);
     };
@@ -2905,7 +2905,7 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
         String  compilerExecutable;
         Process process;
         compilerExecutable = format("{}/bin/x86_64-w64-mingw32-clang++", package.installDirectoryLink);
-        SC_TRY(process.exec({compilerExecutable.view(), "--version"}, result));
+        SC_TRY(process.exec({compilerExecutable.view(), "--version"}, result).toResult());
         SC_TRY_MSG(process.getExitStatus() == 0, "llvm-mingw compiler returned error");
         SC_TRY_MSG(StringView(result.view()).containsString("clang version"), "llvm-mingw compiler version missing");
         SC_TRY_MSG(StringView(result.view()).containsString(llvmVersion), "llvm-mingw compiler version doesn't match");
@@ -3403,7 +3403,7 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
         String version    = StringEncoding::Utf8;
         SC_TRY(Path::join(executable, {installedPackage.installDirectoryLink.view(), "bin", "wine"}));
         Process process;
-        SC_TRY(process.exec({executable.view(), "--version"}, version));
+        SC_TRY(process.exec({executable.view(), "--version"}, version).toResult());
         SC_TRY_MSG(process.getExitStatus() == 0, "Linux Wine runner returned error");
         SC_TRY_MSG(StringView(version.view()).containsString("wine-11.0"), "Linux Wine runner version doesn't match");
         return Result(true);
@@ -3558,7 +3558,7 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
         String version    = StringEncoding::Utf8;
         SC_TRY(Path::join(executable, {installedPackage.installDirectoryLink.view(), "bin", "wine"}));
         Process process;
-        SC_TRY(process.exec({executable.view(), "--version"}, version));
+        SC_TRY(process.exec({executable.view(), "--version"}, version).toResult());
         SC_TRY_MSG(process.getExitStatus() == 0, "Linux ARM64 Wine runner returned error");
         SC_TRY_MSG(StringView(version.view()).containsString("wine-6.0"),
                    "Linux ARM64 Wine runner version doesn't match");
@@ -3685,7 +3685,7 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
                                      package.installDirectoryLink));
 
         Process process;
-        SC_TRY(process.exec({executable.view(), "--version"}, version));
+        SC_TRY(process.exec({executable.view(), "--version"}, version).toResult());
         SC_TRY_MSG(process.getExitStatus() == 0, "Wine runner returned error");
         SC_TRY_MSG(StringView(version.view()).containsString("wine-11.0"), "Wine runner version doesn't match");
         return Result(true);

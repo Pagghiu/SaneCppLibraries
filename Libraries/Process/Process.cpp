@@ -21,12 +21,12 @@
 // ProcessChain
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::ProcessChain::internalLaunch(const Process::StdOut& stdOut, const Process::StdIn& stdIn,
-                                            const Process::StdErr& stdErr)
+SC::ResultProcess SC::ProcessChain::internalLaunch(const Process::StdOut& stdOut, const Process::StdIn& stdIn,
+                                                   const Process::StdErr& stdErr)
 {
     if (processes.isEmpty())
     {
-        return Result::Error("ProcessChain::launch - No Processes");
+        return ResultProcess(ProcessError::ProcessChainEmpty);
     }
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
@@ -55,13 +55,14 @@ SC::Result SC::ProcessChain::internalLaunch(const Process::StdOut& stdOut, const
             SC_TRY(process->launchImplementation());
         }
     }
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringSpan> cmd)
+SC::ResultProcess SC::ProcessChain::pipe(Process& process, const Span<const StringSpan> cmd)
 {
     // TODO: Expose options to decide if to pipe also stderr
-    SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use");
+    if (process.parent != nullptr)
+        return ResultProcess(ProcessError::ProcessAlreadyInChain);
 
     if (not processes.isEmpty())
     {
@@ -76,10 +77,10 @@ SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringSpan>
     SC_TRY(process.formatArguments(Span<const StringSpan>(cmd)));
     process.parent = this;
     processes.queueBack(process);
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::ProcessChain::waitForExitSync()
+SC::ResultProcess SC::ProcessChain::waitForExitSync()
 {
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
@@ -87,7 +88,7 @@ SC::Result SC::ProcessChain::waitForExitSync()
         process->parent = nullptr;
     }
     processes.clear();
-    return Result(true);
+    return ResultProcess(true);
 }
 
 void SC::ProcessChain::ProcessLinkedList::clear()
@@ -131,9 +132,10 @@ SC::Process::Options::Options()
     windowsCreateNewProcessGroup = false;
 }
 
-SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError)
+SC::ResultProcess SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError)
 {
-    auto setupInput = [](const StdIn& inputObject, PipeDescriptor& pipe, FileDescriptor& fileDescriptor)
+    auto setupInput = [](const StdIn& inputObject, PipeDescriptor& pipe,
+                         FileDescriptor& fileDescriptor) -> ResultProcess
     {
         switch (inputObject.operation)
         {
@@ -141,12 +143,13 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::Inherit: break;
         case StdStream::Operation::Ignore: break;
         case StdStream::Operation::FileDescriptor: {
-            SC_TRY_MSG(fileDescriptor.assign(inputObject.fileDescriptor), "Input file is not valid");
+            if (not fileDescriptor.assign(inputObject.fileDescriptor))
+                return ResultProcess(ProcessError::InvalidInputRedirection);
         }
         break;
         case StdStream::Operation::ExternalPipe: {
-            SC_TRY_MSG(fileDescriptor.assign(move(inputObject.pipeDescriptor->readPipe)),
-                       "Input pipe is not valid (forgot createPipe?)");
+            if (not fileDescriptor.assign(move(inputObject.pipeDescriptor->readPipe)))
+                return ResultProcess(ProcessError::InvalidInputRedirection);
         }
         break;
         case StdStream::Operation::GrowableBuffer:
@@ -159,13 +162,14 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         }
         break;
         case StdStream::Operation::WritableSpan: {
-            return Result(false);
+            return ResultProcess(ProcessError::UnsupportedInputRedirection);
         }
         }
-        return Result(true);
+        return ResultProcess(true);
     };
 
-    auto setupOutput = [](const StdOut& outputObject, PipeDescriptor& pipe, FileDescriptor& fileDescriptor)
+    auto setupOutput = [](const StdOut& outputObject, PipeDescriptor& pipe,
+                          FileDescriptor& fileDescriptor) -> ResultProcess
     {
         switch (outputObject.operation)
         {
@@ -176,12 +180,13 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
             break;
         }
         case StdStream::Operation::FileDescriptor: {
-            SC_TRY_MSG(fileDescriptor.assign(outputObject.fileDescriptor), "Output file is not valid");
+            if (not fileDescriptor.assign(outputObject.fileDescriptor))
+                return ResultProcess(ProcessError::InvalidOutputRedirection);
         }
         break;
         case StdStream::Operation::ExternalPipe: {
-            SC_TRY_MSG(fileDescriptor.assign(move(outputObject.pipeDescriptor->writePipe)),
-                       "Output pipe is not valid (forgot createPipe?)");
+            if (not fileDescriptor.assign(move(outputObject.pipeDescriptor->writePipe)))
+                return ResultProcess(ProcessError::InvalidOutputRedirection);
         }
         break;
         case StdStream::Operation::GrowableBuffer:
@@ -194,10 +199,10 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         }
         break;
         case StdStream::Operation::ReadableSpan: {
-            return Result(false);
+            return ResultProcess(ProcessError::UnsupportedOutputRedirection);
         }
         }
-        return Result(true);
+        return ResultProcess(true);
     };
     PipeDescriptor  pipes[3];
     PipeDescriptor& stdoutPipe = pipes[0];
@@ -230,11 +235,11 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
     }
     break;
     case StdStream::Operation::WritableSpan: {
-        return Result(false);
+        return ResultProcess(ProcessError::UnsupportedInputRedirection);
     }
     }
 
-    auto finalizeOutput = [](const StdOut& outputObject, PipeDescriptor& pipe)
+    auto finalizeOutput = [](const StdOut& outputObject, PipeDescriptor& pipe) -> ResultProcess
     {
         switch (outputObject.operation)
         {
@@ -254,20 +259,20 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
             return pipe.close();
         }
         case StdStream::Operation::ReadableSpan: {
-            return Result(false);
+            return ResultProcess(ProcessError::UnsupportedOutputRedirection);
         }
         }
-        return Result(true);
+        return ResultProcess(true);
     };
 
     // Read output if requested
     SC_TRY(finalizeOutput(stdOutput, stdoutPipe));
     SC_TRY(finalizeOutput(stdError, stderrPipe));
 
-    return Result(true);
+    return ResultProcess(true);
 }
 
-SC::Result SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
+SC::ResultProcess SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
 {
 #if SC_PLATFORM_WINDOWS
     return ProcessWindowsDetail::makeWorkingDirectoryAbsolute(processWorkingDirectory, currentDirectory.view(),
@@ -277,8 +282,10 @@ SC::Result SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
 #endif
 }
 
-SC::Result SC::Process::setEnvironment(StringSpan name, StringSpan value)
+SC::ResultProcess SC::Process::setEnvironment(StringSpan name, StringSpan value)
 {
+    if (environmentNumber >= MAX_NUM_ENVIRONMENT)
+        return ResultProcess(ProcessError::StringCountCapacityExceeded);
     StringsArena table = {environment, environmentNumber, environmentByteOffset};
     return table.appendAsSingleString({name, SC_NATIVE_STR("="), value});
 }
