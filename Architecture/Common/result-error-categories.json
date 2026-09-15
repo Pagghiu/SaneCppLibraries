@@ -28,6 +28,12 @@
       "owner": "SerialPort",
       "declaration": "Libraries/SerialPort/SerialPortError.h",
       "constant": "SerialPortResultCategory"
+    },
+    {
+      "value": 4,
+      "owner": "FileSystemIterator",
+      "declaration": "Libraries/FileSystemIterator/FileSystemIteratorError.h",
+      "constant": "FileSystemIteratorResultCategory"
     }
   ]
 }

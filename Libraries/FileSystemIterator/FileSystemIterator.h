@@ -9,7 +9,7 @@
 
 #include "../Common/Assert.h"
 #include "../Common/IGrowableBufferStringPath.h"
-#include "../Common/Result.h"
+#include "FileSystemIteratorError.h"
 
 namespace SC
 {
@@ -101,27 +101,23 @@ struct FileSystemIterator
 
     /// @brief Check if any error happened during iteration
     /// @return A valid Result if no errors have happened during file system iteration
-    Result checkErrors()
-    {
-        errorsChecked = true;
-        return errorResult;
-    }
+    ResultFileSystemIterator checkErrors() const { return errorResult; }
 
     /// @brief Initializes the iterator on a given directory
     /// @param directory Directory to iterate
     /// @param recursiveEntries User supplied buffer for the stack used during folder recursion (must be >= 1 elements)
     /// @return Valid result if directory exists and is accessible
-    Result init(StringSpan directory, Span<FolderState> recursiveEntries);
+    ResultFileSystemIterator init(StringSpan directory, Span<FolderState> recursiveEntries);
 
     /// Returned string is only valid until next enumerateNext call and/or another init call
 
     /// @brief Moves iterator to next file
-    /// @return Valid result if there are more files to iterate
-    Result enumerateNext();
+    /// @return `true` if a new entry is available, or `false` on successful exhaustion or retained failure
+    [[nodiscard]] bool enumerateNext();
 
     /// @brief Recurse into current item (assuming Entry::isDirectory == `true`)
     /// @return Valid result if current item is a directory and it can be accessed successfully
-    Result recurseSubdirectory();
+    ResultFileSystemIterator recurseSubdirectory();
 
   private:
     static constexpr auto MaxPath = StringPath::MaxPath;
@@ -134,16 +130,18 @@ struct FileSystemIterator
 
         FolderState& back();
 
-        void   pop_back();
-        Result push_back(const FolderState& other);
-        size_t size() const { return size_t(currentEntry + 1); }
-        bool   isEmpty() const { return currentEntry == -1; }
+        void                     pop_back();
+        ResultFileSystemIterator push_back(const FolderState& other);
+        size_t                   size() const { return size_t(currentEntry + 1); }
+        bool                     isEmpty() const { return currentEntry == -1; }
     };
     RecurseStack recurseStack;
 
-    Entry  currentEntry;
-    Result errorResult   = Result(true);
-    bool   errorsChecked = false;
+    Entry                    currentEntry;
+    ResultFileSystemIterator errorResult    = ResultFileSystemIterator(true);
+    bool                     initialized    = false;
+    bool                     finished       = false;
+    bool                     entryAvailable = false;
 
 #if SC_PLATFORM_WINDOWS
     bool       expectDotDirectories = true;
@@ -154,8 +152,9 @@ struct FileSystemIterator
     StringPath currentPath;
 #endif
 
-    Result enumerateNextInternal(Entry& entry);
-    Result recurseSubdirectoryInternal(Entry& entry);
+    ResultFileSystemIterator initInternal(StringSpan directory, Span<FolderState> recursiveEntries);
+    ResultFileSystemIterator enumerateNextInternal(Entry& entry, bool& hasEntry);
+    ResultFileSystemIterator recurseSubdirectoryInternal(Entry& entry);
 };
 
 //! @}

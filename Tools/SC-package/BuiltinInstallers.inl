@@ -15,6 +15,7 @@ static Result findFirstSubdirectory(StringView directory, String& output)
             return Result(true);
         }
     }
+    SC_TRY(iterator.checkErrors());
     return Result::Error("Missing package directory");
 }
 

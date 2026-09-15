@@ -732,7 +732,7 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
     String path;
     SC_TRY(Path::join(path, {parameters.directories.projectDirectory.view(), "Examples"}));
 
-    fsi.init(path.view(), entries);
+    SC_TRY(fsi.init(path.view(), entries));
 
     while (fsi.enumerateNext())
     {
@@ -806,7 +806,7 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.addFiles(entry.path, "**.cpp");
         workspace.projects.push_back(move(project));
     }
-    return Result(true);
+    return fsi.checkErrors();
 }
 
 Result configureSingleFileLibs(Definition& definition, const Parameters& parameters)
@@ -867,6 +867,7 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
 
         workspace.projects.push_back(move(project));
     }
+    SC_TRY(fsi.checkErrors());
     definition.workspaces.push_back(move(workspace));
     return Result(true);
 }

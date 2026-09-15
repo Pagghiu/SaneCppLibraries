@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/FileSystemIterator/FileSystemIteratorErrorFormatter.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
+
+#include <string.h>
 namespace SC
 {
 struct FileSystemIteratorTest;
@@ -26,6 +30,14 @@ struct SC::FileSystemIteratorTest : public SC::TestCase
         {
             walkNotEnough();
         }
+        if (test_section("completion and sticky errors"))
+        {
+            completionAndStickyErrors();
+        }
+        if (test_section("structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
+        }
 #if SC_PLATFORM_WINDOWS
         if (test_section("prefixed input logical output"))
         {
@@ -36,6 +48,8 @@ struct SC::FileSystemIteratorTest : public SC::TestCase
     inline void walkRecursiveManual();
     inline void walkRecursive();
     inline void walkNotEnough();
+    inline void completionAndStickyErrors();
+    inline void structuredErrorsAndFormatter();
 #if SC_PLATFORM_WINDOWS
     inline void prefixedInputLogicalOutput();
 #endif
@@ -76,9 +90,95 @@ void SC::FileSystemIteratorTest::walkNotEnough()
     {
         report.console.printLine(fsIterator.get().path);
     }
-    SC_TEST_EXPECT(not fsIterator.checkErrors()); // one error must be reported
+    const ResultFileSystemIterator traversalResult = fsIterator.checkErrors();
+    SC_TEST_EXPECT(traversalResult.isError(FileSystemIteratorError::RecursionLimitExceeded));
+    SC_TEST_EXPECT(traversalResult.depth == 1);
+    SC_TEST_EXPECT(fsIterator.checkErrors().isError(FileSystemIteratorError::RecursionLimitExceeded));
     SC_TEST_EXPECT(fs.removeEmptyDirectory("test"));
     //! [walkNotEnoughSnippet]
+}
+
+void SC::FileSystemIteratorTest::completionAndStickyErrors()
+{
+    FileSystemIterator beforeInit;
+    SC_TEST_EXPECT(not beforeInit.enumerateNext());
+    SC_TEST_EXPECT(beforeInit.checkErrors().isError(FileSystemIteratorError::NotInitialized));
+    SC_TEST_EXPECT(not beforeInit.enumerateNext());
+    SC_TEST_EXPECT(beforeInit.checkErrors().isError(FileSystemIteratorError::NotInitialized));
+
+    FileSystemIterator             failedInit;
+    const ResultFileSystemIterator missing = failedInit.init("FileSystemIteratorMissingDirectory", {});
+    SC_TEST_EXPECT(missing.isError(FileSystemIteratorError::RecursionLimitExceeded));
+    SC_TEST_EXPECT(failedInit.checkErrors().isError(FileSystemIteratorError::RecursionLimitExceeded));
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+    constexpr StringView emptyDirectory = "FileSystemIteratorEmpty";
+    (void)fs.removeEmptyDirectory(emptyDirectory);
+    SC_TEST_EXPECT(fs.makeDirectory(emptyDirectory));
+
+    StringPath emptyPath;
+    SC_TEST_EXPECT(Path::join(emptyPath, {report.applicationRootDirectory.view(), emptyDirectory}));
+    FileSystemIterator::FolderState entries[1];
+
+    StringPath missingPath;
+    SC_TEST_EXPECT(
+        Path::join(missingPath, {report.applicationRootDirectory.view(), "FileSystemIteratorMissingDirectory"}));
+    const ResultFileSystemIterator openFailure = failedInit.init(missingPath.view(), entries);
+    SC_TEST_EXPECT(openFailure.isError(FileSystemIteratorError::OpenDirectoryFailed));
+    SC_TEST_EXPECT(openFailure.nativeError != 0);
+    SC_TEST_EXPECT(failedInit.checkErrors().isError(FileSystemIteratorError::OpenDirectoryFailed));
+
+    SC_TEST_EXPECT(failedInit.init(emptyPath.view(), entries));
+    SC_TEST_EXPECT(not failedInit.enumerateNext());
+    SC_TEST_EXPECT(failedInit.checkErrors());
+    SC_TEST_EXPECT(not failedInit.enumerateNext());
+    SC_TEST_EXPECT(failedInit.checkErrors());
+
+    FileSystemIterator invalidRecursion;
+    invalidRecursion.options.recursive = true;
+    SC_TEST_EXPECT(invalidRecursion.init(emptyPath.view(), entries));
+    const ResultFileSystemIterator recursionResult = invalidRecursion.recurseSubdirectory();
+    SC_TEST_EXPECT(recursionResult.isError(FileSystemIteratorError::InvalidRecursionState));
+    SC_TEST_EXPECT(invalidRecursion.checkErrors().isError(FileSystemIteratorError::InvalidRecursionState));
+
+    SC_TEST_EXPECT(fs.removeEmptyDirectory(emptyDirectory));
+}
+
+void SC::FileSystemIteratorTest::structuredErrorsAndFormatter()
+{
+    static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemIterator) == 24,
+                  "The migration bridge temporarily expands ResultFileSystemIterator");
+    static_assert(__is_standard_layout(ResultFileSystemIterator),
+                  "ResultFileSystemIterator must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystemIterator>::value,
+                  "ResultFileSystemIterator must remain trivially copyable");
+
+    constexpr char           expected[] = "Failed to open directory (native error: 2, depth: 3)";
+    ResultFileSystemIterator detailed(FileSystemIteratorError::OpenDirectoryFailed, 2, 3);
+    char                     message[sizeof(expected)];
+    ResultErrorFormat        formatted = formatFileSystemIteratorError(detailed, message);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    SC_TEST_EXPECT(::memcmp(message, expected, sizeof(expected)) == 0);
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(FileSystemIteratorResultCategory, FileSystemIteratorError::OpenDirectoryFailed));
+
+    const ResultFileSystemIterator legacy(Result::Error("legacy iterator result"));
+    SC_TEST_EXPECT(not legacy);
+    SC_TEST_EXPECT(legacy.nativeError == 0);
+    SC_TEST_EXPECT(legacy.depth == 0);
+    SC_TEST_EXPECT(legacy.result.hasLegacyError());
+    formatted = formatFileSystemIteratorError(legacy, message);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
+
+    formatted = formatFileSystemIteratorError(Result(true), message);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::NotAnError);
+    formatted = formatFileSystemIteratorError(Result::Error(ResultCategory(1234), 1), message);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
+    formatted = formatFileSystemIteratorError(Result::Error(FileSystemIteratorResultCategory, 9999), message);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
 }
 void SC::FileSystemIteratorTest::walkRecursiveManual()
 {

@@ -13,29 +13,82 @@
 
 SC::FileSystemIterator::~FileSystemIterator() { Internal::destroy(recurseStack); }
 
-SC::Result SC::FileSystemIterator::enumerateNext()
+SC::ResultFileSystemIterator SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> recursiveEntries)
 {
-    Result res = enumerateNextInternal(currentEntry);
-    if (not res)
+    Internal::destroy(recurseStack);
+    errorResult    = ResultFileSystemIterator(true);
+    initialized    = false;
+    finished       = false;
+    entryAvailable = false;
+
+    const ResultFileSystemIterator result = initInternal(directory, recursiveEntries);
+    if (not result)
     {
-        if (::strcmp(res.message, "Iteration Finished") != 0)
-        {
-            errorResult   = res;
-            errorsChecked = false;
-        }
+        errorResult = result;
+        finished    = true;
+        Internal::destroy(recurseStack);
+        return result;
     }
-    return res;
+    initialized = true;
+    return result;
 }
 
-SC::Result SC::FileSystemIterator::recurseSubdirectory()
+bool SC::FileSystemIterator::enumerateNext()
 {
-    if (options.recursive)
+    if (not errorResult or finished)
+        return false;
+    if (not initialized)
     {
-        errorResult   = Result::Error("Cannot recurseSubdirectory() with recursive==true");
-        errorsChecked = false;
+        errorResult = ResultFileSystemIterator(FileSystemIteratorError::NotInitialized);
+        finished    = true;
+        return false;
+    }
+
+    bool                           hasEntry = false;
+    const ResultFileSystemIterator result   = enumerateNextInternal(currentEntry, hasEntry);
+    if (not result)
+    {
+        errorResult    = result;
+        finished       = true;
+        entryAvailable = false;
+        return false;
+    }
+    if (not hasEntry)
+    {
+        finished       = true;
+        entryAvailable = false;
+        return false;
+    }
+    entryAvailable = true;
+    return true;
+}
+
+SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectory()
+{
+    if (not errorResult)
+        return errorResult;
+    if (not initialized)
+    {
+        errorResult = ResultFileSystemIterator(FileSystemIteratorError::NotInitialized);
+        finished    = true;
         return errorResult;
     }
-    return recurseSubdirectoryInternal(currentEntry);
+    if (options.recursive or finished or not entryAvailable or not currentEntry.isDirectory())
+    {
+        const uint32_t depth = recurseStack.isEmpty() ? 0 : static_cast<uint32_t>(recurseStack.size() - 1);
+        errorResult          = ResultFileSystemIterator(FileSystemIteratorError::InvalidRecursionState, 0, depth);
+        finished             = true;
+        return errorResult;
+    }
+
+    const ResultFileSystemIterator result = recurseSubdirectoryInternal(currentEntry);
+    entryAvailable                        = false;
+    if (not result)
+    {
+        errorResult = result;
+        finished    = true;
+    }
+    return result;
 }
 
 SC::FileSystemIterator::FolderState& SC::FileSystemIterator::RecurseStack::back()
@@ -50,11 +103,12 @@ void SC::FileSystemIterator::RecurseStack::pop_back()
     currentEntry--;
 }
 
-SC::Result SC::FileSystemIterator::RecurseStack::push_back(const FolderState& other)
+SC::ResultFileSystemIterator SC::FileSystemIterator::RecurseStack::push_back(const FolderState& other)
 {
     if (size_t(currentEntry + 1) >= recursiveEntries.sizeInElements())
-        return Result::Error("FileSystemIterator - Not enough space in recurse stack");
+        return ResultFileSystemIterator(FileSystemIteratorError::RecursionLimitExceeded, 0,
+                                        static_cast<uint32_t>(size()));
     currentEntry += 1;
     recursiveEntries.data()[currentEntry] = other;
-    return Result(true);
+    return ResultFileSystemIterator(true);
 }

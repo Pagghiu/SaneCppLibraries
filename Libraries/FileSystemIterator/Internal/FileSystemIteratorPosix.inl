@@ -24,45 +24,26 @@
 struct SC::FileSystemIterator::Internal
 {
 
-    static Result translateErrorCode(int errorCode)
+    static ResultFileSystemIterator nativeError(FileSystemIteratorError error, int errorCode, uint32_t depth)
     {
-        switch (errorCode)
-        {
-        case EACCES: return Result::Error("EACCES");
-        case EDQUOT: return Result::Error("EDQUOT");
-        case EEXIST: return Result::Error("EEXIST");
-        case EFAULT: return Result::Error("EFAULT");
-        case EIO: return Result::Error("EIO");
-        case ELOOP: return Result::Error("ELOOP");
-        case EMLINK: return Result::Error("EMLINK");
-        case ENAMETOOLONG: return Result::Error("ENAMETOOLONG");
-        case ENOENT: return Result::Error("ENOENT");
-        case ENOSPC: return Result::Error("ENOSPC");
-        case ENOTDIR: return Result::Error("ENOTDIR");
-        case EROFS: return Result::Error("EROFS");
-        case EBADF: return Result::Error("EBADF");
-        case EPERM: return Result::Error("EPERM");
-        case ENOMEM: return Result::Error("ENOMEM");
-        case ENOTSUP: return Result::Error("ENOTSUP");
-        case EINVAL: return Result::Error("EINVAL");
-        }
-        return Result::Error("Unknown");
+        return ResultFileSystemIterator(error, static_cast<uint32_t>(errorCode), depth);
     }
-    static Result initFolderState(FolderState& entry, int fd)
+    static ResultFileSystemIterator initFolderState(FolderState& entry, int fd, uint32_t depth)
     {
         entry.fileDescriptor = fd;
         if (entry.fileDescriptor == -1)
         {
-            return translateErrorCode(errno);
+            return nativeError(FileSystemIteratorError::OpenDirectoryFailed, errno, depth);
         }
         entry.dirEnumerator = ::fdopendir(entry.fileDescriptor);
         if (entry.dirEnumerator == nullptr)
         {
+            const int nativeError = errno;
             ::close(entry.fileDescriptor);
             entry.fileDescriptor = -1; // Reset file descriptor on error
-            return translateErrorCode(errno);
+            return Internal::nativeError(FileSystemIteratorError::OpenDirectoryFailed, nativeError, depth);
         }
-        return Result(true);
+        return ResultFileSystemIterator(true);
     }
 
     static void closeFolderState(FolderState& entry)
@@ -87,32 +68,34 @@ struct SC::FileSystemIterator::Internal
     }
 };
 
-SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> recursiveEntries)
+SC::ResultFileSystemIterator SC::FileSystemIterator::initInternal(StringSpan        directory,
+                                                                  Span<FolderState> recursiveEntries)
 {
-    Internal::destroy(recurseStack);
     recurseStack.recursiveEntries = recursiveEntries;
     recurseStack.currentEntry     = -1;
 
     FolderState entry;
     if (directory.getEncoding() == StringEncoding::Utf16)
     {
-        return Result::Error("FileSystemIterator on Posix does not support UTF16 encoded paths");
+        return ResultFileSystemIterator(FileSystemIteratorError::UnsupportedPathEncoding);
     }
 
-    SC_TRY_MSG(currentPath.assign(directory), "Directory path is too long");
+    if (not currentPath.assign(directory))
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong);
 
     entry.textLengthInBytes = directory.sizeInBytes();
 
-    SC_TRY_MSG(recurseStack.push_back(entry), "Exceeding maximum number of recursive entries");
+    SC_TRY(recurseStack.push_back(entry));
     const int fd = ::open(currentPath.view().bytesIncludingTerminator(), O_DIRECTORY);
-    SC_TRY(Internal::initFolderState(recurseStack.back(), fd));
-    return Result(true);
+    SC_TRY(Internal::initFolderState(recurseStack.back(), fd, 0));
+    return ResultFileSystemIterator(true);
 }
 
-SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
+SC::ResultFileSystemIterator SC::FileSystemIterator::enumerateNextInternal(Entry& entry, bool& hasEntry)
 {
+    hasEntry = false;
     if (recurseStack.isEmpty())
-        return Result::Error("Forgot to call init");
+        return ResultFileSystemIterator(FileSystemIteratorError::NotInitialized);
 
     FolderState&   parent = recurseStack.back();
     struct dirent* item;
@@ -125,7 +108,7 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
             recurseStack.pop_back();
             if (recurseStack.isEmpty())
             {
-                return Result::Error("Iteration Finished");
+                return ResultFileSystemIterator(true);
             }
             parent = recurseStack.back();
 
@@ -154,8 +137,9 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
 #endif
     (void)currentPath.resize(recurseStack.back().textLengthInBytes);
 
-    SC_TRY_MSG(currentPath.append("/"), "Insufficient space on current path string");
-    SC_TRY_MSG(currentPath.append(entry.name), "Insufficient space on current path string");
+    if (not currentPath.append("/") or not currentPath.append(entry.name))
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
+                                        static_cast<uint32_t>(recurseStack.size() - 1));
 
     entry.path  = currentPath.view();
     entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
@@ -173,19 +157,23 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
     {
         entry.type = Type::File;
     }
-    return Result(true);
+    hasEntry = true;
+    return ResultFileSystemIterator(true);
 }
 
-SC::Result SC::FileSystemIterator::recurseSubdirectoryInternal(Entry& entry)
+SC::ResultFileSystemIterator SC::FileSystemIterator::recurseSubdirectoryInternal(Entry& entry)
 {
     FolderState newParent;
     (void)currentPath.resize(recurseStack.back().textLengthInBytes);
-    SC_TRY_MSG(currentPath.append("/"), "Directory path is too long");
-    SC_TRY_MSG(currentPath.append(entry.name), "Directory path is too long");
+    if (not currentPath.append("/") or not currentPath.append(entry.name))
+        return ResultFileSystemIterator(FileSystemIteratorError::PathTooLong, 0,
+                                        static_cast<uint32_t>(recurseStack.size()));
     newParent.textLengthInBytes = currentPath.view().sizeInBytes();
-    SC_TRY(entry.name.isNullTerminated());
-    SC_TRY_MSG(recurseStack.push_back(newParent), "Exceeding maximum number of recursive entries");
+    if (not entry.name.isNullTerminated())
+        return ResultFileSystemIterator(FileSystemIteratorError::InvalidRecursionState, 0,
+                                        static_cast<uint32_t>(recurseStack.size()));
+    SC_TRY(recurseStack.push_back(newParent));
     const int fd = ::openat(entry.parentFileDescriptor, entry.name.getNullTerminatedNative(), O_DIRECTORY);
-    SC_TRY(Internal::initFolderState(recurseStack.back(), fd));
-    return Result(true);
+    SC_TRY(Internal::initFolderState(recurseStack.back(), fd, static_cast<uint32_t>(recurseStack.size() - 1)));
+    return ResultFileSystemIterator(true);
 }

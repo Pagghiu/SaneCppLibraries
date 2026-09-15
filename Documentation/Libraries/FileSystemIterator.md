@@ -40,9 +40,10 @@ The usual recursive walk is compact:
 
 \snippet Tests/Libraries/FileSystemIterator/FileSystemIteratorTest.cpp walkRecursiveSnippet
 
-`enumerateNext()` returns an invalid SC::Result both when iteration is finished and when traversal fails. The loop must
-therefore be followed by `checkErrors()` as above. Omitting that final check can mistake an inaccessible directory, an
-overlong path, or exhausted recursion storage for successful completion.
+`enumerateNext()` returns `true` when it exposes a new entry and `false` when traversal stops. Normal exhaustion is not
+an error. The loop must still be followed by `checkErrors()` as above because a retained traversal failure also stops
+the loop. Omitting that final check can mistake an inaccessible directory, an overlong path, or exhausted recursion
+storage for successful completion.
 
 # Choosing recursion explicitly
 

@@ -46,7 +46,7 @@ struct FileSystemFinder
                 }
             }
         }
-        return Result(true);
+        return iterator.checkErrors();
     }
 };
 
