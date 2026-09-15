@@ -232,6 +232,7 @@ void SC::SerialPortTest::invalidPathAndSettings()
 #if SC_PLATFORM_WINDOWS
     const ResultSerialPort openResult = serial.open("COM9999", options);
     SC_TEST_EXPECT(openResult.isError(SerialPortError::OpenFailed));
+    SC_TEST_EXPECT(openResult.detail == SerialPortErrorDetail::WindowsCreateFile);
     SC_TEST_EXPECT(openResult.nativeError != 0);
 #else
     const ResultSerialPort relativePathResult = serial.open("ttyS0", options);
@@ -239,6 +240,7 @@ void SC::SerialPortTest::invalidPathAndSettings()
 
     const ResultSerialPort openResult = serial.open("/dev/this-device-should-not-exist-sc", options);
     SC_TEST_EXPECT(openResult.isError(SerialPortError::OpenFailed));
+    SC_TEST_EXPECT(openResult.detail == SerialPortErrorDetail::PosixOpen);
     SC_TEST_EXPECT(openResult.nativeError == static_cast<uint32_t>(ENOENT));
 #endif
 
@@ -297,11 +299,25 @@ void SC::SerialPortTest::nonSerialHandleContract()
     SC_TEST_EXPECT(serial.assign(nativeHandle));
     const ResultSerialPort setResult = serial.setSettings(SerialSettings());
     SC_TEST_EXPECT(setResult.isError(SerialPortError::ReadSettingsFailed));
+    SC_TEST_EXPECT(setResult.detail ==
+#if SC_PLATFORM_WINDOWS
+                   SerialPortErrorDetail::WindowsReadSettings
+#else
+                   SerialPortErrorDetail::PosixReadSettings
+#endif
+    );
     SC_TEST_EXPECT(setResult.nativeError != 0);
 
     SerialSettings         currentSettings;
     const ResultSerialPort getResult = serial.getSettings(currentSettings);
     SC_TEST_EXPECT(getResult.isError(SerialPortError::ReadSettingsFailed));
+    SC_TEST_EXPECT(getResult.detail ==
+#if SC_PLATFORM_WINDOWS
+                   SerialPortErrorDetail::WindowsReadSettings
+#else
+                   SerialPortErrorDetail::PosixReadSettings
+#endif
+    );
     SC_TEST_EXPECT(getResult.nativeError != 0);
     SC_TEST_EXPECT(serial.close());
 
@@ -313,8 +329,14 @@ void SC::SerialPortTest::nonSerialHandleContract()
 
 void SC::SerialPortTest::structuredErrorsAndFormatter()
 {
+    static_assert(sizeof(void*) != 8 or sizeof(Result) == 16,
+                  "The migration bridge currently retains Result's legacy message pointer");
     static_assert(sizeof(void*) != 8 or sizeof(ResultSerialPort) == 24,
-                  "The migration bridge temporarily expands ResultSerialPort");
+                  "ResultSerialPort currently includes the 16-byte Result bridge and two 4-byte details");
+    // Once Result drops its legacy message pointer, its uint64_t identity plus these two fields must total 16 bytes.
+    static constexpr size_t ResultSerialPortFinalSize =
+        sizeof(uint64_t) + sizeof(SerialPortErrorDetail) + sizeof(uint32_t);
+    static_assert(ResultSerialPortFinalSize == 16, "ResultSerialPort's final target must remain 16 bytes");
     static_assert(__is_standard_layout(ResultSerialPort), "ResultSerialPort must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultSerialPort>::value,
                   "ResultSerialPort must remain trivially copyable");
@@ -329,8 +351,8 @@ void SC::SerialPortTest::structuredErrorsAndFormatter()
     SC_TEST_EXPECT(formatted);
     SC_TEST_EXPECT(::memcmp(exact, expected, sizeof(expected)) == 0);
 
-    constexpr char   expectedNative[] = "Failed to open serial port (native error: 12345)";
-    ResultSerialPort detailed(SerialPortError::OpenFailed, 12345);
+    constexpr char   expectedNative[] = "Failed to open serial port (POSIX open, native error: 12345)";
+    ResultSerialPort detailed(SerialPortError::OpenFailed, SerialPortErrorDetail::PosixOpen, 12345);
     char             nativeMessage[sizeof(expectedNative)];
     formatted = formatSerialPortError(detailed, nativeMessage);
     SC_TEST_EXPECT(formatted);
@@ -339,10 +361,21 @@ void SC::SerialPortTest::structuredErrorsAndFormatter()
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(SerialPortResultCategory, SerialPortError::OpenFailed));
+    SC_TEST_EXPECT(detailed.detail == SerialPortErrorDetail::PosixOpen);
+    SC_TEST_EXPECT(detailed.nativeError == 12345);
+    SC_TEST_EXPECT(plain.errorValue() == static_cast<uint32_t>(SerialPortError::OpenFailed));
+
+    constexpr char   expectedDetail[] = "Failed to read serial settings (Windows GetCommState)";
+    ResultSerialPort detailOnly(SerialPortError::ReadSettingsFailed, SerialPortErrorDetail::WindowsReadSettings);
+    char             detailMessage[sizeof(expectedDetail)];
+    formatted = formatSerialPortError(detailOnly, detailMessage);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(::memcmp(detailMessage, expectedDetail, sizeof(expectedDetail)) == 0);
 
     const ResultSerialPort legacy(Result::Error("legacy serial result"));
     SC_TEST_EXPECT(not legacy);
     SC_TEST_EXPECT(legacy.nativeError == 0);
+    SC_TEST_EXPECT(legacy.detail == SerialPortErrorDetail::None);
     SC_TEST_EXPECT(legacy.result.hasLegacyError());
     formatted = formatSerialPortError(legacy, nativeMessage);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);

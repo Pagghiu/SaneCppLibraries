@@ -60,7 +60,8 @@ static ResultSerialPort setTimeouts(HANDLE serialHandle, bool blocking)
         timeouts.WriteTotalTimeoutConstant   = 0;
     }
     if (::SetCommTimeouts(serialHandle, &timeouts) == FALSE)
-        return ResultSerialPort(SerialPortError::SetTimeoutsFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultSerialPort(SerialPortError::OpenFailed, SerialPortErrorDetail::WindowsSetTimeouts,
+                                static_cast<uint32_t>(::GetLastError()));
     return ResultSerialPort(true);
 }
 
@@ -100,7 +101,8 @@ ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& opti
                                      flagsAndAttrs, nullptr);
     }
     if (serialHandle == INVALID_HANDLE_VALUE)
-        return ResultSerialPort(SerialPortError::OpenFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultSerialPort(SerialPortError::OpenFailed, SerialPortErrorDetail::WindowsCreateFile,
+                                static_cast<uint32_t>(::GetLastError()));
     SC_TRY(setTimeouts(serialHandle, options.blocking));
     outHandle = serialHandle;
     return ResultSerialPort(true);
@@ -112,7 +114,8 @@ ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSe
     ::ZeroMemory(&dcb, sizeof(dcb));
     dcb.DCBlength = sizeof(dcb);
     if (::GetCommState(handle, &dcb) == FALSE)
-        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, SerialPortErrorDetail::WindowsReadSettings,
+                                static_cast<uint32_t>(::GetLastError()));
 
     dcb.fBinary  = TRUE;
     dcb.BaudRate = settings.baudRate;
@@ -160,7 +163,8 @@ ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSe
     }
 
     if (::SetCommState(handle, &dcb) == FALSE)
-        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, SerialPortErrorDetail::WindowsSetSettings,
+                                static_cast<uint32_t>(::GetLastError()));
     return ResultSerialPort(true);
 }
 
@@ -170,7 +174,8 @@ ResultSerialPort getSerialSettings(FileDescriptor::Handle handle, SerialSettings
     ::ZeroMemory(&dcb, sizeof(dcb));
     dcb.DCBlength = sizeof(dcb);
     if (::GetCommState(handle, &dcb) == FALSE)
-        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(::GetLastError()));
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, SerialPortErrorDetail::WindowsReadSettings,
+                                static_cast<uint32_t>(::GetLastError()));
 
     settings.baudRate = dcb.BaudRate;
     switch (dcb.ByteSize)

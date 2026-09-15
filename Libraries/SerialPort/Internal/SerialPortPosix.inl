@@ -199,7 +199,8 @@ ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& opti
         serialFd = ::open(nativePath, flags, 0);
     } while (serialFd == -1 and errno == EINTR);
     if (serialFd == -1)
-        return ResultSerialPort(SerialPortError::OpenFailed, static_cast<uint32_t>(errno));
+        return ResultSerialPort(SerialPortError::OpenFailed, SerialPortErrorDetail::PosixOpen,
+                                static_cast<uint32_t>(errno));
 
     if (not options.inheritable)
     {
@@ -212,7 +213,8 @@ ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& opti
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
             (void)::close(serialFd);
-            return ResultSerialPort(SerialPortError::ReadDescriptorFlagsFailed, nativeError);
+            return ResultSerialPort(SerialPortError::OpenFailed, SerialPortErrorDetail::PosixReadDescriptorFlags,
+                                    nativeError);
         }
         if ((descriptorFlags & FD_CLOEXEC) == 0)
         {
@@ -225,7 +227,8 @@ ResultSerialPort openSerialHandle(StringSpan path, const SerialOpenOptions& opti
             {
                 const uint32_t nativeError = static_cast<uint32_t>(errno);
                 (void)::close(serialFd);
-                return ResultSerialPort(SerialPortError::SetDescriptorFlagsFailed, nativeError);
+                return ResultSerialPort(SerialPortError::OpenFailed, SerialPortErrorDetail::PosixSetDescriptorFlags,
+                                        nativeError);
             }
         }
     }
@@ -244,7 +247,8 @@ ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSe
         result = ::tcgetattr(handle, &tty);
     } while (result == -1 and errno == EINTR);
     if (result != 0)
-        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(errno));
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, SerialPortErrorDetail::PosixReadSettings,
+                                static_cast<uint32_t>(errno));
 
 #if defined(CFMAKE_RAW)
     ::cfmakeraw(&tty);
@@ -307,9 +311,11 @@ ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSe
     if (not mapBaudToNative(settings.baudRate, nativeBaud))
         return ResultSerialPort(SerialPortError::UnsupportedBaudRate);
     if (::cfsetispeed(&tty, nativeBaud) != 0)
-        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(errno));
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, SerialPortErrorDetail::PosixSetInputBaudRate,
+                                static_cast<uint32_t>(errno));
     if (::cfsetospeed(&tty, nativeBaud) != 0)
-        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(errno));
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, SerialPortErrorDetail::PosixSetOutputBaudRate,
+                                static_cast<uint32_t>(errno));
 
     tty.c_cc[VMIN]  = 0;
     tty.c_cc[VTIME] = 0;
@@ -319,7 +325,8 @@ ResultSerialPort setSerialSettings(FileDescriptor::Handle handle, const SerialSe
         result = ::tcsetattr(handle, TCSANOW, &tty);
     } while (result == -1 and errno == EINTR);
     if (result != 0)
-        return ResultSerialPort(SerialPortError::SetSettingsFailed, static_cast<uint32_t>(errno));
+        return ResultSerialPort(SerialPortError::SetSettingsFailed, SerialPortErrorDetail::PosixSetSettings,
+                                static_cast<uint32_t>(errno));
 
     return ResultSerialPort(true);
 }
@@ -333,7 +340,8 @@ ResultSerialPort getSerialSettings(FileDescriptor::Handle handle, SerialSettings
         result = ::tcgetattr(handle, &tty);
     } while (result == -1 and errno == EINTR);
     if (result != 0)
-        return ResultSerialPort(SerialPortError::ReadSettingsFailed, static_cast<uint32_t>(errno));
+        return ResultSerialPort(SerialPortError::ReadSettingsFailed, SerialPortErrorDetail::PosixReadSettings,
+                                static_cast<uint32_t>(errno));
 
     const speed_t inputBaud = ::cfgetispeed(&tty);
     if (not mapNativeToBaud(inputBaud, settings.baudRate))

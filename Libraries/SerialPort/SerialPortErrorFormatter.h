@@ -11,8 +11,8 @@ namespace SC
 
 namespace detail
 {
-inline ResultErrorFormat formatSerialPortErrorWithNativeCode(SerialPortError error, uint32_t nativeError,
-                                                             Span<char> output)
+inline ResultErrorFormat formatSerialPortErrorWithContext(SerialPortError error, SerialPortErrorDetail detail,
+                                                          uint32_t nativeError, Span<char> output)
 {
     ResultErrorFormatter formatter(output);
     switch (error)
@@ -27,8 +27,6 @@ inline ResultErrorFormat formatSerialPortErrorWithNativeCode(SerialPortError err
     case SerialPortError::InvalidPath: formatter.append("Serial path is invalid"); break;
     case SerialPortError::PathMustBeAbsolute: formatter.append("Serial path must be absolute"); break;
     case SerialPortError::OpenFailed: formatter.append("Failed to open serial port"); break;
-    case SerialPortError::ReadDescriptorFlagsFailed: formatter.append("Failed to read descriptor flags"); break;
-    case SerialPortError::SetDescriptorFlagsFailed: formatter.append("Failed to set descriptor flags"); break;
     case SerialPortError::ReadSettingsFailed: formatter.append("Failed to read serial settings"); break;
     case SerialPortError::SetSettingsFailed: formatter.append("Failed to set serial settings"); break;
     case SerialPortError::UnsupportedHardwareFlowControl:
@@ -39,17 +37,61 @@ inline ResultErrorFormat formatSerialPortErrorWithNativeCode(SerialPortError err
     case SerialPortError::UnsupportedParity: formatter.append("Parity value is not supported"); break;
     case SerialPortError::UnsupportedStopBits: formatter.append("Stop bits value is not supported"); break;
     case SerialPortError::PathTooLong: formatter.append("Serial path is too long"); break;
-    case SerialPortError::SetTimeoutsFailed: formatter.append("Failed to set serial timeouts"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 
-    if (nativeError != 0 and
-        (error == SerialPortError::OpenFailed or error == SerialPortError::ReadDescriptorFlagsFailed or
-         error == SerialPortError::SetDescriptorFlagsFailed or error == SerialPortError::ReadSettingsFailed or
-         error == SerialPortError::SetSettingsFailed or error == SerialPortError::SetTimeoutsFailed))
+    Span<const char> detailText = {};
+    switch (detail)
     {
-        formatter.append(" (native error: ");
-        formatter.append(static_cast<uint64_t>(nativeError));
+    case SerialPortErrorDetail::None: break;
+    case SerialPortErrorDetail::PosixOpen: detailText = {"POSIX open", sizeof("POSIX open") - 1}; break;
+    case SerialPortErrorDetail::PosixReadDescriptorFlags:
+        detailText = {"POSIX read descriptor flags", sizeof("POSIX read descriptor flags") - 1};
+        break;
+    case SerialPortErrorDetail::PosixSetDescriptorFlags:
+        detailText = {"POSIX set descriptor flags", sizeof("POSIX set descriptor flags") - 1};
+        break;
+    case SerialPortErrorDetail::PosixReadSettings:
+        detailText = {"POSIX read serial settings", sizeof("POSIX read serial settings") - 1};
+        break;
+    case SerialPortErrorDetail::PosixSetInputBaudRate:
+        detailText = {"POSIX set input baud rate", sizeof("POSIX set input baud rate") - 1};
+        break;
+    case SerialPortErrorDetail::PosixSetOutputBaudRate:
+        detailText = {"POSIX set output baud rate", sizeof("POSIX set output baud rate") - 1};
+        break;
+    case SerialPortErrorDetail::PosixSetSettings:
+        detailText = {"POSIX set serial settings", sizeof("POSIX set serial settings") - 1};
+        break;
+    case SerialPortErrorDetail::WindowsCreateFile:
+        detailText = {"Windows CreateFile", sizeof("Windows CreateFile") - 1};
+        break;
+    case SerialPortErrorDetail::WindowsSetTimeouts:
+        detailText = {"Windows SetCommTimeouts", sizeof("Windows SetCommTimeouts") - 1};
+        break;
+    case SerialPortErrorDetail::WindowsReadSettings:
+        detailText = {"Windows GetCommState", sizeof("Windows GetCommState") - 1};
+        break;
+    case SerialPortErrorDetail::WindowsSetSettings:
+        detailText = {"Windows SetCommState", sizeof("Windows SetCommState") - 1};
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+
+    if (not detailText.empty() or nativeError != 0)
+    {
+        formatter.append(" (");
+        if (not detailText.empty())
+        {
+            formatter.append(detailText);
+            if (nativeError != 0)
+                formatter.append(", ");
+        }
+        if (nativeError != 0)
+        {
+            formatter.append("native error: ");
+            formatter.append(static_cast<uint64_t>(nativeError));
+        }
         formatter.append(")");
     }
     return formatter.finish();
@@ -61,7 +103,7 @@ inline ResultErrorFormat formatSerialPortErrorWithNativeCode(SerialPortError err
 /// ResultErrorFormatter with their own translated text.
 inline ResultErrorFormat formatSerialPortError(SerialPortError error, Span<char> output)
 {
-    return detail::formatSerialPortErrorWithNativeCode(error, 0, output);
+    return detail::formatSerialPortErrorWithContext(error, SerialPortErrorDetail::None, 0, output);
 }
 
 /// @brief Formats a plain Result when it contains a SerialPort error.
@@ -81,8 +123,8 @@ inline ResultErrorFormat formatSerialPortError(ResultSerialPort result, Span<cha
         return ResultErrorFormatter::failure(ResultErrorFormatStatus::NotAnError, output);
     if (result.result.category() != SerialPortResultCategory)
         return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
-    return detail::formatSerialPortErrorWithNativeCode(static_cast<SerialPortError>(result.result.errorValue()),
-                                                       result.nativeError, output);
+    return detail::formatSerialPortErrorWithContext(static_cast<SerialPortError>(result.result.errorValue()),
+                                                    result.detail, result.nativeError, output);
 }
 
 //! @}
