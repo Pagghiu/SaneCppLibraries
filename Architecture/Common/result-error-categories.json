@@ -58,6 +58,12 @@
       "owner": "Socket",
       "declaration": "Libraries/Socket/SocketError.h",
       "constant": "SocketResultCategory"
+    },
+    {
+      "value": 9,
+      "owner": "Cryptography",
+      "declaration": "Libraries/Cryptography/CryptographyError.h",
+      "constant": "CryptographyResultCategory"
     }
   ]
 }

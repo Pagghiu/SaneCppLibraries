@@ -11,8 +11,8 @@
 #include "../Common/CompilerMacrosLifetimeBound.h"
 #include "../Common/CompilerMove.h"
 #include "../Common/OpaqueObject.h"
-#include "../Common/Result.h"
 #include "../Common/Span.h"
+#include "CryptographyError.h"
 
 namespace SC
 {

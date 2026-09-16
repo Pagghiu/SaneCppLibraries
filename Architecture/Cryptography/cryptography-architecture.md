@@ -64,6 +64,7 @@ platform coverage, documentation, and maintainer review justify promotion.
 - [CRYPTOGRAPHY-0006](cryptography-0006-compose-apple-gcm-over-commoncrypto-aes.md)
 - [CRYPTOGRAPHY-0007](cryptography-0007-offer-openssl-alongside-linux-af-alg.md)
 - [CRYPTOGRAPHY-0008](cryptography-0008-load-openssl-on-apple-and-windows.md)
+- [CRYPTOGRAPHY-0009](cryptography-0009-use-structured-result-errors.md)
 
 ## Decision Log
 
@@ -75,3 +76,4 @@ platform coverage, documentation, and maintainer review justify promotion.
 - [CRYPTOGRAPHY-0006 - Compose Apple GCM over CommonCrypto AES](cryptography-0006-compose-apple-gcm-over-commoncrypto-aes.md)
 - [CRYPTOGRAPHY-0007 - Offer OpenSSL alongside Linux AF_ALG](cryptography-0007-offer-openssl-alongside-linux-af-alg.md)
 - [CRYPTOGRAPHY-0008 - Load OpenSSL on Apple and Windows](cryptography-0008-load-openssl-on-apple-and-windows.md)
+- [CRYPTOGRAPHY-0009 - Use structured Cryptography result errors](cryptography-0009-use-structured-result-errors.md)

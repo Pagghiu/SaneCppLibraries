@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Cryptography/Cryptography.h"
 #include "Libraries/Common/PlatformMacrosType.h"
+#include "Libraries/Common/TypeTraits.h"
+#include "Libraries/Cryptography/CryptographyErrorFormatter.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -128,6 +130,7 @@ struct SC::CryptographyTest : public SC::TestCase
     };
 
     void testFeatures();
+    void structuredErrorsAndFormatter();
     void testSecureRandom();
     void testAes128CbcPkcs7();
     void testAes256CbcPkcs7();
@@ -165,6 +168,11 @@ struct SC::CryptographyTest : public SC::TestCase
         using namespace SC;
 
         SC_TEST_EXPECT(Cryptography::queryFeatures(backend, features));
+
+        if (test_section("Structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
+        }
 
         if (test_section("Features"))
         {
@@ -322,6 +330,100 @@ struct SC::CryptographyTest : public SC::TestCase
         }
     }
 };
+
+void SC::CryptographyTest::structuredErrorsAndFormatter()
+{
+    static_assert(CryptographyResultCategory.value == 9, "Cryptography category is registry value 9");
+    static_assert(static_cast<uint32_t>(CryptographyError::OperationUnsupported) == 1,
+                  "Cryptography error values are append-only");
+    static_assert(static_cast<uint32_t>(CryptographyError::InvalidBlockInputSize) == 24,
+                  "Cryptography error values are append-only");
+    static_assert(static_cast<uint16_t>(CryptographyErrorDetail::None) == 0,
+                  "Cryptography detail zero is reserved for no detail");
+    static_assert(static_cast<uint16_t>(CryptographyErrorContextKind::None) == 0,
+                  "Cryptography context kind zero is reserved for no context");
+    static_assert(sizeof(Result) != 16 or sizeof(ResultCryptography) == 24,
+                  "ResultCryptography bridge layout must retain its 24-byte size");
+    static_assert(sizeof(Result) != 8 or sizeof(ResultCryptography) == 16,
+                  "ResultCryptography must meet the final 16-byte target");
+    static_assert(__is_standard_layout(ResultCryptography), "ResultCryptography must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultCryptography>::value,
+                  "ResultCryptography must remain trivially copyable");
+
+    const ResultCryptography detailed = ResultCryptography::withPosixErrno(
+        CryptographyError::BackendOperationFailed, CryptographyErrorDetail::LinuxAFAlgCipherReceive, -5);
+    const ResultCryptography copied = detailed;
+    SC_TEST_EXPECT(copied.isError(CryptographyError::BackendOperationFailed));
+    SC_TEST_EXPECT(copied.detail == CryptographyErrorDetail::LinuxAFAlgCipherReceive);
+    SC_TEST_EXPECT(copied.contextKind == CryptographyErrorContextKind::PosixErrno);
+    SC_TEST_EXPECT(copied.context.posixErrno == -5);
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(CryptographyResultCategory, CryptographyError::BackendOperationFailed));
+    const ResultCryptography fromPlain(plain);
+    SC_TEST_EXPECT(fromPlain.detail == CryptographyErrorDetail::None);
+    SC_TEST_EXPECT(fromPlain.contextKind == CryptographyErrorContextKind::None);
+    SC_TEST_EXPECT(fromPlain.context.windowsNtStatus == 0);
+
+    const Result             foreignResult = Result::Error(ResultCategory(8), 1);
+    const ResultCryptography foreign(foreignResult);
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.toResult().isError(ResultCategory(8), 1));
+    SC_TEST_EXPECT(foreign.detail == CryptographyErrorDetail::None);
+    SC_TEST_EXPECT(foreign.contextKind == CryptographyErrorContextKind::None);
+
+    const ResultCryptography commonCrypto = ResultCryptography::withAppleCommonCryptoStatus(
+        CryptographyError::BackendOperationFailed, CryptographyErrorDetail::AppleCommonCryptoCipherUpdate, -4300);
+    SC_TEST_EXPECT(commonCrypto.contextKind == CryptographyErrorContextKind::AppleCommonCryptoStatus);
+    SC_TEST_EXPECT(commonCrypto.context.appleCommonCryptoStatus == -4300);
+    const ResultCryptography ntStatus =
+        ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                CryptographyErrorDetail::WindowsBCryptAeadOpenAlgorithm, 0xc0000001u);
+    SC_TEST_EXPECT(ntStatus.contextKind == CryptographyErrorContextKind::WindowsNtStatus);
+    SC_TEST_EXPECT(ntStatus.context.windowsNtStatus == 0xc0000001u);
+    const ResultCryptography expected = ResultCryptography::withExpectedBytes(
+        CryptographyError::InvalidNonceSize, CryptographyErrorDetail::ValidateAeadNonce, 12);
+    SC_TEST_EXPECT(expected.context.expectedBytes == 12);
+    const ResultCryptography required = ResultCryptography::withRequiredBytes(
+        CryptographyError::OutputCapacityExceeded, CryptographyErrorDetail::ValidateCipherOutput, 16);
+    SC_TEST_EXPECT(required.context.requiredBytes == 16);
+    const ResultCryptography maximum = ResultCryptography::withMaximumBytes(
+        CryptographyError::SizeLimitExceeded, CryptographyErrorDetail::ValidateHkdfOutput, 12240);
+    SC_TEST_EXPECT(maximum.context.maximumBytes == 12240);
+    const ResultCryptography actual = ResultCryptography::withActualBytes(
+        CryptographyError::UnexpectedOutputSize, CryptographyErrorDetail::OpenSSL3CipherUpdate, 7);
+    SC_TEST_EXPECT(actual.context.actualBytes == 7);
+
+    constexpr char expectedMessage[] =
+        "Cryptographic backend operation failed (detail: Linux AF_ALG receive cipher output) (POSIX errno: -5)";
+    char              message[sizeof(expectedMessage)];
+    ResultErrorFormat formatted = formatCryptographyError(detailed, message);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expectedMessage));
+    SC_TEST_EXPECT(::memcmp(message, expectedMessage, sizeof(expectedMessage)) == 0);
+
+    formatted = formatCryptographyError(CryptographyError::AuthenticationFailed, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Authentication failed"));
+    char tooSmall[2] = {'x', 0};
+    formatted        = formatCryptographyError(CryptographyError::AuthenticationFailed, tooSmall);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(tooSmall[0] == 0);
+    SC_TEST_EXPECT(formatCryptographyError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatCryptographyError(Result::Error(ResultCategory(99), 1), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(formatCryptographyError(Result::Error(CryptographyResultCategory, 999), message).status ==
+                   ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(formatCryptographyError(ResultCryptography(CryptographyError::AuthenticationFailed,
+                                                              static_cast<CryptographyErrorDetail>(999)),
+                                           message)
+                       .status == ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(formatCryptographyError(ResultCryptography(CryptographyError::AuthenticationFailed,
+                                                              CryptographyErrorDetail::None,
+                                                              static_cast<CryptographyErrorContextKind>(999), {}),
+                                           message)
+                       .status == ResultErrorFormatStatus::UnknownError);
+}
 
 namespace SC
 {
