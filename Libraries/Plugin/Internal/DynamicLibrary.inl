@@ -80,7 +80,6 @@ SC::ResultPlugin SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, voi
 #elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
 
 #include <dlfcn.h> // dlopen
-#include <errno.h>
 
 SC::ResultPlugin SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
 {
@@ -88,9 +87,7 @@ SC::ResultPlugin SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handl
     {
         const int res = ::dlclose(handle);
         if (res != 0)
-            return ResultPlugin::withNativeError(PluginError::DynamicLibraryCloseFailed,
-                                                 PluginErrorDetail::PosixDynamicLibraryClose,
-                                                 static_cast<uint32_t>(errno));
+            return ResultPlugin(PluginError::DynamicLibraryCloseFailed, PluginErrorDetail::PosixDynamicLibraryClose);
         return ResultPlugin(true);
     }
     return ResultPlugin(true);
@@ -105,8 +102,7 @@ SC::ResultPlugin SC::SystemDynamicLibrary::load(StringSpan fullPath)
     handle = ::dlopen(fullPathZeroTerminated.view().getNullTerminatedNative(), RTLD_LAZY);
     if (handle == nullptr)
     {
-        return ResultPlugin::withNativeError(PluginError::DynamicLibraryLoadFailed,
-                                             PluginErrorDetail::PosixDynamicLibraryLoad, static_cast<uint32_t>(errno));
+        return ResultPlugin(PluginError::DynamicLibraryLoadFailed, PluginErrorDetail::PosixDynamicLibraryLoad);
     }
     return ResultPlugin(true);
 }
@@ -123,8 +119,7 @@ SC::ResultPlugin SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, voi
                                                static_cast<uint32_t>(symbolName.sizeInBytes() + 1));
     symbol = ::dlsym(handle, symbolZeroTerminated.view().getNullTerminatedNative());
     if (symbol == nullptr)
-        return ResultPlugin::withNativeError(
-            PluginError::SymbolNotFound, PluginErrorDetail::PosixDynamicLibraryGetSymbol, static_cast<uint32_t>(errno));
+        return ResultPlugin(PluginError::SymbolNotFound, PluginErrorDetail::PosixDynamicLibraryGetSymbol);
     return ResultPlugin(true);
 }
 #else

@@ -523,6 +523,7 @@ SC::ResultPlugin SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
         if (not iterator.init(base))
             continue;
         PluginFileSystemIterator::Entry entry;
+
         bool hasEntry = false;
         while (iterator.next(entry, hasEntry) and hasEntry)
         {

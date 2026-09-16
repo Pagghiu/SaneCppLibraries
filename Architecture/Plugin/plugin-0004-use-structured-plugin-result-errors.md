@@ -15,6 +15,9 @@ Plugin owns category 7 and the portable `PluginError` taxonomy. `ResultPlugin` c
 with a `uint16_t` operation detail, a `uint16_t` context kind, and one 32-bit tagged scalar context. Details distinguish
 Plugin stages and OS-qualified native calls; they do not create platform-specific primary errors. Context factories
 represent native errors, signed process exit codes, required byte capacity, and required element capacity.
+Native scalar context is attached only when the platform API defines a meaningful numeric error. POSIX dynamic-loader
+failures retain their OS-qualified operation detail without context because `dlerror()` exposes an externally owned
+string rather than a stable numeric code; `errno` is not used as a substitute.
 
 Plain and foreign `Result` conversion deliberately clears Plugin detail and context. Same-domain copying preserves
 them. Conversion to plain `Result` preserves only the structured category/error identity. The bridge layout is 24 bytes

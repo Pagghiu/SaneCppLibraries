@@ -235,6 +235,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(missingSymbolResult.detail == PluginErrorDetail::WindowsDynamicLibraryGetSymbol);
 #else
             SC_TEST_EXPECT(missingSymbolResult.detail == PluginErrorDetail::PosixDynamicLibraryGetSymbol);
+            SC_TEST_EXPECT(missingSymbolResult.contextKind == PluginErrorContextKind::None);
 #endif
 
             // Modify child plugin to change return value of the exported function
