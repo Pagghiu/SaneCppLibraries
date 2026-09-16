@@ -9,9 +9,11 @@
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Plugin/Internal/PluginFileSystem.h"
 #include "Libraries/Plugin/Internal/PluginString.h"
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Plugin/PluginErrorFormatter.h"
+#include "Libraries/Process/Process.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -72,7 +74,7 @@ struct SC::PluginTest : public SC::TestCase
                                              "Category: valid\n";
             const ResultPlugin oversized   = PluginDefinition::parse(oversizedName, oversizedDefinition, parsed);
             SC_TEST_EXPECT(not oversized);
-            SC_TEST_EXPECT(oversized.isError(PluginError::PathCapacityExceeded));
+            SC_TEST_EXPECT(oversized.isError(PluginError::DefinitionCapacityExceeded));
             SC_TEST_EXPECT(oversized.detail == PluginErrorDetail::MetadataName);
             SC_TEST_EXPECT(oversized.contextKind == PluginErrorContextKind::RequiredBytes);
         }
@@ -113,8 +115,11 @@ struct SC::PluginTest : public SC::TestCase
                 PluginDefinition       definitions[1];
                 Span<PluginDefinition> definitionsSpan;
                 Buffer                 fileStorage;
-                SC_TEST_EXPECT(not PluginScanner::scanDirectory(testPluginsPath.view(), definitions, fileStorage,
-                                                                definitionsSpan));
+                const ResultPlugin     scanResult =
+                    PluginScanner::scanDirectory(testPluginsPath.view(), definitions, fileStorage, definitionsSpan);
+                SC_TEST_EXPECT(scanResult.isError(PluginError::ScannerCapacityExceeded));
+                SC_TEST_EXPECT(scanResult.detail == PluginErrorDetail::ScannerDefinitionStorage);
+                SC_TEST_EXPECT(scanResult.contextKind == PluginErrorContextKind::RequiredElements);
             }
             PluginDefinition       definitions[3];
             Span<PluginDefinition> definitionsSpan;
@@ -159,6 +164,10 @@ struct SC::PluginTest : public SC::TestCase
             PluginRegistry registry;
             registry.init(libraries);
             SC_TEST_EXPECT(registry.replaceDefinitions(move(definitionsSpan)));
+            const ResultPlugin invalidIdentifier =
+                registry.loadPlugin("PluginThatDoesNotExist", compiler, sysroot, report.executableFile.view());
+            SC_TEST_EXPECT(invalidIdentifier.isError(PluginError::PluginNotFound));
+            SC_TEST_EXPECT(invalidIdentifier.detail == PluginErrorDetail::RegistryFindPlugin);
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile.view()));
 
             // Check that plugins have been compiled and are valid
@@ -218,6 +227,15 @@ struct SC::PluginTest : public SC::TestCase
             FunctionIsPluginOriginal isPluginOriginal;
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.getSymbol("isPluginOriginal", isPluginOriginal));
             SC_TEST_EXPECT(isPluginOriginal());
+            FunctionIsPluginOriginal missingSymbol = nullptr;
+            const ResultPlugin       missingSymbolResult =
+                pluginChild->dynamicLibrary.getSymbol("PluginSymbolThatDoesNotExist", missingSymbol);
+            SC_TEST_EXPECT(missingSymbolResult.isError(PluginError::SymbolNotFound));
+#if SC_PLATFORM_WINDOWS
+            SC_TEST_EXPECT(missingSymbolResult.detail == PluginErrorDetail::WindowsDynamicLibraryGetSymbol);
+#else
+            SC_TEST_EXPECT(missingSymbolResult.detail == PluginErrorDetail::PosixDynamicLibraryGetSymbol);
+#endif
 
             // Modify child plugin to change return value of the exported function
             String sourceContent = StringEncoding::Ascii;
@@ -410,6 +428,91 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
                                                       static_cast<PluginErrorContextKind>(999), {}),
                                          message)
                            .status == ResultErrorFormatStatus::UnknownError);
+
+        {
+            StringPath    path;
+            native_char_t pathStorage[StringPath::MaxPath];
+            for (size_t idx = 0; idx < StringPath::MaxPath; ++idx)
+                pathStorage[idx] = static_cast<native_char_t>('a');
+            const StringSpan   fullPath   = {{pathStorage, StringPath::MaxPath}, false, StringEncoding::Native};
+            const ResultPlugin pathResult = PluginString::append(path, {fullPath, "x"});
+            SC_TEST_EXPECT(pathResult.isError(PluginError::PathCapacityExceeded));
+            SC_TEST_EXPECT(pathResult.detail == PluginErrorDetail::PathAppend);
+        }
+
+        {
+            Buffer             fileBuffer;
+            const ResultPlugin fileResult = PluginFileSystem::readAbsoluteFile(
+                SC_NATIVE_STR("plugin-file-that-does-not-exist"), GrowableBuffer<Buffer>{fileBuffer});
+            SC_TEST_EXPECT(fileResult.isError(PluginError::FileOpenFailed));
+            SC_TEST_EXPECT(fileResult.contextKind == PluginErrorContextKind::NativeError);
+#if SC_PLATFORM_WINDOWS
+            SC_TEST_EXPECT(fileResult.detail == PluginErrorDetail::WindowsFileCreate);
+#else
+            SC_TEST_EXPECT(fileResult.detail == PluginErrorDetail::PosixFileOpen);
+#endif
+        }
+
+        {
+            SystemDynamicLibrary library;
+            using MissingFunction        = bool (*)();
+            MissingFunction    symbol    = nullptr;
+            const ResultPlugin notLoaded = library.getSymbol("Missing", symbol);
+            SC_TEST_EXPECT(notLoaded.isError(PluginError::DynamicLibraryNotLoaded));
+#if SC_PLATFORM_WINDOWS
+            SC_TEST_EXPECT(notLoaded.detail == PluginErrorDetail::WindowsDynamicLibraryGetSymbol);
+#else
+            SC_TEST_EXPECT(notLoaded.detail == PluginErrorDetail::PosixDynamicLibraryGetSymbol);
+#endif
+        }
+
+        {
+            PluginDefinition definition;
+            PluginFile       file;
+            SC_TEST_EXPECT(definition.directory.assign("."));
+            SC_TEST_EXPECT(file.absolutePath.assign("plugin-source-that-does-not-exist.cpp"));
+            SC_TEST_EXPECT(definition.files.push_back(file));
+
+            PluginCompiler compiler;
+#if SC_PLATFORM_WINDOWS
+            compiler.type = PluginCompiler::Type::MicrosoftCompiler;
+            SC_TEST_EXPECT(compiler.compilerPath.assign(L"Z:\\plugin-compiler-that-does-not-exist.exe"));
+#else
+            compiler.type = PluginCompiler::Type::GnuCompiler;
+            SC_TEST_EXPECT(compiler.compilerPath.assign("/plugin-compiler-that-does-not-exist"));
+#endif
+            PluginSysroot             sysroot;
+            PluginCompilerEnvironment environment;
+            char                      logStorage[64];
+            Span<char>                log             = {logStorage};
+            const ResultPlugin        missingCompiler = compiler.compile(definition, sysroot, environment, log);
+            SC_TEST_EXPECT(missingCompiler.toResult().isError(ProcessResultCategory, ProcessError::LaunchFailed));
+            SC_TEST_EXPECT(missingCompiler.detail == PluginErrorDetail::None);
+            SC_TEST_EXPECT(missingCompiler.contextKind == PluginErrorContextKind::None);
+        }
+
+#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+        {
+            PluginDefinition definition;
+            PluginFile       file;
+            SC_TEST_EXPECT(definition.directory.assign("."));
+            SC_TEST_EXPECT(file.absolutePath.assign("plugin-source-that-does-not-exist.cpp"));
+            SC_TEST_EXPECT(definition.files.push_back(file));
+
+            PluginCompiler compiler;
+            compiler.type = PluginCompiler::Type::GnuCompiler;
+            SC_TEST_EXPECT(compiler.compilerPath.assign("/usr/bin/false"));
+            PluginSysroot             sysroot;
+            PluginCompilerEnvironment environment;
+            char                      logStorage[64];
+            Span<char>                log    = {logStorage};
+            const ResultPlugin        exited = compiler.compile(definition, sysroot, environment, log);
+            SC_TEST_EXPECT(exited.isError(PluginError::CompilerExitedWithFailure));
+            SC_TEST_EXPECT(exited.detail == PluginErrorDetail::CompilerBuildArguments);
+            SC_TEST_EXPECT(exited.contextKind == PluginErrorContextKind::ExitCode);
+            SC_TEST_EXPECT(exited.context.exitCode == 1);
+        }
+#endif
     }
 };
 
