@@ -10,9 +10,9 @@
 
 #include "../Common/AlignedStorage.h"
 #include "../Common/Assert.h"
-#include "../Common/Result.h"
 #include "../Common/StringSpan.h"
 #include "../Common/UniqueHandle.h"
+#include "SocketError.h"
 
 namespace SC
 {

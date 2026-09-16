@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Socket/SocketErrorFormatter.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
+
+#include <string.h>
 
 namespace SC
 {
@@ -15,6 +18,7 @@ struct SocketTest;
 struct SC::SocketTest : public SC::TestCase
 {
     inline void parseAddress();
+    inline void structuredErrorsAndFormatter();
     inline void parseUnixAddress();
     inline void resolveDNS();
     inline void socketCreate();
@@ -32,6 +36,10 @@ struct SC::SocketTest : public SC::TestCase
     SocketTest(SC::TestReport& report) : TestCase(report, "SocketTest")
     {
         using namespace SC;
+        if (test_section("structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
+        }
         if (test_section("parseAddress"))
         {
             parseAddress();
@@ -79,6 +87,90 @@ struct SC::SocketTest : public SC::TestCase
         }
     }
 };
+
+void SC::SocketTest::structuredErrorsAndFormatter()
+{
+    static_assert(SocketResultCategory.value == 8, "Socket category is registry value 8");
+    static_assert(static_cast<uint32_t>(SocketError::NetworkingNotInitialized) == 1,
+                  "Socket error values are append-only");
+    static_assert(static_cast<uint32_t>(SocketError::TimedOut) == 28, "Socket error values are append-only");
+    static_assert(static_cast<uint16_t>(SocketErrorDetail::None) == 0, "Socket detail zero is reserved for no detail");
+    static_assert(static_cast<uint16_t>(SocketErrorContextKind::None) == 0,
+                  "Socket context kind zero is reserved for no context");
+    static_assert(sizeof(Result) != 16 or sizeof(ResultSocket) == 24,
+                  "ResultSocket bridge layout must retain its 24-byte size");
+    static_assert(sizeof(Result) != 8 or sizeof(ResultSocket) == 16, "ResultSocket must meet the final 16-byte target");
+    static_assert(__is_standard_layout(ResultSocket), "ResultSocket must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultSocket>::value, "ResultSocket must remain trivially copyable");
+
+    const ResultSocket detailed =
+        ResultSocket::withNativeError(SocketError::ReceiveFailed, SocketErrorDetail::ReceiveDatagram, 12345);
+    const ResultSocket copied = detailed;
+    SC_TEST_EXPECT(copied.isError(SocketError::ReceiveFailed));
+    SC_TEST_EXPECT(copied.detail == SocketErrorDetail::ReceiveDatagram);
+    SC_TEST_EXPECT(copied.contextKind == SocketErrorContextKind::NativeError);
+    SC_TEST_EXPECT(copied.context.nativeError == 12345);
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(SocketResultCategory, SocketError::ReceiveFailed));
+    const ResultSocket fromPlain(plain);
+    SC_TEST_EXPECT(fromPlain.detail == SocketErrorDetail::None);
+    SC_TEST_EXPECT(fromPlain.contextKind == SocketErrorContextKind::None);
+    SC_TEST_EXPECT(fromPlain.context.nativeError == 0);
+
+    const Result       foreignResult = Result::Error(ResultCategory(7), 1);
+    const ResultSocket foreign(foreignResult);
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.toResult().isError(ResultCategory(7), 1));
+    SC_TEST_EXPECT(foreign.detail == SocketErrorDetail::None);
+    SC_TEST_EXPECT(foreign.contextKind == SocketErrorContextKind::None);
+
+    const ResultSocket resolver =
+        ResultSocket::withResolverError(SocketError::DNSResolutionFailed, SocketErrorDetail::ResolveHostName, -42);
+    SC_TEST_EXPECT(resolver.contextKind == SocketErrorContextKind::ResolverError);
+    SC_TEST_EXPECT(resolver.context.resolverError == -42);
+    const ResultSocket required = ResultSocket::withRequiredBytes(SocketError::OutputCapacityExceeded,
+                                                                  SocketErrorDetail::CopyResolvedAddress, 512);
+    SC_TEST_EXPECT(required.contextKind == SocketErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(required.context.requiredBytes == 512);
+    const ResultSocket actual =
+        ResultSocket::withActualBytes(SocketError::IncompleteSend, SocketErrorDetail::SendStream, 3);
+    SC_TEST_EXPECT(actual.contextKind == SocketErrorContextKind::ActualBytes);
+    SC_TEST_EXPECT(actual.context.actualBytes == 3);
+
+    constexpr char    expected[] = "Failed to receive socket data (detail: receive datagram) (native error: 12345)";
+    char              message[sizeof(expected)];
+    ResultErrorFormat formatted = formatSocketError(detailed, message);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    SC_TEST_EXPECT(::memcmp(message, expected, sizeof(expected)) == 0);
+
+    constexpr char expectedResolver[] = "Failed to resolve host name (detail: resolve host name) (resolver error: -42)";
+    char           resolverMessage[sizeof(expectedResolver)];
+    formatted = formatSocketError(resolver, resolverMessage);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(::memcmp(resolverMessage, expectedResolver, sizeof(expectedResolver)) == 0);
+
+    formatted = formatSocketError(SocketError::TimedOut, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Socket operation timed out"));
+    char tooSmall[2] = {'x', 0};
+    formatted        = formatSocketError(SocketError::TimedOut, tooSmall);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(tooSmall[0] == 0);
+    SC_TEST_EXPECT(formatSocketError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatSocketError(Result::Error(ResultCategory(99), 1), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(formatSocketError(Result::Error(SocketResultCategory, 999), message).status ==
+                   ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(
+        formatSocketError(ResultSocket(SocketError::ReceiveFailed, static_cast<SocketErrorDetail>(999)), message)
+            .status == ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(formatSocketError(ResultSocket(SocketError::ReceiveFailed, SocketErrorDetail::None,
+                                                  static_cast<SocketErrorContextKind>(999), {}),
+                                     message)
+                       .status == ResultErrorFormatStatus::UnknownError);
+}
 
 void SC::SocketTest::parseAddress()
 {

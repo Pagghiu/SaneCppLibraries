@@ -52,6 +52,12 @@
       "owner": "Plugin",
       "declaration": "Libraries/Plugin/PluginError.h",
       "constant": "PluginResultCategory"
+    },
+    {
+      "value": 8,
+      "owner": "Socket",
+      "declaration": "Libraries/Socket/SocketError.h",
+      "constant": "SocketResultCategory"
     }
   ]
 }
