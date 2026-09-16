@@ -50,7 +50,8 @@ struct SC::PluginCompilerEnvironment::Internal
         PluginString::Tokenizer tokenizer(flags);
         while (tokenizer.next(' '))
         {
-            SC_TRY(arena.appendAsSingleString(tokenizer.component));
+            if (not arena.appendAsSingleString(tokenizer.component))
+                return false;
         }
         return true;
     }
@@ -73,30 +74,36 @@ bool SC::PluginDefinition::find(StringSpan text, StringSpan& extracted)
     return true;
 }
 
-SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const
+SC::ResultPlugin SC::PluginDefinition::getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const
 {
     SC_TRY(PluginString::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(fullDynamicPath.append(".dll"));
+    if (not fullDynamicPath.append(".dll"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
 #elif SC_PLATFORM_APPLE
-    SC_TRY(fullDynamicPath.append(".dylib"));
+    if (not fullDynamicPath.append(".dylib"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
 #else
-    SC_TRY(fullDynamicPath.append(".so"));
+    if (not fullDynamicPath.append(".so"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
 #endif
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const
+SC::ResultPlugin SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const
 {
     SC_TRY(PluginString::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(fullDynamicPath.append(".pdb"));
+    if (not fullDynamicPath.append(".pdb"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
 #elif SC_PLATFORM_APPLE
-    SC_TRY(fullDynamicPath.append(".dSYM"));
+    if (not fullDynamicPath.append(".dSYM"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
 #else
-    SC_TRY(fullDynamicPath.append(".sym"));
+    if (not fullDynamicPath.append(".sym"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
 #endif
-    return Result(true);
+    return ResultPlugin(true);
 }
 
 SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefinition, bool& parsed)
@@ -147,7 +154,7 @@ SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& 
         {
             gotFields[0] = true;
             if (not pluginDefinition.identity.name.assign(value))
-                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                return ResultPlugin::withRequiredBytes(PluginError::DefinitionCapacityExceeded,
                                                        PluginErrorDetail::MetadataName,
                                                        static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
@@ -155,7 +162,7 @@ SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& 
         {
             gotFields[1] = true;
             if (not pluginDefinition.identity.version.assign(value))
-                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                return ResultPlugin::withRequiredBytes(PluginError::DefinitionCapacityExceeded,
                                                        PluginErrorDetail::MetadataVersion,
                                                        static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
@@ -163,7 +170,7 @@ SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& 
         {
             gotFields[2] = true;
             if (not pluginDefinition.description.assign(value))
-                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                return ResultPlugin::withRequiredBytes(PluginError::DefinitionCapacityExceeded,
                                                        PluginErrorDetail::MetadataDescription,
                                                        static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
@@ -171,7 +178,7 @@ SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& 
         {
             gotFields[3] = true;
             if (not pluginDefinition.category.assign(value))
-                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                return ResultPlugin::withRequiredBytes(PluginError::DefinitionCapacityExceeded,
                                                        PluginErrorDetail::MetadataCategory,
                                                        static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
@@ -183,7 +190,7 @@ SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& 
                 PluginIdentifier identifier;
                 if (not identifier.assign(tokenizer.component))
                     return ResultPlugin::withRequiredBytes(
-                        PluginError::PathCapacityExceeded, PluginErrorDetail::MetadataDependency,
+                        PluginError::DefinitionCapacityExceeded, PluginErrorDetail::MetadataDependency,
                         static_cast<uint32_t>(tokenizer.component.sizeInBytes() + 1));
                 if (not pluginDefinition.dependencies.push_back(move(identifier)))
                     return ResultPlugin::withRequiredElements(
@@ -199,7 +206,7 @@ SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& 
                 PluginBuildOption option;
                 if (not option.assign(tokenizer.component))
                     return ResultPlugin::withRequiredBytes(
-                        PluginError::PathCapacityExceeded, PluginErrorDetail::MetadataBuildOption,
+                        PluginError::DefinitionCapacityExceeded, PluginErrorDetail::MetadataBuildOption,
                         static_cast<uint32_t>(tokenizer.component.sizeInBytes() + 1));
                 if (not pluginDefinition.build.push_back(option))
                     return ResultPlugin::withRequiredElements(PluginError::DefinitionCapacityExceeded,
@@ -235,29 +242,36 @@ struct SC::PluginScanner::ScannerState
     size_t numDefinitions      = 0;
     bool   multipleDefinitions = false;
 
-    Result storeTentativePluginFolder(StringSpan pluginDirectory)
+    ResultPlugin storeTentativePluginFolder(StringSpan pluginDirectory)
     {
         if (numDefinitions == 0 or not definitions[numDefinitions - 1].identity.identifier.isEmpty())
         {
             if (numDefinitions >= definitions.sizeInElements())
-                return Result::Error("Insufficient size of PluginDefinitions span");
+                return ResultPlugin::withRequiredElements(PluginError::ScannerCapacityExceeded,
+                                                          PluginErrorDetail::ScannerDefinitionStorage,
+                                                          static_cast<uint32_t>(numDefinitions + 1));
             numDefinitions++;
             definitions[numDefinitions - 1] = {};
         }
         PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
         pluginDefinition.files.clear();
-        SC_TRY(pluginDefinition.directory.assign(pluginDirectory));
+        if (not pluginDefinition.directory.assign(pluginDirectory))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::ScannerCandidatePath);
         multipleDefinitions = false;
-        return Result(true);
+        return ResultPlugin(true);
     }
 
-    Result tryParseCandidate(StringSpan candidate, IGrowableBuffer&& tempFileBuffer)
+    ResultPlugin tryParseCandidate(StringSpan candidate, IGrowableBuffer&& tempFileBuffer)
     {
         PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
         {
             PluginFile pluginFile;
-            SC_TRY(pluginFile.absolutePath.assign(candidate));
-            SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
+            if (not pluginFile.absolutePath.assign(candidate))
+                return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::ScannerCandidatePath);
+            if (not pluginDefinition.files.push_back(move(pluginFile)))
+                return ResultPlugin::withRequiredElements(PluginError::DefinitionCapacityExceeded,
+                                                          PluginErrorDetail::ScannerCandidateFile,
+                                                          static_cast<uint32_t>(pluginDefinition.files.size() + 1));
         }
         SC_TRY(PluginFileSystem::readAbsoluteFile(candidate, move(tempFileBuffer)));
         StringSpan extracted;
@@ -271,7 +285,9 @@ struct SC::PluginScanner::ScannerState
                 if (pluginDefinition.identity.identifier.isEmpty())
                 {
                     const StringSpan identifier = PluginString::basename(pluginDefinition.directory.view());
-                    SC_TRY(pluginDefinition.identity.identifier.assign(identifier));
+                    if (not pluginDefinition.identity.identifier.assign(identifier))
+                        return ResultPlugin(PluginError::DefinitionCapacityExceeded,
+                                            PluginErrorDetail::ScannerCandidatePath);
                     pluginDefinition.pluginFileIndex = pluginDefinition.files.size() - 1;
                 }
                 else
@@ -281,7 +297,7 @@ struct SC::PluginScanner::ScannerState
                 }
             }
         }
-        return Result(true);
+        return ResultPlugin(true);
     }
 
     template <typename T, typename P>
@@ -337,13 +353,15 @@ struct SC::PluginScanner::ScannerState
     }
 };
 
-SC::Result SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDefinition> definitions,
-                                            IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
+SC::ResultPlugin SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDefinition> definitions,
+                                                  IGrowableBuffer&&       tempFileBuffer,
+                                                  Span<PluginDefinition>& foundDefinitions)
 {
     ScannerState scannerState = {definitions};
 
     StringPath pathBuffer;
-    SC_TRY(pathBuffer.assign(directory));
+    if (not pathBuffer.assign(directory))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAssign);
 
     PluginFileSystemIterator iterator;
     SC_TRY(iterator.init(directory));
@@ -359,8 +377,8 @@ SC::Result SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDef
             continue; // skip . and ..
         }
         StringPath fullPath = pathBuffer;
-        SC_TRY(fullPath.append(iterator.pathSeparator));
-        SC_TRY(fullPath.append(entry.name));
+        if (not fullPath.append(iterator.pathSeparator) or not fullPath.append(entry.name))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::ScannerCandidatePath);
         if (entry.isDirectory)
         {
             // Immediately recurse to find candidates
@@ -379,8 +397,8 @@ SC::Result SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDef
                     continue; // skip . and ..
                 }
                 StringPath subFullPath = fullPath;
-                SC_TRY(subFullPath.append(subIterator.pathSeparator));
-                SC_TRY(subFullPath.append(subEntry.name));
+                if (not subFullPath.append(subIterator.pathSeparator) or not subFullPath.append(subEntry.name))
+                    return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::ScannerCandidatePath);
                 if (not subEntry.isDirectory and PluginString::endsWith(subEntry.name, SC_NATIVE_STR(".cpp")))
                 {
                     // It's a regular file ending with .cpp
@@ -394,7 +412,7 @@ SC::Result SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDef
         }
     }
     scannerState.writeDefinitions(foundDefinitions);
-    return Result(true);
+    return ResultPlugin(true);
 }
 #if SC_PLATFORM_WINDOWS
 struct SC::PluginCompiler::CompilerFinder
@@ -413,22 +431,25 @@ struct SC::PluginCompiler::CompilerFinder
     bool       found = false;
     Version    version, bestVersion;
 
-    Result tryFindCompiler(StringSpan base, StringSpan candidate, PluginCompiler& compiler)
+    ResultPlugin tryFindCompiler(StringSpan base, StringSpan candidate, PluginCompiler& compiler)
     {
         SC_TRY(PluginString::assign(bestCompiler, {base, SC_NATIVE_STR("/"), candidate}));
 #if SC_PLATFORM_ARM64
-        SC_TRY(bestCompiler.append(SC_NATIVE_STR("/bin/Hostarm64/arm64/")));
+        if (not bestCompiler.append(SC_NATIVE_STR("/bin/Hostarm64/arm64/")))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
 #else
 #if SC_PLATFORM_64_BIT
-        SC_TRY(bestCompiler.append(SC_NATIVE_STR("/bin/Hostx64/x64/")));
+        if (not bestCompiler.append(SC_NATIVE_STR("/bin/Hostx64/x64/")))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
 #else
-        SC_TRY(bestCompiler.append(SC_NATIVE_STR("/bin/Hostx64/x86/")));
+        if (not bestCompiler.append(SC_NATIVE_STR("/bin/Hostx64/x86/")))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
 #endif
 #endif
 
-        SC_TRY(bestLinker.assign(bestCompiler.view()));
-        SC_TRY(bestLinker.append(SC_NATIVE_STR("link.exe")));
-        SC_TRY(bestCompiler.append(SC_NATIVE_STR("cl.exe")));
+        if (not bestLinker.assign(bestCompiler.view()) or not bestLinker.append(SC_NATIVE_STR("link.exe")) or
+            not bestCompiler.append(SC_NATIVE_STR("cl.exe")))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
         {
             if (PluginFileSystem::existsAndIsFileAbsolute(bestCompiler.view()) and
                 PluginFileSystem::existsAndIsFileAbsolute(bestLinker.view()))
@@ -449,12 +470,18 @@ struct SC::PluginCompiler::CompilerFinder
                 if (bestVersion < version)
                 {
                     bestVersion = version;
-                    SC_TRY(compiler.compilerPath.assign(bestCompiler.view()));
-                    SC_TRY(compiler.linkerPath.assign(bestLinker.view()));
+                    if (not compiler.compilerPath.assign(bestCompiler.view()) or
+                        not compiler.linkerPath.assign(bestLinker.view()))
+                        return ResultPlugin(PluginError::PathCapacityExceeded,
+                                            PluginErrorDetail::CompilerFindConfiguration);
                     StringPath sysrootInclude;
                     SC_TRY(PluginString::assign(sysrootInclude,
                                                 {base, SC_NATIVE_STR("/"), candidate, SC_NATIVE_STR("/include")}));
-                    SC_TRY(compiler.compilerIncludePaths.push_back(sysrootInclude));
+                    if (not compiler.compilerIncludePaths.push_back(sysrootInclude))
+                        return ResultPlugin::withRequiredElements(
+                            PluginError::CompilerConfigurationCapacityExceeded,
+                            PluginErrorDetail::CompilerFindConfiguration,
+                            static_cast<uint32_t>(compiler.compilerIncludePaths.size() + 1));
                     StringPath sysrootLib;
                     StringSpan instructionSet = "x86_64";
                     switch (HostInstructionSet)
@@ -465,16 +492,20 @@ struct SC::PluginCompiler::CompilerFinder
                     }
                     SC_TRY(PluginString::assign(
                         sysrootLib, {base, SC_NATIVE_STR("/"), candidate, SC_NATIVE_STR("/lib/"), instructionSet}));
-                    SC_TRY(compiler.compilerLibraryPaths.push_back(sysrootLib));
+                    if (not compiler.compilerLibraryPaths.push_back(sysrootLib))
+                        return ResultPlugin::withRequiredElements(
+                            PluginError::CompilerConfigurationCapacityExceeded,
+                            PluginErrorDetail::CompilerFindConfiguration,
+                            static_cast<uint32_t>(compiler.compilerLibraryPaths.size() + 1));
                 }
                 found = true;
             }
         }
-        return Result(true);
+        return ResultPlugin(true);
     }
 };
 #endif
-SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
+SC::ResultPlugin SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 {
 #if SC_PLATFORM_WINDOWS
     // TODO: can we use findLatest in order to avoid finding best compiler version...?
@@ -492,7 +523,8 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
         if (not iterator.init(base))
             continue;
         PluginFileSystemIterator::Entry entry;
-        while (iterator.next(entry))
+        bool hasEntry = false;
+        while (iterator.next(entry, hasEntry) and hasEntry)
         {
             if (entry.isDirectory and entry.name != SC_NATIVE_STR(".") and entry.name != SC_NATIVE_STR(".."))
             {
@@ -508,24 +540,23 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
         }
     }
     if (not compilerFinder.found)
-    {
-        return Result::Error("Visual Studio PluginCompiler not found");
-    }
+        return ResultPlugin(PluginError::CompilerNotFound, PluginErrorDetail::CompilerFindConfiguration);
 #elif SC_PLATFORM_APPLE
     compiler.type = Type::ClangCompiler;
-    SC_TRY(compiler.compilerPath.assign("clang"));
-    SC_TRY(compiler.linkerPath.assign("clang"));
+    if (not compiler.compilerPath.assign("clang") or not compiler.linkerPath.assign("clang"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
 #elif SC_PLATFORM_LINUX
     compiler.type = Type::GnuCompiler;
-    SC_TRY(compiler.compilerPath.assign("g++"));
-    SC_TRY(compiler.linkerPath.assign("g++"));
+    if (not compiler.compilerPath.assign("g++") or not compiler.linkerPath.assign("g++"))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
 #endif
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                                           const PluginCompilerEnvironment& compilerEnvironment, StringSpan sourceFile,
-                                           StringSpan objectFile, Span<char>& standardOutput) const
+SC::ResultPlugin SC::PluginCompiler::compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                                                 const PluginCompilerEnvironment& compilerEnvironment,
+                                                 StringSpan sourceFile, StringSpan objectFile,
+                                                 Span<char>& standardOutput) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 32;
 
@@ -535,110 +566,131 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     StringSpan::NativeWritable bufferWritable = {buffer};
 
     StringsArena argumentsArena{bufferWritable, numberOfArguments, {argumentsLengths}};
-    SC_TRY(argumentsArena.appendAsSingleString(compilerPath.view()));
+    if (not argumentsArena.appendAsSingleString(compilerPath.view()))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 #if SC_PLATFORM_WINDOWS
     for (size_t idx = 0; idx < includePaths.size(); ++idx)
     {
-        SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", includePaths[idx].view(), L"\""}));
+        if (not argumentsArena.appendAsSingleString({L"/I\"", includePaths[idx].view(), L"\""}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
 
     if (definition.build.contains("libc"))
     {
         for (size_t idx = 0; idx < compilerIncludePaths.size(); ++idx)
         {
-            SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", compilerIncludePaths[idx].view(), L"\""}));
+            if (not argumentsArena.appendAsSingleString({L"/I\"", compilerIncludePaths[idx].view(), L"\""}))
+                return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
         }
 
         for (size_t idx = 0; idx < sysroot.includePaths.size(); ++idx)
         {
-            SC_TRY(argumentsArena.appendAsSingleString({L"/I\"", sysroot.includePaths[idx].view(), L"\""}));
+            if (not argumentsArena.appendAsSingleString({L"/I\"", sysroot.includePaths[idx].view(), L"\""}))
+                return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
         }
     }
 
-    SC_TRY(argumentsArena.appendAsSingleString({L"/Fo:", objectFile}));
+    if (not argumentsArena.appendAsSingleString({L"/Fo:", objectFile}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     if (not definition.build.contains("libc"))
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({L"/DSC_INCLUDE_STD_CPP=0"}));
+        if (not argumentsArena.appendMultipleStrings({L"/DSC_INCLUDE_STD_CPP=0"}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
     if (not definition.build.contains("libc++"))
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({L"/DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}));
+        if (not argumentsArena.appendMultipleStrings({L"/DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
-    SC_TRY(argumentsArena.appendMultipleStrings({L"/std:c++17", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-",
-                                                 L"/Zi", L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/nologo",
-                                                 L"/c", sourceFile}));
+    if (not argumentsArena.appendMultipleStrings({L"/std:c++17", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-",
+                                                  L"/Zi", L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/nologo",
+                                                  L"/c", sourceFile}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 #else
     (void)sysroot;
     for (size_t idx = 0; idx < includePaths.size(); ++idx)
     {
-        SC_TRY(argumentsArena.appendAsSingleString({"-I", includePaths[idx].view()}));
+        if (not argumentsArena.appendAsSingleString({"-I", includePaths[idx].view()}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
     if (not definition.build.contains("libc"))
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc", "-nostdinc++", "-fno-stack-protector"}));
-        SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_INCLUDE_STD_CPP=0"}));
+        if (not argumentsArena.appendMultipleStrings({"-nostdinc", "-nostdinc++", "-fno-stack-protector"}) or
+            not argumentsArena.appendMultipleStrings({"-DSC_INCLUDE_STD_CPP=0"}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
     if (not definition.build.contains("libc++"))
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}));
+        if (not argumentsArena.appendMultipleStrings({"-DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
     if (not definition.build.contains("exceptions"))
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({"-fno-exceptions"}));
+        if (not argumentsArena.appendMultipleStrings({"-fno-exceptions"}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
     if (not definition.build.contains("rtti"))
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({"-fno-rtti"}));
+        if (not argumentsArena.appendMultipleStrings({"-fno-rtti"}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
 
 #if defined(__SANITIZE_ADDRESS__)
-    SC_TRY(argumentsArena.appendMultipleStrings({"-fsanitize=address,undefined"}));
+    if (not argumentsArena.appendMultipleStrings({"-fsanitize=address,undefined"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 #if SC_PLATFORM_APPLE
-    SC_TRY(argumentsArena.appendMultipleStrings({"-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"}));
+    if (not argumentsArena.appendMultipleStrings({"-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 #endif
 #endif
 
     // This is really important on macOS because otherwise symbols exported on some plugin .dylib that
     // match the signature and assembly content, will be re-used by other plugin.dylib making the first
     // plugin .dylib not re-loadable until the other .dylibs having references to it are unloaded too...
-    SC_TRY(argumentsArena.appendMultipleStrings({"-fvisibility=hidden", "-fvisibility-inlines-hidden"}));
+    if (not argumentsArena.appendMultipleStrings({"-fvisibility=hidden", "-fvisibility-inlines-hidden"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 
-    SC_TRY(argumentsArena.appendMultipleStrings(
-        {"-DSC_PLUGIN_LIBRARY=1", "-std=c++14", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}));
+    if (not argumentsArena.appendMultipleStrings(
+            {"-DSC_PLUGIN_LIBRARY=1", "-std=c++14", "-g", "-c", "-fpic", sourceFile, "-o", objectFile}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 #endif
     if (not sysroot.isysroot.isEmpty())
     {
-        SC_TRY(argumentsArena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}));
+        if (not argumentsArena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
     }
-    SC_TRY_MSG(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.cFlags, argumentsArena),
-               "writeFlags");
+    if (not PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.cFlags, argumentsArena))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerWriteArguments);
     StringSpan arguments[MAX_PROCESS_ARGUMENTS];
-    SC_TRY_MSG(argumentsArena.writeTo(arguments), "arguments MAX_PROCESS_ARGUMENTS exceeded");
+    if (not argumentsArena.writeTo(arguments))
+        return ResultPlugin::withRequiredElements(PluginError::ArgumentCapacityExceeded,
+                                                  PluginErrorDetail::CompilerWriteArguments,
+                                                  static_cast<uint32_t>(numberOfArguments));
     Process process;
     if (type == Type::ClangCompiler)
     {
-        SC_TRY_MSG(process.exec({arguments, numberOfArguments}, Process::StdOut::Inherit(), Process::StdIn::Inherit(),
-                                standardOutput),
-                   "Process exec failed (clang)");
+        SC_TRY(process.exec({arguments, numberOfArguments}, Process::StdOut::Inherit(), Process::StdIn::Inherit(),
+                            standardOutput));
     }
     else
     {
-        SC_TRY_MSG(process.exec({arguments, numberOfArguments}, standardOutput), "Process exec failed");
+        SC_TRY(process.exec({arguments, numberOfArguments}, standardOutput));
     }
     if (process.getExitStatus() == 0)
     {
         standardOutput = {};
-        return Result(true);
+        return ResultPlugin(true);
     }
     else
     {
-        return Result::Error("Plugin::compileFile failed");
+        return ResultPlugin::withExitCode(PluginError::CompilerExitedWithFailure,
+                                          PluginErrorDetail::CompilerBuildArguments, process.getExitStatus());
     }
 }
 
-SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const PluginSysroot& sysroot,
-                                       const PluginCompilerEnvironment& compilerEnvironment,
-                                       Span<char>&                      standardOutput) const
+SC::ResultPlugin SC::PluginCompiler::compile(const PluginDefinition& plugin, const PluginSysroot& sysroot,
+                                             const PluginCompilerEnvironment& compilerEnvironment,
+                                             Span<char>&                      standardOutput) const
 {
     // TODO: Spawn parallel tasks
     StringPath destFile;
@@ -646,16 +698,17 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
     {
         StringSpan outputName = PluginString::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
         SC_TRY(PluginString::join(destFile, {plugin.directory.view(), outputName}));
-        SC_TRY(destFile.append(SC_NATIVE_STR(".o")));
+        if (not destFile.append(SC_NATIVE_STR(".o")))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerBuildObjectPath);
         SC_TRY(compileFile(plugin, sysroot, compilerEnvironment, file.absolutePath.view(), destFile.view(),
                            standardOutput));
     }
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                                    const PluginCompilerEnvironment& compilerEnvironment, StringSpan executablePath,
-                                    Span<char>& linkerLog) const
+SC::ResultPlugin SC::PluginCompiler::link(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                                          const PluginCompilerEnvironment& compilerEnvironment,
+                                          StringSpan executablePath, Span<char>& linkerLog) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
@@ -665,42 +718,52 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     StringSpan::NativeWritable bufferWritable = {buffer};
 
     StringsArena arena = {bufferWritable, numberOfStrings, {stringLengths}};
-    SC_TRY_MSG(arena.appendAsSingleString({linkerPath.view()}), "link buffer full");
+    if (not arena.appendAsSingleString({linkerPath.view()}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 
 #if SC_PLATFORM_WINDOWS
     (void)(compilerEnvironment);
 
     if (not definition.build.contains("libc") and not definition.build.contains("libc++"))
     {
-        SC_TRY(arena.appendMultipleStrings({SC_NATIVE_STR("/NODEFAULTLIB"), SC_NATIVE_STR("/ENTRY:DllMain")}));
+        if (not arena.appendMultipleStrings({SC_NATIVE_STR("/NODEFAULTLIB"), SC_NATIVE_STR("/ENTRY:DllMain")}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
     }
-    SC_TRY(arena.appendMultipleStrings(
-        {SC_NATIVE_STR("/nologo"), SC_NATIVE_STR("/DLL"), SC_NATIVE_STR("/DEBUG"), SC_NATIVE_STR("/SAFESEH:NO")}));
+    if (not arena.appendMultipleStrings(
+            {SC_NATIVE_STR("/nologo"), SC_NATIVE_STR("/DLL"), SC_NATIVE_STR("/DEBUG"), SC_NATIVE_STR("/SAFESEH:NO")}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 
     for (size_t idx = 0; idx < compilerLibraryPaths.size(); ++idx)
     {
-        SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), compilerLibraryPaths[idx].view()}));
+        if (not arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), compilerLibraryPaths[idx].view()}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
     }
 
     for (size_t idx = 0; idx < sysroot.libraryPaths.size(); ++idx)
     {
-        SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), sysroot.libraryPaths[idx].view()}));
+        if (not arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), sysroot.libraryPaths[idx].view()}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
     }
 
-    SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), PluginString::dirname(executablePath)}));
+    if (not arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), PluginString::dirname(executablePath)}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 
     StringSpan exeName = PluginString::basename(executablePath, SC_NATIVE_STR(".exe"));
-    SC_TRY(arena.appendAsSingleString({exeName, SC_NATIVE_STR(".lib")}));
+    if (not arena.appendAsSingleString({exeName, SC_NATIVE_STR(".lib")}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 
 #else
     (void)(sysroot);
-    SC_TRY(arena.appendMultipleStrings({"-fpic"}));
+    if (not arena.appendMultipleStrings({"-fpic"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 
     if (not sysroot.isysroot.isEmpty())
     {
-        SC_TRY(arena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}));
+        if (not arena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
     }
-    SC_TRY(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.ldFlags, arena));
+    if (not PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.ldFlags, arena))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerWriteArguments);
 
     // TODO: Figure out where to link _memcpy & co when using -nostdlib
 
@@ -708,63 +771,72 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     {
         if (not definition.build.contains("libc++"))
         {
-            SC_TRY(arena.appendMultipleStrings({"-nostdlib++"}));
+            if (not arena.appendMultipleStrings({"-nostdlib++"}))
+                return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
         }
     }
 
 #if SC_PLATFORM_APPLE
-    SC_TRY(arena.appendMultipleStrings({"-bundle_loader", executablePath, "-bundle"}));
+    if (not arena.appendMultipleStrings({"-bundle_loader", executablePath, "-bundle"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 #else
     (void)(executablePath);
-    SC_TRY(arena.appendMultipleStrings({"-shared", "-Wl,-Bsymbolic-functions"}));
+    if (not arena.appendMultipleStrings({"-shared", "-Wl,-Bsymbolic-functions"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 #endif
 #if defined(__SANITIZE_ADDRESS__)
-    SC_TRY(arena.appendMultipleStrings({"-fsanitize=address,undefined"}));
+    if (not arena.appendMultipleStrings({"-fsanitize=address,undefined"}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 #endif
 #endif
 
     for (auto& file : definition.files)
     {
         const StringSpan outputName = PluginString::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        SC_TRY(arena.appendAsSingleString(
-            {definition.directory.view(), SC_NATIVE_STR("/"), outputName, SC_NATIVE_STR(".o")}));
+        if (not arena.appendAsSingleString(
+                {definition.directory.view(), SC_NATIVE_STR("/"), outputName, SC_NATIVE_STR(".o")}))
+            return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
     }
 
     StringPath destFile;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(destFile));
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/OUT:"), destFile.view()}));
+    if (not arena.appendAsSingleString({SC_NATIVE_STR("/OUT:"), destFile.view()}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 #else
-    SC_TRY(arena.appendMultipleStrings({"-o", destFile.view()}));
+    if (not arena.appendMultipleStrings({"-o", destFile.view()}))
+        return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 #endif
 
     StringSpan       args[MAX_PROCESS_ARGUMENTS];
     Span<StringSpan> argsSpan = {args};
-    SC_TRY_MSG(arena.writeTo(argsSpan), "Excessive number of arguments");
+    if (not arena.writeTo(argsSpan))
+        return ResultPlugin::withRequiredElements(PluginError::ArgumentCapacityExceeded,
+                                                  PluginErrorDetail::LinkerWriteArguments,
+                                                  static_cast<uint32_t>(numberOfStrings));
     Process process;
     if (type == Type::ClangCompiler)
     {
-        SC_TRY_MSG(
-            process.exec({args, numberOfStrings}, Process::StdOut::Inherit(), Process::StdIn::Inherit(), linkerLog),
-            "Process link exec failed (clang)");
+        SC_TRY(process.exec({args, numberOfStrings}, Process::StdOut::Inherit(), Process::StdIn::Inherit(), linkerLog));
     }
     else
     {
-        SC_TRY_MSG(process.exec({args, numberOfStrings}, linkerLog), "Process link exec failed");
+        SC_TRY(process.exec({args, numberOfStrings}, linkerLog));
     }
     if (process.getExitStatus() == 0)
     {
         linkerLog = {};
-        return Result(true);
+        return ResultPlugin(true);
     }
     else
     {
-        return Result::Error("Plugin::link failed");
+        return ResultPlugin::withExitCode(PluginError::LinkerExitedWithFailure, PluginErrorDetail::LinkerBuildArguments,
+                                          process.getExitStatus());
     }
 }
 
 SC::PluginDynamicLibrary::PluginDynamicLibrary() : lastLoadTime(PluginNow()) { numReloads = 0; }
-SC::Result SC::PluginDynamicLibrary::unload(bool releaseDebuggerFiles)
+SC::ResultPlugin SC::PluginDynamicLibrary::unload(bool releaseDebuggerFiles)
 {
     SC_TRY(dynamicLibrary.close());
 #if SC_PLATFORM_WINDOWS
@@ -785,10 +857,10 @@ SC::Result SC::PluginDynamicLibrary::unload(bool releaseDebuggerFiles)
     pluginClose = nullptr;
 
     pluginQueryInterface = nullptr;
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType, PluginSysroot& sysroot)
+SC::ResultPlugin SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType, PluginSysroot& sysroot)
 {
 #if SC_PLATFORM_WINDOWS
     // TODO: This is clearly semi-hardcoded, and we could get the installed directory by looking at registry
@@ -800,16 +872,19 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
     PluginFileSystemIterator iterator;
     SC_TRY(iterator.init(searchPath));
     PluginFileSystemIterator::Entry entry;
-    while (iterator.next(entry))
+    bool                            hasEntry = false;
+    while (iterator.next(entry, hasEntry) and hasEntry)
     {
         if (entry.isDirectory and entry.name != SC_NATIVE_STR(".") and entry.name != SC_NATIVE_STR(".."))
         {
-            SC_TRY(windowsSdkVersion.assign(entry.name));
+            if (not windowsSdkVersion.assign(entry.name))
+                return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::SysrootFindVersion);
             break;
         }
     }
 
-    SC_TRY_MSG(not windowsSdkVersion.isEmpty(), "Cannot find Windows Kits 10 include directory")
+    if (windowsSdkVersion.isEmpty())
+        return ResultPlugin(PluginError::SysrootNotFound, PluginErrorDetail::SysrootFindVersion);
     switch (compilerType)
     {
     case PluginCompiler::Type::MicrosoftCompiler: {
@@ -821,7 +896,10 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
             StringPath str;
             SC_TRY(PluginString::assign(
                 str, {baseDirectory, SC_NATIVE_STR("\\include\\"), windowsSdkVersion.view(), SC_NATIVE_STR("\\"), it}));
-            SC_TRY(sysroot.includePaths.push_back(move(str)));
+            if (not sysroot.includePaths.push_back(move(str)))
+                return ResultPlugin::withRequiredElements(PluginError::SysrootCapacityExceeded,
+                                                          PluginErrorDetail::SysrootBuildIncludePath,
+                                                          static_cast<uint32_t>(sysroot.includePaths.size() + 1));
         }
         StringSpan instructionSet = "x64";
         switch (HostInstructionSet)
@@ -837,7 +915,10 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
             StringPath str;
             SC_TRY(PluginString::assign(str, {baseDirectory, SC_NATIVE_STR("\\lib\\"), windowsSdkVersion.view(),
                                               SC_NATIVE_STR("\\"), it, SC_NATIVE_STR("\\"), instructionSet}));
-            SC_TRY(sysroot.libraryPaths.push_back(move(str)));
+            if (not sysroot.libraryPaths.push_back(move(str)))
+                return ResultPlugin::withRequiredElements(PluginError::SysrootCapacityExceeded,
+                                                          PluginErrorDetail::SysrootBuildLibraryPath,
+                                                          static_cast<uint32_t>(sysroot.libraryPaths.size() + 1));
         }
     }
     break;
@@ -847,13 +928,14 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
     (void)compilerType;
     (void)sysroot;
 #endif
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const PluginSysroot& sysroot,
-                                          StringSpan executablePath)
+SC::ResultPlugin SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const PluginSysroot& sysroot,
+                                                StringSpan executablePath)
 {
-    SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first");
+    if (dynamicLibrary.isValid())
+        return ResultPlugin(PluginError::DynamicLibraryAlreadyLoaded);
     ProcessEnvironment        environment;
     PluginCompilerEnvironment compilerEnvironment;
 
@@ -861,11 +943,13 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     StringSpan name;
     if (environment.contains("CFLAGS", &index))
     {
-        SC_TRY(environment.get(index, name, compilerEnvironment.cFlags));
+        if (not environment.get(index, name, compilerEnvironment.cFlags))
+            return ResultPlugin(PluginError::CompilerEnvironmentReadFailed);
     }
     if (environment.contains("LDFLAGS", &index))
     {
-        SC_TRY(environment.get(index, name, compilerEnvironment.ldFlags));
+        if (not environment.get(index, name, compilerEnvironment.ldFlags))
+            return ResultPlugin(PluginError::CompilerEnvironmentReadFailed);
     }
     lastErrorLog = {};
 
@@ -881,26 +965,26 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
             }
             lastErrorLog = {lastErrorLogCopy, true, StringEncoding::Ascii};
         });
-    SC_TRY_MSG(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLogCopy), "Compile failed");
+    SC_TRY(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLogCopy));
 #if SC_PLATFORM_WINDOWS
     ::Sleep(400); // Sometimes file is locked...
 #endif
     lastErrorLogCopy = {errorStorage, sizeof(errorStorage) - 1};
-    SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLogCopy), "Link fails");
+    SC_TRY(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLogCopy));
     deferWrite.disarm();
     StringPath buffer;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(buffer));
     SC_TRY(dynamicLibrary.load(buffer.view()));
 
     SC_TRY(PluginString::assign(buffer, {definition.identity.identifier.view(), "Init"}));
-    SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginInit), "Missing #PluginName#Init");
+    SC_TRY(dynamicLibrary.getSymbol(buffer.view(), pluginInit));
     SC_TRY(PluginString::assign(buffer, {definition.identity.identifier.view(), "Close"}));
-    SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close");
+    SC_TRY(dynamicLibrary.getSymbol(buffer.view(), pluginClose));
     SC_TRY(PluginString::assign(buffer, {definition.identity.identifier.view(), "QueryInterface"}));
     (void)(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
     numReloads += 1;
     lastLoadTime = PluginNow();
-    return Result(true);
+    return ResultPlugin(true);
 }
 
 void SC::PluginRegistry::init(Span<PluginDynamicLibrary> librariesStorage)
@@ -910,15 +994,15 @@ void SC::PluginRegistry::init(Span<PluginDynamicLibrary> librariesStorage)
     libraries = {};
 }
 
-SC::Result SC::PluginRegistry::close()
+SC::ResultPlugin SC::PluginRegistry::close()
 {
-    Result result(true);
+    ResultPlugin result(true);
     for (size_t idx = 0; idx < getNumberOfEntries(); ++idx)
     {
         // TODO: Investigate why releasing debugger PDB handles through Restart Manager can take
         // several seconds when exiting SCExample under VSCode on a Parallels shared folder.
         // Final process shutdown does not need it, but explicit unload/reload still does.
-        Result res = unloadPlugin(getIdentifierAt(idx).view(), false);
+        ResultPlugin res = unloadPlugin(getIdentifierAt(idx).view(), false);
         if (not res)
         {
             // We still want to continue unload all plugins
@@ -928,7 +1012,7 @@ SC::Result SC::PluginRegistry::close()
     return result;
 }
 
-SC::Result SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& definitions)
+SC::ResultPlugin SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& definitions)
 {
     FixedVector<PluginIdentifier, 16> librariesToUnload;
     // Unload libraries that have no match in the definitions
@@ -947,7 +1031,10 @@ SC::Result SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& defin
         }
         if (not found)
         {
-            SC_TRY(librariesToUnload.push_back(item.definition.identity.identifier));
+            if (not librariesToUnload.push_back(item.definition.identity.identifier))
+                return ResultPlugin::withRequiredElements(PluginError::RegistryCapacityExceeded,
+                                                          PluginErrorDetail::RegistryUnloadList,
+                                                          static_cast<uint32_t>(librariesToUnload.size() + 1));
         }
     }
 
@@ -976,15 +1063,17 @@ SC::Result SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& defin
         PluginDynamicLibrary* plugin = findPlugin(pdl.definition.identity.identifier.view());
         if (plugin == nullptr)
         {
-            SC_TRY_MSG(libraries.sizeInElements() < storage.sizeInElements(),
-                       "Exceeded number of Plugins storage space");
+            if (libraries.sizeInElements() >= storage.sizeInElements())
+                return ResultPlugin::withRequiredElements(PluginError::RegistryCapacityExceeded,
+                                                          PluginErrorDetail::RegistryStoreDefinition,
+                                                          static_cast<uint32_t>(libraries.sizeInElements() + 1));
             libraries = {storage.data(), libraries.sizeInElements() + 1};
 
             libraries[libraries.sizeInElements() - 1] = move(pdl);
         }
     }
     definitions = {};
-    return Result(true);
+    return ResultPlugin(true);
 }
 
 SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(StringSpan identifier)
@@ -1030,11 +1119,13 @@ void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringSpan relativePath, Ti
     }
 }
 
-SC::Result SC::PluginRegistry::loadPlugin(StringSpan identifier, const PluginCompiler& compiler,
-                                          const PluginSysroot& sysroot, StringSpan executablePath, LoadMode loadMode)
+SC::ResultPlugin SC::PluginRegistry::loadPlugin(StringSpan identifier, const PluginCompiler& compiler,
+                                                const PluginSysroot& sysroot, StringSpan executablePath,
+                                                LoadMode loadMode)
 {
     PluginDynamicLibrary* res = findPlugin(identifier);
-    SC_TRY_MSG(res != nullptr, "loadplugin res == nullptr");
+    if (res == nullptr)
+        return ResultPlugin(PluginError::PluginNotFound, PluginErrorDetail::RegistryFindPlugin);
     PluginDynamicLibrary& lib = *res;
     if (loadMode == LoadMode::Reload or not lib.dynamicLibrary.isValid())
     {
@@ -1045,21 +1136,23 @@ SC::Result SC::PluginRegistry::loadPlugin(StringSpan identifier, const PluginCom
         }
         if (lib.dynamicLibrary.isValid())
         {
-            SC_TRY_MSG(unloadPlugin(identifier), "unload plugin");
+            SC_TRY(unloadPlugin(identifier));
         }
         SC_TRY(lib.load(compiler, sysroot, executablePath));
-        SC_TRY_MSG(lib.pluginInit(lib.instance), "PluginInit failed"); // TODO: Return actual failure strings
-        return Result(true);
+        if (not lib.pluginInit(lib.instance))
+            return ResultPlugin(PluginError::PluginInitializationFailed);
+        return ResultPlugin(true);
     }
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::PluginRegistry::unloadPlugin(StringSpan identifier) { return unloadPlugin(identifier, true); }
+SC::ResultPlugin SC::PluginRegistry::unloadPlugin(StringSpan identifier) { return unloadPlugin(identifier, true); }
 
-SC::Result SC::PluginRegistry::unloadPlugin(StringSpan identifier, bool releaseDebuggerFiles)
+SC::ResultPlugin SC::PluginRegistry::unloadPlugin(StringSpan identifier, bool releaseDebuggerFiles)
 {
     PluginDynamicLibrary* res = findPlugin(identifier);
-    SC_TRY(res != nullptr);
+    if (res == nullptr)
+        return ResultPlugin(PluginError::PluginNotFound, PluginErrorDetail::RegistryFindPlugin);
     PluginDynamicLibrary& lib = *res;
     if (lib.dynamicLibrary.isValid())
     {
@@ -1078,10 +1171,11 @@ SC::Result SC::PluginRegistry::unloadPlugin(StringSpan identifier, bool releaseD
     return lib.unload(releaseDebuggerFiles);
 }
 
-SC::Result SC::PluginRegistry::removeAllBuildProducts(StringSpan identifier)
+SC::ResultPlugin SC::PluginRegistry::removeAllBuildProducts(StringSpan identifier)
 {
     PluginDynamicLibrary* res = findPlugin(identifier);
-    SC_TRY(res != nullptr);
+    if (res == nullptr)
+        return ResultPlugin(PluginError::PluginNotFound, PluginErrorDetail::RegistryFindPlugin);
     PluginDynamicLibrary& lib = *res;
     StringPath            buffer;
 
@@ -1098,7 +1192,8 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(StringSpan identifier)
     {
         ::Sleep(10); // It looks like FreeLibrary needs some time to avoid getting access denied
         numTries--;
-        SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll");
+        if (numTries < 0)
+            return ResultPlugin(PluginError::FileRemoveFailed, PluginErrorDetail::WindowsFileDelete);
     }
 #elif SC_PLATFORM_APPLE
     SC_TRY(PluginString::assign(buffer, {lib.definition.directory.view(), "/", identifier, ".dylib"}));
@@ -1113,8 +1208,9 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(StringSpan identifier)
 
         StringPath destFile;
         SC_TRY(PluginString::join(destFile, {lib.definition.directory.view(), outputName}));
-        SC_TRY(destFile.append(".o"));
+        if (not destFile.append(".o"))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
         SC_TRY(PluginFileSystem::removeFileAbsolute(destFile.view()));
     }
-    return Result(true);
+    return ResultPlugin(true);
 }

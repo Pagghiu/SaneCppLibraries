@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Common/Deferred.h"
-#include "../../Common/Result.h"
+#include "../PluginError.h"
 #include "PluginString.h"
 
 namespace SC
@@ -23,13 +23,13 @@ struct SC::Debugger
     /// @param fileName The file to unlock
     /// @return Valid Result if file has been successfully unlocked
     /// @note This is only supported on windows for now
-    [[nodiscard]] static Result unlockFileFromAllProcesses(StringSpan fileName);
+    [[nodiscard]] static ResultPlugin unlockFileFromAllProcesses(StringSpan fileName);
 
     /// @brief Forcefully deletes a file previously unlocked by Debugger::unlockFileFromAllProcesses
     /// @param fileName The file to delete
     /// @return Valid Result if file has been successfully deleted
     /// @note This is only supported on windows for now
-    [[nodiscard]] static Result deleteForcefullyUnlockedFile(StringSpan fileName);
+    [[nodiscard]] static ResultPlugin deleteForcefullyUnlockedFile(StringSpan fileName);
 
   private:
     struct Internal;
@@ -256,7 +256,7 @@ struct SC::Debugger::Internal
                                     &newHandle, 0, FALSE, DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS))
                 {
                     CloseHandle(newHandle);
-                    return Result(true);
+                    return true;
                 }
             }
         }
@@ -269,11 +269,13 @@ struct SC::Debugger::Internal
 
 // Find all processes that have an handle open on the given fileName and unlock it
 // https://devblogs.microsoft.com/oldnewthing/20120217-00/?p=8283
-SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringSpan fileName)
+SC::ResultPlugin SC::Debugger::unlockFileFromAllProcesses(SC::StringSpan fileName)
 {
     using namespace SC;
-    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
-    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16");
+    if (not fileName.isNullTerminated())
+        return ResultPlugin(PluginError::PathNotNullTerminated, PluginErrorDetail::WindowsDebuggerUnlock);
+    if (fileName.getEncoding() != SC::StringEncoding::Utf16)
+        return ResultPlugin(PluginError::UnsupportedPathEncoding, PluginErrorDetail::WindowsDebuggerUnlock);
     DWORD dwSession;
     WCHAR szSessionKey[CCH_RM_SESSION_KEY + 1] = {0};
 
@@ -304,7 +306,9 @@ SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringSpan fileName)
                         if (GetProcessTimes(hProcess, &ftCreate, &ftExit, &ftKernel, &ftUser) &&
                             CompareFileTime(&rmProcessInfo[i].Process.ProcessStartTime, &ftCreate) == 0)
                         {
-                            SC_TRY(Internal::unlockFileFromProcess(fileName, rmProcessInfo[i].Process.dwProcessId));
+                            if (not Internal::unlockFileFromProcess(fileName, rmProcessInfo[i].Process.dwProcessId))
+                                return ResultPlugin(PluginError::DebuggerUnlockFailed,
+                                                    PluginErrorDetail::WindowsDebuggerUnlock);
                         }
                         CloseHandle(hProcess);
                     }
@@ -313,16 +317,18 @@ SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringSpan fileName)
         }
         RmEndSession(dwSession);
     }
-    return Result(true);
+    return ResultPlugin(true);
 }
 
 bool SC::Debugger::isDebuggerConnected() { return ::IsDebuggerPresent() == TRUE; }
 
-SC::Result SC::Debugger::deleteForcefullyUnlockedFile(SC::StringSpan fileName)
+SC::ResultPlugin SC::Debugger::deleteForcefullyUnlockedFile(SC::StringSpan fileName)
 {
     using namespace SC;
-    SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
-    SC_TRY_MSG(fileName.getEncoding() == SC::StringEncoding::Utf16, "Filename must be UTF16");
+    if (not fileName.isNullTerminated())
+        return ResultPlugin(PluginError::PathNotNullTerminated, PluginErrorDetail::WindowsDebuggerDelete);
+    if (fileName.getEncoding() != SC::StringEncoding::Utf16)
+        return ResultPlugin(PluginError::UnsupportedPathEncoding, PluginErrorDetail::WindowsDebuggerDelete);
     HANDLE fd = CreateFileW(fileName.getNullTerminatedNative(), // File path
                             GENERIC_READ | GENERIC_WRITE,       // Desired access
                             FILE_SHARE_DELETE,                  // Share mode (0 for exclusive access)
@@ -332,6 +338,10 @@ SC::Result SC::Debugger::deleteForcefullyUnlockedFile(SC::StringSpan fileName)
                             NULL                                // Template file handle
     );
     if (fd == INVALID_HANDLE_VALUE)
-        return Result::Error("deleteForcefullyUnlockedFile CreateFileW failed");
-    return Result(::CloseHandle(fd) == TRUE);
+        return ResultPlugin::withNativeError(PluginError::DebuggerUnlockFailed,
+                                             PluginErrorDetail::WindowsDebuggerDelete, ::GetLastError());
+    if (::CloseHandle(fd) == FALSE)
+        return ResultPlugin::withNativeError(PluginError::DebuggerUnlockFailed,
+                                             PluginErrorDetail::WindowsDebuggerDelete, ::GetLastError());
+    return ResultPlugin(true);
 }

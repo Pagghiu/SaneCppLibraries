@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Common/StringPath.h"
+#include "../PluginError.h"
 
 namespace SC
 {
@@ -204,35 +205,42 @@ namespace PluginString
 }
 #endif
 
-[[nodiscard]] inline bool append(StringPath& output, Span<const StringSpan> components)
+[[nodiscard]] inline ResultPlugin append(StringPath& output, Span<const StringSpan> components)
 {
     for (StringSpan component : components)
     {
-        SC_TRY(output.append(component));
+        if (not output.append(component))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
     }
-    return true;
+    return ResultPlugin(true);
 }
 
-[[nodiscard]] inline bool assign(StringPath& output, Span<const StringSpan> components)
+[[nodiscard]] inline ResultPlugin assign(StringPath& output, Span<const StringSpan> components)
 {
-    SC_TRY(output.resize(0));
+    if (not output.resize(0))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAssign);
     return append(output, components);
 }
 
-[[nodiscard]] inline bool join(StringPath& output, Span<const StringSpan> components)
+[[nodiscard]] inline ResultPlugin join(StringPath& output, Span<const StringSpan> components)
 {
-    SC_TRY(output.resize(0));
+    if (not output.resize(0))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAssign);
     bool first = true;
     for (StringSpan component : components)
     {
         if (component.isEmpty())
             continue;
         if (not first)
-            SC_TRY(output.append(SC_NATIVE_STR("/")));
-        SC_TRY(output.append(component));
+        {
+            if (not output.append(SC_NATIVE_STR("/")))
+                return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
+        }
+        if (not output.append(component))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAppend);
         first = false;
     }
-    return true;
+    return ResultPlugin(true);
 }
 
 struct Tokenizer

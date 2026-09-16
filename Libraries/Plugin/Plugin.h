@@ -150,12 +150,12 @@ struct PluginDefinition
     /// @brief Gets absolute path of where compiled dynamic library will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled dynamic library from plugin
     /// @return Valid result if string can be allocated successfully
-    Result getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const;
+    ResultPlugin getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const;
 
     /// @brief Gets absolute path of where compiled Program Database File will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled Program Database File from plugin
     /// @return Valid result if string can be allocated successfully
-    Result getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const;
+    ResultPlugin getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const;
 
   private:
     size_t pluginFileIndex = 0;
@@ -172,15 +172,15 @@ struct PluginScanner
     /// @param foundDefinitions Parsed definitions (it's a slice of definitionsStorage)
     /// @return Valid result if the given directory is accessible and valid PluginDefinition can be parsed
     template <typename T>
-    static Result scanDirectory(StringSpan directory, Span<PluginDefinition> definitionsStorage, T& tempFileBuffer,
-                                Span<PluginDefinition>& foundDefinitions)
+    static ResultPlugin scanDirectory(StringSpan directory, Span<PluginDefinition> definitionsStorage,
+                                      T& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
     {
         return scanDirectory(directory, definitionsStorage, GrowableBuffer<T>{tempFileBuffer}, foundDefinitions);
     }
 
   private:
-    static Result scanDirectory(StringSpan directory, Span<PluginDefinition> definitionsStorage,
-                                IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions);
+    static ResultPlugin scanDirectory(StringSpan directory, Span<PluginDefinition> definitionsStorage,
+                                      IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions);
     struct ScannerState;
 };
 
@@ -193,8 +193,8 @@ struct PluginCompiler
     /// @param environment An environment used to populate CFLAGS and LDFLAGS from environment variables
     /// @param compilerLog If provided, will receive the log output produced by the compiler
     /// @return Valid result if all files of given definition can be compiled to valid object files
-    Result compile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                   const PluginCompilerEnvironment& environment, Span<char>& compilerLog) const;
+    ResultPlugin compile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                         const PluginCompilerEnvironment& environment, Span<char>& compilerLog) const;
 
     /// @brief Links a Definition into a dynamic library, with symbols from `executablePath`
     /// @param definition A valid Definition already compiled with PluginCompiler::compile
@@ -203,8 +203,9 @@ struct PluginCompiler
     /// @param executablePath Path to the executable loading the given plugin, exposing symbols used by Plugin
     /// @param linkerLog If provided, will receive the log output produced by the linker
     /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
-    Result link(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                const PluginCompilerEnvironment& environment, StringSpan executablePath, Span<char>& linkerLog) const;
+    ResultPlugin link(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                      const PluginCompilerEnvironment& environment, StringSpan executablePath,
+                      Span<char>& linkerLog) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -225,14 +226,14 @@ struct PluginCompiler
     /// @brief Look for best compiler on current system
     /// @param[out] compiler Best compiler found
     /// @return Valid Result if best compiler has been found
-    [[nodiscard]] static Result findBestCompiler(PluginCompiler& compiler);
+    [[nodiscard]] static ResultPlugin findBestCompiler(PluginCompiler& compiler);
 
   private:
     mutable native_char_t buffer[4096];
 
-    Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                       const PluginCompilerEnvironment& compilerEnvironment, StringSpan sourceFile,
-                       StringSpan objectFile, Span<char>& compilerLog) const;
+    ResultPlugin compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                             const PluginCompilerEnvironment& compilerEnvironment, StringSpan sourceFile,
+                             StringSpan objectFile, Span<char>& compilerLog) const;
     struct CompilerFinder;
 };
 
@@ -248,7 +249,7 @@ struct PluginSysroot
     /// @param compiler The PluginCompiler::Type to constrain the compatible PluginSysroot to look for
     /// @param[out] sysroot The PluginSysroot with filled in include and library path
     /// @return Valid Result if sysroot has been found
-    [[nodiscard]] static Result findBestSysroot(PluginCompiler::Type compiler, PluginSysroot& sysroot);
+    [[nodiscard]] static ResultPlugin findBestSysroot(PluginCompiler::Type compiler, PluginSysroot& sysroot);
 };
 
 /// @brief Reads and holds CFLAGS and LDFLAGS environment variables, mainly to pass down sysroot location
@@ -295,8 +296,8 @@ struct PluginDynamicLibrary
     bool (*pluginQueryInterface)(void* instance, uint32_t hash, void** instanceInterface) = nullptr;
 
     friend struct PluginRegistry;
-    Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringSpan executablePath);
-    Result unload(bool releaseDebuggerFiles);
+    ResultPlugin load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringSpan executablePath);
+    ResultPlugin unload(bool releaseDebuggerFiles);
 };
 
 /// @brief Holds a registry of plugins, loading and compiling them on the fly
@@ -306,12 +307,12 @@ struct PluginRegistry
     void init(Span<PluginDynamicLibrary> librariesStorage);
 
     /// @brief Unregisters all plugins
-    Result close();
+    ResultPlugin close();
 
     /// @brief Appends the definitions to registry
     /// @param definitions found plugin definitions
     /// @return Valid Result if definitions have been replaced successfully
-    Result replaceDefinitions(Span<PluginDefinition>&& definitions);
+    ResultPlugin replaceDefinitions(Span<PluginDefinition>&& definitions);
 
     /// @brief Instructs loadPlugin to Load or Reload the plugin
     enum class LoadMode
@@ -327,18 +328,18 @@ struct PluginRegistry
     /// @param executablePath The loader executable path holding symbols used by the plugin
     /// @param loadMode If to load or force reload of the plugin
     /// @return Valid Result if the plugin has been found, compiled, loaded and inited successfully
-    Result loadPlugin(StringSpan identifier, const PluginCompiler& compiler, const PluginSysroot& sysroot,
-                      StringSpan executablePath, LoadMode loadMode = LoadMode::Load);
+    ResultPlugin loadPlugin(StringSpan identifier, const PluginCompiler& compiler, const PluginSysroot& sysroot,
+                            StringSpan executablePath, LoadMode loadMode = LoadMode::Load);
 
     /// @brief Unloads an already loaded plugin by its identifier
     /// @param identifier Identifier of a plugin that must be unloaded
     /// @return Valid Result if an already loaded plugin exists with the given identifier and it can be unloaded
-    Result unloadPlugin(StringSpan identifier);
+    ResultPlugin unloadPlugin(StringSpan identifier);
 
     /// @brief Removes all temporary build products of the Plugin with given identifier
     /// @param identifier Identifier of the plugin
     /// @return Valid Result if all build products for the given plugin can be successfully removed
-    Result removeAllBuildProducts(StringSpan identifier);
+    ResultPlugin removeAllBuildProducts(StringSpan identifier);
 
     /// @brief Find a PluginDynamicLibrary in the registry with a given identifier
     /// @param identifier Identifier of the Plugin to find
@@ -365,7 +366,7 @@ struct PluginRegistry
                                      Function<void(const PluginIdentifier&)> onPlugin);
 
   private:
-    Result unloadPlugin(StringSpan identifier, bool releaseDebuggerFiles);
+    ResultPlugin unloadPlugin(StringSpan identifier, bool releaseDebuggerFiles);
 
     Span<PluginDynamicLibrary> storage;
     Span<PluginDynamicLibrary> libraries;

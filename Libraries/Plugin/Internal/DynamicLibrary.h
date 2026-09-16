@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Result.h"
 #include "../../Common/StringSpan.h"
 #include "../../Common/UniqueHandle.h"
+#include "../PluginError.h"
 
 namespace SC
 {
@@ -21,7 +21,7 @@ struct SystemDynamicLibraryDefinition;
 struct SC::detail::SystemDynamicLibraryDefinition
 {
     using Handle = void*; // HANDLE
-    static Result releaseHandle(Handle& handle);
+    static ResultPlugin releaseHandle(Handle& handle);
 
     static constexpr Handle Invalid = nullptr; // INVALID_HANDLE_VALUE
 };
@@ -32,7 +32,7 @@ struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDyna
     /// @brief Loads a dynamic library at given path
     /// @param fullPath Path where dynamic library exists
     /// @return Valid Result if dynamic library has been loaded successfully
-    Result load(StringSpan fullPath);
+    ResultPlugin load(StringSpan fullPath);
 
     /// @brief Obtains a function pointer exported from the dynamic library, casting to the wanted signature
     /// @tparam R Return type of the function exported from dynamic library
@@ -41,13 +41,13 @@ struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDyna
     /// @param[out] symbol The function pointer that has been read from the dynamic library
     /// @return `true` if a symbol with the given `symbolName` exists in the library
     template <typename R, typename... Args>
-    Result getSymbol(StringSpan symbolName, R (*&symbol)(Args...)) const
+    ResultPlugin getSymbol(StringSpan symbolName, R (*&symbol)(Args...)) const
     {
         return loadSymbol(symbolName, reinterpret_cast<void*&>(symbol));
     }
 
   private:
-    Result loadSymbol(StringSpan symbolName, void*& symbol) const;
+    ResultPlugin loadSymbol(StringSpan symbolName, void*& symbol) const;
 };
 
 //! @}

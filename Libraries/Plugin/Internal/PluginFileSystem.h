@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Common/Deferred.h"
+#include "../PluginError.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>
 #else
+#include <errno.h>
 #include <fcntl.h>    // open
 #include <stdio.h>    // remove
 #include <sys/stat.h> // stat
@@ -16,34 +18,54 @@ namespace SC
 {
 struct PluginFileSystem
 {
-    static Result readAbsoluteFile(StringSpan path, IGrowableBuffer&& buffer)
+    static ResultPlugin readAbsoluteFile(StringSpan path, IGrowableBuffer&& buffer)
     {
 #if SC_PLATFORM_WINDOWS
         HANDLE hFile = ::CreateFileW(path.getNullTerminatedNative(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-        SC_TRY_MSG(hFile != INVALID_HANDLE_VALUE, "Failed to open file");
+        if (hFile == INVALID_HANDLE_VALUE)
+            return ResultPlugin::withNativeError(PluginError::FileOpenFailed, PluginErrorDetail::WindowsFileCreate,
+                                                 ::GetLastError());
 
         auto deferClose = MakeDeferred([&]() { CloseHandle(hFile); });
 
         LARGE_INTEGER fileSize;
-        SC_TRY_MSG(::GetFileSizeEx(hFile, &fileSize) == TRUE, "Failed to get file size");
-        SC_TRY_MSG(buffer.resizeWithoutInitializing(static_cast<size_t>(fileSize.QuadPart)), "Failed to grow buffer");
+        if (::GetFileSizeEx(hFile, &fileSize) == FALSE)
+            return ResultPlugin::withNativeError(PluginError::FileSizeQueryFailed,
+                                                 PluginErrorDetail::WindowsFileGetSize, ::GetLastError());
+        if (not buffer.resizeWithoutInitializing(static_cast<size_t>(fileSize.QuadPart)))
+            return ResultPlugin::withRequiredBytes(PluginError::FileBufferCapacityExceeded,
+                                                   PluginErrorDetail::WindowsFileRead,
+                                                   static_cast<uint32_t>(fileSize.QuadPart));
         DWORD bytesRead = static_cast<DWORD>(fileSize.QuadPart);
-        SC_TRY_MSG(::ReadFile(hFile, buffer.data(), bytesRead, &bytesRead, nullptr) == TRUE, "Read failed");
-        SC_TRY_MSG(bytesRead == static_cast<DWORD>(fileSize.QuadPart), "Read incomplete");
-        return Result(true);
+        if (::ReadFile(hFile, buffer.data(), bytesRead, &bytesRead, nullptr) == FALSE)
+            return ResultPlugin::withNativeError(PluginError::FileReadFailed, PluginErrorDetail::WindowsFileRead,
+                                                 ::GetLastError());
+        if (bytesRead != static_cast<DWORD>(fileSize.QuadPart))
+            return ResultPlugin(PluginError::FileReadIncomplete, PluginErrorDetail::WindowsFileRead);
+        return ResultPlugin(true);
 #else
         int fd = ::open(path.getNullTerminatedNative(), O_RDONLY);
-        SC_TRY_MSG(fd != -1, "Failed to open file");
+        if (fd == -1)
+            return ResultPlugin::withNativeError(PluginError::FileOpenFailed, PluginErrorDetail::PosixFileOpen,
+                                                 static_cast<uint32_t>(errno));
         auto deferClose = MakeDeferred([&]() { ::close(fd); });
 
         struct stat fileStat;
-        SC_TRY_MSG(::fstat(fd, &fileStat) != -1, "Failed to get file stat");
-        SC_TRY_MSG(buffer.resizeWithoutInitializing(static_cast<size_t>(fileStat.st_size)), "Failed to grow buffer");
+        if (::fstat(fd, &fileStat) == -1)
+            return ResultPlugin::withNativeError(PluginError::FileSizeQueryFailed, PluginErrorDetail::PosixFileStat,
+                                                 static_cast<uint32_t>(errno));
+        if (not buffer.resizeWithoutInitializing(static_cast<size_t>(fileStat.st_size)))
+            return ResultPlugin::withRequiredBytes(PluginError::FileBufferCapacityExceeded,
+                                                   PluginErrorDetail::PosixFileRead,
+                                                   static_cast<uint32_t>(fileStat.st_size));
         ssize_t bytesRead = ::read(fd, buffer.data(), static_cast<size_t>(fileStat.st_size));
-        SC_TRY_MSG(bytesRead != -1, "Read failed");
-        SC_TRY_MSG(static_cast<size_t>(bytesRead) == static_cast<size_t>(fileStat.st_size), "Read incomplete");
-        return Result(true);
+        if (bytesRead == -1)
+            return ResultPlugin::withNativeError(PluginError::FileReadFailed, PluginErrorDetail::PosixFileRead,
+                                                 static_cast<uint32_t>(errno));
+        if (static_cast<size_t>(bytesRead) != static_cast<size_t>(fileStat.st_size))
+            return ResultPlugin(PluginError::FileReadIncomplete, PluginErrorDetail::PosixFileRead);
+        return ResultPlugin(true);
 #endif
     }
 
@@ -62,14 +84,18 @@ struct PluginFileSystem
     }
 #endif
 
-    static Result removeFileAbsolute(StringSpan path)
+    static ResultPlugin removeFileAbsolute(StringSpan path)
     {
 #if SC_PLATFORM_WINDOWS
-        SC_TRY_MSG(::DeleteFileW(path.getNullTerminatedNative()), "Failed to remove file");
+        if (::DeleteFileW(path.getNullTerminatedNative()) == FALSE)
+            return ResultPlugin::withNativeError(PluginError::FileRemoveFailed, PluginErrorDetail::WindowsFileDelete,
+                                                 ::GetLastError());
 #else
-        SC_TRY_MSG(::remove(path.getNullTerminatedNative()) == 0, "Failed to remove file");
+        if (::remove(path.getNullTerminatedNative()) != 0)
+            return ResultPlugin::withNativeError(PluginError::FileRemoveFailed, PluginErrorDetail::PosixFileRemove,
+                                                 static_cast<uint32_t>(errno));
 #endif
-        return Result(true);
+        return ResultPlugin(true);
     }
 };
 

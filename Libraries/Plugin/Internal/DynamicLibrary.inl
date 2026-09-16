@@ -6,7 +6,7 @@
 
 #include <Windows.h>
 
-SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
+SC::ResultPlugin SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
 {
     if (handle)
     {
@@ -16,28 +16,34 @@ SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& han
         memcpy(&module, &handle, sizeof(HMODULE));
         handle         = nullptr;
         const BOOL res = ::FreeLibrary(module);
-        return Result(res == TRUE);
+        if (res == FALSE)
+            return ResultPlugin::withNativeError(PluginError::DynamicLibraryCloseFailed,
+                                                 PluginErrorDetail::WindowsDynamicLibraryClose, ::GetLastError());
+        return ResultPlugin(true);
     }
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::load(StringSpan fullPath)
+SC::ResultPlugin SC::SystemDynamicLibrary::load(StringSpan fullPath)
 {
     SC_TRY(close());
     StringPath fullPathZeroTerminated;
-    SC_TRY(fullPathZeroTerminated.assign(fullPath));
+    if (not fullPathZeroTerminated.assign(fullPath))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAssign);
     HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.view().getNullTerminatedNative());
     if (module == nullptr)
     {
-        return Result::Error("LoadLibraryW failed");
+        return ResultPlugin::withNativeError(PluginError::DynamicLibraryLoadFailed,
+                                             PluginErrorDetail::WindowsDynamicLibraryLoad, ::GetLastError());
     }
     memcpy(&handle, &module, sizeof(HMODULE));
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& symbol) const
+SC::ResultPlugin SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& symbol) const
 {
-    SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle");
+    if (not isValid())
+        return ResultPlugin(PluginError::DynamicLibraryNotLoaded, PluginErrorDetail::WindowsDynamicLibraryGetSymbol);
     char symbolNullTerminated[512];
     if (symbolName.getEncoding() == StringEncoding::Utf16)
     {
@@ -48,14 +54,17 @@ SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& sy
                                 static_cast<int>(sizeof(symbolNullTerminated) - 1), nullptr, nullptr);
         if (numChars == 0)
         {
-            return Result::Error("SystemDynamicLibrary::loadSymbol - WideCharToMultiByte failed");
+            return ResultPlugin::withNativeError(PluginError::SymbolNameConversionFailed,
+                                                 PluginErrorDetail::WindowsSymbolNameConversion, ::GetLastError());
         }
         symbolNullTerminated[numChars] = 0;
     }
     else
     {
         if (symbolName.sizeInBytes() + 1 > sizeof(symbolNullTerminated))
-            return Result::Error("SystemDynamicLibrary::loadSymbol - symbol name too long");
+            return ResultPlugin::withRequiredBytes(PluginError::SymbolNameCapacityExceeded,
+                                                   PluginErrorDetail::WindowsSymbolNameConversion,
+                                                   static_cast<uint32_t>(symbolName.sizeInBytes() + 1));
         ::memcpy(symbolNullTerminated, symbolName.bytesWithoutTerminator(), symbolName.sizeInBytes());
         symbolNullTerminated[symbolName.sizeInBytes()] = 0; // ensure null termination
     }
@@ -63,50 +72,76 @@ SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& sy
     HMODULE module;
     memcpy(&module, &handle, sizeof(HMODULE));
     symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolNullTerminated));
-    return Result(symbol != nullptr);
+    if (symbol == nullptr)
+        return ResultPlugin::withNativeError(PluginError::SymbolNotFound,
+                                             PluginErrorDetail::WindowsDynamicLibraryGetSymbol, ::GetLastError());
+    return ResultPlugin(true);
 }
 #elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
 
 #include <dlfcn.h> // dlopen
+#include <errno.h>
 
-SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
+SC::ResultPlugin SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& handle)
 {
     if (handle)
     {
         const int res = ::dlclose(handle);
-        return Result(res == 0);
+        if (res != 0)
+            return ResultPlugin::withNativeError(PluginError::DynamicLibraryCloseFailed,
+                                                 PluginErrorDetail::PosixDynamicLibraryClose,
+                                                 static_cast<uint32_t>(errno));
+        return ResultPlugin(true);
     }
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::load(StringSpan fullPath)
+SC::ResultPlugin SC::SystemDynamicLibrary::load(StringSpan fullPath)
 {
     SC_TRY(close());
     StringPath fullPathZeroTerminated;
-    SC_TRY(fullPathZeroTerminated.assign(fullPath));
+    if (not fullPathZeroTerminated.assign(fullPath))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::PathAssign);
     handle = ::dlopen(fullPathZeroTerminated.view().getNullTerminatedNative(), RTLD_LAZY);
     if (handle == nullptr)
     {
-        return Result::Error("dlopen failed");
+        return ResultPlugin::withNativeError(PluginError::DynamicLibraryLoadFailed,
+                                             PluginErrorDetail::PosixDynamicLibraryLoad, static_cast<uint32_t>(errno));
     }
-    return Result(true);
+    return ResultPlugin(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& symbol) const
+SC::ResultPlugin SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& symbol) const
 {
-    SC_TRY_MSG(isValid(), "Invalid dlsym handle");
+    if (not isValid())
+        return ResultPlugin(PluginError::DynamicLibraryNotLoaded, PluginErrorDetail::PosixDynamicLibraryGetSymbol);
     // Using StringPath just to null terminate the symbol name
     StringPath symbolZeroTerminated;
-    SC_TRY(symbolZeroTerminated.assign(symbolName));
+    if (not symbolZeroTerminated.assign(symbolName))
+        return ResultPlugin::withRequiredBytes(PluginError::SymbolNameCapacityExceeded,
+                                               PluginErrorDetail::PosixSymbolNameAssign,
+                                               static_cast<uint32_t>(symbolName.sizeInBytes() + 1));
     symbol = ::dlsym(handle, symbolZeroTerminated.view().getNullTerminatedNative());
-    return Result(symbol != nullptr);
+    if (symbol == nullptr)
+        return ResultPlugin::withNativeError(
+            PluginError::SymbolNotFound, PluginErrorDetail::PosixDynamicLibraryGetSymbol, static_cast<uint32_t>(errno));
+    return ResultPlugin(true);
 }
 #else
 
-SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle&) { return Result(false); }
+SC::ResultPlugin SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle&)
+{
+    return ResultPlugin(PluginError::DynamicLibraryOperationUnsupported);
+}
 
-SC::Result SC::SystemDynamicLibrary::load(StringSpan) { return Result(false); }
+SC::ResultPlugin SC::SystemDynamicLibrary::load(StringSpan)
+{
+    return ResultPlugin(PluginError::DynamicLibraryOperationUnsupported);
+}
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan, void*&) const { return Result(false); }
+SC::ResultPlugin SC::SystemDynamicLibrary::loadSymbol(StringSpan, void*&) const
+{
+    return ResultPlugin(PluginError::DynamicLibraryOperationUnsupported);
+}
 
 #endif
