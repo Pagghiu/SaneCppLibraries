@@ -262,7 +262,7 @@ void SC::CryptographyAsyncStreamsTest::hmacPipelineFanOut()
     } finishContext = {&hmacSink, &mac, &macReady};
     (void)hmacSink.eventFinish.addListener(
         [finishContext = &finishContext]
-        { *finishContext->macReady = finishContext->sink->hmac.getMac(*finishContext->mac); });
+        { *finishContext->macReady = static_cast<bool>(finishContext->sink->hmac.getMac(*finishContext->mac)); });
 
     bool          pipelineSucceeded = true;
     AsyncPipeline pipeline          = {&source, {}, {&copySink, &hmacSink}};

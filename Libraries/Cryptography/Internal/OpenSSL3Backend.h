@@ -3,7 +3,8 @@
 #pragma once
 
 // Platform-neutral fixed-storage interface to the optional OpenSSL 3 implementation.
-// Cryptography.cpp includes this after Cryptography.h, so Result, Span, and Cryptography are already available.
+// Cryptography.cpp includes this after Cryptography.h, so ResultCryptography, Span, and Cryptography are already
+// available.
 
 namespace SC
 {
@@ -17,12 +18,12 @@ struct OpenSSL3AeadBackend
     OpenSSL3AeadBackend();
     ~OpenSSL3AeadBackend();
 
-    void   reset();
-    Result init(Cryptography::AeadType type, Span<const uint8_t> key);
-    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten);
-    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten);
+    void               reset();
+    ResultCryptography init(Cryptography::AeadType type, Span<const uint8_t> key);
+    ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                            Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten);
+    ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                            Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten);
 };
 
 struct OpenSSL3CipherBackend
@@ -33,11 +34,11 @@ struct OpenSSL3CipherBackend
     OpenSSL3CipherBackend();
     ~OpenSSL3CipherBackend();
 
-    void   reset();
-    Result start(Cryptography::CipherType type, Cryptography::Cipher::Operation operation, Span<const uint8_t> key,
-                 Span<const uint8_t> iv);
-    Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten);
-    Result finish(Span<uint8_t> output, size_t& bytesWritten);
+    void               reset();
+    ResultCryptography start(Cryptography::CipherType type, Cryptography::Cipher::Operation operation,
+                             Span<const uint8_t> key, Span<const uint8_t> iv);
+    ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten);
+    ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten);
 };
 
 struct OpenSSL3HmacBackend
@@ -48,11 +49,11 @@ struct OpenSSL3HmacBackend
     OpenSSL3HmacBackend();
     ~OpenSSL3HmacBackend();
 
-    void   reset();
-    Result setType(Cryptography::HashType type);
-    Result setKey(Span<const uint8_t> key);
-    Result add(Span<const uint8_t> data);
-    Result getMac(Cryptography::MacResult& result);
+    void               reset();
+    ResultCryptography setType(Cryptography::HashType type);
+    ResultCryptography setKey(Span<const uint8_t> key);
+    ResultCryptography add(Span<const uint8_t> data);
+    ResultCryptography getMac(Cryptography::MacResult& result);
 };
 } // namespace detail
 } // namespace SC

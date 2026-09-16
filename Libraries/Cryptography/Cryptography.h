@@ -84,15 +84,15 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
     };
 
     /// @brief Query which primitives are available on the default native backend.
-    static Result queryFeatures(Features& outFeatures);
+    static ResultCryptography queryFeatures(Features& outFeatures);
 
     /// @brief Query which primitives are available on a specific backend.
-    static Result queryFeatures(Backend backend, Features& outFeatures);
+    static ResultCryptography queryFeatures(Backend backend, Features& outFeatures);
 
     struct SC_CRYPTOGRAPHY_EXPORT Random
     {
         /// @brief Fill output with cryptographically secure random bytes.
-        static Result fill(Span<uint8_t> output);
+        static ResultCryptography fill(Span<uint8_t> output);
     };
 
     struct SC_CRYPTOGRAPHY_EXPORT Aead
@@ -130,7 +130,7 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
 
         /// @brief Initialize an AEAD context with a single key.
         /// @note Every initialization attempt discards the previous key, including when initialization fails.
-        Result init(AeadType type, Span<const uint8_t> key);
+        ResultCryptography init(AeadType type, Span<const uint8_t> key);
 
         /// @brief Encrypt a single message using AEAD.
         /// @param nonce Nonce/IV for the message. Must be 12 bytes for AES-GCM and unique for every message under a
@@ -143,8 +143,8 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @param tag Output authentication tag. Must be 16 bytes and must not overlap another argument.
         /// @param[out] bytesWritten Number of ciphertext bytes written. Always zero on failure. Validation failures
         /// leave outputs unchanged; after a backend failure ciphertext and tag must be treated as unusable.
-        Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                    Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten);
+        ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten);
 
         /// @brief Decrypt a single message using AEAD.
         /// @param nonce Nonce/IV for the message. Must be 12 bytes for AES-GCM.
@@ -156,8 +156,8 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// overlap is rejected. Nonce and AAD must not overlap plaintext. Authentication or backend failure clears the
         /// complete output span; validation failure leaves it unchanged.
         /// @param[out] bytesWritten Number of plaintext bytes written. Always zero on failure.
-        Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                    Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten);
+        ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten);
 
       private:
         friend decltype(internal);
@@ -206,18 +206,18 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @warning AES-CBC does not authenticate ciphertext. Use only when required by an existing authenticated
         /// protocol. Encryption IVs must be unpredictable and freshly generated for each message.
         /// @note Every start attempt discards the previous operation, including when start fails.
-        Result start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv);
+        ResultCryptography start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv);
 
         /// @brief Process the next chunk of bytes.
         /// @note Input and output must not overlap. An output span of input size plus 15 bytes is always sufficient.
         /// An insufficient output span fails without consuming input and can be retried. bytesWritten is always zero on
         /// failure.
-        Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten);
+        ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten);
 
         /// @brief Finalize the operation and flush the remaining bytes / padding.
         /// @note Output must have at least 16 bytes. Success and invalid ciphertext or padding consume the session.
         /// bytesWritten is always zero on failure.
-        Result finish(Span<uint8_t> output, size_t& bytesWritten);
+        ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten);
 
         /// @brief Discard the current operation and clear library-owned session state.
         /// @note This operation is idempotent.
@@ -263,19 +263,19 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @brief Select which hash family to use for HMAC.
         /// @note Every call resets any configured key or input state, including when the requested type is invalid. A
         /// failed call preserves the previously selected hash type but requires setKey before reuse.
-        Result setType(HashType type);
+        ResultCryptography setType(HashType type);
 
         /// @brief Set the HMAC key and reset the current running MAC state.
         /// @note Failure leaves no active key or computation.
-        Result setKey(Span<const uint8_t> key);
+        ResultCryptography setKey(Span<const uint8_t> key);
 
         /// @brief Add more message bytes to the running HMAC computation.
-        Result add(Span<const uint8_t> data);
+        ResultCryptography add(Span<const uint8_t> data);
 
         /// @brief Finalize the current HMAC computation.
         /// @note Finalization consumes the session. Call setKey again before computing another MAC. result is valid
         /// only on success.
-        Result getMac(MacResult& result);
+        ResultCryptography getMac(MacResult& result);
 
         /// @brief Discard the current HMAC computation and clear library-owned session state.
         /// @note This operation is idempotent. The selected hash type is preserved.
@@ -290,12 +290,12 @@ struct SC_CRYPTOGRAPHY_EXPORT Cryptography
         /// @brief Derive output keying material with RFC5869 HKDF built on top of the native HMAC primitive.
         /// @note Output is limited to 255 times the selected hash output size. An empty salt uses HashLen zero bytes.
         /// On failure output can contain partial keying material and must be treated as unusable.
-        static Result derive(HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm, Span<const uint8_t> info,
-                             Span<uint8_t> output);
+        static ResultCryptography derive(HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm,
+                                         Span<const uint8_t> info, Span<uint8_t> output);
 
         /// @brief Derive output keying material using HMAC from a specific backend.
-        static Result derive(Backend backend, HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm,
-                             Span<const uint8_t> info, Span<uint8_t> output);
+        static ResultCryptography derive(Backend backend, HashType type, Span<const uint8_t> salt,
+                                         Span<const uint8_t> ikm, Span<const uint8_t> info, Span<uint8_t> output);
     };
 };
 

@@ -49,13 +49,15 @@ struct AsyncCipherTransformStreamT : public AsyncTransformStream
         SC_TRY(input.sliceStartLength(0, inputSize, inputChunk));
 
         size_t bytesWritten = 0;
-        Result result       = cipher.update(inputChunk.reinterpret_as_span_of<const uint8_t>(),
+        auto   result       = cipher.update(inputChunk.reinterpret_as_span_of<const uint8_t>(),
                                             output.reinterpret_as_span_of<uint8_t>(), bytesWritten);
         if (not result or bytesWritten > output.sizeInBytes())
         {
             cipher.reset();
-            AsyncWritableStream::emitError(result ? Result::Error("AsyncCipherTransformStreamT - invalid output size")
-                                                  : result);
+            if (result)
+                AsyncWritableStream::emitError(Result::Error("AsyncCipherTransformStreamT - invalid output size"));
+            else
+                AsyncWritableStream::emitError(result);
             AsyncTransformStream::afterProcess({}, output);
             return Result(true);
         }
@@ -80,12 +82,14 @@ struct AsyncCipherTransformStreamT : public AsyncTransformStream
         }
 
         size_t bytesWritten = 0;
-        Result result       = cipher.finish(output.reinterpret_as_span_of<uint8_t>(), bytesWritten);
+        auto   result       = cipher.finish(output.reinterpret_as_span_of<uint8_t>(), bytesWritten);
         if (not result or bytesWritten > output.sizeInBytes())
         {
             cipher.reset();
-            AsyncWritableStream::emitError(result ? Result::Error("AsyncCipherTransformStreamT - invalid output size")
-                                                  : result);
+            if (result)
+                AsyncWritableStream::emitError(Result::Error("AsyncCipherTransformStreamT - invalid output size"));
+            else
+                AsyncWritableStream::emitError(result);
             AsyncTransformStream::afterFinalize(output, true);
             return Result(true);
         }
@@ -130,7 +134,7 @@ struct AsyncHmacWritableStreamT : public AsyncWritableStream
     {
         Span<const char> data;
         SC_TRY(getBuffersPool().getReadableData(bufferID, data));
-        Result result = hmac.add(data.reinterpret_as_span_of<const uint8_t>());
+        auto result = hmac.add(data.reinterpret_as_span_of<const uint8_t>());
         if (not result)
             hmac.reset();
         finishedWriting(bufferID, move(callback), result);

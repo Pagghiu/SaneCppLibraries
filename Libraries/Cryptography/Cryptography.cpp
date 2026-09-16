@@ -158,25 +158,26 @@ static bool spansOverlap(Span<const uint8_t> input, Span<uint8_t> output)
     return inputBegin < outputEnd and outputBegin < inputEnd;
 }
 
-static Result validateOutputNoPartialOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
+static ResultCryptography validateOutputNoPartialOverlap(Span<const uint8_t> input, Span<uint8_t> output,
+                                                         const char* message)
 {
     if (spansOverlap(input, output) and not spansExactlyOverlap(input, output))
         return Result::FromStableCharPointer(message);
-    return Result(true);
+    return ResultCryptography(true);
 }
 
-static Result validateOutputNoOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
+static ResultCryptography validateOutputNoOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
 {
     if (spansOverlap(input, output))
         return Result::FromStableCharPointer(message);
-    return Result(true);
+    return ResultCryptography(true);
 }
 
-static Result validateKeySize(size_t actual, size_t expected, const char* message)
+static ResultCryptography validateKeySize(size_t actual, size_t expected, const char* message)
 {
     if (actual != expected)
         return Result::FromStableCharPointer(message);
-    return Result(true);
+    return ResultCryptography(true);
 }
 #endif
 
@@ -214,8 +215,8 @@ static size_t cipherDecryptUpdateSize(const CipherStreamState& state, size_t inp
 }
 
 template <typename Backend>
-static Result cipherUpdateEncrypt(Backend& backend, Span<const uint8_t> input, Span<uint8_t> output,
-                                  size_t& bytesWritten)
+static ResultCryptography cipherUpdateEncrypt(Backend& backend, Span<const uint8_t> input, Span<uint8_t> output,
+                                              size_t& bytesWritten)
 {
     CipherStreamState& state        = backend.stream;
     size_t             inputOffset  = 0;
@@ -257,12 +258,12 @@ static Result cipherUpdateEncrypt(Backend& backend, Span<const uint8_t> input, S
     }
 
     bytesWritten = outputOffset;
-    return Result(true);
+    return ResultCryptography(true);
 }
 
 template <typename Backend>
-static Result cipherUpdateDecrypt(Backend& backend, Span<const uint8_t> input, Span<uint8_t> output,
-                                  size_t& bytesWritten)
+static ResultCryptography cipherUpdateDecrypt(Backend& backend, Span<const uint8_t> input, Span<uint8_t> output,
+                                              size_t& bytesWritten)
 {
     CipherStreamState& state        = backend.stream;
     size_t             inputOffset  = 0;
@@ -304,11 +305,12 @@ static Result cipherUpdateDecrypt(Backend& backend, Span<const uint8_t> input, S
     }
 
     bytesWritten = outputOffset;
-    return Result(true);
+    return ResultCryptography(true);
 }
 
 template <typename Backend>
-static Result cipherUpdate(Backend& backend, Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+static ResultCryptography cipherUpdate(Backend& backend, Span<const uint8_t> input, Span<uint8_t> output,
+                                       size_t& bytesWritten)
 {
     bytesWritten = 0;
     SC_TRY_MSG(backend.initialized, "Cryptography::Cipher::update - not initialized");
@@ -319,16 +321,16 @@ static Result cipherUpdate(Backend& backend, Span<const uint8_t> input, Span<uin
                                 : cipherDecryptUpdateSize(backend.stream, input.sizeInBytes());
     SC_TRY_MSG(output.sizeInBytes() >= required, "Cryptography::Cipher::update - insufficient output buffer");
 
-    Result result = backend.stream.operation == Cryptography::Cipher::Operation::Encrypt
-                        ? cipherUpdateEncrypt(backend, input, output, bytesWritten)
-                        : cipherUpdateDecrypt(backend, input, output, bytesWritten);
+    ResultCryptography result = backend.stream.operation == Cryptography::Cipher::Operation::Encrypt
+                                    ? cipherUpdateEncrypt(backend, input, output, bytesWritten)
+                                    : cipherUpdateDecrypt(backend, input, output, bytesWritten);
     if (not result)
         backend.close();
     return result;
 }
 
 template <typename Backend>
-static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytesWritten)
+static ResultCryptography cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytesWritten)
 {
     bytesWritten = 0;
     SC_TRY_MSG(backend.initialized, "Cryptography::Cipher::finish - not initialized");
@@ -341,7 +343,7 @@ static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytes
         const uint8_t pad = static_cast<uint8_t>(AESBlockSize - backend.stream.pendingSize);
         memcpy(finalBlock, backend.stream.pending, backend.stream.pendingSize);
         memset(finalBlock + backend.stream.pendingSize, pad, pad);
-        Result result = backend.processBlocks(finalBlock, output, bytesWritten);
+        ResultCryptography result = backend.processBlocks(finalBlock, output, bytesWritten);
         secureClear(finalBlock);
         backend.close();
         return result;
@@ -354,9 +356,9 @@ static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytes
     }
     SC_TRY_MSG(output.sizeInBytes() >= AESBlockSize, "Cryptography::Cipher::finish - insufficient output buffer");
 
-    uint8_t block[16];
-    size_t  produced = 0;
-    Result  result   = backend.processBlocks(backend.stream.pending, block, produced);
+    uint8_t            block[16];
+    size_t             produced = 0;
+    ResultCryptography result   = backend.processBlocks(backend.stream.pending, block, produced);
     backend.close();
     if (not result)
     {
@@ -386,7 +388,7 @@ static Result cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytes
     bytesWritten = AESBlockSize - pad;
     memcpy(output.data(), block, bytesWritten);
     secureClear(block);
-    return Result(true);
+    return ResultCryptography(true);
 }
 #endif
 
@@ -404,8 +406,8 @@ static constexpr size_t AeadMaxInputSize          = 0x7fffffffu;
 static constexpr size_t AeadMaxAssociatedDataSize = 4096;
 #endif
 
-static Result validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> input,
-                                    Span<uint8_t> output, size_t tagSize)
+static ResultCryptography validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                Span<const uint8_t> input, Span<uint8_t> output, size_t tagSize)
 {
     SC_TRY_MSG(nonce.sizeInBytes() == GCMNonceSize, "Cryptography::Aead - invalid nonce size");
     SC_TRY_MSG(tagSize == GCMTagSize, "Cryptography::Aead - invalid tag size");
@@ -414,11 +416,12 @@ static Result validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_
                "Cryptography::Aead - message is too large for the backend");
     SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Aead - insufficient output buffer");
     SC_TRY(validateOutputNoPartialOverlap(input, output, "Cryptography::Aead - partial overlap is not supported"));
-    return Result(true);
+    return ResultCryptography(true);
 }
 
-static Result validateAeadSealArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
-                                        Span<const uint8_t> plaintext, Span<uint8_t> ciphertext, Span<uint8_t> tag)
+static ResultCryptography validateAeadSealArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                    Span<const uint8_t> plaintext, Span<uint8_t> ciphertext,
+                                                    Span<uint8_t> tag)
 {
     SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
     SC_TRY_MSG(not spansOverlap(nonce, ciphertext) and not spansOverlap(aad, ciphertext),
@@ -426,18 +429,18 @@ static Result validateAeadSealArguments(Span<const uint8_t> nonce, Span<const ui
     SC_TRY_MSG(not spansOverlap(nonce, tag) and not spansOverlap(aad, tag) and not spansOverlap(plaintext, tag) and
                    not spansOverlap(Span<const uint8_t>(ciphertext.data(), ciphertext.sizeInBytes()), tag),
                "Cryptography::Aead::seal - tag overlaps another argument");
-    return Result(true);
+    return ResultCryptography(true);
 }
 
-static Result validateAeadOpenArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
-                                        Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
-                                        Span<uint8_t> plaintext)
+static ResultCryptography validateAeadOpenArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                    Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
+                                                    Span<uint8_t> plaintext)
 {
     SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
     SC_TRY_MSG(not spansOverlap(nonce, plaintext) and not spansOverlap(aad, plaintext) and
                    not spansOverlap(tag, plaintext),
                "Cryptography::Aead::open - plaintext overlaps nonce, associated data, or tag");
-    return Result(true);
+    return ResultCryptography(true);
 }
 #endif
 
@@ -572,7 +575,7 @@ static void closeIfValid(int& fd)
     }
 }
 
-static Result openAlgorithmSocket(const char* algorithmType, const char* algorithmName, int& mainSocket)
+static ResultCryptography openAlgorithmSocket(const char* algorithmType, const char* algorithmName, int& mainSocket)
 {
     closeIfValid(mainSocket);
 
@@ -591,10 +594,10 @@ static Result openAlgorithmSocket(const char* algorithmType, const char* algorit
         return Result::Error("Cryptography - bind(AF_ALG) failed");
     }
 
-    return Result(true);
+    return ResultCryptography(true);
 }
 
-static Result acceptOperationSocket(int mainSocket, int& opSocket)
+static ResultCryptography acceptOperationSocket(int mainSocket, int& opSocket)
 {
     closeIfValid(opSocket);
     opSocket = ::accept(mainSocket, nullptr, 0);
@@ -602,28 +605,28 @@ static Result acceptOperationSocket(int mainSocket, int& opSocket)
     {
         return Result::Error("Cryptography - accept(AF_ALG) failed");
     }
-    return Result(true);
+    return ResultCryptography(true);
 }
 
 static bool algorithmSupported(const char* algorithmType, const char* algorithmName)
 {
     int  mainSocket = -1;
     int  opSocket   = -1;
-    bool supported  = openAlgorithmSocket(algorithmType, algorithmName, mainSocket);
+    bool supported  = static_cast<bool>(openAlgorithmSocket(algorithmType, algorithmName, mainSocket));
     if (supported)
-        supported = acceptOperationSocket(mainSocket, opSocket);
+        supported = static_cast<bool>(acceptOperationSocket(mainSocket, opSocket));
     closeIfValid(opSocket);
     closeIfValid(mainSocket);
     return supported;
 }
 
-static Result configureKey(int mainSocket, Span<const uint8_t> key)
+static ResultCryptography configureKey(int mainSocket, Span<const uint8_t> key)
 {
     SC_TRY_MSG(key.sizeInBytes() <= 0xffffffffu, "Cryptography - key is too large for the backend");
     SC_TRY_MSG(
         ::setsockopt(mainSocket, SOL_ALG, ALG_SET_KEY, key.data(), static_cast<unsigned int>(key.sizeInBytes())) == 0,
         "Cryptography - ALG_SET_KEY failed");
-    return Result(true);
+    return ResultCryptography(true);
 }
 
 static bool aeadSupported(size_t requestedKeySize)
@@ -638,7 +641,7 @@ static bool aeadSupported(size_t requestedKeySize)
     if (supported)
         supported = ::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) == 0;
     if (supported)
-        supported = acceptOperationSocket(mainSocket, opSocket);
+        supported = static_cast<bool>(acceptOperationSocket(mainSocket, opSocket));
 
     closeIfValid(opSocket);
     closeIfValid(mainSocket);
@@ -808,17 +811,17 @@ struct SC::Cryptography::Aead::Internal
         backend = newBackend;
     }
 
-    Result encryptBlocks(Span<const uint8_t> input, Span<uint8_t> output)
+    ResultCryptography encryptBlocks(Span<const uint8_t> input, Span<uint8_t> output)
     {
         size_t                written = 0;
         const CCCryptorStatus status  = CCCryptorUpdate(aesEncryptor, input.data(), input.sizeInBytes(), output.data(),
                                                         output.sizeInBytes(), &written);
         SC_TRY_MSG(status == kCCSuccess and written == input.sizeInBytes(),
                    "Cryptography::Aead - CommonCrypto AES encryption failed");
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result init(AeadType type, Span<const uint8_t> key)
+    ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
         reset();
         if (backend == Backend::OpenSSL)
@@ -833,8 +836,8 @@ struct SC::Cryptography::Aead::Internal
             return Result::Error("Cryptography::Aead::init - CCCryptorCreate failed");
         }
 
-        uint8_t zeroBlock[AESBlockSize] = {0};
-        Result  result                  = encryptBlocks(zeroBlock, hashSubkey);
+        uint8_t            zeroBlock[AESBlockSize] = {0};
+        ResultCryptography result                  = encryptBlocks(zeroBlock, hashSubkey);
         secureClear(zeroBlock);
         if (not result)
         {
@@ -842,10 +845,10 @@ struct SC::Cryptography::Aead::Internal
             return result;
         }
         initialized = true;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result transform(Span<const uint8_t> nonce, Span<const uint8_t> input, Span<uint8_t> output)
+    ResultCryptography transform(Span<const uint8_t> nonce, Span<const uint8_t> input, Span<uint8_t> output)
     {
         uint8_t counter[AESBlockSize];
         uint8_t counterBlocks[CounterBatchBlocks * AESBlockSize];
@@ -864,7 +867,7 @@ struct SC::Cryptography::Aead::Internal
                 memcpy(counterBlocks + blockIndex * AESBlockSize, counter, AESBlockSize);
             }
 
-            Result result =
+            ResultCryptography result =
                 encryptBlocks(Span<const uint8_t>(counterBlocks, counterSize), Span<uint8_t>(keyStream, counterSize));
             if (not result)
             {
@@ -883,16 +886,16 @@ struct SC::Cryptography::Aead::Internal
         secureClear(counter);
         secureClear(counterBlocks);
         secureClear(keyStream);
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result calculateTag(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                        uint8_t tag[AESBlockSize])
+    ResultCryptography calculateTag(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                                    uint8_t tag[AESBlockSize])
     {
         uint8_t counter[AESBlockSize];
         uint8_t encryptedCounter[AESBlockSize];
         gcmInitialCounter(nonce, counter);
-        Result result = encryptBlocks(counter, encryptedCounter);
+        ResultCryptography result = encryptBlocks(counter, encryptedCounter);
         if (result)
         {
             gcmHash(hashSubkey, aad, ciphertext, tag);
@@ -904,15 +907,15 @@ struct SC::Cryptography::Aead::Internal
         return result;
     }
 
-    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
+    ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                            Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
         SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
         SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
 
-        Result result = transform(nonce, plaintext, ciphertext);
+        ResultCryptography result = transform(nonce, plaintext, ciphertext);
         if (result)
         {
             result =
@@ -925,24 +928,25 @@ struct SC::Cryptography::Aead::Internal
             return result;
         }
         bytesWritten = plaintext.sizeInBytes();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
+    ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                            Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
         SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
         SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
 
-        uint8_t expectedTag[AESBlockSize];
-        Result  result = calculateTag(nonce, aad, ciphertext, expectedTag);
+        uint8_t            expectedTag[AESBlockSize];
+        ResultCryptography result = calculateTag(nonce, aad, ciphertext, expectedTag);
         if (not result or not gcmTagsEqual(tag, expectedTag))
         {
             secureClear(expectedTag);
             secureClear(plaintext);
-            return result ? Result::Error("Cryptography::Aead::open - authentication failed") : result;
+            return result ? ResultCryptography(Result::Error("Cryptography::Aead::open - authentication failed"))
+                          : result;
         }
         secureClear(expectedTag);
 
@@ -953,7 +957,7 @@ struct SC::Cryptography::Aead::Internal
             return result;
         }
         bytesWritten = ciphertext.sizeInBytes();
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -992,7 +996,7 @@ struct SC::Cryptography::Cipher::Internal
         backend = newBackend;
     }
 
-    Result start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv)
+    ResultCryptography start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         reset();
         if (backend == Backend::OpenSSL)
@@ -1007,10 +1011,10 @@ struct SC::Cryptography::Cipher::Internal
 
         stream.operation = operation;
         initialized      = true;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         bytesWritten = 0;
         SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
@@ -1020,17 +1024,17 @@ struct SC::Cryptography::Cipher::Internal
                                                  output.sizeInBytes(), &bytesWritten);
         SC_TRY_MSG(status == kCCSuccess and bytesWritten == input.sizeInBytes(),
                    "Cryptography::Cipher - CCCryptorUpdate failed");
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.update(input, output, bytesWritten);
         return cipherUpdate(*this, input, output, bytesWritten);
     }
 
-    Result finish(Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten)
     {
         return backend == Backend::OpenSSL ? openSSL.finish(output, bytesWritten)
                                            : cipherFinish(*this, output, bytesWritten);
@@ -1060,17 +1064,17 @@ struct SC::Cryptography::Hmac::Internal
         backend = newBackend;
     }
 
-    Result setType(HashType newType)
+    ResultCryptography setType(HashType newType)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.setType(newType);
         secureClear(Span<uint8_t>(reinterpret_cast<uint8_t*>(&context), sizeof(context)));
         type        = newType;
         initialized = false;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result setKey(Span<const uint8_t> key)
+    ResultCryptography setKey(Span<const uint8_t> key)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.setKey(key);
@@ -1078,19 +1082,19 @@ struct SC::Cryptography::Hmac::Internal
         CCHmacAlgorithm algorithm = type == HashType::SHA256 ? kCCHmacAlgSHA256 : kCCHmacAlgSHA384;
         CCHmacInit(&context, algorithm, key.data(), key.sizeInBytes());
         initialized = true;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result add(Span<const uint8_t> data)
+    ResultCryptography add(Span<const uint8_t> data)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.add(data);
         SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
         CCHmacUpdate(&context, data.data(), data.sizeInBytes());
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result getMac(MacResult& result)
+    ResultCryptography getMac(MacResult& result)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.getMac(result);
@@ -1099,7 +1103,7 @@ struct SC::Cryptography::Hmac::Internal
         CCHmacFinal(&context, result.bytes);
         secureClear(Span<uint8_t>(reinterpret_cast<uint8_t*>(&context), sizeof(context)));
         initialized = false;
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -1145,7 +1149,7 @@ struct SC::Cryptography::Aead::Internal
         backend = newBackend;
     }
 
-    Result init(AeadType type, Span<const uint8_t> keyBytes)
+    ResultCryptography init(AeadType type, Span<const uint8_t> keyBytes)
     {
         reset();
         if (backend == Backend::OpenSSL)
@@ -1189,11 +1193,11 @@ struct SC::Cryptography::Aead::Internal
         }
 
         initialized = true;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
+    ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                            Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         bytesWritten = 0;
         if (backend == Backend::OpenSSL)
@@ -1218,11 +1222,11 @@ struct SC::Cryptography::Aead::Internal
         SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Aead::seal - BCryptEncrypt failed");
 
         bytesWritten = written;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
+    ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                            Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         bytesWritten = 0;
         if (backend == Backend::OpenSSL)
@@ -1253,7 +1257,7 @@ struct SC::Cryptography::Aead::Internal
         }
 
         bytesWritten = written;
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -1302,7 +1306,8 @@ struct SC::Cryptography::Cipher::Internal
         backend = newBackend;
     }
 
-    Result start(CipherType type, Operation newOperation, Span<const uint8_t> keyBytes, Span<const uint8_t> iv)
+    ResultCryptography start(CipherType type, Operation newOperation, Span<const uint8_t> keyBytes,
+                             Span<const uint8_t> iv)
     {
         reset();
         if (backend == Backend::OpenSSL)
@@ -1350,14 +1355,14 @@ struct SC::Cryptography::Cipher::Internal
         memcpy(currentIV, iv.data(), sizeof(currentIV));
         stream.operation = newOperation;
         initialized      = true;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         bytesWritten = 0;
         if (input.empty())
-            return Result(true);
+            return ResultCryptography(true);
 
         SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
         SC_TRY_MSG(input.sizeInBytes() <= BcryptMaxInputSize,
@@ -1390,17 +1395,17 @@ struct SC::Cryptography::Cipher::Internal
             else
                 memcpy(currentIV, input.data() + input.sizeInBytes() - AESBlockSize, AESBlockSize);
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.update(input, output, bytesWritten);
         return cipherUpdate(*this, input, output, bytesWritten);
     }
 
-    Result finish(Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten)
     {
         return backend == Backend::OpenSSL ? openSSL.finish(output, bytesWritten)
                                            : cipherFinish(*this, output, bytesWritten);
@@ -1449,16 +1454,16 @@ struct SC::Cryptography::Hmac::Internal
         backend = newBackend;
     }
 
-    Result setType(HashType newType)
+    ResultCryptography setType(HashType newType)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.setType(newType);
         close();
         type = newType;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result setKey(Span<const uint8_t> key)
+    ResultCryptography setKey(Span<const uint8_t> key)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.setKey(key);
@@ -1495,10 +1500,10 @@ struct SC::Cryptography::Hmac::Internal
         }
 
         initialized = true;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result add(Span<const uint8_t> data)
+    ResultCryptography add(Span<const uint8_t> data)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.add(data);
@@ -1512,10 +1517,10 @@ struct SC::Cryptography::Hmac::Internal
             SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Hmac::add - BCryptHashData failed");
             offset += chunkSize;
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result getMac(MacResult& result)
+    ResultCryptography getMac(MacResult& result)
     {
         if (backend == Backend::OpenSSL)
             return openSSL.getMac(result);
@@ -1529,7 +1534,7 @@ struct SC::Cryptography::Hmac::Internal
             result.size = 0;
             return Result::Error("Cryptography::Hmac::getMac - BCryptFinishHash failed");
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -1561,7 +1566,7 @@ struct AFAlgAeadBackend
 
     void reset() { close(); }
 
-    Result init(AeadType type, Span<const uint8_t> key)
+    ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
         close();
         SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
@@ -1572,11 +1577,11 @@ struct AFAlgAeadBackend
                    "Cryptography::Aead::init - ALG_SET_AEAD_AUTHSIZE failed");
         initialized = true;
         deferClose.disarm();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
+    ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                            Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
@@ -1629,11 +1634,11 @@ struct AFAlgAeadBackend
         }
 
         bytesWritten = plaintext.sizeInBytes();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
+    ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                            Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
@@ -1695,7 +1700,7 @@ struct AFAlgAeadBackend
         }
 
         bytesWritten = ciphertext.sizeInBytes();
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -1720,7 +1725,7 @@ struct AFAlgCipherBackend
 
     void reset() { close(); }
 
-    Result start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
+    ResultCryptography start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         close();
         SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Cipher::start - invalid key size"));
@@ -1733,14 +1738,14 @@ struct AFAlgCipherBackend
         stream.operation = newOperation;
         initialized      = true;
         deferClose.disarm();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         bytesWritten = 0;
         if (input.empty())
-            return Result(true);
+            return ResultCryptography(true);
 
         SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
         SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Cipher - insufficient output buffer");
@@ -1785,15 +1790,18 @@ struct AFAlgCipherBackend
             memcpy(currentIV, output.data() + bytesWritten - AESBlockSize, AESBlockSize);
         else
             memcpy(currentIV, input.data() + input.sizeInBytes() - AESBlockSize, AESBlockSize);
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         return cipherUpdate(*this, input, output, bytesWritten);
     }
 
-    Result finish(Span<uint8_t> output, size_t& bytesWritten) { return cipherFinish(*this, output, bytesWritten); }
+    ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten)
+    {
+        return cipherFinish(*this, output, bytesWritten);
+    }
 };
 
 struct AFAlgHmacBackend
@@ -1824,14 +1832,14 @@ struct AFAlgHmacBackend
         return "hmac(sha256)";
     }
 
-    Result setType(HashType newType)
+    ResultCryptography setType(HashType newType)
     {
         close();
         type = newType;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result setKey(Span<const uint8_t> key)
+    ResultCryptography setKey(Span<const uint8_t> key)
     {
         close();
         SC_TRY(openAlgorithmSocket("hash", algorithmName(), mainSocket));
@@ -1840,10 +1848,10 @@ struct AFAlgHmacBackend
         SC_TRY(acceptOperationSocket(mainSocket, opSocket));
         initialized = true;
         deferClose.disarm();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result add(Span<const uint8_t> data)
+    ResultCryptography add(Span<const uint8_t> data)
     {
         SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
         size_t offset = 0;
@@ -1854,10 +1862,10 @@ struct AFAlgHmacBackend
             SC_TRY_MSG(sent > 0, "Cryptography::Hmac::add - send failed");
             offset += static_cast<size_t>(sent);
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result getMac(MacResult& result)
+    ResultCryptography getMac(MacResult& result)
     {
         SC_TRY_MSG(initialized, "Cryptography::Hmac::getMac - key not set");
         result.size      = digestSize(type);
@@ -1869,7 +1877,7 @@ struct AFAlgHmacBackend
             result.size = 0;
             return Result::Error("Cryptography::Hmac::getMac - recv failed");
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -1914,7 +1922,7 @@ struct OpenSSL3AeadBackendImplementation
 
     void reset() { close(); }
 
-    Result init(AeadType type, Span<const uint8_t> key)
+    ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
         close();
         SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
@@ -1936,10 +1944,10 @@ struct OpenSSL3AeadBackendImplementation
         memcpy(keyBytes, key.data(), key.sizeInBytes());
         initialized = true;
         deferClose.disarm();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result addAssociatedData(OpenSSL3API& api, Span<const uint8_t> aad)
+    ResultCryptography addAssociatedData(OpenSSL3API& api, Span<const uint8_t> aad)
     {
         size_t offset = 0;
         while (offset < aad.sizeInBytes())
@@ -1951,10 +1959,11 @@ struct OpenSSL3AeadBackendImplementation
                 "Cryptography::Aead - OpenSSL associated data update failed");
             offset += chunkSize;
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result transform(OpenSSL3API& api, Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography transform(OpenSSL3API& api, Span<const uint8_t> input, Span<uint8_t> output,
+                                 size_t& bytesWritten)
     {
         size_t inputOffset  = 0;
         size_t outputOffset = 0;
@@ -1970,11 +1979,11 @@ struct OpenSSL3AeadBackendImplementation
             outputOffset += static_cast<size_t>(produced);
         }
         bytesWritten = outputOffset;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
+    ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                            Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
@@ -1982,9 +1991,10 @@ struct OpenSSL3AeadBackendImplementation
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
-        Result             result = api.cipherInit(context, cipher, keyBytes, nonce.data(), 1, nullptr) == 1
-                                        ? addAssociatedData(api, aad)
-                                        : Result::Error("Cryptography::Aead::seal - OpenSSL initialization failed");
+        ResultCryptography result =
+            api.cipherInit(context, cipher, keyBytes, nonce.data(), 1, nullptr) == 1
+                ? addAssociatedData(api, aad)
+                : ResultCryptography(Result::Error("Cryptography::Aead::seal - OpenSSL initialization failed"));
         if (result)
             result = transform(api, plaintext, ciphertext, bytesWritten);
 
@@ -2005,13 +2015,15 @@ struct OpenSSL3AeadBackendImplementation
             bytesWritten = 0;
             secureClear(ciphertext);
             secureClear(tag);
-            return result ? Result::Error("Cryptography::Aead::seal - unexpected OpenSSL output size") : result;
+            return result
+                       ? ResultCryptography(Result::Error("Cryptography::Aead::seal - unexpected OpenSSL output size"))
+                       : result;
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
+    ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                            Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         bytesWritten = 0;
         SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
@@ -2019,9 +2031,10 @@ struct OpenSSL3AeadBackendImplementation
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
-        Result             result = api.cipherInit(context, cipher, keyBytes, nonce.data(), 0, nullptr) == 1
-                                        ? addAssociatedData(api, aad)
-                                        : Result::Error("Cryptography::Aead::open - OpenSSL initialization failed");
+        ResultCryptography result =
+            api.cipherInit(context, cipher, keyBytes, nonce.data(), 0, nullptr) == 1
+                ? addAssociatedData(api, aad)
+                : ResultCryptography(Result::Error("Cryptography::Aead::open - OpenSSL initialization failed"));
         if (result)
             result = transform(api, ciphertext, plaintext, bytesWritten);
 
@@ -2041,9 +2054,11 @@ struct OpenSSL3AeadBackendImplementation
         {
             bytesWritten = 0;
             secureClear(plaintext);
-            return result ? Result::Error("Cryptography::Aead::open - unexpected OpenSSL output size") : result;
+            return result
+                       ? ResultCryptography(Result::Error("Cryptography::Aead::open - unexpected OpenSSL output size"))
+                       : result;
         }
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 
@@ -2073,7 +2088,7 @@ struct OpenSSL3CipherBackendImplementation
 
     void reset() { close(); }
 
-    Result start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
+    ResultCryptography start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         close();
         SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Cipher::start - invalid key size"));
@@ -2095,14 +2110,14 @@ struct OpenSSL3CipherBackendImplementation
         stream.operation = newOperation;
         initialized      = true;
         deferClose.disarm();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         bytesWritten = 0;
         if (input.empty())
-            return Result(true);
+            return ResultCryptography(true);
 
         SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
         SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Cipher - insufficient output buffer");
@@ -2121,15 +2136,18 @@ struct OpenSSL3CipherBackendImplementation
             offset += chunkSize;
         }
         bytesWritten = offset;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         return cipherUpdate(*this, input, output, bytesWritten);
     }
 
-    Result finish(Span<uint8_t> output, size_t& bytesWritten) { return cipherFinish(*this, output, bytesWritten); }
+    ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten)
+    {
+        return cipherFinish(*this, output, bytesWritten);
+    }
 };
 
 struct OpenSSL3HmacBackendImplementation
@@ -2157,14 +2175,14 @@ struct OpenSSL3HmacBackendImplementation
 
     void reset() { close(); }
 
-    Result setType(HashType newType)
+    ResultCryptography setType(HashType newType)
     {
         close();
         type = newType;
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result setKey(Span<const uint8_t> key)
+    ResultCryptography setKey(Span<const uint8_t> key)
     {
         close();
 
@@ -2187,23 +2205,23 @@ struct OpenSSL3HmacBackendImplementation
 
         initialized = true;
         deferClose.disarm();
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result add(Span<const uint8_t> data)
+    ResultCryptography add(Span<const uint8_t> data)
     {
         SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
         if (data.empty())
-            return Result(true);
+            return ResultCryptography(true);
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
         SC_TRY_MSG(api.macUpdate(context, data.data(), data.sizeInBytes()) == 1,
                    "Cryptography::Hmac::add - OpenSSL MAC update failed");
-        return Result(true);
+        return ResultCryptography(true);
     }
 
-    Result getMac(MacResult& result)
+    ResultCryptography getMac(MacResult& result)
     {
         SC_TRY_MSG(initialized, "Cryptography::Hmac::getMac - key not set");
         OpenSSL3API&       api = openSSL3API();
@@ -2220,7 +2238,7 @@ struct OpenSSL3HmacBackendImplementation
             return Result::Error("Cryptography::Hmac::getMac - OpenSSL MAC finalization failed");
         }
         result.size = written;
-        return Result(true);
+        return ResultCryptography(true);
     }
 };
 } // namespace
@@ -2252,22 +2270,22 @@ void SC::detail::OpenSSL3AeadBackend::reset()
     reinterpret_cast<OpenSSL3AeadBackendImplementation*>(storage)->reset();
 }
 
-SC::Result SC::detail::OpenSSL3AeadBackend::init(Cryptography::AeadType type, Span<const uint8_t> key)
+SC::ResultCryptography SC::detail::OpenSSL3AeadBackend::init(Cryptography::AeadType type, Span<const uint8_t> key)
 {
     return reinterpret_cast<OpenSSL3AeadBackendImplementation*>(storage)->init(type, key);
 }
 
-SC::Result SC::detail::OpenSSL3AeadBackend::seal(Span<const uint8_t> nonce, Span<const uint8_t> aad,
-                                                 Span<const uint8_t> plaintext, Span<uint8_t> ciphertext,
-                                                 Span<uint8_t> tag, size_t& bytesWritten)
+SC::ResultCryptography SC::detail::OpenSSL3AeadBackend::seal(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                             Span<const uint8_t> plaintext, Span<uint8_t> ciphertext,
+                                                             Span<uint8_t> tag, size_t& bytesWritten)
 {
     return reinterpret_cast<OpenSSL3AeadBackendImplementation*>(storage)->seal(nonce, aad, plaintext, ciphertext, tag,
                                                                                bytesWritten);
 }
 
-SC::Result SC::detail::OpenSSL3AeadBackend::open(Span<const uint8_t> nonce, Span<const uint8_t> aad,
-                                                 Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
-                                                 Span<uint8_t> plaintext, size_t& bytesWritten)
+SC::ResultCryptography SC::detail::OpenSSL3AeadBackend::open(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                             Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
+                                                             Span<uint8_t> plaintext, size_t& bytesWritten)
 {
     return reinterpret_cast<OpenSSL3AeadBackendImplementation*>(storage)->open(nonce, aad, ciphertext, tag, plaintext,
                                                                                bytesWritten);
@@ -2288,20 +2306,20 @@ void SC::detail::OpenSSL3CipherBackend::reset()
     reinterpret_cast<OpenSSL3CipherBackendImplementation*>(storage)->reset();
 }
 
-SC::Result SC::detail::OpenSSL3CipherBackend::start(Cryptography::CipherType        type,
-                                                    Cryptography::Cipher::Operation operation, Span<const uint8_t> key,
-                                                    Span<const uint8_t> iv)
+SC::ResultCryptography SC::detail::OpenSSL3CipherBackend::start(Cryptography::CipherType        type,
+                                                                Cryptography::Cipher::Operation operation,
+                                                                Span<const uint8_t> key, Span<const uint8_t> iv)
 {
     return reinterpret_cast<OpenSSL3CipherBackendImplementation*>(storage)->start(type, operation, key, iv);
 }
 
-SC::Result SC::detail::OpenSSL3CipherBackend::update(Span<const uint8_t> input, Span<uint8_t> output,
-                                                     size_t& bytesWritten)
+SC::ResultCryptography SC::detail::OpenSSL3CipherBackend::update(Span<const uint8_t> input, Span<uint8_t> output,
+                                                                 size_t& bytesWritten)
 {
     return reinterpret_cast<OpenSSL3CipherBackendImplementation*>(storage)->update(input, output, bytesWritten);
 }
 
-SC::Result SC::detail::OpenSSL3CipherBackend::finish(Span<uint8_t> output, size_t& bytesWritten)
+SC::ResultCryptography SC::detail::OpenSSL3CipherBackend::finish(Span<uint8_t> output, size_t& bytesWritten)
 {
     return reinterpret_cast<OpenSSL3CipherBackendImplementation*>(storage)->finish(output, bytesWritten);
 }
@@ -2321,22 +2339,22 @@ void SC::detail::OpenSSL3HmacBackend::reset()
     reinterpret_cast<OpenSSL3HmacBackendImplementation*>(storage)->reset();
 }
 
-SC::Result SC::detail::OpenSSL3HmacBackend::setType(Cryptography::HashType type)
+SC::ResultCryptography SC::detail::OpenSSL3HmacBackend::setType(Cryptography::HashType type)
 {
     return reinterpret_cast<OpenSSL3HmacBackendImplementation*>(storage)->setType(type);
 }
 
-SC::Result SC::detail::OpenSSL3HmacBackend::setKey(Span<const uint8_t> key)
+SC::ResultCryptography SC::detail::OpenSSL3HmacBackend::setKey(Span<const uint8_t> key)
 {
     return reinterpret_cast<OpenSSL3HmacBackendImplementation*>(storage)->setKey(key);
 }
 
-SC::Result SC::detail::OpenSSL3HmacBackend::add(Span<const uint8_t> data)
+SC::ResultCryptography SC::detail::OpenSSL3HmacBackend::add(Span<const uint8_t> data)
 {
     return reinterpret_cast<OpenSSL3HmacBackendImplementation*>(storage)->add(data);
 }
 
-SC::Result SC::detail::OpenSSL3HmacBackend::getMac(Cryptography::MacResult& result)
+SC::ResultCryptography SC::detail::OpenSSL3HmacBackend::getMac(Cryptography::MacResult& result)
 {
     return reinterpret_cast<OpenSSL3HmacBackendImplementation*>(storage)->getMac(result);
 }
@@ -2385,20 +2403,20 @@ struct SC::Cryptography::Aead::Internal
             storage.native.reset();
     }
 
-    Result init(AeadType type, Span<const uint8_t> key)
+    ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.init(type, key) : storage.native.init(type, key);
     }
 
-    Result seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
-                Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
+    ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
+                            Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten)
                                            : storage.native.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
     }
 
-    Result open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
-                Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
+    ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
+                            Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten)
                                            : storage.native.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
@@ -2439,19 +2457,19 @@ struct SC::Cryptography::Cipher::Internal
             placementNew(storage.native);
     }
 
-    Result start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv)
+    ResultCryptography start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.start(type, operation, key, iv)
                                            : storage.native.start(type, operation, key, iv);
     }
 
-    Result update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.update(input, output, bytesWritten)
                                            : storage.native.update(input, output, bytesWritten);
     }
 
-    Result finish(Span<uint8_t> output, size_t& bytesWritten)
+    ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.finish(output, bytesWritten)
                                            : storage.native.finish(output, bytesWritten);
@@ -2500,22 +2518,22 @@ struct SC::Cryptography::Hmac::Internal
             placementNew(storage.native);
     }
 
-    Result setType(HashType type)
+    ResultCryptography setType(HashType type)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.setType(type) : storage.native.setType(type);
     }
 
-    Result setKey(Span<const uint8_t> key)
+    ResultCryptography setKey(Span<const uint8_t> key)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.setKey(key) : storage.native.setKey(key);
     }
 
-    Result add(Span<const uint8_t> data)
+    ResultCryptography add(Span<const uint8_t> data)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.add(data) : storage.native.add(data);
     }
 
-    Result getMac(MacResult& result)
+    ResultCryptography getMac(MacResult& result)
     {
         return backend == Backend::OpenSSL ? storage.openSSL.getMac(result) : storage.native.getMac(result);
     }
@@ -2534,13 +2552,17 @@ struct SC::Cryptography::Aead::Internal
     void setBackend(Backend) {}
     void reset() {}
 
-    Result init(AeadType, Span<const uint8_t>) { return Result::Error("Cryptography::Aead - unsupported platform"); }
-    Result seal(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>, Span<uint8_t>, size_t&)
+    ResultCryptography init(AeadType, Span<const uint8_t>)
     {
         return Result::Error("Cryptography::Aead - unsupported platform");
     }
-    Result open(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>,
-                size_t&)
+    ResultCryptography seal(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>, Span<uint8_t>,
+                            size_t&)
+    {
+        return Result::Error("Cryptography::Aead - unsupported platform");
+    }
+    ResultCryptography open(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>,
+                            Span<uint8_t>, size_t&)
     {
         return Result::Error("Cryptography::Aead - unsupported platform");
     }
@@ -2548,36 +2570,42 @@ struct SC::Cryptography::Aead::Internal
 
 struct SC::Cryptography::Cipher::Internal
 {
-    void   setBackend(Backend) {}
-    Result start(CipherType, Operation, Span<const uint8_t>, Span<const uint8_t>)
+    void               setBackend(Backend) {}
+    ResultCryptography start(CipherType, Operation, Span<const uint8_t>, Span<const uint8_t>)
     {
         return Result::Error("Cryptography::Cipher - unsupported platform");
     }
-    Result update(Span<const uint8_t>, Span<uint8_t>, size_t&)
+    ResultCryptography update(Span<const uint8_t>, Span<uint8_t>, size_t&)
     {
         return Result::Error("Cryptography::Cipher - unsupported platform");
     }
-    Result finish(Span<uint8_t>, size_t&) { return Result::Error("Cryptography::Cipher - unsupported platform"); }
-    void   reset() {}
+    ResultCryptography finish(Span<uint8_t>, size_t&)
+    {
+        return Result::Error("Cryptography::Cipher - unsupported platform");
+    }
+    void reset() {}
 };
 
 struct SC::Cryptography::Hmac::Internal
 {
-    void   setBackend(Backend) {}
-    Result setType(HashType) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
-    Result setKey(Span<const uint8_t>) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
-    Result add(Span<const uint8_t>) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
-    Result getMac(MacResult&) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
-    void   reset() {}
+    void               setBackend(Backend) {}
+    ResultCryptography setType(HashType) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
+    ResultCryptography setKey(Span<const uint8_t>)
+    {
+        return Result::Error("Cryptography::Hmac - unsupported platform");
+    }
+    ResultCryptography add(Span<const uint8_t>) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
+    ResultCryptography getMac(MacResult&) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
+    void               reset() {}
 };
 #endif
 
-SC::Result SC::Cryptography::queryFeatures(Features& outFeatures)
+SC::ResultCryptography SC::Cryptography::queryFeatures(Features& outFeatures)
 {
     return queryFeatures(Backend::Native, outFeatures);
 }
 
-SC::Result SC::Cryptography::queryFeatures(Backend backend, Features& outFeatures)
+SC::ResultCryptography SC::Cryptography::queryFeatures(Backend backend, Features& outFeatures)
 {
     outFeatures         = {};
     outFeatures.backend = backend;
@@ -2639,18 +2667,18 @@ SC::Result SC::Cryptography::queryFeatures(Backend backend, Features& outFeature
         outFeatures.hkdfSha384     = outFeatures.hmacSha384;
     }
 #endif
-    return Result(true);
+    return ResultCryptography(true);
 }
 
-SC::Result SC::Cryptography::Random::fill(Span<uint8_t> output)
+SC::ResultCryptography SC::Cryptography::Random::fill(Span<uint8_t> output)
 {
     if (output.empty())
-        return Result(true);
+        return ResultCryptography(true);
 
 #if SC_PLATFORM_APPLE
     SC_TRY_MSG(CCRandomGenerateBytes(output.data(), output.sizeInBytes()) == kCCSuccess,
                "Cryptography::Random::fill - CCRandomGenerateBytes failed");
-    return Result(true);
+    return ResultCryptography(true);
 #elif SC_PLATFORM_WINDOWS
     size_t offset = 0;
     while (offset < output.sizeInBytes())
@@ -2661,7 +2689,7 @@ SC::Result SC::Cryptography::Random::fill(Span<uint8_t> output)
         SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Random::fill - BCryptGenRandom failed");
         offset += chunkSize;
     }
-    return Result(true);
+    return ResultCryptography(true);
 #elif SC_PLATFORM_LINUX
     size_t total = 0;
     while (total < output.sizeInBytes())
@@ -2672,38 +2700,38 @@ SC::Result SC::Cryptography::Random::fill(Span<uint8_t> output)
         SC_TRY_MSG(res > 0, "Cryptography::Random::fill - getrandom failed");
         total += static_cast<size_t>(res);
     }
-    return Result(true);
+    return ResultCryptography(true);
 #else
     (void)output;
     return Result::Error("Cryptography::Random::fill - unsupported platform");
 #endif
 }
 
-SC::Result SC::Cryptography::Aead::init(AeadType type, Span<const uint8_t> key)
+SC::ResultCryptography SC::Cryptography::Aead::init(AeadType type, Span<const uint8_t> key)
 {
     internal.get().reset();
     SC_TRY_MSG(isValid(type), "Cryptography::Aead::init - invalid AEAD type");
     return internal.get().init(type, key);
 }
 
-SC::Result SC::Cryptography::Aead::seal(Span<const uint8_t> nonce, Span<const uint8_t> aad,
-                                        Span<const uint8_t> plaintext, Span<uint8_t> ciphertext, Span<uint8_t> tag,
-                                        size_t& bytesWritten)
+SC::ResultCryptography SC::Cryptography::Aead::seal(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                    Span<const uint8_t> plaintext, Span<uint8_t> ciphertext,
+                                                    Span<uint8_t> tag, size_t& bytesWritten)
 {
     bytesWritten = 0;
     return internal.get().seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
 }
 
-SC::Result SC::Cryptography::Aead::open(Span<const uint8_t> nonce, Span<const uint8_t> aad,
-                                        Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
-                                        Span<uint8_t> plaintext, size_t& bytesWritten)
+SC::ResultCryptography SC::Cryptography::Aead::open(Span<const uint8_t> nonce, Span<const uint8_t> aad,
+                                                    Span<const uint8_t> ciphertext, Span<const uint8_t> tag,
+                                                    Span<uint8_t> plaintext, size_t& bytesWritten)
 {
     bytesWritten = 0;
     return internal.get().open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
 }
 
-SC::Result SC::Cryptography::Cipher::start(CipherType type, Operation operation, Span<const uint8_t> key,
-                                           Span<const uint8_t> iv)
+SC::ResultCryptography SC::Cryptography::Cipher::start(CipherType type, Operation operation, Span<const uint8_t> key,
+                                                       Span<const uint8_t> iv)
 {
     reset();
     SC_TRY_MSG(isValid(type), "Cryptography::Cipher::start - invalid cipher type");
@@ -2711,13 +2739,14 @@ SC::Result SC::Cryptography::Cipher::start(CipherType type, Operation operation,
     return internal.get().start(type, operation, key, iv);
 }
 
-SC::Result SC::Cryptography::Cipher::update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
+SC::ResultCryptography SC::Cryptography::Cipher::update(Span<const uint8_t> input, Span<uint8_t> output,
+                                                        size_t& bytesWritten)
 {
     bytesWritten = 0;
     return internal.get().update(input, output, bytesWritten);
 }
 
-SC::Result SC::Cryptography::Cipher::finish(Span<uint8_t> output, size_t& bytesWritten)
+SC::ResultCryptography SC::Cryptography::Cipher::finish(Span<uint8_t> output, size_t& bytesWritten)
 {
     bytesWritten = 0;
     return internal.get().finish(output, bytesWritten);
@@ -2725,18 +2754,18 @@ SC::Result SC::Cryptography::Cipher::finish(Span<uint8_t> output, size_t& bytesW
 
 void SC::Cryptography::Cipher::reset() { internal.get().reset(); }
 
-SC::Result SC::Cryptography::Hmac::setType(HashType type)
+SC::ResultCryptography SC::Cryptography::Hmac::setType(HashType type)
 {
     reset();
     SC_TRY_MSG(isValid(type), "Cryptography::Hmac::setType - invalid hash type");
     return internal.get().setType(type);
 }
 
-SC::Result SC::Cryptography::Hmac::setKey(Span<const uint8_t> key) { return internal.get().setKey(key); }
+SC::ResultCryptography SC::Cryptography::Hmac::setKey(Span<const uint8_t> key) { return internal.get().setKey(key); }
 
-SC::Result SC::Cryptography::Hmac::add(Span<const uint8_t> data) { return internal.get().add(data); }
+SC::ResultCryptography SC::Cryptography::Hmac::add(Span<const uint8_t> data) { return internal.get().add(data); }
 
-SC::Result SC::Cryptography::Hmac::getMac(MacResult& result)
+SC::ResultCryptography SC::Cryptography::Hmac::getMac(MacResult& result)
 {
     result.size = 0;
     return internal.get().getMac(result);
@@ -2744,14 +2773,15 @@ SC::Result SC::Cryptography::Hmac::getMac(MacResult& result)
 
 void SC::Cryptography::Hmac::reset() { internal.get().reset(); }
 
-SC::Result SC::Cryptography::Hkdf::derive(HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm,
-                                          Span<const uint8_t> info, Span<uint8_t> output)
+SC::ResultCryptography SC::Cryptography::Hkdf::derive(HashType type, Span<const uint8_t> salt, Span<const uint8_t> ikm,
+                                                      Span<const uint8_t> info, Span<uint8_t> output)
 {
     return derive(Backend::Native, type, salt, ikm, info, output);
 }
 
-SC::Result SC::Cryptography::Hkdf::derive(Backend backend, HashType type, Span<const uint8_t> salt,
-                                          Span<const uint8_t> ikm, Span<const uint8_t> info, Span<uint8_t> output)
+SC::ResultCryptography SC::Cryptography::Hkdf::derive(Backend backend, HashType type, Span<const uint8_t> salt,
+                                                      Span<const uint8_t> ikm, Span<const uint8_t> info,
+                                                      Span<uint8_t> output)
 {
     size_t hashLen = digestSize(type);
     SC_TRY_MSG(hashLen > 0, "Cryptography::Hkdf::derive - unsupported hash type");
@@ -2803,7 +2833,7 @@ SC::Result SC::Cryptography::Hkdf::derive(Backend backend, HashType type, Span<c
         counter += 1;
     }
     clearOutputOnFailure.disarm();
-    return Result(true);
+    return ResultCryptography(true);
 }
 
 template <>
