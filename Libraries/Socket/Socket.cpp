@@ -19,16 +19,22 @@
 #include "Internal/SocketClient.inl"
 #include "Internal/SocketServer.inl"
 
-SC::Result SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const
+SC::ResultSocket SC::SocketDescriptor::getAddressFamily(SocketFlags::AddressFamily& addressFamily) const
 {
     SocketAddress socketInfo;
 
     socklen_t socketInfoLen = sizeof(socketInfo.handle);
     if (::getsockname(handle, &socketInfo.handle.reinterpret_as<struct sockaddr>(), &socketInfoLen) == SOCKET_ERROR)
     {
-        return Result::Error("getsockname failed");
+#if SC_PLATFORM_WINDOWS
+        const uint32_t nativeError = static_cast<uint32_t>(WSAGetLastError());
+#else
+        const uint32_t nativeError = static_cast<uint32_t>(errno);
+#endif
+        return ResultSocket::withNativeError(SocketError::DescriptorQueryFailed, SocketErrorDetail::GetSocketAddress,
+                                             nativeError);
     }
     socketInfo.nativeSize = socketInfoLen;
     addressFamily         = socketInfo.getAddressFamily();
-    return Result(true);
+    return {};
 }

@@ -34,7 +34,7 @@ namespace detail
 struct SC_SOCKET_EXPORT SocketDescriptorDefinition
 {
     using Handle = size_t; // SOCKET
-    static Result releaseHandle(Handle& handle);
+    static ResultSocket releaseHandle(Handle& handle);
 
     static constexpr Handle Invalid = ~static_cast<Handle>(0); // INVALID_SOCKET
 };
@@ -44,7 +44,7 @@ struct SC_SOCKET_EXPORT SocketDescriptorDefinition
 struct SC_SOCKET_EXPORT SocketDescriptorDefinition
 {
     using Handle = int; // fd
-    static Result releaseHandle(Handle& handle);
+    static ResultSocket releaseHandle(Handle& handle);
 
     static constexpr Handle Invalid = -1; // invalid fd
 };
@@ -137,7 +137,7 @@ struct SC_SOCKET_EXPORT SocketIPAddress
     /// @param interfaceAddress A valid IPV4 or IPV6 address expressed as an ASCII string
     /// @param port The port to connect to
     /// @return A valid Result if the address has been parsed successfully
-    Result fromAddressPort(StringSpan interfaceAddress, uint16_t port);
+    ResultSocket fromAddressPort(StringSpan interfaceAddress, uint16_t port);
 
     /// @brief Size of the native IP Address representation
     [[nodiscard]] uint32_t sizeOfHandle() const;
@@ -177,21 +177,21 @@ struct SC_SOCKET_EXPORT SocketAddress
     SocketAddress(const SocketIPAddress& ipAddress);
 
     /// @brief Builds a filesystem-named Unix-domain address.
-    Result fromUnixPath(StringSpan path);
+    ResultSocket fromUnixPath(StringSpan path);
 
     /// @brief Builds a Linux abstract-namespace Unix-domain address.
     /// @note Returns an unsupported result on platforms other than Linux.
-    Result fromUnixAbstractName(Span<const char> name);
+    ResultSocket fromUnixAbstractName(Span<const char> name);
 
     [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() const;
     [[nodiscard]] uint32_t                   sizeOfHandle() const;
     [[nodiscard]] bool                       isValid() const;
 
     /// @brief Extracts an IP address when this address contains IPv4 or IPv6.
-    Result getIPAddress(SocketIPAddress& output) const;
+    ResultSocket getIPAddress(SocketIPAddress& output) const;
 
     /// @brief Returns a view into the inline Unix-domain name storage.
-    Result getUnixName(Span<const char>& output, UnixNamespace& unixNamespace) const;
+    ResultSocket getUnixName(Span<const char>& output, UnixNamespace& unixNamespace) const;
 
     /// @brief Handle to native OS representation of the socket address.
     AlignedStorage<128> handle     = {};
@@ -212,85 +212,85 @@ struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDes
     /// @param blocking If the socket should be created in blocking mode
     /// @param inheritable If the socket should be inheritable by child processes
     /// @return Valid Result if a socket with the requested options has been successfully created
-    Result create(SocketFlags::AddressFamily   addressFamily,
-                  SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
-                  SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
-                  SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
-                  SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
+    ResultSocket create(SocketFlags::AddressFamily   addressFamily,
+                        SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
+                        SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
+                        SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
+                        SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
 
     /// @brief Check if socket is inheritable by child processes
     /// @param[out] value if set to `true` indicates that this socket is inheritable by child processes
     /// @return Valid Result if the inheritable status for this socket has been queried successfully
-    Result isInheritable(bool& value) const;
+    ResultSocket isInheritable(bool& value) const;
 
     /// @brief Changes the inheritable flag for this socket
     /// @param value `true` if this socket should be made inheritable, `false` for non-inheritable
     /// @return Valid Result if it has been possible changing the inheritable status of this socket
-    Result setInheritable(bool value);
+    ResultSocket setInheritable(bool value);
 
     /// @brief Changes the blocking flag for this socket (if IO reads / writes should be blocking or not)
     /// @param value `true` if this socket should be made blocking, `false` for non-blocking
     /// @return Valid Result if it has been possible changing the blocking status of this socket
-    Result setBlocking(bool value);
+    ResultSocket setBlocking(bool value);
 
     /// @brief Get the address family of this socket
     /// @param[out] addressFamily The address family of this socket (if Result is valid)
     /// @return Valid Result the address family for this socket has been queried successfully
-    Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
+    ResultSocket getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
 
     /// @brief Shuts down the socket for reading, writing, or both
     /// @param shutdownType The type of shutdown to perform
     /// @return Valid Result if the socket has been successfully shut down
-    Result shutdown(SocketFlags::ShutdownType shutdownType);
+    ResultSocket shutdown(SocketFlags::ShutdownType shutdownType);
 
     /// @brief Disables Nagle's algorithm for low-latency communication
     /// @param tcpNoDelay `true` to disable Nagle's algorithm (set TCP_NODELAY), `false` to enable it
     /// @return Valid Result if the TCP_NODELAY option has been set successfully
-    Result setTcpNoDelay(bool tcpNoDelay);
+    ResultSocket setTcpNoDelay(bool tcpNoDelay);
 
     /// @brief Enables or disables broadcast on this socket (for UDP)
     /// @param enableBroadcast `true` to enable broadcast (set SO_BROADCAST), `false` to disable
     /// @return Valid Result if the SO_BROADCAST option has been set successfully
-    Result setBroadcast(bool enableBroadcast);
+    ResultSocket setBroadcast(bool enableBroadcast);
 
     /// @brief Joins an IPv4 or IPv6 multicast group on a specific interface
     /// @param multicastAddress The multicast group address to join
     /// @param interfaceAddress The local interface address to join on
     /// @return Valid Result if the socket has successfully joined the multicast group
-    Result joinMulticastGroup(const SocketIPAddress& multicastAddress, const SocketIPAddress& interfaceAddress);
+    ResultSocket joinMulticastGroup(const SocketIPAddress& multicastAddress, const SocketIPAddress& interfaceAddress);
 
     /// @brief Leaves a previously joined IPv4 or IPv6 multicast group on a specific interface
     /// @param multicastAddress The multicast group address to leave
     /// @param interfaceAddress The local interface address to leave from
     /// @return Valid Result if the socket has successfully left the multicast group
-    Result leaveMulticastGroup(const SocketIPAddress& multicastAddress, const SocketIPAddress& interfaceAddress);
+    ResultSocket leaveMulticastGroup(const SocketIPAddress& multicastAddress, const SocketIPAddress& interfaceAddress);
 
     /// @brief Controls whether multicast traffic is sent back to the local host
     /// @param addressFamily Address family of the socket
     /// @param enableLoopback `true` to enable multicast loopback, `false` to disable
     /// @return Valid Result if the multicast loopback option has been set successfully
-    Result setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback);
+    ResultSocket setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback);
 
     /// @brief Specifies the default TTL or hop limit for outgoing multicast datagrams
     /// @param addressFamily Address family of the socket
     /// @param hops The hop limit (0-255)
     /// @return Valid Result if the multicast hop limit has been set successfully
-    Result setMulticastHops(SocketFlags::AddressFamily addressFamily, int hops);
+    ResultSocket setMulticastHops(SocketFlags::AddressFamily addressFamily, int hops);
 
     /// @brief Specifies the default local network interface for outgoing multicast datagrams
     /// @param interfaceAddress The local interface address
     /// @return Valid Result if the multicast outgoing interface has been set successfully
-    Result setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress);
+    ResultSocket setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress);
 
     /// @brief Sends a datagram to the given destination address
     /// @param data Bytes to send as a single datagram; the whole span must be sent for success
     /// @param destination The destination address of the datagram
     /// @return Valid Result if the whole datagram has been sent successfully
     /// @note On non-blocking sockets, an unsuccessful Result is also returned when the operation would block
-    Result sendTo(Span<const char> data, const SocketAddress& destination);
+    ResultSocket sendTo(Span<const char> data, const SocketAddress& destination);
 
     /// @brief IP-address compatibility overload for sendTo.
-    Result sendTo(Span<const char> data, const SocketIPAddress& destination);
+    ResultSocket sendTo(Span<const char> data, const SocketIPAddress& destination);
 
     /// @brief Receives a datagram, reporting its source address
     /// @param[in,out] buffer Span of memory that will receive the datagram and may be modified on truncation
@@ -300,10 +300,10 @@ struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDes
     /// @note On non-blocking sockets, an unsuccessful Result is also returned when no datagram is immediately available
     /// @note An oversized datagram is consumed and returns an unsuccessful Result. `buffer` may contain a truncated
     /// prefix
-    Result receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress);
+    ResultSocket receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress);
 
     /// @brief IP-address compatibility overload for receiveFrom.
-    Result receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress);
+    ResultSocket receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress);
 };
 
 /// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).
@@ -330,34 +330,34 @@ struct SC_SOCKET_EXPORT SocketServer
 
     /// @brief Calls SocketDescriptor::close
     /// @return The Result of SocketDescriptor::close
-    Result close();
+    ResultSocket close();
 
     /// @brief Binds this socket to an address
     /// @param nativeAddress The local address to bind
     /// @param reuseAddress Whether SO_REUSEADDR should be set before binding
     /// @param outStatus Optional detailed status for bind failures
     /// @return Valid Result if this socket has successfully been bound
-    Result bind(const SocketAddress& nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
-                BindStatus* outStatus = nullptr);
+    ResultSocket bind(const SocketAddress& nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
+                      BindStatus* outStatus = nullptr);
 
     /// @brief IP-address compatibility overload for bind.
-    Result bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
-                BindStatus* outStatus = nullptr);
+    ResultSocket bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
+                      BindStatus* outStatus = nullptr);
 
     /// @brief Start listening for incoming connections at a specific address / port combination (after bind)
     /// @param numberOfWaitingConnections How many connections can be queued before `accept`
     /// @return Valid Result if this socket has successfully been put in listening mode
     /// @note Datagram sockets cannot be listened. Stream sockets need a successful bind before listen
-    Result listen(uint32_t numberOfWaitingConnections);
+    ResultSocket listen(uint32_t numberOfWaitingConnections);
 
     /// @brief Accepts a new client, blocking while waiting for it
     /// @param[in] addressFamily Compatibility parameter; the accepted descriptor family is inherited from the listener
     /// @param[out] newClient The SocketDescriptor that will be accepted
     /// @return Valid Result if the socket has been successfully accepted
-    Result accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
+    ResultSocket accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
 
     /// @brief Accepts a new client and optionally reports its peer address.
-    Result accept(SocketDescriptor& newClient, SocketAddress* peerAddress = nullptr);
+    ResultSocket accept(SocketDescriptor& newClient, SocketAddress* peerAddress = nullptr);
 
   private:
     SocketDescriptor& socket;
@@ -384,33 +384,33 @@ struct SC_SOCKET_EXPORT SocketClient
     /// @param port Port to start listening to
     /// @return Valid Result if this client successfully connected to the specified address and port
     /// @note Socket descriptor MUST have already been created with SocketDescriptor::create
-    Result connect(StringSpan address, uint16_t port);
+    ResultSocket connect(StringSpan address, uint16_t port);
 
     /// @brief Connect to a given address and port combination
     /// @param ipAddress Address and port to connect to
     /// @return Valid Result if this client successfully connected to the specified address and port
-    Result connect(SocketIPAddress ipAddress);
+    ResultSocket connect(SocketIPAddress ipAddress);
 
     /// @brief Connect to a family-neutral socket address.
-    Result connect(const SocketAddress& address);
+    ResultSocket connect(const SocketAddress& address);
 
     /// @brief Writes bytes to this socket
     /// @param data Bytes to write to this socket
     /// @return Valid Result if bytes have been written successfully
-    Result write(Span<const char> data);
+    ResultSocket write(Span<const char> data);
 
     /// @brief Read bytes from this socket blocking until they're actually received
     /// @param[in] data Span of memory pointing at a buffer that will receive the read data
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
     /// @return Valid Result if bytes have been read successfully
-    Result read(Span<char> data, Span<char>& readData);
+    ResultSocket read(Span<char> data, Span<char>& readData);
 
     /// @brief Read bytes from this socket blocking until they're actually received or timeout occurs
     /// @param[in] data Span of memory pointing at a buffer that will receive the read data
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
     /// @param[in] timeout For how many milliseconds the read should wait before timing out
     /// @return Valid Result if bytes have been read successfully and timeout didn't occur
-    Result readWithTimeout(Span<char> data, Span<char>& readData, int64_t timeout);
+    ResultSocket readWithTimeout(Span<char> data, Span<char>& readData, int64_t timeout);
 
   private:
     const SocketDescriptor& socket;
@@ -429,7 +429,7 @@ struct SC_SOCKET_EXPORT SocketDNS
     ///
     /// Example:
     /// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
-    [[nodiscard]] static Result resolveDNS(StringSpan host, Span<char>& ipAddress);
+    [[nodiscard]] static ResultSocket resolveDNS(StringSpan host, Span<char>& ipAddress);
 };
 
 /// @brief Networking globals initialization (Winsock2 WSAStartup)

@@ -24,7 +24,8 @@ namespace detail
 template <size_t N>
 [[nodiscard]] bool writeNullTerminatedToBuffer(Span<const char> source, char (&destination)[N])
 {
-    SC_TRY(N >= source.sizeInBytes() + 1);
+    if (N < source.sizeInBytes() + 1)
+        return false;
     ::memcpy(destination, source.data(), source.sizeInBytes());
     destination[source.sizeInBytes()] = 0;
     return true;
@@ -34,7 +35,8 @@ template <size_t N>
 template <typename T, typename U>
 [[nodiscard]] bool copyFromTo(const Span<T> source, Span<U>& other)
 {
-    SC_TRY(other.sizeInBytes() >= source.sizeInBytes());
+    if (other.sizeInBytes() < source.sizeInBytes())
+        return false;
     ::memcpy(other.data(), source.data(), source.sizeInBytes());
     other = {other.data(), source.sizeInBytes() / sizeof(U)};
     return true;

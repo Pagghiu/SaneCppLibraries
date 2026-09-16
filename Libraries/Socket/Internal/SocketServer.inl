@@ -11,23 +11,26 @@
 #include <sys/socket.h> // bind
 #endif
 
-SC::Result SC::SocketServer::close() { return socket.close(); }
+SC::ResultSocket SC::SocketServer::close() { return socket.close(); }
 
 // TODO: Add EINTR checks for all SocketServer/SocketClient os calls.
 
-SC::Result SC::SocketServer::bind(const SocketAddress& nativeAddress, BindReuseAddress reuseAddress,
-                                  BindStatus* outStatus)
+SC::ResultSocket SC::SocketServer::bind(const SocketAddress& nativeAddress, BindReuseAddress reuseAddress,
+                                        BindStatus* outStatus)
 {
     if (outStatus != nullptr)
     {
         *outStatus = BindStatus::None;
     }
 
-    SC_TRY(SocketNetworking::isNetworkingInited());
-    SC_TRY_MSG(socket.isValid(), "Invalid socket");
-    SC_TRY_MSG(nativeAddress.isValid(), "invalid bind address");
+    if (not SocketNetworking::isNetworkingInited())
+        return {SocketError::NetworkingNotInitialized, SocketErrorDetail::BindSocket};
+    if (not socket.isValid())
+        return {SocketError::InvalidSocket, SocketErrorDetail::BindSocket};
+    if (not nativeAddress.isValid())
+        return {SocketError::InvalidAddress, SocketErrorDetail::BindSocket};
     SocketDescriptor::Handle listenSocket;
-    SC_SOCKET_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
+    SC_TRY(socket.get(listenSocket, ResultSocket(SocketError::InvalidSocket, SocketErrorDetail::BindSocket)));
 
     const int value = reuseAddress == BindReuseAddress::Enabled ? 1 : 0;
     if (nativeAddress.getAddressFamily() != SocketFlags::AddressFamilyUnix)
@@ -45,47 +48,76 @@ SC::Result SC::SocketServer::bind(const SocketAddress& nativeAddress, BindReuseA
     if (::bind(listenSocket, sa, saSize) == SOCKET_ERROR)
     {
 #if SC_PLATFORM_WINDOWS
-        if (outStatus != nullptr and WSAGetLastError() == WSAEADDRINUSE)
+        const uint32_t nativeError = static_cast<uint32_t>(WSAGetLastError());
+        if (outStatus != nullptr and nativeError == WSAEADDRINUSE)
         {
             *outStatus = BindStatus::AddressInUse;
         }
 #elif !SC_PLATFORM_EMSCRIPTEN
-        if (outStatus != nullptr and errno == EADDRINUSE)
+        const uint32_t nativeError = static_cast<uint32_t>(errno);
+        if (outStatus != nullptr and nativeError == EADDRINUSE)
         {
             *outStatus = BindStatus::AddressInUse;
         }
 #endif
-        return Result::Error("Could not bind socket to address");
+#if SC_PLATFORM_WINDOWS
+        if (nativeError == WSAEADDRINUSE)
+            return ResultSocket::withNativeError(SocketError::AddressInUse, SocketErrorDetail::BindSocket, nativeError);
+#elif !SC_PLATFORM_EMSCRIPTEN
+        if (nativeError == EADDRINUSE)
+            return ResultSocket::withNativeError(SocketError::AddressInUse, SocketErrorDetail::BindSocket, nativeError);
+#endif
+        return ResultSocket::withNativeError(SocketError::BindFailed, SocketErrorDetail::BindSocket,
+#if SC_PLATFORM_WINDOWS
+                                             nativeError
+#elif !SC_PLATFORM_EMSCRIPTEN
+                                             nativeError
+#else
+                                             0
+#endif
+        );
     }
-    return Result(true);
+    return {};
 }
 
-SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress, BindStatus* outStatus)
+SC::ResultSocket SC::SocketServer::bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress,
+                                        BindStatus* outStatus)
 {
     return bind(SocketAddress(nativeAddress), reuseAddress, outStatus);
 }
 
-SC::Result SC::SocketServer::listen(uint32_t numberOfWaitingConnections)
+SC::ResultSocket SC::SocketServer::listen(uint32_t numberOfWaitingConnections)
 {
-    SC_TRY(SocketNetworking::isNetworkingInited());
-    SC_TRY_MSG(socket.isValid(), "Invalid socket");
+    if (not SocketNetworking::isNetworkingInited())
+        return {SocketError::NetworkingNotInitialized, SocketErrorDetail::ListenSocket};
+    if (not socket.isValid())
+        return {SocketError::InvalidSocket, SocketErrorDetail::ListenSocket};
     SocketDescriptor::Handle listenSocket;
-    SC_SOCKET_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
-    SC_TRY_MSG(::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) != SOCKET_ERROR, "listen failed");
-    return Result(true);
+    SC_TRY(socket.get(listenSocket, ResultSocket(SocketError::InvalidSocket, SocketErrorDetail::ListenSocket)));
+    if (::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) == SOCKET_ERROR)
+    {
+#if SC_PLATFORM_WINDOWS
+        const uint32_t nativeError = static_cast<uint32_t>(WSAGetLastError());
+#else
+        const uint32_t nativeError = static_cast<uint32_t>(errno);
+#endif
+        return ResultSocket::withNativeError(SocketError::ListenFailed, SocketErrorDetail::ListenSocket, nativeError);
+    }
+    return {};
 }
 
-SC::Result SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient)
+SC::ResultSocket SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient)
 {
     (void)addressFamily;
     return accept(newClient, nullptr);
 }
 
-SC::Result SC::SocketServer::accept(SocketDescriptor& newClient, SocketAddress* peerAddress)
+SC::ResultSocket SC::SocketServer::accept(SocketDescriptor& newClient, SocketAddress* peerAddress)
 {
-    SC_TRY_MSG(not newClient.isValid(), "destination socket already in use");
+    if (newClient.isValid())
+        return {SocketError::DestinationSocketInUse, SocketErrorDetail::AcceptConnection};
     SocketDescriptor::Handle listenDescriptor;
-    SC_TRY(socket.get(listenDescriptor, Result::Error("Invalid socket")));
+    SC_TRY(socket.get(listenDescriptor, ResultSocket(SocketError::InvalidSocket, SocketErrorDetail::AcceptConnection)));
 
     SocketAddress receivedPeerAddress;
     socklen_t     nativeSize = sizeof(receivedPeerAddress.handle);
@@ -94,12 +126,22 @@ SC::Result SC::SocketServer::accept(SocketDescriptor& newClient, SocketAddress* 
     socklen_t* nativeSizePointer = peerAddress == nullptr ? nullptr : &nativeSize;
 
     SocketDescriptor::Handle acceptedClient = ::accept(listenDescriptor, nativeAddress, nativeSizePointer);
-    SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed");
-    SC_TRY(newClient.assign(acceptedClient));
+    if (acceptedClient == SocketDescriptor::Invalid)
+    {
+#if SC_PLATFORM_WINDOWS
+        const uint32_t nativeError = static_cast<uint32_t>(WSAGetLastError());
+#else
+        const uint32_t nativeError = static_cast<uint32_t>(errno);
+#endif
+        return ResultSocket::withNativeError(SocketError::AcceptFailed, SocketErrorDetail::AcceptConnection,
+                                             nativeError);
+    }
+    if (not newClient.assign(acceptedClient))
+        return {SocketError::DestinationSocketInUse, SocketErrorDetail::AcceptConnection};
     if (peerAddress != nullptr)
     {
         receivedPeerAddress.nativeSize = nativeSize;
         *peerAddress                   = receivedPeerAddress;
     }
-    return Result(true);
+    return {};
 }

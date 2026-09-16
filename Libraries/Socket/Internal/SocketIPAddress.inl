@@ -21,34 +21,36 @@ struct SocketIPAddressInternal;
 }
 struct SC::SocketIPAddressInternal
 {
-    [[nodiscard]] static Result parseIPV4(StringSpan ipAddress, uint16_t port, struct sockaddr_in& inaddr)
+    [[nodiscard]] static ResultSocket parseIPV4(StringSpan ipAddress, uint16_t port, struct sockaddr_in& inaddr)
     {
         char buffer[64] = {0};
-        SC_TRY_MSG(detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer), "ipAddress too long");
+        if (not detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer))
+            return {SocketError::InputCapacityExceeded, SocketErrorDetail::ParseIPv4Address};
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin_port   = htons(port);
         inaddr.sin_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV4);
         const auto res    = ::inet_pton(inaddr.sin_family, buffer, &inaddr.sin_addr);
         if (res == 0 or res == -1)
         {
-            return Result::Error("inet_pton Invalid IPV4 Address");
+            return {SocketError::InvalidIPAddress, SocketErrorDetail::ParseIPv4Address};
         }
-        return Result(true);
+        return {};
     }
 
-    [[nodiscard]] static Result parseIPV6(StringSpan ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
+    [[nodiscard]] static ResultSocket parseIPV6(StringSpan ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
     {
         char buffer[64] = {0};
-        SC_TRY_MSG(detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer), "ipAddress too long");
+        if (not detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer))
+            return {SocketError::InputCapacityExceeded, SocketErrorDetail::ParseIPv6Address};
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin6_port   = htons(port);
         inaddr.sin6_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV6);
         const auto res     = ::inet_pton(inaddr.sin6_family, buffer, &inaddr.sin6_addr);
         if (res == 0 or res == -1)
         {
-            return Result::Error("inet_pton Invalid IPV6 Address");
+            return {SocketError::InvalidIPAddress, SocketErrorDetail::ParseIPv6Address};
         }
-        return Result(true);
+        return {};
     }
 };
 
@@ -137,15 +139,18 @@ bool SC::SocketIPAddress::toString(Span<char> inputSpan, StringSpan& outputSpan)
     return false;
 }
 
-SC::Result SC::SocketIPAddress::fromAddressPort(StringSpan interfaceAddress, uint16_t port)
+SC::ResultSocket SC::SocketIPAddress::fromAddressPort(StringSpan interfaceAddress, uint16_t port)
 {
     static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
     static_assert(alignof(sockaddr_in6) >= alignof(sockaddr_in), "size");
-    SC_TRY_MSG(detail::isASCII(interfaceAddress), "Only ASCII encoding is supported");
+    if (not detail::isASCII(interfaceAddress))
+        return {SocketError::UnsupportedTextEncoding};
 
-    Result res = SocketIPAddressInternal::parseIPV4(interfaceAddress, port, handle.reinterpret_as<sockaddr_in>());
+    ResultSocket res = SocketIPAddressInternal::parseIPV4(interfaceAddress, port, handle.reinterpret_as<sockaddr_in>());
     if (not res)
     {
+        if (res.isError(SocketError::InputCapacityExceeded))
+            return res;
         res = SocketIPAddressInternal::parseIPV6(interfaceAddress, port, handle.reinterpret_as<sockaddr_in6>());
     }
     return res;
@@ -157,21 +162,25 @@ SC::SocketAddress::SocketAddress(const SocketIPAddress& ipAddress)
     ::memcpy(&handle.reinterpret_as<char>(), &ipAddress.handle.reinterpret_as<const char>(), nativeSize);
 }
 
-SC::Result SC::SocketAddress::fromUnixPath(StringSpan path)
+SC::ResultSocket SC::SocketAddress::fromUnixPath(StringSpan path)
 {
 #if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
-    SC_TRY_MSG(path.getEncoding() != StringEncoding::Utf16, "SocketAddress::fromUnixPath only ASCII/UTF8 paths");
-    SC_TRY_MSG(not path.isEmpty(), "SocketAddress::fromUnixPath path cannot be empty");
+    if (path.getEncoding() == StringEncoding::Utf16)
+        return {SocketError::UnsupportedTextEncoding, SocketErrorDetail::BuildUnixPathAddress};
+    if (path.isEmpty())
+        return {SocketError::InvalidAddress, SocketErrorDetail::BuildUnixPathAddress};
 
     const Span<const char> pathBytes = path.toCharSpan();
     for (size_t idx = 0; idx < pathBytes.sizeInBytes(); ++idx)
     {
-        SC_TRY_MSG(pathBytes[idx] != '\0', "SocketAddress::fromUnixPath path contains null bytes");
+        if (pathBytes[idx] == '\0')
+            return {SocketError::InvalidAddress, SocketErrorDetail::BuildUnixPathAddress};
     }
 
     static_assert(sizeof(sockaddr_un) <= sizeof(handle), "SocketAddress storage is too small for sockaddr_un");
     sockaddr_un& address = handle.reinterpret_as<sockaddr_un>();
-    SC_TRY_MSG(pathBytes.sizeInBytes() < sizeof(address.sun_path), "SocketAddress::fromUnixPath path too long");
+    if (pathBytes.sizeInBytes() >= sizeof(address.sun_path))
+        return {SocketError::InputCapacityExceeded, SocketErrorDetail::BuildUnixPathAddress};
 
     ::memset(&address, 0, sizeof(address));
     address.sun_family = AF_UNIX;
@@ -180,29 +189,31 @@ SC::Result SC::SocketAddress::fromUnixPath(StringSpan path)
 #endif
     ::memcpy(address.sun_path, pathBytes.data(), pathBytes.sizeInBytes());
     nativeSize = static_cast<uint32_t>(offsetof(sockaddr_un, sun_path) + pathBytes.sizeInBytes() + 1);
-    return Result(true);
+    return {};
 #else
     (void)path;
-    return Result::Error("Unix-domain sockets are unsupported on this platform");
+    return {SocketError::OperationUnsupported, SocketErrorDetail::BuildUnixPathAddress};
 #endif
 }
 
-SC::Result SC::SocketAddress::fromUnixAbstractName(Span<const char> name)
+SC::ResultSocket SC::SocketAddress::fromUnixAbstractName(Span<const char> name)
 {
 #if SC_PLATFORM_LINUX
-    SC_TRY_MSG(not name.empty(), "SocketAddress::fromUnixAbstractName name cannot be empty");
+    if (name.empty())
+        return {SocketError::InvalidAddress, SocketErrorDetail::BuildUnixAbstractAddress};
     static_assert(sizeof(sockaddr_un) <= sizeof(handle), "SocketAddress storage is too small for sockaddr_un");
     sockaddr_un& address = handle.reinterpret_as<sockaddr_un>();
-    SC_TRY_MSG(name.sizeInBytes() + 1 <= sizeof(address.sun_path), "SocketAddress::fromUnixAbstractName name too long");
+    if (name.sizeInBytes() + 1 > sizeof(address.sun_path))
+        return {SocketError::InputCapacityExceeded, SocketErrorDetail::BuildUnixAbstractAddress};
 
     ::memset(&address, 0, sizeof(address));
     address.sun_family = AF_UNIX;
     ::memcpy(address.sun_path + 1, name.data(), name.sizeInBytes());
     nativeSize = static_cast<uint32_t>(offsetof(sockaddr_un, sun_path) + 1 + name.sizeInBytes());
-    return Result(true);
+    return {};
 #else
     (void)name;
-    return Result::Error("Unix abstract namespace is unsupported on this platform");
+    return {SocketError::OperationUnsupported, SocketErrorDetail::BuildUnixAbstractAddress};
 #endif
 }
 
@@ -235,23 +246,23 @@ bool SC::SocketAddress::isValid() const
     return false;
 }
 
-SC::Result SC::SocketAddress::getIPAddress(SocketIPAddress& output) const
+SC::ResultSocket SC::SocketAddress::getIPAddress(SocketIPAddress& output) const
 {
-    SC_TRY_MSG(nativeSize == sizeof(sockaddr_in) or nativeSize == sizeof(sockaddr_in6),
-               "SocketAddress does not contain an IP address");
+    if (nativeSize != sizeof(sockaddr_in) and nativeSize != sizeof(sockaddr_in6))
+        return {SocketError::AddressTypeMismatch, SocketErrorDetail::ExtractIPAddress};
     const sockaddr& address = handle.reinterpret_as<const sockaddr>();
-    SC_TRY_MSG(address.sa_family == AF_INET or address.sa_family == AF_INET6,
-               "SocketAddress does not contain an IP address");
+    if (address.sa_family != AF_INET and address.sa_family != AF_INET6)
+        return {SocketError::AddressTypeMismatch, SocketErrorDetail::ExtractIPAddress};
     ::memcpy(&output.handle.reinterpret_as<char>(), &handle.reinterpret_as<const char>(), nativeSize);
-    return Result(true);
+    return {};
 }
 
-SC::Result SC::SocketAddress::getUnixName(Span<const char>& output, UnixNamespace& unixNamespace) const
+SC::ResultSocket SC::SocketAddress::getUnixName(Span<const char>& output, UnixNamespace& unixNamespace) const
 {
 #if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
     const sockaddr_un& address = handle.reinterpret_as<const sockaddr_un>();
-    SC_TRY_MSG(address.sun_family == AF_UNIX and nativeSize >= offsetof(sockaddr_un, sun_path),
-               "SocketAddress does not contain a Unix-domain address");
+    if (address.sun_family != AF_UNIX or nativeSize < offsetof(sockaddr_un, sun_path))
+        return {SocketError::AddressTypeMismatch, SocketErrorDetail::ExtractUnixAddress};
     const size_t nameSize = nativeSize - offsetof(sockaddr_un, sun_path);
     if (nameSize == 0)
     {
@@ -269,10 +280,10 @@ SC::Result SC::SocketAddress::getUnixName(Span<const char>& output, UnixNamespac
         output                = {address.sun_path, pathSize};
         unixNamespace         = UnixNamespace::Pathname;
     }
-    return Result(true);
+    return {};
 #else
     (void)output;
     (void)unixNamespace;
-    return Result::Error("Unix-domain sockets are unsupported on this platform");
+    return {SocketError::OperationUnsupported, SocketErrorDetail::ExtractUnixAddress};
 #endif
 }

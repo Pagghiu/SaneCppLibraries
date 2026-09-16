@@ -124,7 +124,7 @@ struct [[nodiscard]] ResultSocket
     SocketErrorContextKind contextKind = SocketErrorContextKind::None;
     SocketErrorContext     context     = {};
 
-    explicit constexpr ResultSocket(bool valid = true) : result(valid) {}
+    constexpr ResultSocket(bool valid = true) : result(valid) {}
     constexpr ResultSocket(SocketError error, SocketErrorDetail detail = SocketErrorDetail::None)
         : result(Result::Error(SocketResultCategory, error)), detail(detail)
     {}

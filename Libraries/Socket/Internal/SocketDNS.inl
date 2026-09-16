@@ -9,7 +9,7 @@
 #endif
 #include <string.h>
 
-SC::Result SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
+SC::ResultSocket SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
 {
     struct addrinfo hints, *res, *p;
 
@@ -19,12 +19,18 @@ SC::Result SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
     hints.ai_socktype = SOCK_STREAM; // Use SOCK_STREAM for TCP
 
     char nullTerminated[256] = {0};
-    SC_TRY_MSG(detail::isASCII(host), "Only ASCII encoding is supported");
-    SC_TRY_MSG(detail::writeNullTerminatedToBuffer(host.toCharSpan(), nullTerminated), "host is too big");
+    if (not detail::isASCII(host))
+        return {SocketError::UnsupportedTextEncoding, SocketErrorDetail::CopyHostName};
+    if (not detail::writeNullTerminatedToBuffer(host.toCharSpan(), nullTerminated))
+        return {SocketError::InputCapacityExceeded, SocketErrorDetail::CopyHostName};
     // Get address information
-    SC_TRY_MSG(::getaddrinfo(nullTerminated, NULL, &hints, &res) == 0, "getaddrinfo error");
+    const int resolverError = ::getaddrinfo(nullTerminated, NULL, &hints, &res);
+    if (resolverError != 0)
+        return ResultSocket::withResolverError(SocketError::DNSResolutionFailed, SocketErrorDetail::ResolveHostName,
+                                               resolverError);
 
     // Loop through results and print IP addresses
+    ResultSocket result;
     for (p = res; p != NULL; p = p->ai_next)
     {
         void* addr;
@@ -41,12 +47,22 @@ SC::Result SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
         {
             // Convert IP address to a readable string
             char ipstr[INET6_ADDRSTRLEN + 1] = {0};
-            ::inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
+            if (::inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr) == nullptr)
+            {
+                result = {SocketError::DNSResolutionFailed, SocketErrorDetail::CopyResolvedAddress};
+                break;
+            }
             Span<const char> ipOut = {ipstr, ::strnlen(ipstr, sizeof(ipstr) - 1)};
-            SC_TRY_MSG(detail::copyFromTo(ipOut, ipAddress), "ipAddress is insufficient");
+            if (not detail::copyFromTo(ipOut, ipAddress))
+            {
+                result = ResultSocket::withRequiredBytes(SocketError::OutputCapacityExceeded,
+                                                         SocketErrorDetail::CopyResolvedAddress,
+                                                         static_cast<uint32_t>(ipOut.sizeInBytes() + 1));
+                break;
+            }
         }
     }
 
     ::freeaddrinfo(res); // Free the linked list
-    return Result(true);
+    return result;
 }

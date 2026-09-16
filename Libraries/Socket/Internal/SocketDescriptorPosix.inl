@@ -17,23 +17,28 @@ namespace SC
 {
 namespace
 {
-static Result getFileFlags(int flagRead, const int fileDescriptor, int& outFlags)
+static ResultSocket getFileFlags(int flagRead, const int fileDescriptor, int& outFlags)
 {
     do
     {
         outFlags = ::fcntl(fileDescriptor, flagRead);
     } while (outFlags == -1 && errno == EINTR);
-    SC_TRY_MSG(outFlags != -1, "fcntl getFlag failed");
-    return Result(true);
+    if (outFlags == -1)
+        return ResultSocket::withNativeError(SocketError::DescriptorQueryFailed,
+                                             SocketErrorDetail::PosixGetDescriptorFlags, static_cast<uint32_t>(errno));
+    return {};
 }
-static Result setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag, const int flag)
+static ResultSocket setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
+                                 const int flag)
 {
     int oldFlags;
     do
     {
         oldFlags = ::fcntl(fileDescriptor, flagRead);
     } while (oldFlags == -1 && errno == EINTR);
-    SC_TRY_MSG(oldFlags != -1, "fcntl getFlag failed");
+    if (oldFlags == -1)
+        return ResultSocket::withNativeError(SocketError::DescriptorQueryFailed,
+                                             SocketErrorDetail::PosixGetDescriptorFlags, static_cast<uint32_t>(errno));
     const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
     if (newFlags != oldFlags)
     {
@@ -42,201 +47,225 @@ static Result setFileFlags(int flagRead, int flagWrite, const int fileDescriptor
         {
             res = ::fcntl(fileDescriptor, flagWrite, newFlags);
         } while (res == -1 && errno == EINTR);
-        SC_TRY_MSG(res == 0, "fcntl setFlag failed");
+        if (res == -1)
+            return ResultSocket::withNativeError(SocketError::DescriptorConfigurationFailed,
+                                                 SocketErrorDetail::PosixSetDescriptorFlags,
+                                                 static_cast<uint32_t>(errno));
     }
-    return Result(true);
+    return {};
 }
 template <int flag>
-static Result hasFileDescriptorFlags(int fileDescriptor, bool& hasFlag)
+static ResultSocket hasFileDescriptorFlags(int fileDescriptor, bool& hasFlag)
 {
     static_assert(flag == FD_CLOEXEC, "hasFileDescriptorFlags invalid value");
     int flags = 0;
     SC_TRY(getFileFlags(F_GETFD, fileDescriptor, flags));
     hasFlag = (flags & flag) != 0;
-    return Result(true);
+    return {};
 }
 template <int flag>
-static Result setFileDescriptorFlags(int fileDescriptor, bool setFlag)
+static ResultSocket setFileDescriptorFlags(int fileDescriptor, bool setFlag)
 {
     static_assert(flag == FD_CLOEXEC, "setFileDescriptorFlags invalid value");
     return setFileFlags(F_GETFD, F_SETFD, fileDescriptor, setFlag, flag);
 }
 template <int flag>
-static Result hasFileStatusFlags(int fileDescriptor, bool& hasFlag)
+static ResultSocket hasFileStatusFlags(int fileDescriptor, bool& hasFlag)
 {
     static_assert(flag == O_NONBLOCK, "hasFileStatusFlags invalid value");
     int flags = 0;
     SC_TRY(getFileFlags(F_GETFL, fileDescriptor, flags));
     hasFlag = (flags & flag) != 0;
-    return Result(true);
+    return {};
 }
 template <int flag>
-static Result setFileStatusFlags(int fileDescriptor, bool setFlag)
+static ResultSocket setFileStatusFlags(int fileDescriptor, bool setFlag)
 {
     static_assert(flag == O_NONBLOCK, "setFileStatusFlags invalid value");
     return setFileFlags(F_GETFL, F_SETFL, fileDescriptor, setFlag, flag);
 }
 } // namespace
 
-Result detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
+ResultSocket detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {
     ::close(handle);
     handle = Invalid;
-    return Result(true);
+    return {};
 }
 
-Result SocketDescriptor::setInheritable(bool inheritable)
+ResultSocket SocketDescriptor::setInheritable(bool inheritable)
 {
     // On POSIX, inheritable = false means set FD_CLOEXEC
     return setFileDescriptorFlags<FD_CLOEXEC>(handle, !inheritable);
 }
 
-Result SocketDescriptor::setBlocking(bool blocking)
+ResultSocket SocketDescriptor::setBlocking(bool blocking)
 {
     // On POSIX, blocking = false means set O_NONBLOCK
     return setFileStatusFlags<O_NONBLOCK>(handle, !blocking);
 }
 
-Result SocketDescriptor::setTcpNoDelay(bool tcpNoDelay)
+ResultSocket SocketDescriptor::setTcpNoDelay(bool tcpNoDelay)
 {
     int active = tcpNoDelay ? 1 : 0;
-    SC_TRY_MSG(::setsockopt(handle, IPPROTO_TCP, TCP_NODELAY, &active, sizeof(active)) == 0,
-               "setsockopt TCP_NODELAY failed");
-    return Result(true);
+    if (::setsockopt(handle, IPPROTO_TCP, TCP_NODELAY, &active, sizeof(active)) != 0)
+        return ResultSocket::withNativeError(SocketError::SocketOptionFailed, SocketErrorDetail::SetTcpNoDelay,
+                                             static_cast<uint32_t>(errno));
+    return {};
 }
 
-Result SocketDescriptor::setBroadcast(bool enableBroadcast)
+ResultSocket SocketDescriptor::setBroadcast(bool enableBroadcast)
 {
     int active = enableBroadcast ? 1 : 0;
-    SC_TRY_MSG(::setsockopt(handle, SOL_SOCKET, SO_BROADCAST, &active, sizeof(active)) == 0,
-               "setsockopt SO_BROADCAST failed");
-    return Result(true);
+    if (::setsockopt(handle, SOL_SOCKET, SO_BROADCAST, &active, sizeof(active)) != 0)
+        return ResultSocket::withNativeError(SocketError::SocketOptionFailed, SocketErrorDetail::SetBroadcast,
+                                             static_cast<uint32_t>(errno));
+    return {};
 }
 
-Result SocketDescriptor::joinMulticastGroup(const SocketIPAddress& multicastAddress,
-                                            const SocketIPAddress& interfaceAddress)
+ResultSocket SocketDescriptor::joinMulticastGroup(const SocketIPAddress& multicastAddress,
+                                                  const SocketIPAddress& interfaceAddress)
 {
-    SC_TRY_MSG(multicastAddress.getAddressFamily() == interfaceAddress.getAddressFamily(),
-               "multicast and interface address families do not match");
+    if (multicastAddress.getAddressFamily() != interfaceAddress.getAddressFamily())
+        return {SocketError::AddressFamilyMismatch};
     if (multicastAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
     {
         struct ip_mreq mreq;
         mreq.imr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
         mreq.imr_interface = interfaceAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == 0,
-                   "setsockopt IP_ADD_MEMBERSHIP failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed, SocketErrorDetail::JoinIPv4Multicast,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
     else
     {
         struct ipv6_mreq mreq;
         mreq.ipv6mr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in6>().sin6_addr;
         mreq.ipv6mr_interface = 0;
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) == 0,
-                   "setsockopt IPV6_JOIN_GROUP failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed, SocketErrorDetail::JoinIPv6Multicast,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
 }
 
-Result SocketDescriptor::leaveMulticastGroup(const SocketIPAddress& multicastAddress,
-                                             const SocketIPAddress& interfaceAddress)
+ResultSocket SocketDescriptor::leaveMulticastGroup(const SocketIPAddress& multicastAddress,
+                                                   const SocketIPAddress& interfaceAddress)
 {
-    SC_TRY_MSG(multicastAddress.getAddressFamily() == interfaceAddress.getAddressFamily(),
-               "multicast and interface address families do not match");
+    if (multicastAddress.getAddressFamily() != interfaceAddress.getAddressFamily())
+        return {SocketError::AddressFamilyMismatch};
     if (multicastAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
     {
         struct ip_mreq mreq;
         mreq.imr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
         mreq.imr_interface = interfaceAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) == 0,
-                   "setsockopt IP_DROP_MEMBERSHIP failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed, SocketErrorDetail::LeaveIPv4Multicast,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
     else
     {
         struct ipv6_mreq mreq;
         mreq.ipv6mr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in6>().sin6_addr;
         mreq.ipv6mr_interface = 0;
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &mreq, sizeof(mreq)) == 0,
-                   "setsockopt IPV6_LEAVE_GROUP failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &mreq, sizeof(mreq)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed, SocketErrorDetail::LeaveIPv6Multicast,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
 }
 
-Result SocketDescriptor::setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback)
+ResultSocket SocketDescriptor::setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback)
 {
     int active = enableLoopback ? 1 : 0;
     if (addressFamily == SocketFlags::AddressFamilyIPV4)
     {
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_LOOP, &active, sizeof(active)) == 0,
-                   "setsockopt IP_MULTICAST_LOOP failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_LOOP, &active, sizeof(active)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv4MulticastLoopback,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
     else
     {
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &active, sizeof(active)) == 0,
-                   "setsockopt IPV6_MULTICAST_LOOP failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &active, sizeof(active)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv6MulticastLoopback,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
 }
 
-Result SocketDescriptor::setMulticastHops(SocketFlags::AddressFamily addressFamily, int hops)
+ResultSocket SocketDescriptor::setMulticastHops(SocketFlags::AddressFamily addressFamily, int hops)
 {
     if (addressFamily == SocketFlags::AddressFamilyIPV4)
     {
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_TTL, &hops, sizeof(hops)) == 0,
-                   "setsockopt IP_MULTICAST_TTL failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_TTL, &hops, sizeof(hops)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv4MulticastHops, static_cast<uint32_t>(errno));
+        return {};
     }
     else
     {
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) == 0,
-                   "setsockopt IPV6_MULTICAST_HOPS failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv6MulticastHops, static_cast<uint32_t>(errno));
+        return {};
     }
 }
 
-Result SocketDescriptor::setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress)
+ResultSocket SocketDescriptor::setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress)
 {
     if (interfaceAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
     {
         struct in_addr addr = interfaceAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_IF, &addr, sizeof(addr)) == 0,
-                   "setsockopt IP_MULTICAST_IF failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_IF, &addr, sizeof(addr)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv4MulticastInterface,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
     else
     {
         const unsigned int interfaceIndex = interfaceAddress.handle.reinterpret_as<struct sockaddr_in6>().sin6_scope_id;
-        SC_TRY_MSG(::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_IF, &interfaceIndex, sizeof(interfaceIndex)) == 0,
-                   "setsockopt IPV6_MULTICAST_IF failed");
-        return Result(true);
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_IF, &interfaceIndex, sizeof(interfaceIndex)) != 0)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv6MulticastInterface,
+                                                 static_cast<uint32_t>(errno));
+        return {};
     }
 }
 
-Result SocketDescriptor::isInheritable(bool& hasValue) const
+ResultSocket SocketDescriptor::isInheritable(bool& hasValue) const
 {
     bool cloexec = false;
     SC_TRY(hasFileDescriptorFlags<FD_CLOEXEC>(handle, cloexec));
     hasValue = !cloexec;
-    return Result(true);
+    return {};
 }
 
-Result SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType)
+ResultSocket SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType)
 {
-    SC_TRY_MSG(shutdownType == SocketFlags::ShutdownBoth, "Invalid shutdown type");
+    if (shutdownType != SocketFlags::ShutdownBoth)
+        return {SocketError::InvalidShutdownType, SocketErrorDetail::ShutdownSocket};
     int how = 0;
-    SC_TRY_MSG(::shutdown(handle, how) == 0, "shutdown failed");
-    return Result(true);
+    if (::shutdown(handle, how) != 0)
+        return ResultSocket::withNativeError(SocketError::ShutdownFailed, SocketErrorDetail::ShutdownSocket,
+                                             static_cast<uint32_t>(errno));
+    return {};
 }
 
-Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, SocketFlags::SocketType socketType,
-                                SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
-                                SocketFlags::InheritableType inheritable)
+ResultSocket SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, SocketFlags::SocketType socketType,
+                                      SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
+                                      SocketFlags::InheritableType inheritable)
 {
-    SC_TRY(SocketNetworking::isNetworkingInited());
+    if (not SocketNetworking::isNetworkingInited())
+        return {SocketError::NetworkingNotInitialized};
 #if SC_PLATFORM_EMSCRIPTEN
-    SC_TRY_MSG(addressFamily != SocketFlags::AddressFamilyUnix, "Unix-domain sockets are not supported on Emscripten");
+    if (addressFamily == SocketFlags::AddressFamilyUnix)
+        return {SocketError::OperationUnsupported};
 #endif
     SC_SOCKET_TRUST_RESULT(close());
 
@@ -257,6 +286,9 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
     {
         handle = ::socket(SocketFlags::toNative(addressFamily), typeWithAdditions, SocketFlags::toNative(protocol));
     } while (handle == -1 and errno == EINTR);
+    if (handle == SocketDescriptor::Invalid)
+        return ResultSocket::withNativeError(SocketError::SocketCreationFailed, SocketErrorDetail::CreateSocket,
+                                             static_cast<uint32_t>(errno));
 #if !defined(SOCK_CLOEXEC)
     if (inheritable == SocketFlags::NonInheritable)
     {
@@ -276,12 +308,13 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
         ::setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &active, sizeof(active));
     }
 #endif // defined(SO_NOSIGPIPE)
-    return Result(isValid());
+    return {};
 }
 
-Result SocketDescriptor::sendTo(Span<const char> data, const SocketAddress& destination)
+ResultSocket SocketDescriptor::sendTo(Span<const char> data, const SocketAddress& destination)
 {
-    SC_TRY_MSG(destination.isValid(), "invalid sendTo destination address");
+    if (not destination.isValid())
+        return {SocketError::InvalidAddress, SocketErrorDetail::SendDatagram};
     const socklen_t addressSize = static_cast<socklen_t>(destination.sizeOfHandle());
     ssize_t         sent;
     do
@@ -289,21 +322,25 @@ Result SocketDescriptor::sendTo(Span<const char> data, const SocketAddress& dest
         sent = ::sendto(handle, data.data(), data.sizeInBytes(), 0,
                         &destination.handle.reinterpret_as<const struct sockaddr>(), addressSize);
     } while (sent == -1 and errno == EINTR);
-    if (sent == -1 and (errno == EAGAIN or errno == EWOULDBLOCK))
+    if (sent == -1)
     {
-        return Result(false);
+        const uint32_t nativeError = static_cast<uint32_t>(errno);
+        if (nativeError == EAGAIN or nativeError == EWOULDBLOCK)
+            return {SocketError::WouldBlock, SocketErrorDetail::SendDatagram};
+        return ResultSocket::withNativeError(SocketError::SendFailed, SocketErrorDetail::SendDatagram, nativeError);
     }
-    SC_TRY_MSG(sent >= 0, "sendto error");
-    SC_TRY_MSG(static_cast<size_t>(sent) == data.sizeInBytes(), "sendto didn't send the whole datagram");
-    return Result(true);
+    if (static_cast<size_t>(sent) != data.sizeInBytes())
+        return ResultSocket::withActualBytes(SocketError::IncompleteSend, SocketErrorDetail::SendDatagram,
+                                             static_cast<uint32_t>(sent));
+    return {};
 }
 
-Result SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
+ResultSocket SocketDescriptor::sendTo(Span<const char> data, const SocketIPAddress& destination)
 {
     return sendTo(data, SocketAddress(destination));
 }
 
-Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress)
+ResultSocket SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketAddress& sourceAddress)
 {
     SocketAddress receivedSourceAddress;
     struct iovec  receiveBuffer = {};
@@ -322,19 +359,23 @@ Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData
         message.msg_flags   = 0;
         received            = ::recvmsg(handle, &message, 0);
     } while (received == -1 and errno == EINTR);
-    if (received == -1 and (errno == EAGAIN or errno == EWOULDBLOCK))
+    if (received == -1)
     {
-        return Result(false);
+        const uint32_t nativeError = static_cast<uint32_t>(errno);
+        if (nativeError == EAGAIN or nativeError == EWOULDBLOCK)
+            return {SocketError::WouldBlock, SocketErrorDetail::ReceiveDatagram};
+        return ResultSocket::withNativeError(SocketError::ReceiveFailed, SocketErrorDetail::ReceiveDatagram,
+                                             nativeError);
     }
-    SC_TRY_MSG(received >= 0, "receiveFrom error");
-    SC_TRY_MSG((message.msg_flags & MSG_TRUNC) == 0, "receiveFrom datagram truncated");
+    if ((message.msg_flags & MSG_TRUNC) != 0)
+        return {SocketError::DatagramTruncated, SocketErrorDetail::ReceiveDatagram};
     receivedSourceAddress.nativeSize = message.msg_namelen;
     receivedData                     = {buffer.data(), static_cast<size_t>(received)};
     sourceAddress                    = receivedSourceAddress;
-    return Result(true);
+    return {};
 }
 
-Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress)
+ResultSocket SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData, SocketIPAddress& sourceAddress)
 {
     Span<char>    stagedReceivedData;
     SocketAddress stagedSourceAddress;
@@ -344,10 +385,10 @@ Result SocketDescriptor::receiveFrom(Span<char> buffer, Span<char>& receivedData
     SC_TRY(stagedSourceAddress.getIPAddress(stagedIPAddress));
     receivedData  = stagedReceivedData;
     sourceAddress = stagedIPAddress;
-    return Result(true);
+    return {};
 }
 
 void SocketNetworking::initNetworking() {}
 void SocketNetworking::shutdownNetworking() {}
-bool SocketNetworking::isNetworkingInited() { return Result(true); }
+bool SocketNetworking::isNetworkingInited() { return true; }
 } // namespace SC
