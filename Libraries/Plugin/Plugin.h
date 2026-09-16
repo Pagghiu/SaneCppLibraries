@@ -140,7 +140,11 @@ struct PluginDefinition
     /// @brief Parses an extracted plugin definition text
     /// @param[in] text An extracted plugin definition text (`extracted` of PluginDefinition::find)
     /// @param[out] pluginDefinition A valid PluginDefinition parsed from the given text
-    /// @return `true` if the plugin definition can be parsed successfully
+    /// @param[out] parsed `true` when text contains a complete valid definition.
+    /// @return A Plugin error when metadata is malformed or bounded storage cannot hold the definition.
+    [[nodiscard]] static ResultPlugin parse(StringSpan text, PluginDefinition& pluginDefinition, bool& parsed);
+
+    /// @brief Compatibility helper that returns false for either normal absence or a parsing storage failure.
     [[nodiscard]] static bool parse(StringSpan text, PluginDefinition& pluginDefinition);
 
     /// @brief Gets absolute path of where compiled dynamic library will exist after plugin is compiled

@@ -99,8 +99,11 @@ SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(StringPath& fu
     return Result(true);
 }
 
-bool SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefinition)
+SC::ResultPlugin SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefinition, bool& parsed)
 {
+    parsed = false;
+    if (text.getEncoding() == StringEncoding::Utf16)
+        return ResultPlugin(PluginError::UnsupportedPathEncoding);
     struct Cursor
     {
         StringSpan text;
@@ -108,8 +111,6 @@ bool SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefini
 
         bool parseLine(StringSpan& key, StringSpan& value)
         {
-            if (text.getEncoding() == StringEncoding::Utf16)
-                return false;
             const auto isSkipped = [](char current)
             { return current == '\t' or current == '\n' or current == '\r' or current == ' ' or current == '/'; };
             while (offset < text.sizeInBytes() and isSkipped(text.bytesWithoutTerminator()[offset]))
@@ -145,22 +146,34 @@ bool SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefini
         if (key == "Name")
         {
             gotFields[0] = true;
-            SC_TRY_MSG(pluginDefinition.identity.name.assign(value), "Name exceeds fixed size");
+            if (not pluginDefinition.identity.name.assign(value))
+                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                                                       PluginErrorDetail::MetadataName,
+                                                       static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
         else if (key == "Version")
         {
             gotFields[1] = true;
-            SC_TRY_MSG(pluginDefinition.identity.version.assign(value), "Version exceeds fixed size");
+            if (not pluginDefinition.identity.version.assign(value))
+                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                                                       PluginErrorDetail::MetadataVersion,
+                                                       static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
         else if (key == "Description")
         {
             gotFields[2] = true;
-            SC_TRY_MSG(pluginDefinition.description.assign(value), "Description exceeds fixed size");
+            if (not pluginDefinition.description.assign(value))
+                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                                                       PluginErrorDetail::MetadataDescription,
+                                                       static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
         else if (key == "Category")
         {
             gotFields[3] = true;
-            SC_TRY_MSG(pluginDefinition.category.assign(value), "Category exceeds fixed size");
+            if (not pluginDefinition.category.assign(value))
+                return ResultPlugin::withRequiredBytes(PluginError::PathCapacityExceeded,
+                                                       PluginErrorDetail::MetadataCategory,
+                                                       static_cast<uint32_t>(value.sizeInBytes() + 1));
         }
         else if (key == "Dependencies") // Optional
         {
@@ -168,8 +181,14 @@ bool SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefini
             while (tokenizer.next(','))
             {
                 PluginIdentifier identifier;
-                SC_TRY(identifier.assign(tokenizer.component));
-                SC_TRY(pluginDefinition.dependencies.push_back(move(identifier)));
+                if (not identifier.assign(tokenizer.component))
+                    return ResultPlugin::withRequiredBytes(
+                        PluginError::PathCapacityExceeded, PluginErrorDetail::MetadataDependency,
+                        static_cast<uint32_t>(tokenizer.component.sizeInBytes() + 1));
+                if (not pluginDefinition.dependencies.push_back(move(identifier)))
+                    return ResultPlugin::withRequiredElements(
+                        PluginError::DefinitionCapacityExceeded, PluginErrorDetail::MetadataDependency,
+                        static_cast<uint32_t>(pluginDefinition.dependencies.size() + 1));
             }
         }
         else if (key == "Build") // Optional
@@ -178,17 +197,35 @@ bool SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefini
             while (tokenizer.next(','))
             {
                 PluginBuildOption option;
-                SC_TRY_MSG(option.assign(tokenizer.component), "Build option exceeds fixed size");
-                SC_TRY(pluginDefinition.build.push_back(option));
+                if (not option.assign(tokenizer.component))
+                    return ResultPlugin::withRequiredBytes(
+                        PluginError::PathCapacityExceeded, PluginErrorDetail::MetadataBuildOption,
+                        static_cast<uint32_t>(tokenizer.component.sizeInBytes() + 1));
+                if (not pluginDefinition.build.push_back(option))
+                    return ResultPlugin::withRequiredElements(PluginError::DefinitionCapacityExceeded,
+                                                              PluginErrorDetail::MetadataBuildOption,
+                                                              static_cast<uint32_t>(pluginDefinition.build.size() + 1));
             }
         }
     }
     for (size_t i = 0; i < sizeof(gotFields) / sizeof(bool); ++i)
     {
         if (not gotFields[i])
-            return false;
+        {
+            constexpr PluginErrorDetail requiredFields[] = {
+                PluginErrorDetail::MetadataName, PluginErrorDetail::MetadataVersion,
+                PluginErrorDetail::MetadataDescription, PluginErrorDetail::MetadataCategory};
+            return ResultPlugin(PluginError::InvalidDefinition, requiredFields[i]);
+        }
     }
-    return true;
+    parsed = true;
+    return ResultPlugin(true);
+}
+
+bool SC::PluginDefinition::parse(StringSpan text, PluginDefinition& pluginDefinition)
+{
+    bool parsed = false;
+    return static_cast<bool>(parse(text, pluginDefinition, parsed)) and parsed;
 }
 
 struct SC::PluginScanner::ScannerState
@@ -227,7 +264,9 @@ struct SC::PluginScanner::ScannerState
         StringSpan fileView = {{tempFileBuffer.data(), tempFileBuffer.size()}, false, StringEncoding::Utf8};
         if (PluginDefinition::find(fileView, extracted))
         {
-            if (PluginDefinition::parse(extracted, pluginDefinition))
+            bool parsed = false;
+            SC_TRY(PluginDefinition::parse(extracted, pluginDefinition, parsed));
+            if (parsed)
             {
                 if (pluginDefinition.identity.identifier.isEmpty())
                 {
@@ -309,8 +348,12 @@ SC::Result SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDef
     PluginFileSystemIterator iterator;
     SC_TRY(iterator.init(directory));
     PluginFileSystemIterator::Entry entry;
-    while (iterator.next(entry))
+    bool                            hasEntry = false;
+    while (true)
     {
+        SC_TRY(iterator.next(entry, hasEntry));
+        if (not hasEntry)
+            break;
         if (entry.name == SC_NATIVE_STR(".") or entry.name == SC_NATIVE_STR(".."))
         {
             continue; // skip . and ..
@@ -326,8 +369,11 @@ SC::Result SC::PluginScanner::scanDirectory(StringSpan directory, Span<PluginDef
             PluginFileSystemIterator subIterator;
             SC_TRY(subIterator.init(fullPath.view()));
             PluginFileSystemIterator::Entry subEntry;
-            while (subIterator.next(subEntry))
+            while (true)
             {
+                SC_TRY(subIterator.next(subEntry, hasEntry));
+                if (not hasEntry)
+                    break;
                 if (subEntry.name == SC_NATIVE_STR(".") or subEntry.name == SC_NATIVE_STR(".."))
                 {
                     continue; // skip . and ..

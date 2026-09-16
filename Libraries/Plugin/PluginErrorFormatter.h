@@ -76,6 +76,7 @@ inline bool appendPluginError(ResultErrorFormatter& formatter, PluginError error
     {
     case PluginError::PathNotNullTerminated: formatter.append("Path is not null terminated"); break;
     case PluginError::UnsupportedPathEncoding: formatter.append("Path encoding is not supported"); break;
+    case PluginError::InvalidDefinition: formatter.append("Plugin definition is invalid"); break;
     case PluginError::DynamicLibraryOperationUnsupported:
         formatter.append("Dynamic library operation is unsupported");
         break;

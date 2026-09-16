@@ -14,6 +14,7 @@ enum class PluginError : uint32_t
 {
     PathNotNullTerminated = 1,
     UnsupportedPathEncoding,
+    InvalidDefinition,
     DynamicLibraryOperationUnsupported,
     PathCapacityExceeded,
     DefinitionCapacityExceeded,

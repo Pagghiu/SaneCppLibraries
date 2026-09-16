@@ -24,8 +24,9 @@ The optional `PluginErrorFormatter.h` follows the Common caller-storage formatte
 enriched values, rejects foreign categories and unknown primary/detail/context values, and formats signed exit codes
 without allocation.
 
-Expected completion remains successful: absent or malformed metadata, empty directories, iterator exhaustion, optional
-symbols, absent interface hashes, no matching standalone lookup, and no-op load/unload states do not become errors.
+Expected completion remains successful: source without plugin metadata, empty directories, iterator exhaustion,
+optional symbols, absent interface hashes, no matching standalone lookup, and no-op load/unload states do not become
+errors. Metadata enclosed by plugin markers but malformed or incomplete is an inspectable `InvalidDefinition` failure.
 
 ## Consequences
 

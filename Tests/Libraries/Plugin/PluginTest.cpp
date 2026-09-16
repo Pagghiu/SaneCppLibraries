@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include <memory.h>
 
-#include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Async/Async.h"
 #include "Libraries/Common/Deferred.h"
 #include "Libraries/FileSystem/FileSystem.h"
@@ -11,6 +10,7 @@
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Plugin/Internal/PluginString.h"
+#include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Plugin/PluginErrorFormatter.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -57,6 +57,24 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(definition.dependencies[1].view() == "TestPlugin02");
             SC_TEST_EXPECT(definition.build[0] == "libc");
             SC_TEST_EXPECT(definition.build[1] == "libc++");
+
+            PluginDefinition   malformedDefinition;
+            bool               parsed    = true;
+            const ResultPlugin malformed = PluginDefinition::parse("Name: only one field", malformedDefinition, parsed);
+            SC_TEST_EXPECT(malformed.isError(PluginError::InvalidDefinition));
+            SC_TEST_EXPECT(malformed.detail == PluginErrorDetail::MetadataVersion);
+            SC_TEST_EXPECT(not parsed);
+
+            PluginDefinition oversizedDefinition;
+            constexpr char oversizedName[] = "Name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+                                             "Version: 1\n"
+                                             "Description: valid\n"
+                                             "Category: valid\n";
+            const ResultPlugin oversized   = PluginDefinition::parse(oversizedName, oversizedDefinition, parsed);
+            SC_TEST_EXPECT(not oversized);
+            SC_TEST_EXPECT(oversized.isError(PluginError::PathCapacityExceeded));
+            SC_TEST_EXPECT(oversized.detail == PluginErrorDetail::MetadataName);
+            SC_TEST_EXPECT(oversized.contextKind == PluginErrorContextKind::RequiredBytes);
         }
         if (test_section("Plugin structured errors and formatter"))
         {

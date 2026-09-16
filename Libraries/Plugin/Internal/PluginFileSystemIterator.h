@@ -1,12 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../PluginError.h"
 #include "PluginString.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>
 #else
-#include <dirent.h>   // opendir, readdir, closedir
+#include <dirent.h> // opendir, readdir, closedir
+#include <errno.h>
 #include <sys/stat.h> // stat
 #endif
 
@@ -22,24 +24,29 @@ struct PluginFileSystemIterator
     PluginFileSystemIterator() = default;
     ~PluginFileSystemIterator() { close(); }
 
-    Result init(StringSpan directoryPath)
+    ResultPlugin init(StringSpan directoryPath)
     {
-        SC_TRY(directory.assign(directoryPath));
+        if (not directory.assign(directoryPath))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::IteratorAssignDirectory);
 
         started       = false;
         pathSeparator = SC_NATIVE_STR("/");
 
 #if SC_PLATFORM_WINDOWS
         StringPath searchPath = directory;
-        SC_TRY(searchPath.append(pathSeparator));
-        SC_TRY(searchPath.append("*"));
+        if (not searchPath.append(pathSeparator) or not searchPath.append("*"))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::IteratorBuildSearchPath);
         hFind = ::FindFirstFileW(searchPath.view().getNullTerminatedNative(), &findData);
-        SC_TRY_MSG(hFind != INVALID_HANDLE_VALUE, "FindFirstFileW failed");
+        if (hFind == INVALID_HANDLE_VALUE)
+            return ResultPlugin::withNativeError(PluginError::DirectoryOpenFailed,
+                                                 PluginErrorDetail::WindowsDirectoryFindFirst, ::GetLastError());
 #else
         dir = ::opendir(directory.view().getNullTerminatedNative());
-        SC_TRY_MSG(dir, "opendir failed");
+        if (dir == nullptr)
+            return ResultPlugin::withNativeError(PluginError::DirectoryOpenFailed,
+                                                 PluginErrorDetail::PosixDirectoryOpen, static_cast<uint32_t>(errno));
 #endif
-        return Result(true);
+        return ResultPlugin(true);
     }
 
     void close()
@@ -59,8 +66,9 @@ struct PluginFileSystemIterator
 #endif
     }
 
-    bool next(Entry& entry)
+    ResultPlugin next(Entry& entry, bool& hasEntry)
     {
+        hasEntry = false;
 #if SC_PLATFORM_WINDOWS
         if (not started)
         {
@@ -68,27 +76,44 @@ struct PluginFileSystemIterator
         }
         else
         {
-            SC_TRY(::FindNextFileW(hFind, &findData) == TRUE);
+            if (::FindNextFileW(hFind, &findData) == FALSE)
+            {
+                const DWORD error = ::GetLastError();
+                if (error == ERROR_NO_MORE_FILES)
+                    return ResultPlugin(true);
+                return ResultPlugin::withNativeError(PluginError::DirectoryReadFailed,
+                                                     PluginErrorDetail::WindowsDirectoryFindNext, error);
+            }
         }
         StringSpan nativeName = StringSpan::fromNullTerminated(findData.cFileName, StringEncoding::Utf16);
-        SC_TRY(currentEntryName.assign(nativeName));
+        if (not currentEntryName.assign(nativeName))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::IteratorBuildEntryPath);
         entry.name        = currentEntryName.view();
         entry.isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-        return true;
+        hasEntry          = true;
+        return ResultPlugin(true);
 #else
-        struct dirent* current;
-        current = ::readdir(dir);
-        SC_TRY(current != nullptr);
+        errno                  = 0;
+        struct dirent* current = ::readdir(dir);
+        if (current == nullptr)
+        {
+            if (errno == 0)
+                return ResultPlugin(true);
+            return ResultPlugin::withNativeError(PluginError::DirectoryReadFailed,
+                                                 PluginErrorDetail::PosixDirectoryRead, static_cast<uint32_t>(errno));
+        }
         StringSpan entryName = StringSpan::fromNullTerminated(current->d_name, StringEncoding::Utf8);
         StringPath fullPath  = directory;
-        SC_TRY(fullPath.append(pathSeparator));
-        SC_TRY(fullPath.append(entryName));
+        if (not fullPath.append(pathSeparator) or not fullPath.append(entryName))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::IteratorBuildEntryPath);
         struct stat statBuffer;
         const int   statRes = ::stat(fullPath.view().getNullTerminatedNative(), &statBuffer);
         entry.isDirectory   = (statRes == 0 and S_ISDIR(statBuffer.st_mode));
-        SC_TRY(currentEntryName.assign(entryName));
+        if (not currentEntryName.assign(entryName))
+            return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::IteratorBuildEntryPath);
         entry.name = currentEntryName.view();
-        return true;
+        hasEntry   = true;
+        return ResultPlugin(true);
 #endif
     }
 
