@@ -19,6 +19,7 @@ struct SC::SocketTest : public SC::TestCase
 {
     inline void parseAddress();
     inline void structuredErrorsAndFormatter();
+    inline void structuredProducerFailures();
     inline void parseUnixAddress();
     inline void resolveDNS();
     inline void socketCreate();
@@ -39,6 +40,10 @@ struct SC::SocketTest : public SC::TestCase
         if (test_section("structured errors and formatter"))
         {
             structuredErrorsAndFormatter();
+        }
+        if (test_section("structured producer failures"))
+        {
+            structuredProducerFailures();
         }
         if (test_section("parseAddress"))
         {
@@ -170,6 +175,94 @@ void SC::SocketTest::structuredErrorsAndFormatter()
                                                   static_cast<SocketErrorContextKind>(999), {}),
                                      message)
                        .status == ResultErrorFormatStatus::UnknownError);
+}
+
+void SC::SocketTest::structuredProducerFailures()
+{
+    SocketIPAddress address;
+    ResultSocket    result = address.fromAddressPort("not-an-ip-address", 1);
+    SC_TEST_EXPECT(result.isError(SocketError::InvalidIPAddress));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::ParseIPv6Address);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::None);
+
+    const char nonAscii[] = {'1', static_cast<char>(0xc3), static_cast<char>(0xa9)};
+    result = address.fromAddressPort(StringSpan({nonAscii, sizeof(nonAscii)}, false, StringEncoding::Utf8), 1);
+    SC_TEST_EXPECT(result.isError(SocketError::UnsupportedTextEncoding));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::None);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::None);
+
+    SocketDescriptor           invalidSocket;
+    SocketFlags::AddressFamily family;
+    result = invalidSocket.getAddressFamily(family);
+    SC_TEST_EXPECT(result.isError(SocketError::DescriptorQueryFailed));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::GetSocketAddress);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::NativeError);
+
+    char       dnsBuffer[256] = {};
+    Span<char> dnsOutput      = {dnsBuffer};
+    result                    = SocketDNS::resolveDNS("[", dnsOutput);
+    SC_TEST_EXPECT(result.isError(SocketError::DNSResolutionFailed));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::ResolveHostName);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::ResolverError);
+
+    char smallOutput[2] = {};
+    dnsOutput           = {smallOutput};
+    result              = SocketDNS::resolveDNS("localhost", dnsOutput);
+    SC_TEST_EXPECT(result.isError(SocketError::OutputCapacityExceeded));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::CopyResolvedAddress);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(result.context.requiredBytes > 2);
+
+    SocketDescriptor datagram;
+    SC_TEST_EXPECT(datagram.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp,
+                                   SocketFlags::NonBlocking));
+    SocketIPAddress wouldBlockAddress;
+    SC_TEST_EXPECT(wouldBlockAddress.fromAddressPort("127.0.0.1", report.mapPort(5230)));
+    SocketServer wouldBlockServer(datagram);
+    SC_TEST_EXPECT(wouldBlockServer.bind(wouldBlockAddress, SocketServer::BindReuseAddress::Disabled));
+    char          receiveBuffer[16] = {};
+    Span<char>    receivedData;
+    SocketAddress sourceAddress;
+    result = datagram.receiveFrom(receiveBuffer, receivedData, sourceAddress);
+    SC_TEST_EXPECT(result.isError(SocketError::WouldBlock));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::ReceiveDatagram);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::None);
+    SC_TEST_EXPECT(wouldBlockServer.close());
+
+    SocketDescriptor timeoutSocket;
+    SC_TEST_EXPECT(
+        timeoutSocket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+    SocketIPAddress timeoutAddress;
+    SC_TEST_EXPECT(timeoutAddress.fromAddressPort("127.0.0.1", report.mapPort(5240)));
+    SocketServer timeoutServer(timeoutSocket);
+    SC_TEST_EXPECT(timeoutServer.bind(timeoutAddress, SocketServer::BindReuseAddress::Disabled));
+    SocketClient timeoutClient(timeoutSocket);
+    result = timeoutClient.readWithTimeout(receiveBuffer, receivedData, 1);
+    SC_TEST_EXPECT(result.isError(SocketError::TimedOut));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::WaitForRead);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::None);
+    SC_TEST_EXPECT(timeoutServer.close());
+
+    const uint16_t  bindPort = report.mapPort(5250);
+    SocketIPAddress bindAddress;
+    SC_TEST_EXPECT(bindAddress.fromAddressPort("127.0.0.1", bindPort));
+    SocketDescriptor firstSocket;
+    SocketDescriptor secondSocket;
+    SC_TEST_EXPECT(
+        firstSocket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+    SC_TEST_EXPECT(
+        secondSocket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+    SocketServer firstServer(firstSocket);
+    SocketServer secondServer(secondSocket);
+    SC_TEST_EXPECT(firstServer.bind(bindAddress, SocketServer::BindReuseAddress::Disabled));
+    SocketServer::BindStatus bindStatus = SocketServer::BindStatus::None;
+    result = secondServer.bind(bindAddress, SocketServer::BindReuseAddress::Disabled, &bindStatus);
+    SC_TEST_EXPECT(result.isError(SocketError::AddressInUse));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::BindSocket);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::NativeError);
+    SC_TEST_EXPECT(bindStatus == SocketServer::BindStatus::AddressInUse);
+    SC_TEST_EXPECT(secondServer.close());
+    SC_TEST_EXPECT(firstServer.close());
 }
 
 void SC::SocketTest::parseAddress()
