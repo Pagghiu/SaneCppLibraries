@@ -22,7 +22,8 @@ SC::ResultSocket SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddres
     if (not detail::isASCII(host))
         return {SocketError::UnsupportedTextEncoding, SocketErrorDetail::CopyHostName};
     if (not detail::writeNullTerminatedToBuffer(host.toCharSpan(), nullTerminated))
-        return {SocketError::InputCapacityExceeded, SocketErrorDetail::CopyHostName};
+        return ResultSocket::withRequiredBytes(SocketError::InputCapacityExceeded, SocketErrorDetail::CopyHostName,
+                                               static_cast<uint32_t>(host.sizeInBytes() + 1));
     // Get address information
     const int resolverError = ::getaddrinfo(nullTerminated, NULL, &hints, &res);
     if (resolverError != 0)
@@ -47,11 +48,7 @@ SC::ResultSocket SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddres
         {
             // Convert IP address to a readable string
             char ipstr[INET6_ADDRSTRLEN + 1] = {0};
-            if (::inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr) == nullptr)
-            {
-                result = {SocketError::DNSResolutionFailed, SocketErrorDetail::CopyResolvedAddress};
-                break;
-            }
+            ::inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
             Span<const char> ipOut = {ipstr, ::strnlen(ipstr, sizeof(ipstr) - 1)};
             if (not detail::copyFromTo(ipOut, ipAddress))
             {

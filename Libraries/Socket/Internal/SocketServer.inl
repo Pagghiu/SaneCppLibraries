@@ -67,15 +67,13 @@ SC::ResultSocket SC::SocketServer::bind(const SocketAddress& nativeAddress, Bind
         if (nativeError == EADDRINUSE)
             return ResultSocket::withNativeError(SocketError::AddressInUse, SocketErrorDetail::BindSocket, nativeError);
 #endif
-        return ResultSocket::withNativeError(SocketError::BindFailed, SocketErrorDetail::BindSocket,
 #if SC_PLATFORM_WINDOWS
-                                             nativeError
+        return ResultSocket::withNativeError(SocketError::BindFailed, SocketErrorDetail::BindSocket, nativeError);
 #elif !SC_PLATFORM_EMSCRIPTEN
-                                             nativeError
+        return ResultSocket::withNativeError(SocketError::BindFailed, SocketErrorDetail::BindSocket, nativeError);
 #else
-                                             0
+        return {SocketError::BindFailed, SocketErrorDetail::BindSocket};
 #endif
-        );
     }
     return {};
 }

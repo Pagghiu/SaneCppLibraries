@@ -25,7 +25,9 @@ struct SC::SocketIPAddressInternal
     {
         char buffer[64] = {0};
         if (not detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer))
-            return {SocketError::InputCapacityExceeded, SocketErrorDetail::ParseIPv4Address};
+            return ResultSocket::withRequiredBytes(SocketError::InputCapacityExceeded,
+                                                   SocketErrorDetail::ParseIPv4Address,
+                                                   static_cast<uint32_t>(ipAddress.sizeInBytes() + 1));
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin_port   = htons(port);
         inaddr.sin_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV4);
@@ -41,7 +43,9 @@ struct SC::SocketIPAddressInternal
     {
         char buffer[64] = {0};
         if (not detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer))
-            return {SocketError::InputCapacityExceeded, SocketErrorDetail::ParseIPv6Address};
+            return ResultSocket::withRequiredBytes(SocketError::InputCapacityExceeded,
+                                                   SocketErrorDetail::ParseIPv6Address,
+                                                   static_cast<uint32_t>(ipAddress.sizeInBytes() + 1));
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin6_port   = htons(port);
         inaddr.sin6_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV6);
@@ -180,7 +184,9 @@ SC::ResultSocket SC::SocketAddress::fromUnixPath(StringSpan path)
     static_assert(sizeof(sockaddr_un) <= sizeof(handle), "SocketAddress storage is too small for sockaddr_un");
     sockaddr_un& address = handle.reinterpret_as<sockaddr_un>();
     if (pathBytes.sizeInBytes() >= sizeof(address.sun_path))
-        return {SocketError::InputCapacityExceeded, SocketErrorDetail::BuildUnixPathAddress};
+        return ResultSocket::withRequiredBytes(SocketError::InputCapacityExceeded,
+                                               SocketErrorDetail::BuildUnixPathAddress,
+                                               static_cast<uint32_t>(pathBytes.sizeInBytes() + 1));
 
     ::memset(&address, 0, sizeof(address));
     address.sun_family = AF_UNIX;
@@ -204,7 +210,9 @@ SC::ResultSocket SC::SocketAddress::fromUnixAbstractName(Span<const char> name)
     static_assert(sizeof(sockaddr_un) <= sizeof(handle), "SocketAddress storage is too small for sockaddr_un");
     sockaddr_un& address = handle.reinterpret_as<sockaddr_un>();
     if (name.sizeInBytes() + 1 > sizeof(address.sun_path))
-        return {SocketError::InputCapacityExceeded, SocketErrorDetail::BuildUnixAbstractAddress};
+        return ResultSocket::withRequiredBytes(SocketError::InputCapacityExceeded,
+                                               SocketErrorDetail::BuildUnixAbstractAddress,
+                                               static_cast<uint32_t>(name.sizeInBytes() + 1));
 
     ::memset(&address, 0, sizeof(address));
     address.sun_family = AF_UNIX;

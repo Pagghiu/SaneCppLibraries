@@ -191,6 +191,16 @@ void SC::SocketTest::structuredProducerFailures()
     SC_TEST_EXPECT(result.detail == SocketErrorDetail::None);
     SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::None);
 
+    char addressTooLong[64];
+    for (size_t idx = 0; idx < sizeof(addressTooLong); ++idx)
+        addressTooLong[idx] = '1';
+    result =
+        address.fromAddressPort(StringSpan({addressTooLong, sizeof(addressTooLong)}, false, StringEncoding::Ascii), 1);
+    SC_TEST_EXPECT(result.isError(SocketError::InputCapacityExceeded));
+    SC_TEST_EXPECT(result.detail == SocketErrorDetail::ParseIPv4Address);
+    SC_TEST_EXPECT(result.contextKind == SocketErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(result.context.requiredBytes == sizeof(addressTooLong) + 1);
+
     SocketDescriptor           invalidSocket;
     SocketFlags::AddressFamily family;
     result = invalidSocket.getAddressFamily(family);
