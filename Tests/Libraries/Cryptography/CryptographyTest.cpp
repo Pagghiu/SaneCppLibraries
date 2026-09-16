@@ -1860,15 +1860,21 @@ void CryptographyTest::testHkdfBounds()
     uint8_t byte = 0xA5;
     SC_TEST_EXPECT(Cryptography::Hkdf::derive(backend, Cryptography::HashType::SHA384, {}, {}, {}, {}));
     SC_TEST_EXPECT(byte == 0xA5);
-    SC_TEST_EXPECT(not Cryptography::Hkdf::derive(backend, Cryptography::HashType::SHA384, {}, {}, {},
-                                                  Span<uint8_t>(&byte, 255 * 48 + 1)));
+    const ResultCryptography tooLarge = Cryptography::Hkdf::derive(backend, Cryptography::HashType::SHA384, {}, {}, {},
+                                                                   Span<uint8_t>(&byte, 255 * 48 + 1));
+    SC_TEST_EXPECT(tooLarge.isError(CryptographyError::SizeLimitExceeded));
+    SC_TEST_EXPECT(tooLarge.detail == CryptographyErrorDetail::ValidateHkdfOutput);
+    SC_TEST_EXPECT(tooLarge.contextKind == CryptographyErrorContextKind::MaximumBytes);
+    SC_TEST_EXPECT(tooLarge.context.maximumBytes == 255 * 48);
     SC_TEST_EXPECT(byte == 0xA5);
 }
 
 void CryptographyTest::testInvalidInputs()
 {
     Cryptography::Hmac hmac(backend);
-    SC_TEST_EXPECT(not hmac.setType(static_cast<Cryptography::HashType>(255)));
+    ResultCryptography failure = hmac.setType(static_cast<Cryptography::HashType>(255));
+    SC_TEST_EXPECT(failure.isError(CryptographyError::InvalidHashType));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::SetHmacType);
     if (features.hmacSha256)
     {
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
@@ -1879,16 +1885,23 @@ void CryptographyTest::testInvalidInputs()
 
     Cryptography::Aead aead(backend);
     auto               badAead = aead.init(Cryptography::AeadType::AES128GCM, Span<const uint8_t>(zeroKey32, 15));
-    SC_TEST_EXPECT(not badAead);
+    SC_TEST_EXPECT(badAead.isError(CryptographyError::InvalidKeySize));
+    SC_TEST_EXPECT(badAead.detail == CryptographyErrorDetail::ValidateAeadKey);
+    SC_TEST_EXPECT(badAead.contextKind == CryptographyErrorContextKind::ExpectedBytes);
+    SC_TEST_EXPECT(badAead.context.expectedBytes == 16);
 
     Cryptography::Cipher cipher(backend);
     auto badCipher = cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                   zeroKey16, Span<const uint8_t>(zeroIV16, 8));
-    SC_TEST_EXPECT(not badCipher);
+    SC_TEST_EXPECT(badCipher.isError(CryptographyError::InvalidInitializationVectorSize));
+    SC_TEST_EXPECT(badCipher.detail == CryptographyErrorDetail::ValidateCipherInitializationVector);
+    SC_TEST_EXPECT(badCipher.contextKind == CryptographyErrorContextKind::ExpectedBytes);
+    SC_TEST_EXPECT(badCipher.context.expectedBytes == 16);
 
     auto badOperation = cipher.start(Cryptography::CipherType::AES128CBCPKCS7,
                                      static_cast<Cryptography::Cipher::Operation>(255), zeroKey16, zeroIV16);
-    SC_TEST_EXPECT(not badOperation);
+    SC_TEST_EXPECT(badOperation.isError(CryptographyError::InvalidCipherOperation));
+    SC_TEST_EXPECT(badOperation.detail == CryptographyErrorDetail::StartCipher);
 
     if (features.aes128CbcPkcs7)
     {
@@ -1900,10 +1913,14 @@ void CryptographyTest::testInvalidInputs()
 
     uint8_t outputByte = 0;
     size_t  written    = 77;
-    SC_TEST_EXPECT(not cipher.update({}, Span<uint8_t>(&outputByte, 1), written));
+    failure            = cipher.update({}, Span<uint8_t>(&outputByte, 1), written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::UpdateCipher);
     SC_TEST_EXPECT(written == 0);
     written = 77;
-    SC_TEST_EXPECT(not cipher.finish(Span<uint8_t>(&outputByte, 1), written));
+    failure = cipher.finish(Span<uint8_t>(&outputByte, 1), written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::FinishCipher);
     SC_TEST_EXPECT(written == 0);
 
     if (features.aes128Gcm)

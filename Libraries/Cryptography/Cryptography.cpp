@@ -120,6 +120,34 @@ static bool isValid(Cryptography::Cipher::Operation operation)
     return false;
 }
 
+static ResultCryptography withExpectedBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
+{
+    if (bytes <= static_cast<size_t>(0xffffffffu))
+        return ResultCryptography::withExpectedBytes(error, detail, static_cast<uint32_t>(bytes));
+    return {error, detail};
+}
+
+static ResultCryptography withRequiredBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
+{
+    if (bytes <= static_cast<size_t>(0xffffffffu))
+        return ResultCryptography::withRequiredBytes(error, detail, static_cast<uint32_t>(bytes));
+    return {error, detail};
+}
+
+static ResultCryptography withMaximumBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
+{
+    if (bytes <= static_cast<size_t>(0xffffffffu))
+        return ResultCryptography::withMaximumBytes(error, detail, static_cast<uint32_t>(bytes));
+    return {error, detail};
+}
+
+static ResultCryptography withActualBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
+{
+    if (bytes <= static_cast<size_t>(0xffffffffu))
+        return ResultCryptography::withActualBytes(error, detail, static_cast<uint32_t>(bytes));
+    return {error, detail};
+}
+
 #if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
 static size_t keySize(Cryptography::AeadType type)
 {
@@ -159,24 +187,25 @@ static bool spansOverlap(Span<const uint8_t> input, Span<uint8_t> output)
 }
 
 static ResultCryptography validateOutputNoPartialOverlap(Span<const uint8_t> input, Span<uint8_t> output,
-                                                         const char* message)
+                                                         CryptographyErrorDetail detail)
 {
     if (spansOverlap(input, output) and not spansExactlyOverlap(input, output))
-        return Result::FromStableCharPointer(message);
+        return {CryptographyError::BufferOverlap, detail};
     return ResultCryptography(true);
 }
 
-static ResultCryptography validateOutputNoOverlap(Span<const uint8_t> input, Span<uint8_t> output, const char* message)
+static ResultCryptography validateOutputNoOverlap(Span<const uint8_t> input, Span<uint8_t> output,
+                                                  CryptographyErrorDetail detail)
 {
     if (spansOverlap(input, output))
-        return Result::FromStableCharPointer(message);
+        return {CryptographyError::BufferOverlap, detail};
     return ResultCryptography(true);
 }
 
-static ResultCryptography validateKeySize(size_t actual, size_t expected, const char* message)
+static ResultCryptography validateKeySize(size_t actual, size_t expected, CryptographyErrorDetail detail)
 {
     if (actual != expected)
-        return Result::FromStableCharPointer(message);
+        return withExpectedBytes(CryptographyError::InvalidKeySize, detail, expected);
     return ResultCryptography(true);
 }
 #endif
@@ -313,13 +342,16 @@ static ResultCryptography cipherUpdate(Backend& backend, Span<const uint8_t> inp
                                        size_t& bytesWritten)
 {
     bytesWritten = 0;
-    SC_TRY_MSG(backend.initialized, "Cryptography::Cipher::update - not initialized");
-    SC_TRY(validateOutputNoOverlap(input, output, "Cryptography::Cipher::update - overlap is not supported"));
+    if (not backend.initialized)
+        return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::UpdateCipher};
+    SC_TRY(validateOutputNoOverlap(input, output, CryptographyErrorDetail::ValidateCipherOverlap));
 
     const size_t required = backend.stream.operation == Cryptography::Cipher::Operation::Encrypt
                                 ? cipherEncryptUpdateSize(backend.stream, input.sizeInBytes())
                                 : cipherDecryptUpdateSize(backend.stream, input.sizeInBytes());
-    SC_TRY_MSG(output.sizeInBytes() >= required, "Cryptography::Cipher::update - insufficient output buffer");
+    if (output.sizeInBytes() < required)
+        return withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                 CryptographyErrorDetail::ValidateCipherOutput, required);
 
     ResultCryptography result = backend.stream.operation == Cryptography::Cipher::Operation::Encrypt
                                     ? cipherUpdateEncrypt(backend, input, output, bytesWritten)
@@ -333,11 +365,14 @@ template <typename Backend>
 static ResultCryptography cipherFinish(Backend& backend, Span<uint8_t> output, size_t& bytesWritten)
 {
     bytesWritten = 0;
-    SC_TRY_MSG(backend.initialized, "Cryptography::Cipher::finish - not initialized");
+    if (not backend.initialized)
+        return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::FinishCipher};
 
     if (backend.stream.operation == Cryptography::Cipher::Operation::Encrypt)
     {
-        SC_TRY_MSG(output.sizeInBytes() >= AESBlockSize, "Cryptography::Cipher::finish - insufficient output buffer");
+        if (output.sizeInBytes() < AESBlockSize)
+            return ResultCryptography::withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                                         CryptographyErrorDetail::ValidateCipherOutput, AESBlockSize);
 
         uint8_t       finalBlock[16];
         const uint8_t pad = static_cast<uint8_t>(AESBlockSize - backend.stream.pendingSize);
@@ -352,9 +387,11 @@ static ResultCryptography cipherFinish(Backend& backend, Span<uint8_t> output, s
     if (backend.stream.pendingSize != AESBlockSize)
     {
         backend.close();
-        return Result::Error("Cryptography::Cipher::finish - invalid ciphertext");
+        return {CryptographyError::InvalidCiphertext, CryptographyErrorDetail::ValidateCipherFinalBlock};
     }
-    SC_TRY_MSG(output.sizeInBytes() >= AESBlockSize, "Cryptography::Cipher::finish - insufficient output buffer");
+    if (output.sizeInBytes() < AESBlockSize)
+        return ResultCryptography::withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                                     CryptographyErrorDetail::ValidateCipherOutput, AESBlockSize);
 
     uint8_t            block[16];
     size_t             produced = 0;
@@ -368,7 +405,8 @@ static ResultCryptography cipherFinish(Backend& backend, Span<uint8_t> output, s
     if (produced != AESBlockSize)
     {
         secureClear(block);
-        return Result::Error("Cryptography::Cipher::finish - unexpected block size");
+        return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                               CryptographyErrorDetail::ValidateCipherFinalBlock, produced);
     }
 
     const uint8_t pad               = block[AESBlockSize - 1];
@@ -382,7 +420,7 @@ static ResultCryptography cipherFinish(Backend& backend, Span<uint8_t> output, s
     if (not validPadding)
     {
         secureClear(block);
-        return Result::Error("Cryptography::Cipher::finish - invalid ciphertext");
+        return {CryptographyError::InvalidCiphertext, CryptographyErrorDetail::ValidateCipherPadding};
     }
 
     bytesWritten = AESBlockSize - pad;
@@ -409,13 +447,20 @@ static constexpr size_t AeadMaxAssociatedDataSize = 4096;
 static ResultCryptography validateAeadArguments(Span<const uint8_t> nonce, Span<const uint8_t> aad,
                                                 Span<const uint8_t> input, Span<uint8_t> output, size_t tagSize)
 {
-    SC_TRY_MSG(nonce.sizeInBytes() == GCMNonceSize, "Cryptography::Aead - invalid nonce size");
-    SC_TRY_MSG(tagSize == GCMTagSize, "Cryptography::Aead - invalid tag size");
-    SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxInputSize and input.sizeInBytes() <= AeadMaxInputSize and
-                   output.sizeInBytes() <= AeadMaxInputSize,
-               "Cryptography::Aead - message is too large for the backend");
-    SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Aead - insufficient output buffer");
-    SC_TRY(validateOutputNoPartialOverlap(input, output, "Cryptography::Aead - partial overlap is not supported"));
+    if (nonce.sizeInBytes() != GCMNonceSize)
+        return ResultCryptography::withExpectedBytes(CryptographyError::InvalidNonceSize,
+                                                     CryptographyErrorDetail::ValidateAeadNonce, GCMNonceSize);
+    if (tagSize != GCMTagSize)
+        return ResultCryptography::withExpectedBytes(CryptographyError::InvalidTagSize,
+                                                     CryptographyErrorDetail::ValidateAeadTag, GCMTagSize);
+    if (aad.sizeInBytes() > AeadMaxInputSize or input.sizeInBytes() > AeadMaxInputSize or
+        output.sizeInBytes() > AeadMaxInputSize)
+        return withMaximumBytes(CryptographyError::SizeLimitExceeded, CryptographyErrorDetail::ValidateAeadMessageSize,
+                                AeadMaxInputSize);
+    if (output.sizeInBytes() < input.sizeInBytes())
+        return withRequiredBytes(CryptographyError::OutputCapacityExceeded, CryptographyErrorDetail::ValidateAeadOutput,
+                                 input.sizeInBytes());
+    SC_TRY(validateOutputNoPartialOverlap(input, output, CryptographyErrorDetail::ValidateAeadPartialOverlap));
     return ResultCryptography(true);
 }
 
@@ -424,11 +469,11 @@ static ResultCryptography validateAeadSealArguments(Span<const uint8_t> nonce, S
                                                     Span<uint8_t> tag)
 {
     SC_TRY(validateAeadArguments(nonce, aad, plaintext, ciphertext, tag.sizeInBytes()));
-    SC_TRY_MSG(not spansOverlap(nonce, ciphertext) and not spansOverlap(aad, ciphertext),
-               "Cryptography::Aead::seal - ciphertext overlaps nonce or associated data");
-    SC_TRY_MSG(not spansOverlap(nonce, tag) and not spansOverlap(aad, tag) and not spansOverlap(plaintext, tag) and
-                   not spansOverlap(Span<const uint8_t>(ciphertext.data(), ciphertext.sizeInBytes()), tag),
-               "Cryptography::Aead::seal - tag overlaps another argument");
+    if (spansOverlap(nonce, ciphertext) or spansOverlap(aad, ciphertext))
+        return {CryptographyError::BufferOverlap, CryptographyErrorDetail::ValidateAeadSealCiphertextOverlap};
+    if (spansOverlap(nonce, tag) or spansOverlap(aad, tag) or spansOverlap(plaintext, tag) or
+        spansOverlap(Span<const uint8_t>(ciphertext.data(), ciphertext.sizeInBytes()), tag))
+        return {CryptographyError::BufferOverlap, CryptographyErrorDetail::ValidateAeadSealTagOverlap};
     return ResultCryptography(true);
 }
 
@@ -437,9 +482,8 @@ static ResultCryptography validateAeadOpenArguments(Span<const uint8_t> nonce, S
                                                     Span<uint8_t> plaintext)
 {
     SC_TRY(validateAeadArguments(nonce, aad, ciphertext, plaintext, tag.sizeInBytes()));
-    SC_TRY_MSG(not spansOverlap(nonce, plaintext) and not spansOverlap(aad, plaintext) and
-                   not spansOverlap(tag, plaintext),
-               "Cryptography::Aead::open - plaintext overlaps nonce, associated data, or tag");
+    if (spansOverlap(nonce, plaintext) or spansOverlap(aad, plaintext) or spansOverlap(tag, plaintext))
+        return {CryptographyError::BufferOverlap, CryptographyErrorDetail::ValidateAeadOpenPlaintextOverlap};
     return ResultCryptography(true);
 }
 #endif
@@ -816,8 +860,13 @@ struct SC::Cryptography::Aead::Internal
         size_t                written = 0;
         const CCCryptorStatus status  = CCCryptorUpdate(aesEncryptor, input.data(), input.sizeInBytes(), output.data(),
                                                         output.sizeInBytes(), &written);
-        SC_TRY_MSG(status == kCCSuccess and written == input.sizeInBytes(),
-                   "Cryptography::Aead - CommonCrypto AES encryption failed");
+        if (status != kCCSuccess)
+            return ResultCryptography::withAppleCommonCryptoStatus(
+                CryptographyError::BackendOperationFailed, CryptographyErrorDetail::AppleCommonCryptoAeadEncrypt,
+                status);
+        if (written != input.sizeInBytes())
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::AppleCommonCryptoAeadEncrypt, written);
         return ResultCryptography(true);
     }
 
@@ -826,14 +875,16 @@ struct SC::Cryptography::Aead::Internal
         reset();
         if (backend == Backend::OpenSSL)
             return openSSL.init(type, key);
-        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateAeadKey));
 
         const CCCryptorStatus status = CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, kCCOptionECBMode, key.data(),
                                                        key.sizeInBytes(), nullptr, &aesEncryptor);
         if (status != kCCSuccess)
         {
             close();
-            return Result::Error("Cryptography::Aead::init - CCCryptorCreate failed");
+            return ResultCryptography::withAppleCommonCryptoStatus(CryptographyError::BackendInitializationFailed,
+                                                                   CryptographyErrorDetail::AppleCommonCryptoAeadCreate,
+                                                                   status);
         }
 
         uint8_t            zeroBlock[AESBlockSize] = {0};
@@ -912,7 +963,8 @@ struct SC::Cryptography::Aead::Internal
     {
         if (backend == Backend::OpenSSL)
             return openSSL.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
-        SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::SealAead};
         SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
 
         ResultCryptography result = transform(nonce, plaintext, ciphertext);
@@ -936,7 +988,8 @@ struct SC::Cryptography::Aead::Internal
     {
         if (backend == Backend::OpenSSL)
             return openSSL.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
-        SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::OpenAead};
         SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
 
         uint8_t            expectedTag[AESBlockSize];
@@ -945,8 +998,9 @@ struct SC::Cryptography::Aead::Internal
         {
             secureClear(expectedTag);
             secureClear(plaintext);
-            return result ? ResultCryptography(Result::Error("Cryptography::Aead::open - authentication failed"))
-                          : result;
+            return result
+                       ? ResultCryptography(CryptographyError::AuthenticationFailed, CryptographyErrorDetail::OpenAead)
+                       : result;
         }
         secureClear(expectedTag);
 
@@ -1001,13 +1055,18 @@ struct SC::Cryptography::Cipher::Internal
         reset();
         if (backend == Backend::OpenSSL)
             return openSSL.start(type, operation, key, iv);
-        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Cipher::start - invalid key size"));
-        SC_TRY_MSG(iv.sizeInBytes() == AESBlockSize, "Cryptography::Cipher::start - invalid IV size");
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateCipherKey));
+        if (iv.sizeInBytes() != AESBlockSize)
+            return withExpectedBytes(CryptographyError::InvalidInitializationVectorSize,
+                                     CryptographyErrorDetail::ValidateCipherInitializationVector, AESBlockSize);
 
         CCCryptorStatus status =
             CCCryptorCreate(operation == Operation::Encrypt ? kCCEncrypt : kCCDecrypt, kCCAlgorithmAES, 0, key.data(),
                             key.sizeInBytes(), iv.data(), &cryptor);
-        SC_TRY_MSG(status == kCCSuccess, "Cryptography::Cipher::start - CCCryptorCreate failed");
+        if (status != kCCSuccess)
+            return ResultCryptography::withAppleCommonCryptoStatus(
+                CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::AppleCommonCryptoCipherCreate,
+                status);
 
         stream.operation = operation;
         initialized      = true;
@@ -1017,13 +1076,21 @@ struct SC::Cryptography::Cipher::Internal
     ResultCryptography processBlocks(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
         bytesWritten = 0;
-        SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
-        SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Cipher - insufficient output buffer");
+        if (input.sizeInBytes() % AESBlockSize != 0)
+            return {CryptographyError::InvalidBlockInputSize, CryptographyErrorDetail::ValidateCipherBlockInput};
+        if (output.sizeInBytes() < input.sizeInBytes())
+            return withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                     CryptographyErrorDetail::ValidateCipherOutput, input.sizeInBytes());
 
         CCCryptorStatus status = CCCryptorUpdate(cryptor, input.data(), input.sizeInBytes(), output.data(),
                                                  output.sizeInBytes(), &bytesWritten);
-        SC_TRY_MSG(status == kCCSuccess and bytesWritten == input.sizeInBytes(),
-                   "Cryptography::Cipher - CCCryptorUpdate failed");
+        if (status != kCCSuccess)
+            return ResultCryptography::withAppleCommonCryptoStatus(
+                CryptographyError::BackendOperationFailed, CryptographyErrorDetail::AppleCommonCryptoCipherUpdate,
+                status);
+        if (bytesWritten != input.sizeInBytes())
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::AppleCommonCryptoCipherUpdate, bytesWritten);
         return ResultCryptography(true);
     }
 
@@ -1089,7 +1156,8 @@ struct SC::Cryptography::Hmac::Internal
     {
         if (backend == Backend::OpenSSL)
             return openSSL.add(data);
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::AddHmacData};
         CCHmacUpdate(&context, data.data(), data.sizeInBytes());
         return ResultCryptography(true);
     }
@@ -1098,7 +1166,8 @@ struct SC::Cryptography::Hmac::Internal
     {
         if (backend == Backend::OpenSSL)
             return openSSL.getMac(result);
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::getMac - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::FinalizeHmac};
         result.size = digestSize(type);
         CCHmacFinal(&context, result.bytes);
         secureClear(Span<uint8_t>(reinterpret_cast<uint8_t*>(&context), sizeof(context)));
@@ -1154,7 +1223,7 @@ struct SC::Cryptography::Aead::Internal
         reset();
         if (backend == Backend::OpenSSL)
             return openSSL.init(type, keyBytes);
-        SC_TRY(validateKeySize(keyBytes.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
+        SC_TRY(validateKeySize(keyBytes.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateAeadKey));
 
         NTSTATUS status = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_AES_ALGORITHM, nullptr, 0);
         SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Aead::init - BCryptOpenAlgorithmProvider failed");
@@ -1312,9 +1381,10 @@ struct SC::Cryptography::Cipher::Internal
         reset();
         if (backend == Backend::OpenSSL)
             return openSSL.start(type, newOperation, keyBytes, iv);
-        SC_TRY(
-            validateKeySize(keyBytes.sizeInBytes(), keySize(type), "Cryptography::Cipher::start - invalid key size"));
-        SC_TRY_MSG(iv.sizeInBytes() == AESBlockSize, "Cryptography::Cipher::start - invalid IV size");
+        SC_TRY(validateKeySize(keyBytes.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateCipherKey));
+        if (iv.sizeInBytes() != AESBlockSize)
+            return withExpectedBytes(CryptographyError::InvalidInitializationVectorSize,
+                                     CryptographyErrorDetail::ValidateCipherInitializationVector, AESBlockSize);
 
         NTSTATUS status = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_AES_ALGORITHM, nullptr, 0);
         SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Cipher::start - BCryptOpenAlgorithmProvider failed");
@@ -1569,7 +1639,7 @@ struct AFAlgAeadBackend
     ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
         close();
-        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateAeadKey));
         SC_TRY(openAlgorithmSocket("aead", "gcm(aes)", mainSocket));
         auto deferClose = MakeDeferred([&] { close(); });
         SC_TRY(configureKey(mainSocket, key));
@@ -1728,7 +1798,7 @@ struct AFAlgCipherBackend
     ResultCryptography start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         close();
-        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Cipher::start - invalid key size"));
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateCipherKey));
         SC_TRY_MSG(iv.sizeInBytes() == AESBlockSize, "Cryptography::Cipher::start - invalid IV size");
         SC_TRY(openAlgorithmSocket("skcipher", "cbc(aes)", mainSocket));
         auto deferClose = MakeDeferred([&] { close(); });
@@ -1925,7 +1995,7 @@ struct OpenSSL3AeadBackendImplementation
     ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
         close();
-        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Aead::init - invalid key size"));
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateAeadKey));
 
         OpenSSL3API& api = openSSL3API();
         SC_TRY_MSG(api.isValid(), "Cryptography::Aead::init - OpenSSL 3 is unavailable");
@@ -2091,8 +2161,10 @@ struct OpenSSL3CipherBackendImplementation
     ResultCryptography start(CipherType type, Operation newOperation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
         close();
-        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), "Cryptography::Cipher::start - invalid key size"));
-        SC_TRY_MSG(iv.sizeInBytes() == AESBlockSize, "Cryptography::Cipher::start - invalid IV size");
+        SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateCipherKey));
+        if (iv.sizeInBytes() != AESBlockSize)
+            return withExpectedBytes(CryptographyError::InvalidInitializationVectorSize,
+                                     CryptographyErrorDetail::ValidateCipherInitializationVector, AESBlockSize);
 
         OpenSSL3API& api = openSSL3API();
         SC_TRY_MSG(api.isValid(), "Cryptography::Cipher::start - OpenSSL 3 is unavailable");
@@ -2554,17 +2626,17 @@ struct SC::Cryptography::Aead::Internal
 
     ResultCryptography init(AeadType, Span<const uint8_t>)
     {
-        return Result::Error("Cryptography::Aead - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::InitializeAead};
     }
     ResultCryptography seal(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<uint8_t>, Span<uint8_t>,
                             size_t&)
     {
-        return Result::Error("Cryptography::Aead - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::SealAead};
     }
     ResultCryptography open(Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>, Span<const uint8_t>,
                             Span<uint8_t>, size_t&)
     {
-        return Result::Error("Cryptography::Aead - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::OpenAead};
     }
 };
 
@@ -2573,15 +2645,15 @@ struct SC::Cryptography::Cipher::Internal
     void               setBackend(Backend) {}
     ResultCryptography start(CipherType, Operation, Span<const uint8_t>, Span<const uint8_t>)
     {
-        return Result::Error("Cryptography::Cipher - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::StartCipher};
     }
     ResultCryptography update(Span<const uint8_t>, Span<uint8_t>, size_t&)
     {
-        return Result::Error("Cryptography::Cipher - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::UpdateCipher};
     }
     ResultCryptography finish(Span<uint8_t>, size_t&)
     {
-        return Result::Error("Cryptography::Cipher - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::FinishCipher};
     }
     void reset() {}
 };
@@ -2589,14 +2661,23 @@ struct SC::Cryptography::Cipher::Internal
 struct SC::Cryptography::Hmac::Internal
 {
     void               setBackend(Backend) {}
-    ResultCryptography setType(HashType) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
+    ResultCryptography setType(HashType)
+    {
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::SetHmacType};
+    }
     ResultCryptography setKey(Span<const uint8_t>)
     {
-        return Result::Error("Cryptography::Hmac - unsupported platform");
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::SetHmacKey};
     }
-    ResultCryptography add(Span<const uint8_t>) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
-    ResultCryptography getMac(MacResult&) { return Result::Error("Cryptography::Hmac - unsupported platform"); }
-    void               reset() {}
+    ResultCryptography add(Span<const uint8_t>)
+    {
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::AddHmacData};
+    }
+    ResultCryptography getMac(MacResult&)
+    {
+        return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::FinalizeHmac};
+    }
+    void reset() {}
 };
 #endif
 
@@ -2676,8 +2757,11 @@ SC::ResultCryptography SC::Cryptography::Random::fill(Span<uint8_t> output)
         return ResultCryptography(true);
 
 #if SC_PLATFORM_APPLE
-    SC_TRY_MSG(CCRandomGenerateBytes(output.data(), output.sizeInBytes()) == kCCSuccess,
-               "Cryptography::Random::fill - CCRandomGenerateBytes failed");
+    const int status = CCRandomGenerateBytes(output.data(), output.sizeInBytes());
+    if (status != kCCSuccess)
+        return ResultCryptography::withAppleCommonCryptoStatus(CryptographyError::RandomGenerationFailed,
+                                                               CryptographyErrorDetail::AppleCommonCryptoRandomGenerate,
+                                                               status);
     return ResultCryptography(true);
 #elif SC_PLATFORM_WINDOWS
     size_t offset = 0;
@@ -2686,7 +2770,10 @@ SC::ResultCryptography SC::Cryptography::Random::fill(Span<uint8_t> output)
         const size_t chunkSize = min(BcryptMaxInputSize, output.sizeInBytes() - offset);
         NTSTATUS     status    = BCryptGenRandom(nullptr, output.data() + offset, static_cast<ULONG>(chunkSize),
                                                  BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-        SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Random::fill - BCryptGenRandom failed");
+        if (not bcryptSuccess(status))
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::RandomGenerationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptRandomGenerate,
+                                                           static_cast<uint32_t>(status));
         offset += chunkSize;
     }
     return ResultCryptography(true);
@@ -2697,20 +2784,29 @@ SC::ResultCryptography SC::Cryptography::Random::fill(Span<uint8_t> output)
         ssize_t res = ::getrandom(output.data() + total, output.sizeInBytes() - total, 0);
         if (res == -1 and errno == EINTR)
             continue;
-        SC_TRY_MSG(res > 0, "Cryptography::Random::fill - getrandom failed");
+        if (res == -1)
+        {
+            const int errorNumber = errno;
+            return ResultCryptography::withPosixErrno(CryptographyError::RandomGenerationFailed,
+                                                      CryptographyErrorDetail::LinuxGetRandom, errorNumber);
+        }
+        if (res == 0)
+            return withActualBytes(CryptographyError::RandomGenerationFailed, CryptographyErrorDetail::LinuxGetRandom,
+                                   0);
         total += static_cast<size_t>(res);
     }
     return ResultCryptography(true);
 #else
     (void)output;
-    return Result::Error("Cryptography::Random::fill - unsupported platform");
+    return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::FillRandom};
 #endif
 }
 
 SC::ResultCryptography SC::Cryptography::Aead::init(AeadType type, Span<const uint8_t> key)
 {
     internal.get().reset();
-    SC_TRY_MSG(isValid(type), "Cryptography::Aead::init - invalid AEAD type");
+    if (not isValid(type))
+        return {CryptographyError::InvalidAeadType, CryptographyErrorDetail::InitializeAead};
     return internal.get().init(type, key);
 }
 
@@ -2734,8 +2830,10 @@ SC::ResultCryptography SC::Cryptography::Cipher::start(CipherType type, Operatio
                                                        Span<const uint8_t> iv)
 {
     reset();
-    SC_TRY_MSG(isValid(type), "Cryptography::Cipher::start - invalid cipher type");
-    SC_TRY_MSG(isValid(operation), "Cryptography::Cipher::start - invalid operation");
+    if (not isValid(type))
+        return {CryptographyError::InvalidCipherType, CryptographyErrorDetail::StartCipher};
+    if (not isValid(operation))
+        return {CryptographyError::InvalidCipherOperation, CryptographyErrorDetail::StartCipher};
     return internal.get().start(type, operation, key, iv);
 }
 
@@ -2757,7 +2855,8 @@ void SC::Cryptography::Cipher::reset() { internal.get().reset(); }
 SC::ResultCryptography SC::Cryptography::Hmac::setType(HashType type)
 {
     reset();
-    SC_TRY_MSG(isValid(type), "Cryptography::Hmac::setType - invalid hash type");
+    if (not isValid(type))
+        return {CryptographyError::InvalidHashType, CryptographyErrorDetail::SetHmacType};
     return internal.get().setType(type);
 }
 
@@ -2784,8 +2883,11 @@ SC::ResultCryptography SC::Cryptography::Hkdf::derive(Backend backend, HashType 
                                                       Span<uint8_t> output)
 {
     size_t hashLen = digestSize(type);
-    SC_TRY_MSG(hashLen > 0, "Cryptography::Hkdf::derive - unsupported hash type");
-    SC_TRY_MSG(output.sizeInBytes() <= hashLen * 255, "Cryptography::Hkdf::derive - output too large");
+    if (hashLen == 0)
+        return {CryptographyError::InvalidHashType, CryptographyErrorDetail::DeriveHkdf};
+    if (output.sizeInBytes() > hashLen * 255)
+        return withMaximumBytes(CryptographyError::SizeLimitExceeded, CryptographyErrorDetail::ValidateHkdfOutput,
+                                hashLen * 255);
     auto clearOutputOnFailure = MakeDeferred([&] { secureClear(output); });
 
     uint8_t zeroSalt[48] = {0};
