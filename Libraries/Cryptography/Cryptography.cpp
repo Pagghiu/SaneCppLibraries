@@ -624,7 +624,9 @@ static ResultCryptography openAlgorithmSocket(const char* algorithmType, const c
     closeIfValid(mainSocket);
 
     mainSocket = ::socket(AF_ALG, SOCK_SEQPACKET, 0);
-    SC_TRY_MSG(mainSocket != -1, "Cryptography - socket(AF_ALG) failed");
+    if (mainSocket == -1)
+        return ResultCryptography::withPosixErrno(CryptographyError::BackendInitializationFailed,
+                                                  CryptographyErrorDetail::LinuxAFAlgCreateAlgorithmSocket, errno);
 
     sockaddr_alg sa;
     memset(&sa, 0, sizeof(sa));
@@ -634,8 +636,10 @@ static ResultCryptography openAlgorithmSocket(const char* algorithmType, const c
 
     if (::bind(mainSocket, reinterpret_cast<sockaddr*>(&sa), sizeof(sa)) == -1)
     {
+        const int errorNumber = errno;
         closeIfValid(mainSocket);
-        return Result::Error("Cryptography - bind(AF_ALG) failed");
+        return ResultCryptography::withPosixErrno(CryptographyError::BackendInitializationFailed,
+                                                  CryptographyErrorDetail::LinuxAFAlgBindAlgorithmSocket, errorNumber);
     }
 
     return ResultCryptography(true);
@@ -647,7 +651,8 @@ static ResultCryptography acceptOperationSocket(int mainSocket, int& opSocket)
     opSocket = ::accept(mainSocket, nullptr, 0);
     if (opSocket == -1)
     {
-        return Result::Error("Cryptography - accept(AF_ALG) failed");
+        return ResultCryptography::withPosixErrno(CryptographyError::BackendInitializationFailed,
+                                                  CryptographyErrorDetail::LinuxAFAlgAcceptOperationSocket, errno);
     }
     return ResultCryptography(true);
 }
@@ -666,10 +671,12 @@ static bool algorithmSupported(const char* algorithmType, const char* algorithmN
 
 static ResultCryptography configureKey(int mainSocket, Span<const uint8_t> key)
 {
-    SC_TRY_MSG(key.sizeInBytes() <= 0xffffffffu, "Cryptography - key is too large for the backend");
-    SC_TRY_MSG(
-        ::setsockopt(mainSocket, SOL_ALG, ALG_SET_KEY, key.data(), static_cast<unsigned int>(key.sizeInBytes())) == 0,
-        "Cryptography - ALG_SET_KEY failed");
+    if (key.sizeInBytes() > 0xffffffffu)
+        return ResultCryptography::withMaximumBytes(CryptographyError::SizeLimitExceeded,
+                                                    CryptographyErrorDetail::LinuxAFAlgSetKey, 0xffffffffu);
+    if (::setsockopt(mainSocket, SOL_ALG, ALG_SET_KEY, key.data(), static_cast<unsigned int>(key.sizeInBytes())) != 0)
+        return ResultCryptography::withPosixErrno(CryptographyError::BackendConfigurationFailed,
+                                                  CryptographyErrorDetail::LinuxAFAlgSetKey, errno);
     return ResultCryptography(true);
 }
 
@@ -1703,8 +1710,10 @@ struct AFAlgAeadBackend
         SC_TRY(openAlgorithmSocket("aead", "gcm(aes)", mainSocket));
         auto deferClose = MakeDeferred([&] { close(); });
         SC_TRY(configureKey(mainSocket, key));
-        SC_TRY_MSG(::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) == 0,
-                   "Cryptography::Aead::init - ALG_SET_AEAD_AUTHSIZE failed");
+        if (::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) != 0)
+            return ResultCryptography::withPosixErrno(CryptographyError::BackendConfigurationFailed,
+                                                      CryptographyErrorDetail::LinuxAFAlgSetAeadAuthenticationSize,
+                                                      errno);
         initialized = true;
         deferClose.disarm();
         return ResultCryptography(true);
@@ -1714,13 +1723,16 @@ struct AFAlgAeadBackend
                             Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         bytesWritten = 0;
-        SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::SealAead};
         SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
-        SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxAssociatedDataSize,
-                   "Cryptography::Aead - associated data is too large for the Linux backend");
-        SC_TRY_MSG(plaintext.sizeInBytes() <= AeadMaxInputSize - GCMTagSize and
-                       aad.sizeInBytes() <= AeadMaxInputSize - plaintext.sizeInBytes(),
-                   "Cryptography::Aead - message is too large for the backend");
+        if (aad.sizeInBytes() > AeadMaxAssociatedDataSize)
+            return withMaximumBytes(CryptographyError::SizeLimitExceeded,
+                                    CryptographyErrorDetail::ValidateAeadMessageSize, AeadMaxAssociatedDataSize);
+        if (plaintext.sizeInBytes() > AeadMaxInputSize - GCMTagSize or
+            aad.sizeInBytes() > AeadMaxInputSize - plaintext.sizeInBytes())
+            return withMaximumBytes(CryptographyError::SizeLimitExceeded,
+                                    CryptographyErrorDetail::ValidateAeadMessageSize, AeadMaxInputSize);
         SC_TRY(acceptOperationSocket(mainSocket, opSocket));
         auto deferClose = MakeDeferred([&] { closeIfValid(opSocket); });
 
@@ -1739,7 +1751,12 @@ struct AFAlgAeadBackend
 
         const size_t  inputSize = aad.sizeInBytes() + plaintext.sizeInBytes();
         const ssize_t sent      = ::sendmsg(opSocket, &inputMessage, 0);
-        SC_TRY_MSG(sent == static_cast<ssize_t>(inputSize), "Cryptography::Aead::seal - sendmsg failed");
+        if (sent < 0)
+            return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                      CryptographyErrorDetail::LinuxAFAlgAeadSealSend, errno);
+        if (sent != static_cast<ssize_t>(inputSize))
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgAeadSealSend, static_cast<size_t>(sent));
 
         uint8_t associatedDataOutput[AeadMaxAssociatedDataSize];
         iovec   outputIov[3];
@@ -1759,8 +1776,14 @@ struct AFAlgAeadBackend
         const ssize_t received   = ::recvmsg(opSocket, &outputMessage, 0);
         if (received != static_cast<ssize_t>(outputSize))
         {
+            const int errorNumber = errno;
             secureClear(tag);
-            return Result::Error("Cryptography::Aead::seal - recvmsg failed");
+            if (received < 0)
+                return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                          CryptographyErrorDetail::LinuxAFAlgAeadSealReceive,
+                                                          errorNumber);
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgAeadSealReceive, static_cast<size_t>(received));
         }
 
         bytesWritten = plaintext.sizeInBytes();
@@ -1771,13 +1794,16 @@ struct AFAlgAeadBackend
                             Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         bytesWritten = 0;
-        SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::OpenAead};
         SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
-        SC_TRY_MSG(aad.sizeInBytes() <= AeadMaxAssociatedDataSize,
-                   "Cryptography::Aead - associated data is too large for the Linux backend");
-        SC_TRY_MSG(ciphertext.sizeInBytes() <= AeadMaxInputSize - GCMTagSize and
-                       aad.sizeInBytes() <= AeadMaxInputSize - ciphertext.sizeInBytes() - GCMTagSize,
-                   "Cryptography::Aead - message is too large for the backend");
+        if (aad.sizeInBytes() > AeadMaxAssociatedDataSize)
+            return withMaximumBytes(CryptographyError::SizeLimitExceeded,
+                                    CryptographyErrorDetail::ValidateAeadMessageSize, AeadMaxAssociatedDataSize);
+        if (ciphertext.sizeInBytes() > AeadMaxInputSize - GCMTagSize or
+            aad.sizeInBytes() > AeadMaxInputSize - ciphertext.sizeInBytes() - GCMTagSize)
+            return withMaximumBytes(CryptographyError::SizeLimitExceeded,
+                                    CryptographyErrorDetail::ValidateAeadMessageSize, AeadMaxInputSize);
         SC_TRY(acceptOperationSocket(mainSocket, opSocket));
         auto deferClose = MakeDeferred([&] { closeIfValid(opSocket); });
 
@@ -1800,8 +1826,13 @@ struct AFAlgAeadBackend
         const ssize_t sent      = ::sendmsg(opSocket, &inputMessage, 0);
         if (sent != static_cast<ssize_t>(inputSize))
         {
+            const int errorNumber = errno;
             secureClear(plaintext);
-            return Result::Error("Cryptography::Aead::open - sendmsg failed");
+            if (sent < 0)
+                return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                          CryptographyErrorDetail::LinuxAFAlgAeadOpenSend, errorNumber);
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgAeadOpenSend, static_cast<size_t>(sent));
         }
 
         uint8_t associatedDataOutput[AeadMaxAssociatedDataSize];
@@ -1823,10 +1854,18 @@ struct AFAlgAeadBackend
         const ssize_t received = ::recvmsg(opSocket, &outputMessage, 0);
         if (received != static_cast<ssize_t>(aad.sizeInBytes() + ciphertext.sizeInBytes()))
         {
+            const int errorNumber = errno;
             secureClear(plaintext);
-            if (received == -1 and errno == EBADMSG)
-                return Result::Error("Cryptography::Aead::open - authentication failed");
-            return Result::Error("Cryptography::Aead::open - recvmsg failed");
+            if (received == -1 and errorNumber == EBADMSG)
+                return ResultCryptography::withPosixErrno(CryptographyError::AuthenticationFailed,
+                                                          CryptographyErrorDetail::LinuxAFAlgAeadOpenReceive,
+                                                          errorNumber);
+            if (received < 0)
+                return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                          CryptographyErrorDetail::LinuxAFAlgAeadOpenReceive,
+                                                          errorNumber);
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgAeadOpenReceive, static_cast<size_t>(received));
         }
 
         bytesWritten = ciphertext.sizeInBytes();
@@ -1859,7 +1898,9 @@ struct AFAlgCipherBackend
     {
         close();
         SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateCipherKey));
-        SC_TRY_MSG(iv.sizeInBytes() == AESBlockSize, "Cryptography::Cipher::start - invalid IV size");
+        if (iv.sizeInBytes() != AESBlockSize)
+            return withExpectedBytes(CryptographyError::InvalidInitializationVectorSize,
+                                     CryptographyErrorDetail::ValidateCipherInitializationVector, AESBlockSize);
         SC_TRY(openAlgorithmSocket("skcipher", "cbc(aes)", mainSocket));
         auto deferClose = MakeDeferred([&] { close(); });
         SC_TRY(configureKey(mainSocket, key));
@@ -1877,8 +1918,11 @@ struct AFAlgCipherBackend
         if (input.empty())
             return ResultCryptography(true);
 
-        SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
-        SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Cipher - insufficient output buffer");
+        if (input.sizeInBytes() % AESBlockSize != 0)
+            return {CryptographyError::InvalidBlockInputSize, CryptographyErrorDetail::ValidateCipherBlockInput};
+        if (output.sizeInBytes() < input.sizeInBytes())
+            return withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                     CryptographyErrorDetail::ValidateCipherOutput, input.sizeInBytes());
 
         char control[CMSG_SPACE(sizeof(uint32_t)) + CMSG_SPACE(sizeof(af_alg_iv) + 16)];
         memset(control, 0, sizeof(control));
@@ -1910,10 +1954,20 @@ struct AFAlgCipherBackend
         memcpy(iv->iv, currentIV, sizeof(currentIV));
 
         ssize_t sent = ::sendmsg(opSocket, &message, 0);
-        SC_TRY_MSG(sent == static_cast<ssize_t>(input.sizeInBytes()), "Cryptography::Cipher - sendmsg failed");
+        if (sent < 0)
+            return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                      CryptographyErrorDetail::LinuxAFAlgCipherSend, errno);
+        if (sent != static_cast<ssize_t>(input.sizeInBytes()))
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgCipherSend, static_cast<size_t>(sent));
 
         ssize_t received = ::recv(opSocket, output.data(), input.sizeInBytes(), 0);
-        SC_TRY_MSG(received == static_cast<ssize_t>(input.sizeInBytes()), "Cryptography::Cipher - recv failed");
+        if (received < 0)
+            return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                      CryptographyErrorDetail::LinuxAFAlgCipherReceive, errno);
+        if (received != static_cast<ssize_t>(input.sizeInBytes()))
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgCipherReceive, static_cast<size_t>(received));
         bytesWritten = input.sizeInBytes();
 
         if (stream.operation == Operation::Encrypt)
@@ -1983,13 +2037,19 @@ struct AFAlgHmacBackend
 
     ResultCryptography add(Span<const uint8_t> data)
     {
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::AddHmacData};
         size_t offset = 0;
         while (offset < data.sizeInBytes())
         {
             const size_t chunkSize = min(static_cast<size_t>(0x7fffffffu), data.sizeInBytes() - offset);
             ssize_t      sent      = ::send(opSocket, data.data() + offset, chunkSize, MSG_MORE);
-            SC_TRY_MSG(sent > 0, "Cryptography::Hmac::add - send failed");
+            if (sent < 0)
+                return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                          CryptographyErrorDetail::LinuxAFAlgHmacSend, errno);
+            if (sent == 0)
+                return ResultCryptography::withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                                           CryptographyErrorDetail::LinuxAFAlgHmacSend, 0);
             offset += static_cast<size_t>(sent);
         }
         return ResultCryptography(true);
@@ -1997,15 +2057,21 @@ struct AFAlgHmacBackend
 
     ResultCryptography getMac(MacResult& result)
     {
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::getMac - key not set");
-        result.size      = digestSize(type);
-        ssize_t received = ::recv(opSocket, result.bytes, result.size, 0);
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::FinalizeHmac};
+        result.size           = digestSize(type);
+        ssize_t   received    = ::recv(opSocket, result.bytes, result.size, 0);
+        const int errorNumber = received < 0 ? errno : 0;
         close();
         if (received != static_cast<ssize_t>(result.size))
         {
             secureClear(result.bytes);
             result.size = 0;
-            return Result::Error("Cryptography::Hmac::getMac - recv failed");
+            if (received < 0)
+                return ResultCryptography::withPosixErrno(CryptographyError::BackendOperationFailed,
+                                                          CryptographyErrorDetail::LinuxAFAlgHmacReceive, errorNumber);
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::LinuxAFAlgHmacReceive, static_cast<size_t>(received));
         }
         return ResultCryptography(true);
     }
