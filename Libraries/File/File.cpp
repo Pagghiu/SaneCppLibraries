@@ -492,7 +492,8 @@ SC::ResultFile SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handl
 {
     if (::close(handle) != 0)
     {
-        return Result::Error("FileDescriptorDefinition::releaseHandle - close failed");
+        return ResultFile::withNativeError(FileError::CloseFailed, FileErrorDetail::CloseDescriptor,
+                                           static_cast<uint32_t>(errno));
     }
     return Result(true);
 }
@@ -503,23 +504,42 @@ SC::ResultFile SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handl
 //-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
-    static ResultFile translateReadError(int errorCode)
+    static ResultFile translateReadError(int errorCode, FileErrorDetail detail)
     {
         switch (errorCode)
         {
-        case EAGAIN: return Result::Error("EAGAIN");
+        case EAGAIN: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
 #if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
-        case EWOULDBLOCK: return Result::Error("EWOULDBLOCK");
+        case EWOULDBLOCK: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
 #endif
-        case EBADF: return Result::Error("EBADF");
-        case EFAULT: return Result::Error("EFAULT");
-        case EINTR: return Result::Error("EINTR");
-        case EINVAL: return Result::Error("EINVAL");
-        case EIO: return Result::Error("EIO");
-        case EISDIR: return Result::Error("EISDIR");
-        case ENOMEM: return Result::Error("ENOMEM");
+        case EBADF: return ResultFile::withNativeError(FileError::InvalidHandle, detail, errorCode);
+#if defined(ECANCELED)
+        case ECANCELED: return ResultFile::withNativeError(FileError::OperationCancelled, detail, errorCode);
+#endif
+#if defined(EPIPE)
+        case EPIPE: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, errorCode);
+#endif
         }
-        return Result::Error("Unknown");
+        return ResultFile::withNativeError(FileError::ReadFailed, detail, errorCode);
+    }
+
+    static ResultFile translateWriteError(int errorCode, FileErrorDetail detail)
+    {
+        switch (errorCode)
+        {
+        case EAGAIN: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
+#if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
+        case EWOULDBLOCK: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
+#endif
+        case EBADF: return ResultFile::withNativeError(FileError::InvalidHandle, detail, errorCode);
+#if defined(ECANCELED)
+        case ECANCELED: return ResultFile::withNativeError(FileError::OperationCancelled, detail, errorCode);
+#endif
+#if defined(EPIPE)
+        case EPIPE: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, errorCode);
+#endif
+        }
+        return ResultFile::withNativeError(FileError::WriteFailed, detail, errorCode);
     }
 
     static ResultFile readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer,
@@ -539,8 +559,8 @@ struct SC::FileDescriptor::Internal
         }
         else
         {
-            SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0,
-                       "FileDescriptor::readAppend - buffer must be bigger than zero");
+            if (fallbackBuffer.sizeInBytes() == 0)
+                return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptor);
             do
             {
                 numReadBytes = ::read(fileDescriptor, fallbackBuffer.data(), fallbackBuffer.sizeInBytes());
@@ -548,8 +568,8 @@ struct SC::FileDescriptor::Internal
         }
         if (numReadBytes > 0)
         {
-            SC_TRY_MSG(buffer.resizeWithoutInitializing(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)),
-                       "FileDescriptor::readAppend - resize failed");
+            if (not buffer.resizeWithoutInitializing(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)))
+                return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::GrowReadBuffer);
             if (not useVector)
             {
                 auto newBufferData = buffer.getDirectAccess();
@@ -567,7 +587,7 @@ struct SC::FileDescriptor::Internal
         }
         else
         {
-            return Internal::translateReadError(errno);
+            return Internal::translateReadError(errno, FileErrorDetail::ReadDescriptor);
         }
     }
 
@@ -579,7 +599,9 @@ struct SC::FileDescriptor::Internal
         {
             oldFlags = ::fcntl(fileDescriptor, flagRead);
         } while (oldFlags == -1 && errno == EINTR);
-        SC_TRY_MSG(oldFlags != -1, "fcntl getFlag failed");
+        if (oldFlags == -1)
+            return ResultFile::withNativeError(FileError::DescriptorConfigurationFailed,
+                                               FileErrorDetail::QueryDescriptorFlags, static_cast<uint32_t>(errno));
         const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
         if (newFlags != oldFlags)
         {
@@ -588,7 +610,10 @@ struct SC::FileDescriptor::Internal
             {
                 res = ::fcntl(fileDescriptor, flagWrite, newFlags);
             } while (res == -1 && errno == EINTR);
-            SC_TRY_MSG(res == 0, "fcntl setFlag failed");
+            if (res != 0)
+                return ResultFile::withNativeError(FileError::DescriptorConfigurationFailed,
+                                                   FileErrorDetail::ConfigureDescriptorFlags,
+                                                   static_cast<uint32_t>(errno));
         }
         return SC::Result(true);
     }
@@ -644,17 +669,21 @@ int SC::FileOpen::toPosixAccess() const { return S_IRUSR | S_IWUSR | S_IRGRP | S
 
 SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
-    SC_TRY_MSG(filePath.getEncoding() != StringEncoding::Utf16,
-               "FileDescriptor::open: POSIX supports only UTF8 and ASCII encoding");
+    if (filePath.getEncoding() == StringEncoding::Utf16)
+        return ResultFile(FileError::UnsupportedPathEncoding, FileErrorDetail::ValidatePathEncoding);
     const int flags  = mode.toPosixFlags();
     const int access = mode.toPosixAccess();
 
     StringPath nullTerminated;
-    SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
+    if (not nullTerminated.assign(filePath))
+        return ResultFile(FileError::PathCapacityExceeded, FileErrorDetail::NormalizePath);
     const char* nullTerminatedPath = nullTerminated.view().bytesIncludingTerminator();
-    SC_TRY_MSG(nullTerminatedPath[0] == '/', "FileDescriptor::open - Path must be absolute");
+    if (nullTerminatedPath[0] != '/')
+        return ResultFile(FileError::PathMustBeAbsolute, FileErrorDetail::ValidateAbsolutePath);
     const int fileDescriptor = ::open(nullTerminatedPath, flags, access);
-    SC_TRY_MSG(fileDescriptor != -1, "open failed");
+    if (fileDescriptor == -1)
+        return ResultFile::withNativeError(FileError::OpenFailed, FileErrorDetail::OpenFile,
+                                           static_cast<uint32_t>(errno));
     SC_TRY(assign(fileDescriptor));
     if (not mode.blocking)
     {
@@ -673,14 +702,18 @@ SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
     case SeekMode::SeekCurrent: flags = SEEK_CUR; break;
     }
     const off_t res = ::lseek(handle, static_cast<off_t>(offset), flags);
-    SC_TRY_MSG(res >= 0, "lseek failed");
+    if (res < 0)
+        return ResultFile::withNativeError(FileError::SeekFailed, FileErrorDetail::SeekDescriptor,
+                                           static_cast<uint32_t>(errno));
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 {
     const off_t fileSize = ::lseek(handle, 0, SEEK_CUR);
-    SC_TRY_MSG(fileSize >= 0, "lseek failed");
+    if (fileSize < 0)
+        return ResultFile::withNativeError(FileError::SeekFailed, FileErrorDetail::QueryDescriptorPosition,
+                                           static_cast<uint32_t>(errno));
     position = static_cast<size_t>(fileSize);
     return Result(true);
 }
@@ -688,55 +721,75 @@ SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 {
     struct stat fileStat;
-    SC_TRY_MSG(::fstat(handle, &fileStat) == 0, "fstat failed");
+    if (::fstat(handle, &fileStat) != 0)
+        return ResultFile::withNativeError(FileError::MetadataQueryFailed, FileErrorDetail::QueryDescriptorSize,
+                                           static_cast<uint32_t>(errno));
     sizeInBytes = static_cast<size_t>(fileStat.st_size);
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::stat - Invalid handle");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::QueryDescriptorMetadata);
     struct stat nativeStat;
-    SC_TRY_MSG(::fstat(handle, &nativeStat) == 0, "fstat failed");
+    if (::fstat(handle, &nativeStat) != 0)
+        return ResultFile::withNativeError(FileError::MetadataQueryFailed, FileErrorDetail::QueryDescriptorMetadata,
+                                           static_cast<uint32_t>(errno));
     return fillFileDescriptorPosixStat(nativeStat, fileStat);
 }
 
 SC::ResultFile SC::FileDescriptor::chmod(uint32_t mode)
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::chmod - Invalid handle");
-    SC_TRY_MSG(::fchmod(handle, static_cast<mode_t>(mode)) == 0, "fchmod failed");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::ChangeDescriptorPermissions);
+    if (::fchmod(handle, static_cast<mode_t>(mode)) != 0)
+        return ResultFile::withNativeError(FileError::PermissionsChangeFailed,
+                                           FileErrorDetail::ChangeDescriptorPermissions, static_cast<uint32_t>(errno));
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::chown - Invalid handle");
-    SC_TRY_MSG(::fchown(handle, static_cast<uid_t>(uid), static_cast<gid_t>(gid)) == 0, "fchown failed");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::ChangeDescriptorOwnership);
+    if (::fchown(handle, static_cast<uid_t>(uid), static_cast<gid_t>(gid)) != 0)
+        return ResultFile::withNativeError(FileError::OwnershipChangeFailed, FileErrorDetail::ChangeDescriptorOwnership,
+                                           static_cast<uint32_t>(errno));
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::sync()
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::sync - Invalid handle");
-    SC_TRY_MSG(::fsync(handle) == 0, "fsync failed");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::SynchronizeDescriptor);
+    if (::fsync(handle) != 0)
+        return ResultFile::withNativeError(FileError::SyncFailed, FileErrorDetail::SynchronizeDescriptor,
+                                           static_cast<uint32_t>(errno));
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::syncData()
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::syncData - Invalid handle");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::SynchronizeDescriptorData);
 #if __APPLE__
-    SC_TRY_MSG(::fsync(handle) == 0, "fsync failed");
+    if (::fsync(handle) != 0)
 #else
-    SC_TRY_MSG(::fdatasync(handle) == 0, "fdatasync failed");
+    if (::fdatasync(handle) != 0)
 #endif
+        return ResultFile::withNativeError(FileError::SyncFailed, FileErrorDetail::SynchronizeDescriptorData,
+                                           static_cast<uint32_t>(errno));
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::truncate(uint64_t sizeInBytes)
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::truncate - Invalid handle");
-    SC_TRY_MSG(::ftruncate(handle, static_cast<off_t>(sizeInBytes)) == 0, "ftruncate failed");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::TruncateDescriptor);
+    if (::ftruncate(handle, static_cast<off_t>(sizeInBytes)) != 0)
+        return ResultFile::withNativeError(FileError::TruncateFailed, FileErrorDetail::TruncateDescriptor,
+                                           static_cast<uint32_t>(errno));
     return Result(true);
 }
 
@@ -747,8 +800,16 @@ SC::ResultFile SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
     {
         res = ::pwrite(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
     } while (res == -1 and errno == EINTR);
-    SC_TRY_MSG(res >= 0, "pwrite failed");
-    return Result(static_cast<size_t>(res) == data.sizeInBytes());
+    if (res < 0)
+        return Internal::translateWriteError(errno, FileErrorDetail::WriteDescriptorAtOffset);
+    if (static_cast<size_t>(res) != data.sizeInBytes())
+    {
+        if (static_cast<uint64_t>(res) <= 0xffffffffULL)
+            return ResultFile::withActualBytes(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptorAtOffset,
+                                               static_cast<uint32_t>(res));
+        return ResultFile(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptorAtOffset);
+    }
+    return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::write(Span<const char> data)
@@ -758,8 +819,16 @@ SC::ResultFile SC::FileDescriptor::write(Span<const char> data)
     {
         res = ::write(handle, data.data(), data.sizeInBytes());
     } while (res == -1 and errno == EINTR);
-    SC_TRY_MSG(res >= 0, "write failed");
-    return Result(static_cast<size_t>(res) == data.sizeInBytes());
+    if (res < 0)
+        return Internal::translateWriteError(errno, FileErrorDetail::WriteDescriptor);
+    if (static_cast<size_t>(res) != data.sizeInBytes())
+    {
+        if (static_cast<uint64_t>(res) <= 0xffffffffULL)
+            return ResultFile::withActualBytes(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptor,
+                                               static_cast<uint32_t>(res));
+        return ResultFile(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptor);
+    }
+    return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
@@ -769,8 +838,11 @@ SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRea
     {
         res = ::pread(handle, data.data(), data.sizeInBytes(), static_cast<off_t>(offset));
     } while (res == -1 and errno == EINTR);
-    SC_TRY_MSG(res >= 0, "pread failed");
-    return Result(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
+    if (res < 0)
+        return Internal::translateReadError(errno, FileErrorDetail::ReadDescriptorAtOffset);
+    if (not data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead))
+        return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptorAtOffset);
+    return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
@@ -780,8 +852,11 @@ SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRea
     {
         res = ::read(handle, data.data(), data.sizeInBytes());
     } while (res == -1 and errno == EINTR);
-    SC_TRY_MSG(res >= 0, "read failed");
-    return Result(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
+    if (res < 0)
+        return Internal::translateReadError(errno, FileErrorDetail::ReadDescriptor);
+    if (not data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead))
+        return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptor);
+    return Result(true);
 }
 #endif
 
@@ -816,7 +891,9 @@ SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
     return Result(assign(duplicated));
 #else
     const int duplicated = ::dup(STDOUT_FILENO);
-    SC_TRY_MSG(duplicated != -1, "dup failed");
+    if (duplicated == -1)
+        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
+                                           static_cast<uint32_t>(errno));
     return Result(assign(duplicated));
 #endif
 }
@@ -839,7 +916,9 @@ SC::ResultFile SC::FileDescriptor::openStdErrDuplicate()
     return Result(assign(duplicated));
 #else
     const int duplicated = ::dup(STDERR_FILENO);
-    SC_TRY_MSG(duplicated != -1, "dup failed");
+    if (duplicated == -1)
+        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
+                                           static_cast<uint32_t>(errno));
     return Result(assign(duplicated));
 #endif
 }
@@ -862,7 +941,9 @@ SC::ResultFile SC::FileDescriptor::openStdInDuplicate()
     return Result(assign(duplicated));
 #else
     const int duplicated = ::dup(STDIN_FILENO);
-    SC_TRY_MSG(duplicated != -1, "dup failed");
+    if (duplicated == -1)
+        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
+                                           static_cast<uint32_t>(errno));
     return Result(assign(duplicated));
 #endif
 }
@@ -914,9 +995,11 @@ SC::ResultFile SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char
 SC::ResultFile SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
 {
     char buffer[1024];
-    SC_TRY_MSG(isValid(), "FileDescriptor::readUntilEOFGrowable - Invalid handle");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::ReadDescriptor);
     bool isEOF = false;
-    SC_TRY_MSG(adapter.resizeWithoutInitializing(0), "FileDescriptor::readUntilEOFGrowable - Cannot reset string");
+    if (not adapter.resizeWithoutInitializing(0))
+        return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::ResetReadBuffer);
     while (not isEOF)
     {
         SC_TRY(Internal::readAppend(handle, adapter, {buffer, sizeof(buffer)}, isEOF));

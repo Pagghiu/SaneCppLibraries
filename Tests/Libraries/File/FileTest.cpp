@@ -45,6 +45,10 @@ struct SC::FileTest : public SC::TestCase
         {
             structuredErrorsAndFormatter();
         }
+        if (test_section("structured producer failures"))
+        {
+            structuredProducerFailures();
+        }
         if (test_section("open"))
         {
             testOpen();
@@ -68,6 +72,7 @@ struct SC::FileTest : public SC::TestCase
     }
     inline void testOpen();
     inline void structuredErrorsAndFormatter();
+    inline void structuredProducerFailures();
     inline void testOpenStdHandles();
     inline void testNamedPipeCreateConnectAccept();
     inline void testDescriptorOperations();
@@ -148,6 +153,72 @@ void SC::FileTest::structuredErrorsAndFormatter()
                                               static_cast<FileErrorContextKind>(999), {}),
                                    message)
                        .status == ResultErrorFormatStatus::UnknownError);
+}
+
+void SC::FileTest::structuredProducerFailures()
+{
+#if !SC_PLATFORM_WINDOWS
+    FileDescriptor descriptor;
+    ResultFile     result = descriptor.open("relative.txt", FileOpen::Read);
+    SC_TEST_EXPECT(result.isError(FileError::PathMustBeAbsolute));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ValidateAbsolutePath);
+    SC_TEST_EXPECT(result.contextKind == FileErrorContextKind::None);
+
+    result = descriptor.open("/__sc_file_result_missing_5423__", FileOpen::Read);
+    SC_TEST_EXPECT(result.isError(FileError::OpenFailed));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::OpenFile);
+    SC_TEST_EXPECT(result.contextKind == FileErrorContextKind::NativeError);
+    SC_TEST_EXPECT(result.context.nativeError == ENOENT);
+
+    FileDescriptorStat statInfo;
+    result = descriptor.stat(statInfo);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::QueryDescriptorMetadata);
+    result = descriptor.chmod(0644u);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ChangeDescriptorPermissions);
+    result = descriptor.chown(0, 0);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ChangeDescriptorOwnership);
+    result = descriptor.sync();
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::SynchronizeDescriptor);
+    result = descriptor.syncData();
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::SynchronizeDescriptorData);
+    result = descriptor.truncate(1);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::TruncateDescriptor);
+
+    PipeDescriptor pipe;
+    PipeOptions    options;
+    options.blocking = false;
+    SC_TEST_EXPECT(pipe.createPipe(options));
+    char fill[4096] = {};
+    for (size_t iteration = 0; iteration < 4096; ++iteration)
+    {
+        result = pipe.writePipe.write({fill, sizeof(fill)});
+        if (not result)
+            break;
+    }
+    SC_TEST_EXPECT(result.isError(FileError::WouldBlock));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::WriteDescriptor);
+    SC_TEST_EXPECT(result.contextKind == FileErrorContextKind::NativeError);
+    SC_TEST_EXPECT(result.context.nativeError == EAGAIN or result.context.nativeError == EWOULDBLOCK);
+
+    char       drainedStorage[4096];
+    Span<char> drained;
+    SC_TEST_EXPECT(pipe.readPipe.read(drainedStorage, drained));
+    SC_TEST_EXPECT(drained.sizeInBytes() > 0);
+    char largeWrite[65536] = {};
+    result                 = pipe.writePipe.write(largeWrite);
+    SC_TEST_EXPECT(result.isError(FileError::IncompleteWrite));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::WriteDescriptor);
+    SC_TEST_EXPECT(result.contextKind == FileErrorContextKind::ActualBytes);
+    SC_TEST_EXPECT(result.context.actualBytes > 0);
+    SC_TEST_EXPECT(result.context.actualBytes < sizeof(largeWrite));
+    SC_TEST_EXPECT(pipe.close());
+#endif
 }
 
 void SC::FileTest::testOpen()
