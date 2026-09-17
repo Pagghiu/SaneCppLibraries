@@ -22,6 +22,23 @@ namespace FileWindowsDetail
 
 namespace
 {
+static SC::ResultFile translateWindowsPathError(SC::FileWindowsDetail::WindowsPathResult result,
+                                                SC::FileErrorDetail                      detail)
+{
+    using SC::FileError;
+    using SC::FileWindowsDetail::WindowsPathError;
+    switch (result.error)
+    {
+    case WindowsPathError::CapacityExceeded: return {FileError::PathCapacityExceeded, detail};
+    case WindowsPathError::BasePathNotAbsolute: return {FileError::PathMustBeAbsolute, detail};
+    case WindowsPathError::MalformedPath: return {FileError::InvalidPath, detail};
+    case WindowsPathError::NativeCallFailed:
+        return SC::ResultFile::withNativeError(FileError::InvalidPath, detail, result.nativeError);
+    case WindowsPathError::None: return {};
+    }
+    return {FileError::InvalidPath, detail};
+}
+
 static SC::TimeMs fileDescriptorWindowsFileTimeToTimeMs(const FILETIME& fileTime)
 {
     ULARGE_INTEGER fileTimeValue;
@@ -398,8 +415,9 @@ SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRea
 SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     StringPath logicalPath;
-    if (not FileWindowsDetail::WindowsPath::makeLogicalPath(filePath, logicalPath))
-        return ResultFile(FileError::InvalidPath, FileErrorDetail::NormalizePath);
+    const auto logicalPathResult = FileWindowsDetail::WindowsPath::makeLogicalPath(filePath, logicalPath);
+    if (not logicalPathResult)
+        return translateWindowsPathError(logicalPathResult, FileErrorDetail::NormalizePath);
     if (logicalPath.view() != L"NUL" and not FileWindowsDetail::WindowsPath::isAbsolute(logicalPath.view()))
     {
         return ResultFile(FileError::PathMustBeAbsolute, FileErrorDetail::ValidateAbsolutePath);
@@ -414,8 +432,10 @@ SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     }
     else
     {
-        if (not FileWindowsDetail::WindowsPath::appendTransportPrefix(logicalPath.view(), transportPath))
-            return ResultFile(FileError::PathCapacityExceeded, FileErrorDetail::BuildTransportPath);
+        const auto transportPathResult =
+            FileWindowsDetail::WindowsPath::appendTransportPrefix(logicalPath.view(), transportPath);
+        if (not transportPathResult)
+            return translateWindowsPathError(transportPathResult, FileErrorDetail::BuildTransportPath);
         nullTerminatedPath = transportPath.view().getNullTerminatedNative();
     }
 

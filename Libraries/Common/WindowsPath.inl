@@ -9,6 +9,30 @@
 // Required includes before this file: Windows.h, string.h, wchar.h, wctype.h.
 // Required SC types: Result, StringPath, StringSpan, StringNativeBuffer.
 
+enum class WindowsPathError : uint8_t
+{
+    None = 0,
+    CapacityExceeded,
+    BasePathNotAbsolute,
+    MalformedPath,
+    NativeCallFailed,
+};
+
+struct WindowsPathResult
+{
+    WindowsPathError error       = WindowsPathError::None;
+    uint32_t         nativeError = 0;
+
+    constexpr WindowsPathResult() = default;
+    constexpr WindowsPathResult(WindowsPathError error, uint32_t nativeError = 0)
+        : error(error), nativeError(nativeError)
+    {}
+
+    explicit constexpr operator bool() const { return error == WindowsPathError::None; }
+    constexpr          operator Result() const { return Result(error == WindowsPathError::None); }
+    constexpr Result   toResult() const { return Result(error == WindowsPathError::None); }
+};
+
 struct WindowsPath
 {
     static constexpr size_t LogicalCapacity   = StringPath::MaxPath;
@@ -16,20 +40,22 @@ struct WindowsPath
 
     using TransportString = StringNativeBuffer<TransportCapacity + 1>;
 
-    static Result makeLogicalPath(StringSpan input, StringPath& logicalPath)
+    static WindowsPathResult makeLogicalPath(StringSpan input, StringPath& logicalPath)
     {
         TransportString inputPath;
-        SC_TRY_MSG(inputPath.assign(input), "Path exceeds SC::StringPath limit (1024)");
+        if (not inputPath.assign(input))
+            return WindowsPathError::CapacityExceeded;
         canonicalizeSeparators(inputPath);
         return copyLogicalPathWithoutTransportPrefix(inputPath.view(), logicalPath);
     }
 
-    static Result makeAbsoluteLogicalPath(StringSpan input, StringSpan baseDirectory, StringPath& logicalPath)
+    static WindowsPathResult makeAbsoluteLogicalPath(StringSpan input, StringSpan baseDirectory,
+                                                     StringPath& logicalPath)
     {
         SC_TRY(makeLogicalPath(input, logicalPath));
         if (isAbsolute(logicalPath.view()))
         {
-            return Result(true);
+            return {};
         }
 
         StringPath basePath;
@@ -42,16 +68,19 @@ struct WindowsPath
             SC_TRY(makeLogicalPath(baseDirectory, basePath));
         }
 
-        SC_TRY_MSG(isAbsolute(basePath.view()), "Windows long-path base directory must be absolute");
+        if (not isAbsolute(basePath.view()))
+            return WindowsPathError::BasePathNotAbsolute;
 
         StringPath joinedPath;
-        SC_TRY_MSG(joinedPath.assign(basePath.view()), "Path exceeds SC::StringPath limit (1024)");
+        if (not joinedPath.assign(basePath.view()))
+            return WindowsPathError::CapacityExceeded;
 
         const wchar_t* logicalData = logicalPath.view().getNullTerminatedNative();
         if (isRootedRelative(logicalPath.view()))
         {
             SC_TRY(copyRootOnly(basePath.view(), joinedPath));
-            SC_TRY_MSG(joinedPath.append(logicalPath.view()), "Path exceeds SC::StringPath limit (1024)");
+            if (not joinedPath.append(logicalPath.view()))
+                return WindowsPathError::CapacityExceeded;
         }
         else if (isDriveRelative(logicalPath.view()))
         {
@@ -77,36 +106,40 @@ struct WindowsPath
         return normalizeAbsolutePath(joinedPath.view(), logicalPath);
     }
 
-    static Result makeTransportPath(StringSpan input, StringSpan baseDirectory, StringPath& logicalPath,
-                                    TransportString& transportPath)
+    static WindowsPathResult makeTransportPath(StringSpan input, StringSpan baseDirectory, StringPath& logicalPath,
+                                               TransportString& transportPath)
     {
         SC_TRY(makeAbsoluteLogicalPath(input, baseDirectory, logicalPath));
         if (not needsTransportPrefix(logicalPath.view()))
         {
             transportPath.clear();
-            SC_TRY_MSG(transportPath.assign(logicalPath.view()), "Path exceeds SC::StringPath limit (1024)");
-            return Result(true);
+            if (not transportPath.assign(logicalPath.view()))
+                return WindowsPathError::CapacityExceeded;
+            return {};
         }
         return appendTransportPrefix(logicalPath.view(), transportPath);
     }
 
-    static Result appendTransportPrefix(StringSpan logicalPath, TransportString& transportPath)
+    static WindowsPathResult appendTransportPrefix(StringSpan logicalPath, TransportString& transportPath)
     {
         transportPath.clear();
         if (isUNC(logicalPath))
         {
-            SC_TRY_MSG(transportPath.append(L"\\\\?\\UNC\\"), "Path exceeds SC::StringPath limit (1024)");
+            if (not transportPath.append(L"\\\\?\\UNC\\"))
+                return WindowsPathError::CapacityExceeded;
             const wchar_t* pathData = logicalPath.getNullTerminatedNative();
-            SC_TRY_MSG(transportPath.append(StringSpan({pathData + 2, logicalPath.sizeInBytes() / sizeof(wchar_t) - 2},
-                                                       true, StringEncoding::Utf16)),
-                       "Path exceeds SC::StringPath limit (1024)");
+            if (not transportPath.append(StringSpan({pathData + 2, logicalPath.sizeInBytes() / sizeof(wchar_t) - 2},
+                                                    true, StringEncoding::Utf16)))
+                return WindowsPathError::CapacityExceeded;
         }
         else
         {
-            SC_TRY_MSG(transportPath.append(L"\\\\?\\"), "Path exceeds SC::StringPath limit (1024)");
-            SC_TRY_MSG(transportPath.append(logicalPath), "Path exceeds SC::StringPath limit (1024)");
+            if (not transportPath.append(L"\\\\?\\"))
+                return WindowsPathError::CapacityExceeded;
+            if (not transportPath.append(logicalPath))
+                return WindowsPathError::CapacityExceeded;
         }
-        return Result(true);
+        return {};
     }
 
     static bool needsTransportPrefix(StringSpan logicalPath)
@@ -115,30 +148,42 @@ struct WindowsPath
         return logicalPath.sizeInBytes() / sizeof(wchar_t) >= MAX_PATH - 12;
     }
 
-    static Result getExecutablePath(StringPath& executablePath)
+    static WindowsPathResult getExecutablePath(StringPath& executablePath)
     {
         DWORD length = ::GetModuleFileNameW(nullptr, executablePath.writableSpan().data(),
                                             static_cast<DWORD>(StringPath::StorageCapacity));
-        if (length == 0 || length >= StringPath::StorageCapacity)
+        if (length == 0)
         {
             (void)executablePath.resize(0);
-            return Result::Error("Path exceeds SC::StringPath limit (1024)");
+            return {WindowsPathError::NativeCallFailed, ::GetLastError()};
         }
-        SC_TRY_MSG(executablePath.resize(length), "Path exceeds SC::StringPath limit (1024)");
+        if (length >= StringPath::StorageCapacity)
+        {
+            (void)executablePath.resize(0);
+            return WindowsPathError::CapacityExceeded;
+        }
+        if (not executablePath.resize(length))
+            return WindowsPathError::CapacityExceeded;
         canonicalizeSeparators(executablePath);
         return stripTransportPrefix(executablePath);
     }
 
-    static Result getCurrentDirectory(StringPath& currentWorkingDirectory)
+    static WindowsPathResult getCurrentDirectory(StringPath& currentWorkingDirectory)
     {
         DWORD length = ::GetCurrentDirectoryW(static_cast<DWORD>(StringPath::StorageCapacity),
                                               currentWorkingDirectory.writableSpan().data());
-        if (length == 0 || length >= StringPath::StorageCapacity)
+        if (length == 0)
         {
             (void)currentWorkingDirectory.resize(0);
-            return Result::Error("Path exceeds SC::StringPath limit (1024)");
+            return {WindowsPathError::NativeCallFailed, ::GetLastError()};
         }
-        SC_TRY_MSG(currentWorkingDirectory.resize(length), "Path exceeds SC::StringPath limit (1024)");
+        if (length >= StringPath::StorageCapacity)
+        {
+            (void)currentWorkingDirectory.resize(0);
+            return WindowsPathError::CapacityExceeded;
+        }
+        if (not currentWorkingDirectory.resize(length))
+            return WindowsPathError::CapacityExceeded;
         canonicalizeSeparators(currentWorkingDirectory);
         return stripTransportPrefix(currentWorkingDirectory);
     }
@@ -209,17 +254,19 @@ struct WindowsPath
         return isDriveLetter(baseData[0]) and towupper(baseData[0]) == towupper(relData[0]);
     }
 
-    static Result copyDriveRoot(StringSpan path, StringPath& rootPath)
+    static WindowsPathResult copyDriveRoot(StringSpan path, StringPath& rootPath)
     {
         const wchar_t* pathData = path.getNullTerminatedNative();
-        SC_TRY_MSG(rootPath.resize(0), "Path exceeds SC::StringPath limit (1024)");
-        SC_TRY_MSG(rootPath.append(StringSpan({pathData, 2}, false, StringEncoding::Utf16)),
-                   "Path exceeds SC::StringPath limit (1024)");
-        SC_TRY_MSG(rootPath.append(L"\\"), "Path exceeds SC::StringPath limit (1024)");
-        return Result(true);
+        if (not rootPath.resize(0))
+            return WindowsPathError::CapacityExceeded;
+        if (not rootPath.append(StringSpan({pathData, 2}, false, StringEncoding::Utf16)))
+            return WindowsPathError::CapacityExceeded;
+        if (not rootPath.append(L"\\"))
+            return WindowsPathError::CapacityExceeded;
+        return {};
     }
 
-    static Result copyRootOnly(StringSpan basePath, StringPath& rootPath)
+    static WindowsPathResult copyRootOnly(StringSpan basePath, StringPath& rootPath)
     {
         if (isDriveAbsolute(basePath))
         {
@@ -231,20 +278,23 @@ struct WindowsPath
         size_t         offset = 2;
         while (offset < length and data[offset] != L'\\')
             offset += 1;
-        SC_TRY_MSG(offset < length, "Malformed Windows UNC path");
+        if (offset >= length)
+            return WindowsPathError::MalformedPath;
         offset += 1;
         while (offset < length and data[offset] != L'\\')
             offset += 1;
-        SC_TRY_MSG(offset <= length, "Malformed Windows UNC path");
+        if (offset > length)
+            return WindowsPathError::MalformedPath;
         if (offset < length)
             offset += 1;
-        SC_TRY_MSG(rootPath.resize(0), "Path exceeds SC::StringPath limit (1024)");
-        SC_TRY_MSG(rootPath.append(StringSpan({data, offset}, false, StringEncoding::Utf16)),
-                   "Path exceeds SC::StringPath limit (1024)");
-        return Result(true);
+        if (not rootPath.resize(0))
+            return WindowsPathError::CapacityExceeded;
+        if (not rootPath.append(StringSpan({data, offset}, false, StringEncoding::Utf16)))
+            return WindowsPathError::CapacityExceeded;
+        return {};
     }
 
-    static Result copyLogicalPathWithoutTransportPrefix(StringSpan inputPath, StringPath& logicalPath)
+    static WindowsPathResult copyLogicalPathWithoutTransportPrefix(StringSpan inputPath, StringPath& logicalPath)
     {
         const wchar_t* pathData       = inputPath.getNullTerminatedNative();
         const size_t   length         = inputPath.sizeInBytes() / sizeof(wchar_t);
@@ -258,51 +308,57 @@ struct WindowsPath
                 (pathData[5] == L'N' or pathData[5] == L'n') and (pathData[6] == L'C' or pathData[6] == L'c') and
                 pathData[7] == L'\\')
             {
-                SC_TRY_MSG(hasUNCServerAndShare(pathData + 8, length - 8), "Malformed Windows long-path prefix");
-                SC_TRY_MSG(logicalPath.resize(0), "Path exceeds SC::StringPath limit (1024)");
-                SC_TRY_MSG(logicalPath.append(L"\\\\"), "Path exceeds SC::StringPath limit (1024)");
-                SC_TRY_MSG(logicalPath.append(StringSpan({pathData + 8, length - 8}, true, StringEncoding::Utf16)),
-                           "Path exceeds SC::StringPath limit (1024)");
-                return Result(true);
+                if (not hasUNCServerAndShare(pathData + 8, length - 8))
+                    return WindowsPathError::MalformedPath;
+                if (not logicalPath.resize(0))
+                    return WindowsPathError::CapacityExceeded;
+                if (not logicalPath.append(L"\\\\"))
+                    return WindowsPathError::CapacityExceeded;
+                if (not logicalPath.append(StringSpan({pathData + 8, length - 8}, true, StringEncoding::Utf16)))
+                    return WindowsPathError::CapacityExceeded;
+                return {};
             }
             if (length >= 7 and isDriveLetter(pathData[4]) and pathData[5] == L':' and pathData[6] == L'\\')
             {
-                SC_TRY_MSG(logicalPath.assign(StringSpan({pathData + 4, length - 4}, true, StringEncoding::Utf16)),
-                           "Path exceeds SC::StringPath limit (1024)");
-                return Result(true);
+                if (not logicalPath.assign(StringSpan({pathData + 4, length - 4}, true, StringEncoding::Utf16)))
+                    return WindowsPathError::CapacityExceeded;
+                return {};
             }
-            return Result::Error("Malformed Windows long-path prefix");
+            return WindowsPathError::MalformedPath;
         }
 
         if (length >= 3 and pathData[0] == L'\\' and pathData[1] == L'\\' and pathData[2] == L'?')
         {
-            return Result::Error("Malformed Windows long-path prefix");
+            return WindowsPathError::MalformedPath;
         }
         if (length >= 3 and pathData[0] == L'\\' and pathData[1] == L'?' and pathData[2] == L'?')
         {
-            return Result::Error("Malformed Windows long-path prefix");
+            return WindowsPathError::MalformedPath;
         }
-        SC_TRY_MSG(logicalPath.assign(inputPath), "Path exceeds SC::StringPath limit (1024)");
-        return Result(true);
+        if (not logicalPath.assign(inputPath))
+            return WindowsPathError::CapacityExceeded;
+        return {};
     }
 
-    static Result appendRelativePath(StringPath& output, StringSpan relativePath)
+    static WindowsPathResult appendRelativePath(StringPath& output, StringSpan relativePath)
     {
         const wchar_t* relativeData   = relativePath.getNullTerminatedNative();
         const size_t   relativeLength = relativePath.sizeInBytes() / sizeof(wchar_t);
         if (relativeLength == 0)
         {
-            return Result(true);
+            return {};
         }
 
         const wchar_t* outputData   = output.view().getNullTerminatedNative();
         const size_t   outputLength = output.view().sizeInBytes() / sizeof(wchar_t);
         if (outputLength > 0 and outputData[outputLength - 1] != L'\\' and relativeData[0] != L'\\')
         {
-            SC_TRY_MSG(output.append(L"\\"), "Path exceeds SC::StringPath limit (1024)");
+            if (not output.append(L"\\"))
+                return WindowsPathError::CapacityExceeded;
         }
-        SC_TRY_MSG(output.append(relativePath), "Path exceeds SC::StringPath limit (1024)");
-        return Result(true);
+        if (not output.append(relativePath))
+            return WindowsPathError::CapacityExceeded;
+        return {};
     }
 
     static size_t absoluteRootLength(StringSpan path)
@@ -335,33 +391,36 @@ struct WindowsPath
         return secondSeparator < length ? secondSeparator + 1 : secondSeparator;
     }
 
-    static Result appendPathSlice(StringPath& output, const wchar_t* data, size_t start, size_t end)
+    static WindowsPathResult appendPathSlice(StringPath& output, const wchar_t* data, size_t start, size_t end)
     {
         if (start >= end)
         {
-            return Result(true);
+            return {};
         }
-        return Result(output.append(StringSpan({data + start, end - start}, false, StringEncoding::Utf16)));
+        if (not output.append(StringSpan({data + start, end - start}, false, StringEncoding::Utf16)))
+            return WindowsPathError::CapacityExceeded;
+        return {};
     }
 
-    static Result appendNormalizedSegment(StringPath& output, const wchar_t* data, size_t start, size_t end,
-                                          size_t* segmentStarts, size_t& segmentCount)
+    static WindowsPathResult appendNormalizedSegment(StringPath& output, const wchar_t* data, size_t start, size_t end,
+                                                     size_t* segmentStarts, size_t& segmentCount)
     {
         if (start >= end)
         {
-            return Result(true);
+            return {};
         }
         if (end == start + 1 and data[start] == L'.')
         {
-            return Result(true);
+            return {};
         }
         if (end == start + 2 and data[start] == L'.' and data[start + 1] == L'.')
         {
             if (segmentCount > 0)
             {
-                SC_TRY(output.resize(segmentStarts[--segmentCount]));
+                if (not output.resize(segmentStarts[--segmentCount]))
+                    return WindowsPathError::CapacityExceeded;
             }
-            return Result(true);
+            return {};
         }
 
         const wchar_t* outputData       = output.view().getNullTerminatedNative();
@@ -369,22 +428,25 @@ struct WindowsPath
         const size_t   segmentStartSize = outputLength;
         if (outputLength > 0 and outputData[outputLength - 1] != L'\\')
         {
-            SC_TRY_MSG(output.append(L"\\"), "Path exceeds SC::StringPath limit (1024)");
+            if (not output.append(L"\\"))
+                return WindowsPathError::CapacityExceeded;
         }
-        SC_TRY_MSG(appendPathSlice(output, data, start, end), "Path exceeds SC::StringPath limit (1024)");
+        SC_TRY(appendPathSlice(output, data, start, end));
         segmentStarts[segmentCount++] = segmentStartSize;
-        return Result(true);
+        return {};
     }
 
-    static Result normalizeAbsolutePath(StringSpan inputPath, StringPath& normalizedPath)
+    static WindowsPathResult normalizeAbsolutePath(StringSpan inputPath, StringPath& normalizedPath)
     {
         const wchar_t* data       = inputPath.getNullTerminatedNative();
         const size_t   length     = inputPath.sizeInBytes() / sizeof(wchar_t);
         const size_t   rootLength = absoluteRootLength(inputPath);
-        SC_TRY_MSG(rootLength > 0, "Windows long-path base directory must be absolute");
+        if (rootLength == 0)
+            return WindowsPathError::BasePathNotAbsolute;
 
-        SC_TRY_MSG(normalizedPath.resize(0), "Path exceeds SC::StringPath limit (1024)");
-        SC_TRY_MSG(appendPathSlice(normalizedPath, data, 0, rootLength), "Path exceeds SC::StringPath limit (1024)");
+        if (not normalizedPath.resize(0))
+            return WindowsPathError::CapacityExceeded;
+        SC_TRY(appendPathSlice(normalizedPath, data, 0, rootLength));
 
         size_t segmentStarts[LogicalCapacity] = {};
         size_t segmentCount                   = 0;
@@ -400,10 +462,10 @@ struct WindowsPath
                 appendNormalizedSegment(normalizedPath, data, segmentStart, segmentEnd, segmentStarts, segmentCount));
             segmentStart = segmentEnd;
         }
-        return Result(true);
+        return {};
     }
 
-    static Result stripTransportPrefix(StringPath& logicalPath)
+    static WindowsPathResult stripTransportPrefix(StringPath& logicalPath)
     {
         wchar_t*   pathData       = logicalPath.writableSpan().data();
         size_t     length         = logicalPath.view().sizeInBytes() / sizeof(wchar_t);
@@ -417,29 +479,34 @@ struct WindowsPath
                 (pathData[5] == L'N' or pathData[5] == L'n') and (pathData[6] == L'C' or pathData[6] == L'c') and
                 pathData[7] == L'\\')
             {
-                SC_TRY_MSG(hasUNCServerAndShare(pathData + 8, length - 8), "Malformed Windows long-path prefix");
+                if (not hasUNCServerAndShare(pathData + 8, length - 8))
+                    return WindowsPathError::MalformedPath;
                 ::memmove(pathData + 2, pathData + 8, (length - 8 + 1) * sizeof(wchar_t));
                 pathData[0] = L'\\';
                 pathData[1] = L'\\';
-                return Result(logicalPath.resize(length - 6));
+                if (not logicalPath.resize(length - 6))
+                    return WindowsPathError::CapacityExceeded;
+                return {};
             }
             if (length >= 7 and isDriveLetter(pathData[4]) and pathData[5] == L':' and pathData[6] == L'\\')
             {
                 ::memmove(pathData, pathData + 4, (length - 4 + 1) * sizeof(wchar_t));
-                return Result(logicalPath.resize(length - 4));
+                if (not logicalPath.resize(length - 4))
+                    return WindowsPathError::CapacityExceeded;
+                return {};
             }
-            return Result::Error("Malformed Windows long-path prefix");
+            return WindowsPathError::MalformedPath;
         }
 
         if (length >= 3 and pathData[0] == L'\\' and pathData[1] == L'\\' and pathData[2] == L'?')
         {
-            return Result::Error("Malformed Windows long-path prefix");
+            return WindowsPathError::MalformedPath;
         }
         if (length >= 3 and pathData[0] == L'\\' and pathData[1] == L'?' and pathData[2] == L'?')
         {
-            return Result::Error("Malformed Windows long-path prefix");
+            return WindowsPathError::MalformedPath;
         }
-        return Result(true);
+        return {};
     }
 
     static bool hasUNCServerAndShare(const wchar_t* data, size_t length)

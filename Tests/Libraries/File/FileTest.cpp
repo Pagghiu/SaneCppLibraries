@@ -225,6 +225,19 @@ void SC::FileTest::structuredProducerFailures()
     SC_TEST_EXPECT(result.detail == FileErrorDetail::ValidateAbsolutePath);
     SC_TEST_EXPECT(result.contextKind == FileErrorContextKind::None);
 
+    result = descriptor.open(L"\\\\?\\malformed", FileOpen::Read);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidPath));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::NormalizePath);
+
+    wchar_t oversizedPath[StringPath::StorageCapacity + 2];
+    for (size_t index = 0; index < StringPath::StorageCapacity + 1; ++index)
+        oversizedPath[index] = L'a';
+    oversizedPath[StringPath::StorageCapacity + 1] = L'\0';
+    result = descriptor.open(StringSpan({oversizedPath, StringPath::StorageCapacity + 1}, true, StringEncoding::Utf16),
+                             FileOpen::Read);
+    SC_TEST_EXPECT(result.isError(FileError::PathCapacityExceeded));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::NormalizePath);
+
     FileDescriptorStat statInfo;
     result = descriptor.stat(statInfo);
     SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
