@@ -258,6 +258,22 @@ void SC::FileTest::structuredProducerFailures()
     SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
     SC_TEST_EXPECT(result.detail == FileErrorDetail::TruncateDescriptor);
 #endif
+
+    PipeDescriptor closeFailurePipe;
+    SC_TEST_EXPECT(closeFailurePipe.createPipe());
+    FileDescriptor::Handle externallyClosedRead = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(closeFailurePipe.readPipe.get(externallyClosedRead, Result(false)));
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(::CloseHandle(externallyClosedRead) != FALSE);
+#else
+    SC_TEST_EXPECT(::close(externallyClosedRead) == 0);
+#endif
+    const ResultFile closeResult = closeFailurePipe.close();
+    SC_TEST_EXPECT(closeResult.isError(FileError::CloseFailed));
+    SC_TEST_EXPECT(closeResult.detail == FileErrorDetail::CloseDescriptor);
+    SC_TEST_EXPECT(closeResult.contextKind == FileErrorContextKind::NativeError);
+    SC_TEST_EXPECT(not closeFailurePipe.readPipe.isValid());
+    SC_TEST_EXPECT(not closeFailurePipe.writePipe.isValid());
 }
 
 void SC::FileTest::testOpen()

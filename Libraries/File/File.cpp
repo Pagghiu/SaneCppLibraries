@@ -1120,22 +1120,27 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
         pipeRead = ::CreateNamedPipeA(pipeName, pipeFlags, pipeMode, 1, 65536, 65536, 0, &security);
         if (pipeRead == INVALID_HANDLE_VALUE)
         {
-            return Result::Error("PipeDescriptor::createPipe - CreateNamedPipeW failed");
+            return ResultFile::withNativeError(FileError::PipeCreationFailed, FileErrorDetail::CreateAnonymousPipe,
+                                               ::GetLastError());
         }
         pipeWrite = ::CreateFileA(pipeName, GENERIC_WRITE | FILE_READ_ATTRIBUTES, 0, &security, OPEN_EXISTING,
                                   FILE_FLAG_OVERLAPPED, nullptr);
         if (pipeWrite == INVALID_HANDLE_VALUE)
         {
+            const DWORD errorCode = ::GetLastError();
             ::CloseHandle(pipeRead);
-            return Result::Error("PipeDescriptor::createPipe - CreateFileW failed");
+            return ResultFile::withNativeError(FileError::PipeCreationFailed, FileErrorDetail::CreateAnonymousPipe,
+                                               errorCode);
         }
         if (::ConnectNamedPipe(pipeRead, nullptr) == FALSE) // Connect the pipe immediately
         {
             if (GetLastError() != ERROR_PIPE_CONNECTED)
             {
+                const DWORD errorCode = ::GetLastError();
                 ::CloseHandle(pipeRead);
                 ::CloseHandle(pipeWrite);
-                return Result::Error("PipeDescriptor::createPipe - ConnectNamedPipe failed");
+                return ResultFile::withNativeError(FileError::PipeCreationFailed, FileErrorDetail::CreateAnonymousPipe,
+                                                   errorCode);
             }
         }
     }
@@ -1143,7 +1148,8 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
     {
         if (::CreatePipe(&pipeRead, &pipeWrite, &security, 0) == FALSE)
         {
-            return Result::Error("PipeDescriptor::createPipe - ::CreatePipe failed");
+            return ResultFile::withNativeError(FileError::PipeCreationFailed, FileErrorDetail::CreateAnonymousPipe,
+                                               ::GetLastError());
         }
     }
     SC_TRY(readPipe.assign(pipeRead));
@@ -1155,14 +1161,16 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
         {
             if (::SetHandleInformation(pipeRead, HANDLE_FLAG_INHERIT, FALSE) == FALSE)
             {
-                return Result::Error("Cannot set read pipe inheritable");
+                return ResultFile::withNativeError(FileError::DescriptorConfigurationFailed,
+                                                   FileErrorDetail::ConfigureDescriptorFlags, ::GetLastError());
             }
         }
         if (not options.writeInheritable)
         {
             if (::SetHandleInformation(pipeWrite, HANDLE_FLAG_INHERIT, FALSE) == FALSE)
             {
-                return Result::Error("Cannot set write pipe inheritable");
+                return ResultFile::withNativeError(FileError::DescriptorConfigurationFailed,
+                                                   FileErrorDetail::ConfigureDescriptorFlags, ::GetLastError());
             }
         }
     }
@@ -1192,7 +1200,10 @@ static SC::ResultFile movePosixDescriptorAboveStandardRange(int& descriptor)
         movedDescriptor = ::fcntl(descriptor, F_DUPFD, 3);
     } while (movedDescriptor == -1 and errno == EINTR);
 #endif
-    SC_TRY_MSG(movedDescriptor != -1, "PipeDescriptor::createPipe - fcntl duplicate failed");
+    if (movedDescriptor == -1)
+        return SC::ResultFile::withNativeError(SC::FileError::DuplicateFailed,
+                                               SC::FileErrorDetail::DuplicatePipeDescriptor,
+                                               static_cast<SC::uint32_t>(errno));
     ::close(descriptor);
     descriptor = movedDescriptor;
     return SC::Result(true);
@@ -1222,7 +1233,8 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
     }
     else if (errno != ENOSYS and errno != EINVAL)
     {
-        return Result::Error("PipeDescriptor::createPipe - pipe2 failed");
+        return ResultFile::withNativeError(FileError::PipeCreationFailed, FileErrorDetail::CreateAnonymousPipe,
+                                           static_cast<uint32_t>(errno));
     }
 #endif
     if (not usedPipeCreationFlags)
@@ -1233,7 +1245,9 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
         } while (res == -1 and errno == EINTR);
     }
 
-    SC_TRY_MSG(res == 0, "PipeDescriptor::createPipe - pipe failed");
+    if (res != 0)
+        return ResultFile::withNativeError(FileError::PipeCreationFailed, FileErrorDetail::CreateAnonymousPipe,
+                                           static_cast<uint32_t>(errno));
     const auto closePipes = MakeDeferred(
         [&]
         {
@@ -1254,18 +1268,18 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
     pipes[0] = -1;
     SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
     pipes[1] = -1;
-    const Result setReadCloExec =
+    const ResultFile setReadCloExec =
         FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(readDescriptor, not options.readInheritable);
-    SC_TRY_MSG(setReadCloExec, "Cannot set close on exec on read pipe");
-    const Result setWriteCloExec =
+    SC_TRY(setReadCloExec);
+    const ResultFile setWriteCloExec =
         FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(writeDescriptor, not options.writeInheritable);
-    SC_TRY_MSG(setWriteCloExec, "Cannot set close on exec on write pipe");
+    SC_TRY(setWriteCloExec);
     if (options.blocking == false and not usedNonBlockingAtCreate)
     {
-        const Result pipeRes1 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(readDescriptor, true);
-        SC_TRY_MSG(pipeRes1, "Cannot set non-blocking flag on read");
-        const Result pipeRes2 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(writeDescriptor, true);
-        SC_TRY_MSG(pipeRes2, "Cannot set non-blocking flag on read");
+        const ResultFile pipeRes1 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(readDescriptor, true);
+        SC_TRY(pipeRes1);
+        const ResultFile pipeRes2 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(writeDescriptor, true);
+        SC_TRY(pipeRes2);
     }
     return Result(true);
 }
@@ -1273,8 +1287,9 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
 
 SC::ResultFile SC::PipeDescriptor::close()
 {
-    SC_TRY(readPipe.close());
-    return writePipe.close();
+    const ResultFile readResult  = readPipe.close();
+    const ResultFile writeResult = writePipe.close();
+    return readResult ? writeResult : readResult;
 }
 
 namespace
