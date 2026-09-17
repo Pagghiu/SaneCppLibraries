@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/File/File.h"
+#include "Libraries/Common/TypeTraits.h"
+#include "Libraries/File/FileErrorFormatter.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
@@ -16,6 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
+#include <string.h>
 
 namespace
 {
@@ -38,6 +41,10 @@ struct SC::FileTest : public SC::TestCase
     FileTest(SC::TestReport& report) : TestCase(report, "FileTest")
     {
         using namespace SC;
+        if (test_section("structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
+        }
         if (test_section("open"))
         {
             testOpen();
@@ -60,6 +67,7 @@ struct SC::FileTest : public SC::TestCase
         }
     }
     inline void testOpen();
+    inline void structuredErrorsAndFormatter();
     inline void testOpenStdHandles();
     inline void testNamedPipeCreateConnectAccept();
     inline void testDescriptorOperations();
@@ -68,6 +76,79 @@ struct SC::FileTest : public SC::TestCase
     Result snippetForUniqueHandle();
     Result snippetForNamedPipeServer();
 };
+
+void SC::FileTest::structuredErrorsAndFormatter()
+{
+    static_assert(FileResultCategory.value == 10, "File category is registry value 10");
+    static_assert(static_cast<uint32_t>(FileError::InvalidHandle) == 1, "File error values are append-only");
+    static_assert(static_cast<uint32_t>(FileError::PipeDisconnected) == 31, "File error values are append-only");
+    static_assert(static_cast<uint16_t>(FileErrorDetail::None) == 0, "File detail zero is reserved for no detail");
+    static_assert(static_cast<uint16_t>(FileErrorContextKind::None) == 0,
+                  "File context kind zero is reserved for no context");
+    static_assert(sizeof(Result) != 16 or sizeof(ResultFile) == 24,
+                  "ResultFile bridge layout must retain its 24-byte size");
+    static_assert(sizeof(Result) != 8 or sizeof(ResultFile) == 16, "ResultFile must meet the final 16-byte target");
+    static_assert(__is_standard_layout(ResultFile), "ResultFile must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultFile>::value, "ResultFile must remain trivially copyable");
+
+    const ResultFile detailed =
+        ResultFile::withNativeError(FileError::ReadFailed, FileErrorDetail::ReadDescriptor, 12345);
+    const ResultFile copied = detailed;
+    SC_TEST_EXPECT(copied.isError(FileError::ReadFailed));
+    SC_TEST_EXPECT(copied.detail == FileErrorDetail::ReadDescriptor);
+    SC_TEST_EXPECT(copied.contextKind == FileErrorContextKind::NativeError);
+    SC_TEST_EXPECT(copied.context.nativeError == 12345);
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(FileResultCategory, FileError::ReadFailed));
+    const ResultFile fromPlain(plain);
+    SC_TEST_EXPECT(fromPlain.detail == FileErrorDetail::None);
+    SC_TEST_EXPECT(fromPlain.contextKind == FileErrorContextKind::None);
+    SC_TEST_EXPECT(fromPlain.context.nativeError == 0);
+
+    const Result     foreignResult = Result::Error(ResultCategory(8), 1);
+    const ResultFile foreign(foreignResult);
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.toResult().isError(ResultCategory(8), 1));
+    SC_TEST_EXPECT(foreign.detail == FileErrorDetail::None);
+    SC_TEST_EXPECT(foreign.contextKind == FileErrorContextKind::None);
+
+    const ResultFile required =
+        ResultFile::withRequiredBytes(FileError::PathCapacityExceeded, FileErrorDetail::BuildTransportPath, 1031);
+    SC_TEST_EXPECT(required.contextKind == FileErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(required.context.requiredBytes == 1031);
+    const ResultFile actual =
+        ResultFile::withActualBytes(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptor, 3);
+    SC_TEST_EXPECT(actual.contextKind == FileErrorContextKind::ActualBytes);
+    SC_TEST_EXPECT(actual.context.actualBytes == 3);
+
+    constexpr char    expected[] = "Failed to read file descriptor (detail: read descriptor) (native error: 12345)";
+    char              message[sizeof(expected)];
+    ResultErrorFormat formatted = formatFileError(detailed, message);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    SC_TEST_EXPECT(::memcmp(message, expected, sizeof(expected)) == 0);
+
+    formatted = formatFileError(FileError::PathMustBeAbsolute, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("File path must be absolute"));
+    char tooSmall[2] = {'x', 0};
+    formatted        = formatFileError(FileError::PathMustBeAbsolute, tooSmall);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(tooSmall[0] == 0);
+    SC_TEST_EXPECT(formatFileError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatFileError(Result::Error(ResultCategory(99), 1), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(formatFileError(Result::Error(FileResultCategory, 999), message).status ==
+                   ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(
+        formatFileError(ResultFile(FileError::ReadFailed, static_cast<FileErrorDetail>(999)), message).status ==
+        ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(formatFileError(ResultFile(FileError::ReadFailed, FileErrorDetail::None,
+                                              static_cast<FileErrorContextKind>(999), {}),
+                                   message)
+                       .status == ResultErrorFormatStatus::UnknownError);
+}
 
 void SC::FileTest::testOpen()
 {

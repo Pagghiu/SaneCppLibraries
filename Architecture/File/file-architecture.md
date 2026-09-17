@@ -45,6 +45,7 @@ Do not turn `File` into a recursive filesystem library, a subprocess library, an
 - [File implementation](../../Libraries/File/File.cpp)
 - [File tests](../../Tests/Libraries/File/FileTest.cpp)
 - [FILE-0001 - Represent Named Pipes as File Pipe Descriptors](file-0001-represent-named-pipes-as-file-pipe-descriptors.md)
+- [FILE-0002 - Use structured File result errors](file-0002-use-structured-result-errors.md)
 - [SC-0001 - Library code must not hide dynamic allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0003 - Keep libraries independently consumable](../Global/sc-0003-keep-libraries-independently-consumable.md)
 - [SC-0007 - Keep public headers free of system and compiler headers](../Global/sc-0007-keep-public-headers-free-of-system-and-compiler-headers.md)
@@ -53,3 +54,4 @@ Do not turn `File` into a recursive filesystem library, a subprocess library, an
 ## Decision Log
 
 - [FILE-0001 - Represent named pipes as File pipe descriptors](file-0001-represent-named-pipes-as-file-pipe-descriptors.md)
+- [FILE-0002 - Use structured File result errors](file-0002-use-structured-result-errors.md)

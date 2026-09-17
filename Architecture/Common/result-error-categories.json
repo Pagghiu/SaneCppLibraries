@@ -64,6 +64,12 @@
       "owner": "Cryptography",
       "declaration": "Libraries/Cryptography/CryptographyError.h",
       "constant": "CryptographyResultCategory"
+    },
+    {
+      "value": 10,
+      "owner": "File",
+      "declaration": "Libraries/File/FileError.h",
+      "constant": "FileResultCategory"
     }
   ]
 }
