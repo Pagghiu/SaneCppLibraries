@@ -1226,7 +1226,10 @@ struct SC::Cryptography::Aead::Internal
         SC_TRY(validateKeySize(keyBytes.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateAeadKey));
 
         NTSTATUS status = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_AES_ALGORITHM, nullptr, 0);
-        SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Aead::init - BCryptOpenAlgorithmProvider failed");
+        if (not bcryptSuccess(status))
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptAeadOpenAlgorithm,
+                                                           static_cast<uint32_t>(status));
 
         status = BCryptSetProperty(algorithm, BCRYPT_CHAINING_MODE,
                                    reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_GCM)),
@@ -1234,7 +1237,9 @@ struct SC::Cryptography::Aead::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Aead::init - BCRYPT_CHAIN_MODE_GCM failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendConfigurationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptAeadSetGcmMode,
+                                                           static_cast<uint32_t>(status));
         }
 
         ULONG bytesCopied = 0;
@@ -1243,13 +1248,18 @@ struct SC::Cryptography::Aead::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Aead::init - BCRYPT_OBJECT_LENGTH failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendConfigurationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptAeadQueryObjectLength,
+                                                           static_cast<uint32_t>(status));
         }
 
         if (keyObjectLength > sizeof(keyObject))
         {
+            const ULONG required = keyObjectLength;
             close();
-            return Result::Error("Cryptography::Aead::init - fixed key object buffer too small");
+            return ResultCryptography::withRequiredBytes(CryptographyError::InternalCapacityExceeded,
+                                                         CryptographyErrorDetail::WindowsBCryptAeadKeyObjectCapacity,
+                                                         required);
         }
 
         status = BCryptGenerateSymmetricKey(algorithm, &key, keyObject, keyObjectLength,
@@ -1258,7 +1268,9 @@ struct SC::Cryptography::Aead::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Aead::init - BCryptGenerateSymmetricKey failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptAeadGenerateKey,
+                                                           static_cast<uint32_t>(status));
         }
 
         initialized = true;
@@ -1271,7 +1283,8 @@ struct SC::Cryptography::Aead::Internal
         bytesWritten = 0;
         if (backend == Backend::OpenSSL)
             return openSSL.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
-        SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::SealAead};
         SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
 
         BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
@@ -1288,7 +1301,10 @@ struct SC::Cryptography::Aead::Internal
                                          static_cast<ULONG>(plaintext.sizeInBytes()), &authInfo, nullptr, 0,
                                          reinterpret_cast<PUCHAR>(ciphertext.data()),
                                          static_cast<ULONG>(ciphertext.sizeInBytes()), &written, 0);
-        SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Aead::seal - BCryptEncrypt failed");
+        if (not bcryptSuccess(status))
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendOperationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptAeadEncrypt,
+                                                           static_cast<uint32_t>(status));
 
         bytesWritten = written;
         return ResultCryptography(true);
@@ -1300,7 +1316,8 @@ struct SC::Cryptography::Aead::Internal
         bytesWritten = 0;
         if (backend == Backend::OpenSSL)
             return openSSL.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
-        SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::OpenAead};
         SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
 
         BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
@@ -1321,8 +1338,12 @@ struct SC::Cryptography::Aead::Internal
         {
             secureClear(plaintext);
             if (status == STATUS_AUTH_TAG_MISMATCH)
-                return Result::Error("Cryptography::Aead::open - authentication failed");
-            return Result::Error("Cryptography::Aead::open - BCryptDecrypt failed");
+                return ResultCryptography::withWindowsNtStatus(CryptographyError::AuthenticationFailed,
+                                                               CryptographyErrorDetail::WindowsBCryptAeadDecrypt,
+                                                               static_cast<uint32_t>(status));
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendOperationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptAeadDecrypt,
+                                                           static_cast<uint32_t>(status));
         }
 
         bytesWritten = written;
@@ -1387,7 +1408,10 @@ struct SC::Cryptography::Cipher::Internal
                                      CryptographyErrorDetail::ValidateCipherInitializationVector, AESBlockSize);
 
         NTSTATUS status = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_AES_ALGORITHM, nullptr, 0);
-        SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Cipher::start - BCryptOpenAlgorithmProvider failed");
+        if (not bcryptSuccess(status))
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptCipherOpenAlgorithm,
+                                                           static_cast<uint32_t>(status));
 
         status = BCryptSetProperty(algorithm, BCRYPT_CHAINING_MODE,
                                    reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_CBC)),
@@ -1395,7 +1419,9 @@ struct SC::Cryptography::Cipher::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Cipher::start - BCRYPT_CHAIN_MODE_CBC failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendConfigurationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptCipherSetCbcMode,
+                                                           static_cast<uint32_t>(status));
         }
 
         ULONG bytesCopied = 0;
@@ -1404,13 +1430,18 @@ struct SC::Cryptography::Cipher::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Cipher::start - BCRYPT_OBJECT_LENGTH failed");
+            return ResultCryptography::withWindowsNtStatus(
+                CryptographyError::BackendConfigurationFailed,
+                CryptographyErrorDetail::WindowsBCryptCipherQueryObjectLength, static_cast<uint32_t>(status));
         }
 
         if (keyObjectLength > sizeof(keyObject))
         {
+            const ULONG required = keyObjectLength;
             close();
-            return Result::Error("Cryptography::Cipher::start - fixed key object buffer too small");
+            return ResultCryptography::withRequiredBytes(CryptographyError::InternalCapacityExceeded,
+                                                         CryptographyErrorDetail::WindowsBCryptCipherKeyObjectCapacity,
+                                                         required);
         }
 
         status = BCryptGenerateSymmetricKey(algorithm, &key, keyObject, keyObjectLength,
@@ -1419,7 +1450,9 @@ struct SC::Cryptography::Cipher::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Cipher::start - BCryptGenerateSymmetricKey failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptCipherGenerateKey,
+                                                           static_cast<uint32_t>(status));
         }
 
         memcpy(currentIV, iv.data(), sizeof(currentIV));
@@ -1434,10 +1467,14 @@ struct SC::Cryptography::Cipher::Internal
         if (input.empty())
             return ResultCryptography(true);
 
-        SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
-        SC_TRY_MSG(input.sizeInBytes() <= BcryptMaxInputSize,
-                   "Cryptography::Cipher - message is too large for the backend");
-        SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Cipher - insufficient output buffer");
+        if (input.sizeInBytes() % AESBlockSize != 0)
+            return {CryptographyError::InvalidBlockInputSize, CryptographyErrorDetail::ValidateCipherBlockInput};
+        if (input.sizeInBytes() > BcryptMaxInputSize)
+            return withMaximumBytes(CryptographyError::SizeLimitExceeded,
+                                    CryptographyErrorDetail::ValidateCipherBlockInput, BcryptMaxInputSize);
+        if (output.sizeInBytes() < input.sizeInBytes())
+            return withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                     CryptographyErrorDetail::ValidateCipherOutput, input.sizeInBytes());
 
         ULONG    written = 0;
         NTSTATUS status;
@@ -1455,7 +1492,12 @@ struct SC::Cryptography::Cipher::Internal
                                    reinterpret_cast<PUCHAR>(output.data()), static_cast<ULONG>(input.sizeInBytes()),
                                    &written, 0);
         }
-        SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Cipher - BCryptEncrypt/Decrypt failed");
+        if (not bcryptSuccess(status))
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendOperationFailed,
+                                                           stream.operation == Operation::Encrypt
+                                                               ? CryptographyErrorDetail::WindowsBCryptCipherEncrypt
+                                                               : CryptographyErrorDetail::WindowsBCryptCipherDecrypt,
+                                                           static_cast<uint32_t>(status));
         bytesWritten = written;
 
         if (input.sizeInBytes() >= AESBlockSize)
@@ -1538,12 +1580,16 @@ struct SC::Cryptography::Hmac::Internal
         if (backend == Backend::OpenSSL)
             return openSSL.setKey(key);
         close();
-        SC_TRY_MSG(key.sizeInBytes() <= BcryptMaxInputSize,
-                   "Cryptography::Hmac::setKey - key is too large for the backend");
+        if (key.sizeInBytes() > BcryptMaxInputSize)
+            return withMaximumBytes(CryptographyError::SizeLimitExceeded, CryptographyErrorDetail::SetHmacKey,
+                                    BcryptMaxInputSize);
 
         NTSTATUS status =
             BCryptOpenAlgorithmProvider(&algorithm, bcryptHashName(type), nullptr, BCRYPT_ALG_HANDLE_HMAC_FLAG);
-        SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Hmac::setKey - BCryptOpenAlgorithmProvider failed");
+        if (not bcryptSuccess(status))
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptHmacOpenAlgorithm,
+                                                           static_cast<uint32_t>(status));
 
         ULONG bytesCopied = 0;
         status            = BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&objectLength),
@@ -1551,13 +1597,18 @@ struct SC::Cryptography::Hmac::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Hmac::setKey - BCRYPT_OBJECT_LENGTH failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendConfigurationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptHmacQueryObjectLength,
+                                                           static_cast<uint32_t>(status));
         }
 
         if (objectLength > sizeof(objectBuffer))
         {
+            const ULONG required = objectLength;
             close();
-            return Result::Error("Cryptography::Hmac::setKey - fixed hash object buffer too small");
+            return ResultCryptography::withRequiredBytes(CryptographyError::InternalCapacityExceeded,
+                                                         CryptographyErrorDetail::WindowsBCryptHmacObjectCapacity,
+                                                         required);
         }
 
         status = BCryptCreateHash(algorithm, &hash, objectBuffer, objectLength,
@@ -1566,7 +1617,9 @@ struct SC::Cryptography::Hmac::Internal
         if (not bcryptSuccess(status))
         {
             close();
-            return Result::Error("Cryptography::Hmac::setKey - BCryptCreateHash failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptHmacCreate,
+                                                           static_cast<uint32_t>(status));
         }
 
         initialized = true;
@@ -1577,14 +1630,18 @@ struct SC::Cryptography::Hmac::Internal
     {
         if (backend == Backend::OpenSSL)
             return openSSL.add(data);
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::AddHmacData};
         size_t offset = 0;
         while (offset < data.sizeInBytes())
         {
             const size_t chunkSize = min(BcryptMaxInputSize, data.sizeInBytes() - offset);
             NTSTATUS status = BCryptHashData(hash, reinterpret_cast<PUCHAR>(const_cast<uint8_t*>(data.data() + offset)),
                                              static_cast<ULONG>(chunkSize), 0);
-            SC_TRY_MSG(bcryptSuccess(status), "Cryptography::Hmac::add - BCryptHashData failed");
+            if (not bcryptSuccess(status))
+                return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendOperationFailed,
+                                                               CryptographyErrorDetail::WindowsBCryptHmacUpdate,
+                                                               static_cast<uint32_t>(status));
             offset += chunkSize;
         }
         return ResultCryptography(true);
@@ -1594,7 +1651,8 @@ struct SC::Cryptography::Hmac::Internal
     {
         if (backend == Backend::OpenSSL)
             return openSSL.getMac(result);
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::getMac - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::FinalizeHmac};
         result.size     = digestSize(type);
         NTSTATUS status = BCryptFinishHash(hash, result.bytes, static_cast<ULONG>(result.size), 0);
         close();
@@ -1602,7 +1660,9 @@ struct SC::Cryptography::Hmac::Internal
         {
             secureClear(result.bytes);
             result.size = 0;
-            return Result::Error("Cryptography::Hmac::getMac - BCryptFinishHash failed");
+            return ResultCryptography::withWindowsNtStatus(CryptographyError::BackendOperationFailed,
+                                                           CryptographyErrorDetail::WindowsBCryptHmacFinalize,
+                                                           static_cast<uint32_t>(status));
         }
         return ResultCryptography(true);
     }
