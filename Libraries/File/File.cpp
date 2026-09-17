@@ -493,7 +493,12 @@ SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 
     if (fileDescriptor == INVALID_HANDLE_VALUE)
         return ResultFile::withNativeError(FileError::OpenFailed, FileErrorDetail::OpenFile, ::GetLastError());
-    return Result(assign(fileDescriptor));
+    if (not assign(fileDescriptor))
+    {
+        ::CloseHandle(fileDescriptor);
+        return {FileError::InvalidState, FileErrorDetail::OpenFile};
+    }
+    return Result(true);
 }
 
 #else
@@ -758,7 +763,11 @@ SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     if (fileDescriptor == -1)
         return ResultFile::withNativeError(FileError::OpenFailed, FileErrorDetail::OpenFile,
                                            static_cast<uint32_t>(errno));
-    SC_TRY(assign(fileDescriptor));
+    if (not assign(fileDescriptor))
+    {
+        ::close(fileDescriptor);
+        return {FileError::InvalidState, FileErrorDetail::OpenFile};
+    }
     if (not mode.blocking)
     {
         SC_TRY(Internal::setFileStatusFlags<O_NONBLOCK>(handle, true));
@@ -964,13 +973,23 @@ SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            ::GetLastError());
     }
-    return Result(assign(duplicated));
+    if (not assign(duplicated))
+    {
+        ::CloseHandle(duplicated);
+        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
+    }
+    return Result(true);
 #else
     const int duplicated = ::dup(STDOUT_FILENO);
     if (duplicated == -1)
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            static_cast<uint32_t>(errno));
-    return Result(assign(duplicated));
+    if (not assign(duplicated))
+    {
+        ::close(duplicated);
+        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
+    }
+    return Result(true);
 #endif
 }
 
@@ -991,13 +1010,23 @@ SC::ResultFile SC::FileDescriptor::openStdErrDuplicate()
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            ::GetLastError());
     }
-    return Result(assign(duplicated));
+    if (not assign(duplicated))
+    {
+        ::CloseHandle(duplicated);
+        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
+    }
+    return Result(true);
 #else
     const int duplicated = ::dup(STDERR_FILENO);
     if (duplicated == -1)
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            static_cast<uint32_t>(errno));
-    return Result(assign(duplicated));
+    if (not assign(duplicated))
+    {
+        ::close(duplicated);
+        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
+    }
+    return Result(true);
 #endif
 }
 
@@ -1018,13 +1047,23 @@ SC::ResultFile SC::FileDescriptor::openStdInDuplicate()
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            ::GetLastError());
     }
-    return Result(assign(duplicated));
+    if (not assign(duplicated))
+    {
+        ::CloseHandle(duplicated);
+        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
+    }
+    return Result(true);
 #else
     const int duplicated = ::dup(STDIN_FILENO);
     if (duplicated == -1)
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            static_cast<uint32_t>(errno));
-    return Result(assign(duplicated));
+    if (not assign(duplicated))
+    {
+        ::close(duplicated);
+        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
+    }
+    return Result(true);
 #endif
 }
 
@@ -1065,10 +1104,12 @@ SC::ResultFile SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char
         SC_TRY(read(availableData, readData));
         if (readData.empty())
             break;
-        SC_TRY(availableData.sliceStartLength(readData.sizeInBytes(),
-                                              availableData.sizeInBytes() - readData.sizeInBytes(), availableData));
+        if (not availableData.sliceStartLength(readData.sizeInBytes(),
+                                               availableData.sizeInBytes() - readData.sizeInBytes(), availableData))
+            return {FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptor};
     }
-    SC_TRY(data.sliceStartLength(0, data.sizeInBytes() - availableData.sizeInBytes(), actuallyRead));
+    if (not data.sliceStartLength(0, data.sizeInBytes() - availableData.sizeInBytes(), actuallyRead))
+        return {FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptor};
     return Result(true);
 }
 
@@ -1152,8 +1193,18 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
                                                ::GetLastError());
         }
     }
-    SC_TRY(readPipe.assign(pipeRead));
-    SC_TRY(writePipe.assign(pipeWrite));
+    if (not readPipe.assign(pipeRead))
+    {
+        ::CloseHandle(pipeRead);
+        ::CloseHandle(pipeWrite);
+        return {FileError::InvalidState, FileErrorDetail::AssignPipeDescriptor};
+    }
+    if (not writePipe.assign(pipeWrite))
+    {
+        ::CloseHandle(pipeWrite);
+        (void)readPipe.close();
+        return {FileError::InvalidState, FileErrorDetail::AssignPipeDescriptor};
+    }
 
     if (security.bInheritHandle)
     {
@@ -1264,9 +1315,11 @@ SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
     SC_TRY(movePosixDescriptorAboveStandardRange(pipes[1]));
     const int readDescriptor  = pipes[0];
     const int writeDescriptor = pipes[1];
-    SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe");
+    if (not readPipe.assign(pipes[0]))
+        return {FileError::InvalidState, FileErrorDetail::AssignPipeDescriptor};
     pipes[0] = -1;
-    SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
+    if (not writePipe.assign(pipes[1]))
+        return {FileError::InvalidState, FileErrorDetail::AssignPipeDescriptor};
     pipes[1] = -1;
     const ResultFile setReadCloExec =
         FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(readDescriptor, not options.readInheritable);
@@ -1386,8 +1439,17 @@ static ResultFile duplicateConnectedPipeHandle(HANDLE connectedHandle, PipeOptio
                                            SC::FileErrorDetail::DuplicateNamedPipeConnection, errorCode);
     }
     PipeDescriptor duplicated;
-    SC_TRY(duplicated.readPipe.assign(readHandle));
-    SC_TRY(duplicated.writePipe.assign(writeHandle));
+    if (not duplicated.readPipe.assign(readHandle))
+    {
+        ::CloseHandle(readHandle);
+        ::CloseHandle(writeHandle);
+        return {SC::FileError::InvalidState, SC::FileErrorDetail::AssignPipeDescriptor};
+    }
+    if (not duplicated.writePipe.assign(writeHandle))
+    {
+        ::CloseHandle(writeHandle);
+        return {SC::FileError::InvalidState, SC::FileErrorDetail::AssignPipeDescriptor};
+    }
     outConnection = move(duplicated);
     return Result(true);
 }
@@ -1425,7 +1487,12 @@ static ResultFile createPendingServerInstance(StringSpan pipeName, const NamedPi
         return ResultFile::withNativeError(SC::FileError::NamedPipeCreationFailed,
                                            SC::FileErrorDetail::CreateNamedPipeServer, ::GetLastError());
 
-    return Result(pendingConnection.assign(handle));
+    if (not pendingConnection.assign(handle))
+    {
+        ::CloseHandle(handle);
+        return {SC::FileError::InvalidState, SC::FileErrorDetail::CreateNamedPipeServer};
+    }
+    return Result(true);
 }
 } // namespace
 
@@ -1519,7 +1586,11 @@ SC::ResultFile SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor&
                                            FileErrorDetail::ConnectNamedPipeClient, ::GetLastError());
 
     FileDescriptor connected;
-    SC_TRY(connected.assign(clientHandle));
+    if (not connected.assign(clientHandle))
+    {
+        ::CloseHandle(clientHandle);
+        return {FileError::InvalidState, FileErrorDetail::ConnectNamedPipeClient};
+    }
 
     HANDLE connectedHandle;
     if (not connected.get(connectedHandle, false))
@@ -1620,8 +1691,17 @@ static ResultFile duplicateConnectedSocket(int connectedDescriptor, PipeOptions 
     }
 
     PipeDescriptor duplicated;
-    SC_TRY(duplicated.readPipe.assign(readDescriptor));
-    SC_TRY(duplicated.writePipe.assign(writeDescriptor));
+    if (not duplicated.readPipe.assign(readDescriptor))
+    {
+        ::close(readDescriptor);
+        ::close(writeDescriptor);
+        return {SC::FileError::InvalidState, SC::FileErrorDetail::AssignPipeDescriptor};
+    }
+    if (not duplicated.writePipe.assign(writeDescriptor))
+    {
+        ::close(writeDescriptor);
+        return {SC::FileError::InvalidState, SC::FileErrorDetail::AssignPipeDescriptor};
+    }
 
     int rawDescriptor = -1;
     if (not duplicated.readPipe.get(rawDescriptor, false))
@@ -1677,7 +1757,11 @@ SC::ResultFile SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerO
         return ResultFile::withNativeError(FileError::NamedPipeCreationFailed, FileErrorDetail::CreateNamedPipeServer,
                                            static_cast<uint32_t>(errno));
 
-    SC_TRY(listeningSocket.assign(listeningDescriptor));
+    if (not listeningSocket.assign(listeningDescriptor))
+    {
+        ::close(listeningDescriptor);
+        return {FileError::InvalidState, FileErrorDetail::CreateNamedPipeServer};
+    }
 
     sockaddr_un address;
     ::memset(&address, 0, sizeof(address));
@@ -1729,7 +1813,11 @@ SC::ResultFile SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
                                            static_cast<uint32_t>(errno));
 
     FileDescriptor acceptedSocket;
-    SC_TRY(acceptedSocket.assign(acceptedDescriptor));
+    if (not acceptedSocket.assign(acceptedDescriptor))
+    {
+        ::close(acceptedDescriptor);
+        return {FileError::InvalidState, FileErrorDetail::AcceptNamedPipeConnection};
+    }
 
     int rawAcceptedDescriptor;
     if (not acceptedSocket.get(rawAcceptedDescriptor, false))
@@ -1790,7 +1878,11 @@ SC::ResultFile SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor&
                                            FileErrorDetail::ConnectNamedPipeClient, static_cast<uint32_t>(errno));
 
     FileDescriptor connectedSocket;
-    SC_TRY(connectedSocket.assign(socketDescriptor));
+    if (not connectedSocket.assign(socketDescriptor))
+    {
+        ::close(socketDescriptor);
+        return {FileError::InvalidState, FileErrorDetail::ConnectNamedPipeClient};
+    }
 
     sockaddr_un address;
     ::memset(&address, 0, sizeof(address));
