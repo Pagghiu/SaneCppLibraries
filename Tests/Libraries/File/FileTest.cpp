@@ -274,6 +274,12 @@ void SC::FileTest::structuredProducerFailures()
     SC_TEST_EXPECT(closeResult.contextKind == FileErrorContextKind::NativeError);
     SC_TEST_EXPECT(not closeFailurePipe.readPipe.isValid());
     SC_TEST_EXPECT(not closeFailurePipe.writePipe.isValid());
+
+    NamedPipeServer  uncreatedServer;
+    PipeDescriptor   unacceptedConnection;
+    const ResultFile acceptResult = uncreatedServer.accept(unacceptedConnection);
+    SC_TEST_EXPECT(acceptResult.isError(FileError::InvalidState));
+    SC_TEST_EXPECT(acceptResult.detail == FileErrorDetail::AcceptNamedPipeConnection);
 }
 
 void SC::FileTest::testOpen()
@@ -368,30 +374,45 @@ void SC::FileTest::testNamedPipeCreateConnectAccept()
     SC_TEST_EXPECT(NamedPipeName::build(logicalName.view(), pipePath));
 
     StringPath outputPath;
-    SC_TEST_EXPECT(not NamedPipeName::build("", outputPath));
-    SC_TEST_EXPECT(not NamedPipeName::build("invalid/name", outputPath));
-    SC_TEST_EXPECT(not NamedPipeName::build("invalid\\name", outputPath));
+    ResultFile nameResult = NamedPipeName::build("", outputPath);
+    SC_TEST_EXPECT(nameResult.isError(FileError::InvalidNamedPipeName));
+    SC_TEST_EXPECT(nameResult.detail == FileErrorDetail::ValidateNamedPipeLogicalName);
+    nameResult = NamedPipeName::build("invalid/name", outputPath);
+    SC_TEST_EXPECT(nameResult.isError(FileError::InvalidNamedPipeName));
+    nameResult = NamedPipeName::build("invalid\\name", outputPath);
+    SC_TEST_EXPECT(nameResult.isError(FileError::InvalidNamedPipeName));
 
 #if !SC_PLATFORM_WINDOWS
     NamedPipeNameOptions nameOptions;
     nameOptions.posixDirectory = "/tmp";
     SC_TEST_EXPECT(NamedPipeName::build("sc-file-test-custom", outputPath, nameOptions));
     nameOptions.posixDirectory = "relative";
-    SC_TEST_EXPECT(not NamedPipeName::build("sc-file-test-custom", outputPath, nameOptions));
+    nameResult                 = NamedPipeName::build("sc-file-test-custom", outputPath, nameOptions);
+    SC_TEST_EXPECT(nameResult.isError(FileError::PathMustBeAbsolute));
+    SC_TEST_EXPECT(nameResult.detail == FileErrorDetail::ValidateAbsolutePath);
 #endif
 
     NamedPipeServer        server;
     NamedPipeServerOptions options;
     options.posix.removeEndpointBeforeCreate = true;
     SC_TEST_EXPECT(server.create(pipePath.view(), options));
+    const ResultFile alreadyCreated = server.create(pipePath.view(), options);
+    SC_TEST_EXPECT(alreadyCreated.isError(FileError::InvalidState));
+    SC_TEST_EXPECT(alreadyCreated.detail == FileErrorDetail::CreateNamedPipeServer);
 
-    NamedPipeServer duplicateServer;
-    SC_TEST_EXPECT(not duplicateServer.create(pipePath.view()));
+    NamedPipeServer  duplicateServer;
+    const ResultFile duplicateCreate = duplicateServer.create(pipePath.view());
+    SC_TEST_EXPECT(duplicateCreate.isError(FileError::NamedPipeCreationFailed));
+    SC_TEST_EXPECT(duplicateCreate.contextKind == FileErrorContextKind::NativeError);
 
 #if SC_PLATFORM_WINDOWS
-    SC_TEST_EXPECT(not duplicateServer.create("invalid"));
+    const ResultFile invalidCreate = duplicateServer.create("invalid");
+    SC_TEST_EXPECT(invalidCreate.isError(FileError::InvalidNamedPipeName));
+    SC_TEST_EXPECT(invalidCreate.detail == FileErrorDetail::ValidateNamedPipePath);
 #else
-    SC_TEST_EXPECT(not duplicateServer.create("relative/path.sock"));
+    const ResultFile invalidCreate = duplicateServer.create("relative/path.sock");
+    SC_TEST_EXPECT(invalidCreate.isError(FileError::PathMustBeAbsolute));
+    SC_TEST_EXPECT(invalidCreate.detail == FileErrorDetail::ValidateAbsolutePath);
 #endif
 
     auto acceptAndConnect =
@@ -439,8 +460,11 @@ void SC::FileTest::testNamedPipeCreateConnectAccept()
 
     SC_TEST_EXPECT(server.close());
 
-    PipeDescriptor shouldFail;
-    SC_TEST_EXPECT(not NamedPipeClient::connect(pipePath.view(), shouldFail));
+    PipeDescriptor   shouldFail;
+    const ResultFile connectAfterClose = NamedPipeClient::connect(pipePath.view(), shouldFail);
+    SC_TEST_EXPECT(connectAfterClose.isError(FileError::NamedPipeConnectionFailed));
+    SC_TEST_EXPECT(connectAfterClose.detail == FileErrorDetail::ConnectNamedPipeClient);
+    SC_TEST_EXPECT(connectAfterClose.contextKind == FileErrorContextKind::NativeError);
 
 #if SC_PLATFORM_WINDOWS
     SmallString<128> alternatePathASCII;
