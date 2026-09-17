@@ -218,6 +218,32 @@ void SC::FileTest::structuredProducerFailures()
     SC_TEST_EXPECT(result.context.actualBytes > 0);
     SC_TEST_EXPECT(result.context.actualBytes < sizeof(largeWrite));
     SC_TEST_EXPECT(pipe.close());
+#else
+    FileDescriptor descriptor;
+    ResultFile     result = descriptor.open(L"relative.txt", FileOpen::Read);
+    SC_TEST_EXPECT(result.isError(FileError::PathMustBeAbsolute));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ValidateAbsolutePath);
+    SC_TEST_EXPECT(result.contextKind == FileErrorContextKind::None);
+
+    FileDescriptorStat statInfo;
+    result = descriptor.stat(statInfo);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::QueryDescriptorMetadata);
+    result = descriptor.chmod(0644u);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ChangeDescriptorPermissions);
+    result = descriptor.chown(0, 0);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ChangeDescriptorOwnership);
+    result = descriptor.sync();
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::SynchronizeDescriptor);
+    result = descriptor.syncData();
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::SynchronizeDescriptorData);
+    result = descriptor.truncate(1);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::TruncateDescriptor);
 #endif
 }
 
@@ -434,6 +460,12 @@ void SC::FileTest::testDescriptorOperations()
     SC_TEST_EXPECT(statInfo.accessedTime.milliseconds > 0);
 
 #if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekStart, 0xffffffffLL));
+    size_t largePosition = 0;
+    SC_TEST_EXPECT(fd.currentPosition(largePosition));
+    SC_TEST_EXPECT(largePosition == 0xffffffffULL);
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekStart, 6));
+
     SC_TEST_EXPECT(statInfo.creationTime.milliseconds > 0);
     SC_TEST_EXPECT(statInfo.windows.attributes != 0);
 
@@ -447,11 +479,9 @@ void SC::FileTest::testDescriptorOperations()
     SC_TEST_EXPECT(fd.stat(writableStat));
     SC_TEST_EXPECT((writableStat.windows.attributes & FILE_ATTRIBUTE_READONLY) == 0);
 
-    SC_TEST_EXPECT(fd.chown(123, 456));
-    FileDescriptorStat afterChownStat;
-    SC_TEST_EXPECT(fd.stat(afterChownStat));
-    SC_TEST_EXPECT(afterChownStat.entryType == FileDescriptorEntryType::File);
-    SC_TEST_EXPECT(afterChownStat.windows.attributes == writableStat.windows.attributes);
+    const ResultFile chownResult = fd.chown(123, 456);
+    SC_TEST_EXPECT(chownResult.isError(FileError::OperationUnsupported));
+    SC_TEST_EXPECT(chownResult.detail == FileErrorDetail::ChangeDescriptorOwnership);
 #else
     int nativeHandle = -1;
     SC_TEST_EXPECT(fd.get(nativeHandle, Result::Error("native handle")));

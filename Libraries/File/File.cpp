@@ -57,7 +57,9 @@ static SC::ResultFile fillFileDescriptorWindowsStat(HANDLE fileHandle, SC::FileD
     fileStat = {};
 
     BY_HANDLE_FILE_INFORMATION handleInfo;
-    SC_TRY_MSG(::GetFileInformationByHandle(fileHandle, &handleInfo) != FALSE, "GetFileInformationByHandle failed");
+    if (::GetFileInformationByHandle(fileHandle, &handleInfo) == FALSE)
+        return SC::ResultFile::withNativeError(SC::FileError::MetadataQueryFailed,
+                                               SC::FileErrorDetail::QueryDescriptorMetadata, ::GetLastError());
 
     FILE_STANDARD_INFO standardInfo = {};
     const bool         hasStandardInfo =
@@ -107,7 +109,7 @@ SC::ResultFile SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handl
 #endif
     if (res == FALSE)
     {
-        return Result::Error("FileDescriptorDefinition::releaseHandle - CloseHandle failed");
+        return ResultFile::withNativeError(FileError::CloseFailed, FileErrorDetail::CloseDescriptor, ::GetLastError());
     }
     return Result(true);
 }
@@ -117,22 +119,18 @@ SC::ResultFile SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handl
 //-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
-    static ResultFile translateReadError(DWORD errorCode)
+    static ResultFile translateReadError(DWORD errorCode, FileErrorDetail detail)
     {
         switch (errorCode)
         {
-        case ERROR_ACCESS_DENIED: return Result::Error("ERROR_ACCESS_DENIED");
-        case ERROR_BROKEN_PIPE: return Result::Error("ERROR_BROKEN_PIPE");
-        case ERROR_HANDLE_EOF: return Result::Error("ERROR_HANDLE_EOF");
-        case ERROR_INVALID_HANDLE: return Result::Error("ERROR_INVALID_HANDLE");
-        case ERROR_INVALID_PARAMETER: return Result::Error("ERROR_INVALID_PARAMETER");
-        case ERROR_MORE_DATA: return Result::Error("ERROR_MORE_DATA");
-        case ERROR_NO_DATA: return Result::Error("ERROR_NO_DATA");
-        case ERROR_NOT_ENOUGH_MEMORY: return Result::Error("ERROR_NOT_ENOUGH_MEMORY");
-        case ERROR_OPERATION_ABORTED: return Result::Error("ERROR_OPERATION_ABORTED");
-        case ERROR_IO_PENDING: return Result::Error("ERROR_IO_PENDING");
+        case ERROR_INVALID_HANDLE: return ResultFile::withNativeError(FileError::InvalidHandle, detail, errorCode);
+        case ERROR_BROKEN_PIPE:
+        case ERROR_NO_DATA: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, errorCode);
+        case ERROR_OPERATION_ABORTED:
+            return ResultFile::withNativeError(FileError::OperationCancelled, detail, errorCode);
+        case ERROR_IO_PENDING: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
         }
-        return Result::Error("Unknown");
+        return ResultFile::withNativeError(FileError::ReadFailed, detail, errorCode);
     }
 
     static ResultFile readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer,
@@ -156,8 +154,8 @@ struct SC::FileDescriptor::Internal
         }
         else
         {
-            SC_TRY_MSG(fallbackBuffer.sizeInBytes() != 0,
-                       "FileDescriptor::readAppend - buffer must be bigger than zero");
+            if (fallbackBuffer.sizeInBytes() == 0)
+                return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptor);
             success = ::ReadFile(fileDescriptor, fallbackBuffer.data(),
                                  static_cast<DWORD>(fallbackBuffer.sizeInBytes()), &numReadBytes, nullptr);
             if (success == FALSE)
@@ -167,12 +165,12 @@ struct SC::FileDescriptor::Internal
         }
         if (Internal::isActualError(success, numReadBytes, fileDescriptor, lastError))
         {
-            return Internal::translateReadError(lastError);
+            return Internal::translateReadError(lastError, FileErrorDetail::ReadDescriptor);
         }
         else if (numReadBytes > 0)
         {
-            SC_TRY_MSG(buffer.resizeWithoutInitializing(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)),
-                       "FileDescriptor::readAppend - resize failed");
+            if (not buffer.resizeWithoutInitializing(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)))
+                return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::GrowReadBuffer);
             if (not useVector)
             {
                 auto newBufferData = buffer.getDirectAccess();
@@ -204,23 +202,25 @@ struct SC::FileDescriptor::Internal
             // ERROR_BROKEN_PIPE.
             return false;
         }
+        if (success == FALSE and numReadBytes == 0 and lastError == ERROR_HANDLE_EOF)
+            return false;
         return success == FALSE;
     }
 };
 
 SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
-    int flags = 0;
+    DWORD flags = 0;
     switch (seekMode)
     {
     case SeekMode::SeekStart: flags = FILE_BEGIN; break;
     case SeekMode::SeekEnd: flags = FILE_END; break;
     case SeekMode::SeekCurrent: flags = FILE_CURRENT; break;
     }
-    const DWORD offsetLow  = static_cast<DWORD>(offset & 0xffffffff);
-    DWORD       offsetHigh = static_cast<DWORD>((offset >> 32) & 0xffffffff);
-    const DWORD newPos     = ::SetFilePointer(handle, offsetLow, (LONG*)&offsetHigh, flags);
-    SC_TRY_MSG(newPos != INVALID_SET_FILE_POINTER, "SetFilePointer failed");
+    LARGE_INTEGER distance;
+    distance.QuadPart = offset;
+    if (::SetFilePointerEx(handle, distance, nullptr, flags) == FALSE)
+        return ResultFile::withNativeError(FileError::SeekFailed, FileErrorDetail::SeekDescriptor, ::GetLastError());
     return Result(true);
 }
 
@@ -233,7 +233,8 @@ SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
         position = static_cast<size_t>(li.QuadPart);
         return Result(true);
     }
-    return Result::Error("SetFilePointerEx failed");
+    return ResultFile::withNativeError(FileError::SeekFailed, FileErrorDetail::QueryDescriptorPosition,
+                                       ::GetLastError());
 }
 
 SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
@@ -244,22 +245,26 @@ SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
         sizeInBytes = static_cast<size_t>(li.QuadPart);
         return Result(true);
     }
-    return Result::Error("GetFileSizeEx failed");
+    return ResultFile::withNativeError(FileError::MetadataQueryFailed, FileErrorDetail::QueryDescriptorSize,
+                                       ::GetLastError());
 }
 
 SC::ResultFile SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::stat - Invalid handle");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::QueryDescriptorMetadata);
     return fillFileDescriptorWindowsStat(handle, fileStat);
 }
 
 SC::ResultFile SC::FileDescriptor::chmod(uint32_t mode)
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::chmod - Invalid handle");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::ChangeDescriptorPermissions);
 
     FILE_BASIC_INFO basicInfo = {};
-    SC_TRY_MSG(::GetFileInformationByHandleEx(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)) != FALSE,
-               "GetFileInformationByHandleEx failed");
+    if (::GetFileInformationByHandleEx(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)) == FALSE)
+        return ResultFile::withNativeError(FileError::MetadataQueryFailed, FileErrorDetail::ChangeDescriptorPermissions,
+                                           ::GetLastError());
 
     if (mode & 0200u)
     {
@@ -270,8 +275,9 @@ SC::ResultFile SC::FileDescriptor::chmod(uint32_t mode)
         basicInfo.FileAttributes |= FILE_ATTRIBUTE_READONLY;
     }
 
-    SC_TRY_MSG(::SetFileInformationByHandle(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)) != FALSE,
-               "SetFileInformationByHandle failed");
+    if (::SetFileInformationByHandle(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)) == FALSE)
+        return ResultFile::withNativeError(FileError::PermissionsChangeFailed,
+                                           FileErrorDetail::ChangeDescriptorPermissions, ::GetLastError());
     return Result(true);
 }
 
@@ -279,42 +285,64 @@ SC::ResultFile SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
 {
     (void)uid;
     (void)gid;
-    SC_TRY_MSG(isValid(), "FileDescriptor::chown - Invalid handle");
-    FileDescriptorStat ignored;
-    return stat(ignored);
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::ChangeDescriptorOwnership);
+    return ResultFile(FileError::OperationUnsupported, FileErrorDetail::ChangeDescriptorOwnership);
 }
 
 SC::ResultFile SC::FileDescriptor::sync()
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::sync - Invalid handle");
-    SC_TRY_MSG(::FlushFileBuffers(handle) != FALSE, "FlushFileBuffers failed");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::SynchronizeDescriptor);
+    if (::FlushFileBuffers(handle) == FALSE)
+        return ResultFile::withNativeError(FileError::SyncFailed, FileErrorDetail::SynchronizeDescriptor,
+                                           ::GetLastError());
     return Result(true);
 }
 
-SC::ResultFile SC::FileDescriptor::syncData() { return sync(); }
+SC::ResultFile SC::FileDescriptor::syncData()
+{
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::SynchronizeDescriptorData);
+    if (::FlushFileBuffers(handle) == FALSE)
+        return ResultFile::withNativeError(FileError::SyncFailed, FileErrorDetail::SynchronizeDescriptorData,
+                                           ::GetLastError());
+    return Result(true);
+}
 
 SC::ResultFile SC::FileDescriptor::truncate(uint64_t sizeInBytes)
 {
-    SC_TRY_MSG(isValid(), "FileDescriptor::truncate - Invalid handle");
+    if (not isValid())
+        return ResultFile(FileError::InvalidHandle, FileErrorDetail::TruncateDescriptor);
 
     LARGE_INTEGER currentPosition = {};
     LARGE_INTEGER newPosition;
     newPosition.QuadPart = 0;
-    SC_TRY_MSG(::SetFilePointerEx(handle, newPosition, &currentPosition, FILE_CURRENT) != FALSE,
-               "SetFilePointerEx failed");
+    if (::SetFilePointerEx(handle, newPosition, &currentPosition, FILE_CURRENT) == FALSE)
+        return ResultFile::withNativeError(FileError::TruncateFailed, FileErrorDetail::TruncateDescriptor,
+                                           ::GetLastError());
 
     LARGE_INTEGER truncatePosition;
     truncatePosition.QuadPart = static_cast<LONGLONG>(sizeInBytes);
-    SC_TRY_MSG(::SetFilePointerEx(handle, truncatePosition, nullptr, FILE_BEGIN) != FALSE, "SetFilePointerEx failed");
-    SC_TRY_MSG(::SetEndOfFile(handle) != FALSE, "SetEndOfFile failed");
-    SC_TRY_MSG(::SetFilePointerEx(handle, currentPosition, nullptr, FILE_BEGIN) != FALSE, "SetFilePointerEx failed");
+    if (::SetFilePointerEx(handle, truncatePosition, nullptr, FILE_BEGIN) == FALSE)
+        return ResultFile::withNativeError(FileError::TruncateFailed, FileErrorDetail::TruncateDescriptor,
+                                           ::GetLastError());
+    if (::SetEndOfFile(handle) == FALSE)
+        return ResultFile::withNativeError(FileError::TruncateFailed, FileErrorDetail::TruncateDescriptor,
+                                           ::GetLastError());
+    if (::SetFilePointerEx(handle, currentPosition, nullptr, FILE_BEGIN) == FALSE)
+        return ResultFile::withNativeError(FileError::TruncateFailed, FileErrorDetail::TruncateDescriptor,
+                                           ::GetLastError());
     return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
-    return write(data);
+    ResultFile result = write(data);
+    if (not result and result.detail == FileErrorDetail::WriteDescriptor)
+        result.detail = FileErrorDetail::WriteDescriptorAtOffset;
+    return result;
 }
 
 SC::ResultFile SC::FileDescriptor::write(Span<const char> data)
@@ -322,14 +350,34 @@ SC::ResultFile SC::FileDescriptor::write(Span<const char> data)
     DWORD      numberOfWrittenBytes;
     const BOOL res =
         ::WriteFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfWrittenBytes, nullptr);
-    SC_TRY_MSG(res, "WriteFile failed");
-    return Result(static_cast<size_t>(numberOfWrittenBytes) == data.sizeInBytes());
+    if (res == FALSE)
+    {
+        const DWORD errorCode = ::GetLastError();
+        if (errorCode == ERROR_INVALID_HANDLE)
+            return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::WriteDescriptor, errorCode);
+        if (errorCode == ERROR_BROKEN_PIPE or errorCode == ERROR_NO_DATA)
+            return ResultFile::withNativeError(FileError::PipeDisconnected, FileErrorDetail::WriteDescriptor,
+                                               errorCode);
+        if (errorCode == ERROR_OPERATION_ABORTED)
+            return ResultFile::withNativeError(FileError::OperationCancelled, FileErrorDetail::WriteDescriptor,
+                                               errorCode);
+        if (errorCode == ERROR_IO_PENDING)
+            return ResultFile::withNativeError(FileError::WouldBlock, FileErrorDetail::WriteDescriptor, errorCode);
+        return ResultFile::withNativeError(FileError::WriteFailed, FileErrorDetail::WriteDescriptor, errorCode);
+    }
+    if (static_cast<size_t>(numberOfWrittenBytes) != data.sizeInBytes())
+        return ResultFile::withActualBytes(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptor,
+                                           numberOfWrittenBytes);
+    return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
-    return read(data, actuallyRead);
+    ResultFile result = read(data, actuallyRead);
+    if (not result and result.detail == FileErrorDetail::ReadDescriptor)
+        result.detail = FileErrorDetail::ReadDescriptorAtOffset;
+    return result;
 }
 
 SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
@@ -337,20 +385,24 @@ SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRea
     DWORD      numberOfReadBytes = 0;
     const BOOL res =
         ::ReadFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfReadBytes, nullptr);
-    if (res == FALSE and ::GetLastError() != ERROR_BROKEN_PIPE)
+    const DWORD lastError = res == FALSE ? ::GetLastError() : ERROR_SUCCESS;
+    if (Internal::isActualError(res, numberOfReadBytes, handle, lastError))
     {
-        return Result::Error("ReadFile failed");
+        return Internal::translateReadError(lastError, FileErrorDetail::ReadDescriptor);
     }
-    return Result(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
+    if (not data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead))
+        return ResultFile(FileError::BufferCapacityExceeded, FileErrorDetail::ReadDescriptor);
+    return Result(true);
 }
 
 SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     StringPath logicalPath;
-    SC_TRY(FileWindowsDetail::WindowsPath::makeLogicalPath(filePath, logicalPath));
+    if (not FileWindowsDetail::WindowsPath::makeLogicalPath(filePath, logicalPath))
+        return ResultFile(FileError::InvalidPath, FileErrorDetail::NormalizePath);
     if (logicalPath.view() != L"NUL" and not FileWindowsDetail::WindowsPath::isAbsolute(logicalPath.view()))
     {
-        return Result::Error("FileDescriptor::open - Path must be absolute");
+        return ResultFile(FileError::PathMustBeAbsolute, FileErrorDetail::ValidateAbsolutePath);
     }
     const wchar_t* logicalData = logicalPath.view().getNullTerminatedNative();
 
@@ -362,7 +414,8 @@ SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     }
     else
     {
-        SC_TRY(FileWindowsDetail::WindowsPath::appendTransportPrefix(logicalPath.view(), transportPath));
+        if (not FileWindowsDetail::WindowsPath::appendTransportPrefix(logicalPath.view(), transportPath))
+            return ResultFile(FileError::PathCapacityExceeded, FileErrorDetail::BuildTransportPath);
         nullTerminatedPath = transportPath.view().getNullTerminatedNative();
     }
 
@@ -418,7 +471,8 @@ SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     HANDLE fileDescriptor =
         ::CreateFileW(nullTerminatedPath, accessMode, shareMode, &security, createDisposition, fileFlags, nullptr);
 
-    SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed");
+    if (fileDescriptor == INVALID_HANDLE_VALUE)
+        return ResultFile::withNativeError(FileError::OpenFailed, FileErrorDetail::OpenFile, ::GetLastError());
     return Result(assign(fileDescriptor));
 }
 
@@ -877,16 +931,18 @@ SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
     HANDLE stdHandle = ::GetStdHandle(STD_OUTPUT_HANDLE);
-    if (stdHandle == INVALID_HANDLE_VALUE)
+    if (stdHandle == INVALID_HANDLE_VALUE or stdHandle == nullptr)
     {
-        return Result::Error("GetStdHandle failed");
+        return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::GetStandardHandle,
+                                           ::GetLastError());
     }
     HANDLE duplicated;
     BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
                                    DUPLICATE_SAME_ACCESS);
     if (res == FALSE)
     {
-        return Result::Error("DuplicateHandle failed");
+        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
+                                           ::GetLastError());
     }
     return Result(assign(duplicated));
 #else
@@ -902,16 +958,18 @@ SC::ResultFile SC::FileDescriptor::openStdErrDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
     HANDLE stdHandle = ::GetStdHandle(STD_ERROR_HANDLE);
-    if (stdHandle == INVALID_HANDLE_VALUE)
+    if (stdHandle == INVALID_HANDLE_VALUE or stdHandle == nullptr)
     {
-        return Result::Error("GetStdHandle failed");
+        return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::GetStandardHandle,
+                                           ::GetLastError());
     }
     HANDLE duplicated;
     BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
                                    DUPLICATE_SAME_ACCESS);
     if (res == FALSE)
     {
-        return Result::Error("DuplicateHandle failed");
+        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
+                                           ::GetLastError());
     }
     return Result(assign(duplicated));
 #else
@@ -927,16 +985,18 @@ SC::ResultFile SC::FileDescriptor::openStdInDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
     HANDLE stdHandle = ::GetStdHandle(STD_INPUT_HANDLE);
-    if (stdHandle == INVALID_HANDLE_VALUE)
+    if (stdHandle == INVALID_HANDLE_VALUE or stdHandle == nullptr)
     {
-        return Result::Error("GetStdHandle failed");
+        return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::GetStandardHandle,
+                                           ::GetLastError());
     }
     HANDLE duplicated;
     BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
                                    DUPLICATE_SAME_ACCESS);
     if (res == FALSE)
     {
-        return Result::Error("DuplicateHandle failed");
+        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
+                                           ::GetLastError());
     }
     return Result(assign(duplicated));
 #else
