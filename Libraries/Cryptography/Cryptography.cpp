@@ -2124,18 +2124,23 @@ struct OpenSSL3AeadBackendImplementation
         SC_TRY(validateKeySize(key.sizeInBytes(), keySize(type), CryptographyErrorDetail::ValidateAeadKey));
 
         OpenSSL3API& api = openSSL3API();
-        SC_TRY_MSG(api.isValid(), "Cryptography::Aead::init - OpenSSL 3 is unavailable");
+        if (not api.isValid())
+            return {CryptographyError::BackendUnavailable, CryptographyErrorDetail::OpenSSL3RuntimeUnavailable};
         OpenSSL3ErrorScope errors(api);
         auto               deferClose = MakeDeferred([&] { close(); });
 
-        cipher  = api.cipherFetch(nullptr, openSSL3CipherName(type), nullptr);
-        context = cipher == nullptr ? nullptr : api.cipherContextNew();
-        SC_TRY_MSG(context != nullptr, "Cryptography::Aead::init - OpenSSL cipher initialization failed");
+        cipher = api.cipherFetch(nullptr, openSSL3CipherName(type), nullptr);
+        if (cipher == nullptr)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3AeadFetchCipher};
+        context = api.cipherContextNew();
+        if (context == nullptr)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3AeadCreateContext};
 
         uint8_t   nonce[GCMNonceSize] = {0};
         const int status              = api.cipherInit(context, cipher, key.data(), nonce, 1, nullptr);
         secureClear(nonce);
-        SC_TRY_MSG(status == 1, "Cryptography::Aead::init - OpenSSL cipher initialization failed");
+        if (status != 1)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3AeadInitialize};
 
         memcpy(keyBytes, key.data(), key.sizeInBytes());
         initialized = true;
@@ -2150,9 +2155,9 @@ struct OpenSSL3AeadBackendImplementation
         {
             const size_t chunkSize = min(static_cast<size_t>(0x7fffffffu), aad.sizeInBytes() - offset);
             int          produced  = 0;
-            SC_TRY_MSG(
-                api.cipherUpdate(context, nullptr, &produced, aad.data() + offset, static_cast<int>(chunkSize)) == 1,
-                "Cryptography::Aead - OpenSSL associated data update failed");
+            if (api.cipherUpdate(context, nullptr, &produced, aad.data() + offset, static_cast<int>(chunkSize)) != 1)
+                return {CryptographyError::BackendOperationFailed,
+                        CryptographyErrorDetail::OpenSSL3AeadAssociatedDataUpdate};
             offset += chunkSize;
         }
         return ResultCryptography(true);
@@ -2167,10 +2172,15 @@ struct OpenSSL3AeadBackendImplementation
         {
             const size_t chunkSize = min(static_cast<size_t>(0x7fffffffu), input.sizeInBytes() - inputOffset);
             int          produced  = 0;
-            SC_TRY_MSG(api.cipherUpdate(context, output.data() + outputOffset, &produced, input.data() + inputOffset,
-                                        static_cast<int>(chunkSize)) == 1 and
-                           produced >= 0 and static_cast<size_t>(produced) <= output.sizeInBytes() - outputOffset,
-                       "Cryptography::Aead - OpenSSL payload update failed");
+            if (api.cipherUpdate(context, output.data() + outputOffset, &produced, input.data() + inputOffset,
+                                 static_cast<int>(chunkSize)) != 1)
+                return {CryptographyError::BackendOperationFailed, CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate};
+            if (produced < 0 or static_cast<size_t>(produced) > output.sizeInBytes() - outputOffset)
+                return produced < 0 ? ResultCryptography(CryptographyError::UnexpectedOutputSize,
+                                                         CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate)
+                                    : withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                                      CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate,
+                                                      static_cast<size_t>(produced));
             inputOffset += chunkSize;
             outputOffset += static_cast<size_t>(produced);
         }
@@ -2182,38 +2192,43 @@ struct OpenSSL3AeadBackendImplementation
                             Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
         bytesWritten = 0;
-        SC_TRY_MSG(initialized, "Cryptography::Aead::seal - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::SealAead};
         SC_TRY(validateAeadSealArguments(nonce, aad, plaintext, ciphertext, tag));
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
-        ResultCryptography result =
-            api.cipherInit(context, cipher, keyBytes, nonce.data(), 1, nullptr) == 1
-                ? addAssociatedData(api, aad)
-                : ResultCryptography(Result::Error("Cryptography::Aead::seal - OpenSSL initialization failed"));
+        ResultCryptography result = api.cipherInit(context, cipher, keyBytes, nonce.data(), 1, nullptr) == 1
+                                        ? addAssociatedData(api, aad)
+                                        : ResultCryptography(CryptographyError::BackendInitializationFailed,
+                                                             CryptographyErrorDetail::OpenSSL3AeadInitialize);
         if (result)
             result = transform(api, plaintext, ciphertext, bytesWritten);
 
         uint8_t finalOutput[AESBlockSize] = {0};
         int     finalSize                 = 0;
-        if (result and (api.cipherFinal(context, finalOutput, &finalSize) != 1 or finalSize != 0))
-            result = Result::Error("Cryptography::Aead::seal - OpenSSL finalization failed");
+        if (result and api.cipherFinal(context, finalOutput, &finalSize) != 1)
+            result = {CryptographyError::BackendOperationFailed, CryptographyErrorDetail::OpenSSL3AeadSealFinalize};
+        if (result and finalSize != 0)
+            result = withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                     CryptographyErrorDetail::OpenSSL3AeadSealFinalize, static_cast<size_t>(finalSize));
         secureClear(finalOutput);
 
         OpenSSL3Param tagParameters[2];
         tagParameters[0] = api.paramOctetString("tag", tag.data(), GCMTagSize);
         tagParameters[1] = api.paramEnd();
         if (result and api.cipherGetParams(context, tagParameters) != 1)
-            result = Result::Error("Cryptography::Aead::seal - OpenSSL tag retrieval failed");
+            result = {CryptographyError::BackendOperationFailed,
+                      CryptographyErrorDetail::OpenSSL3AeadGetAuthenticationTag};
 
         if (not result or bytesWritten != plaintext.sizeInBytes())
         {
             bytesWritten = 0;
             secureClear(ciphertext);
             secureClear(tag);
-            return result
-                       ? ResultCryptography(Result::Error("Cryptography::Aead::seal - unexpected OpenSSL output size"))
-                       : result;
+            return result ? withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                            CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate, bytesWritten)
+                          : result;
         }
         return ResultCryptography(true);
     }
@@ -2222,15 +2237,16 @@ struct OpenSSL3AeadBackendImplementation
                             Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
         bytesWritten = 0;
-        SC_TRY_MSG(initialized, "Cryptography::Aead::open - not initialized");
+        if (not initialized)
+            return {CryptographyError::SessionNotInitialized, CryptographyErrorDetail::OpenAead};
         SC_TRY(validateAeadOpenArguments(nonce, aad, ciphertext, tag, plaintext));
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
-        ResultCryptography result =
-            api.cipherInit(context, cipher, keyBytes, nonce.data(), 0, nullptr) == 1
-                ? addAssociatedData(api, aad)
-                : ResultCryptography(Result::Error("Cryptography::Aead::open - OpenSSL initialization failed"));
+        ResultCryptography result = api.cipherInit(context, cipher, keyBytes, nonce.data(), 0, nullptr) == 1
+                                        ? addAssociatedData(api, aad)
+                                        : ResultCryptography(CryptographyError::BackendInitializationFailed,
+                                                             CryptographyErrorDetail::OpenSSL3AeadInitialize);
         if (result)
             result = transform(api, ciphertext, plaintext, bytesWritten);
 
@@ -2238,21 +2254,25 @@ struct OpenSSL3AeadBackendImplementation
         tagParameters[0] = api.paramOctetString("tag", const_cast<uint8_t*>(tag.data()), GCMTagSize);
         tagParameters[1] = api.paramEnd();
         if (result and api.cipherSetParams(context, tagParameters) != 1)
-            result = Result::Error("Cryptography::Aead::open - OpenSSL tag setup failed");
+            result = {CryptographyError::BackendOperationFailed,
+                      CryptographyErrorDetail::OpenSSL3AeadSetAuthenticationTag};
 
         uint8_t finalOutput[AESBlockSize] = {0};
         int     finalSize                 = 0;
-        if (result and (api.cipherFinal(context, finalOutput, &finalSize) != 1 or finalSize != 0))
-            result = Result::Error("Cryptography::Aead::open - authentication failed");
+        if (result and api.cipherFinal(context, finalOutput, &finalSize) != 1)
+            result = {CryptographyError::AuthenticationFailed, CryptographyErrorDetail::OpenSSL3AeadOpenFinalize};
+        if (result and finalSize != 0)
+            result = withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                     CryptographyErrorDetail::OpenSSL3AeadOpenFinalize, static_cast<size_t>(finalSize));
         secureClear(finalOutput);
 
         if (not result or bytesWritten != ciphertext.sizeInBytes())
         {
             bytesWritten = 0;
             secureClear(plaintext);
-            return result
-                       ? ResultCryptography(Result::Error("Cryptography::Aead::open - unexpected OpenSSL output size"))
-                       : result;
+            return result ? withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                            CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate, bytesWritten)
+                          : result;
         }
         return ResultCryptography(true);
     }
@@ -2293,17 +2313,22 @@ struct OpenSSL3CipherBackendImplementation
                                      CryptographyErrorDetail::ValidateCipherInitializationVector, AESBlockSize);
 
         OpenSSL3API& api = openSSL3API();
-        SC_TRY_MSG(api.isValid(), "Cryptography::Cipher::start - OpenSSL 3 is unavailable");
+        if (not api.isValid())
+            return {CryptographyError::BackendUnavailable, CryptographyErrorDetail::OpenSSL3RuntimeUnavailable};
         OpenSSL3ErrorScope errors(api);
         auto               deferClose = MakeDeferred([&] { close(); });
 
-        cipher  = api.cipherFetch(nullptr, openSSL3CipherName(type), nullptr);
-        context = cipher == nullptr ? nullptr : api.cipherContextNew();
-        SC_TRY_MSG(context != nullptr and
-                       api.cipherInit(context, cipher, key.data(), iv.data(), newOperation == Operation::Encrypt,
-                                      nullptr) == 1 and
-                       api.cipherSetPadding(context, 0) == 1,
-                   "Cryptography::Cipher::start - OpenSSL cipher initialization failed");
+        cipher = api.cipherFetch(nullptr, openSSL3CipherName(type), nullptr);
+        if (cipher == nullptr)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3CipherFetch};
+        context = api.cipherContextNew();
+        if (context == nullptr)
+            return {CryptographyError::BackendInitializationFailed,
+                    CryptographyErrorDetail::OpenSSL3CipherCreateContext};
+        if (api.cipherInit(context, cipher, key.data(), iv.data(), newOperation == Operation::Encrypt, nullptr) != 1)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3CipherInitialize};
+        if (api.cipherSetPadding(context, 0) != 1)
+            return {CryptographyError::BackendConfigurationFailed, CryptographyErrorDetail::OpenSSL3CipherSetPadding};
 
         stream.operation = newOperation;
         initialized      = true;
@@ -2317,8 +2342,11 @@ struct OpenSSL3CipherBackendImplementation
         if (input.empty())
             return ResultCryptography(true);
 
-        SC_TRY_MSG(input.sizeInBytes() % AESBlockSize == 0, "Cryptography::Cipher - block input is not aligned");
-        SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "Cryptography::Cipher - insufficient output buffer");
+        if (input.sizeInBytes() % AESBlockSize != 0)
+            return {CryptographyError::InvalidBlockInputSize, CryptographyErrorDetail::ValidateCipherBlockInput};
+        if (output.sizeInBytes() < input.sizeInBytes())
+            return withRequiredBytes(CryptographyError::OutputCapacityExceeded,
+                                     CryptographyErrorDetail::ValidateCipherOutput, input.sizeInBytes());
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
@@ -2327,10 +2355,15 @@ struct OpenSSL3CipherBackendImplementation
         {
             const size_t chunkSize = min(static_cast<size_t>(0x7ffffff0u), input.sizeInBytes() - offset);
             int          produced  = 0;
-            SC_TRY_MSG(api.cipherUpdate(context, output.data() + offset, &produced, input.data() + offset,
-                                        static_cast<int>(chunkSize)) == 1 and
-                           produced == static_cast<int>(chunkSize),
-                       "Cryptography::Cipher - OpenSSL block update failed");
+            if (api.cipherUpdate(context, output.data() + offset, &produced, input.data() + offset,
+                                 static_cast<int>(chunkSize)) != 1)
+                return {CryptographyError::BackendOperationFailed, CryptographyErrorDetail::OpenSSL3CipherUpdate};
+            if (produced != static_cast<int>(chunkSize))
+                return produced < 0 ? ResultCryptography(CryptographyError::UnexpectedOutputSize,
+                                                         CryptographyErrorDetail::OpenSSL3CipherUpdate)
+                                    : withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                                      CryptographyErrorDetail::OpenSSL3CipherUpdate,
+                                                      static_cast<size_t>(produced));
             offset += chunkSize;
         }
         bytesWritten = offset;
@@ -2385,20 +2418,25 @@ struct OpenSSL3HmacBackendImplementation
         close();
 
         OpenSSL3API& api = openSSL3API();
-        SC_TRY_MSG(api.isValid(), "Cryptography::Hmac::setKey - OpenSSL 3 is unavailable");
+        if (not api.isValid())
+            return {CryptographyError::BackendUnavailable, CryptographyErrorDetail::OpenSSL3RuntimeUnavailable};
         OpenSSL3ErrorScope errors(api);
         auto               deferClose = MakeDeferred([&] { close(); });
 
-        mac     = api.macFetch(nullptr, "HMAC", nullptr);
-        context = mac == nullptr ? nullptr : api.macContextNew(mac);
+        mac = api.macFetch(nullptr, "HMAC", nullptr);
+        if (mac == nullptr)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3HmacFetch};
+        context = api.macContextNew(mac);
+        if (context == nullptr)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3HmacCreateContext};
 
         OpenSSL3Param parameters[2];
         char          digestName[7];
         openSSL3MacParameters(api, type, parameters, digestName);
         uint8_t        emptyKey = 0;
         const uint8_t* keyData  = key.empty() ? &emptyKey : key.data();
-        SC_TRY_MSG(context != nullptr and api.macInit(context, keyData, key.sizeInBytes(), parameters) == 1,
-                   "Cryptography::Hmac::setKey - OpenSSL MAC initialization failed");
+        if (api.macInit(context, keyData, key.sizeInBytes(), parameters) != 1)
+            return {CryptographyError::BackendInitializationFailed, CryptographyErrorDetail::OpenSSL3HmacInitialize};
         emptyKey = 0;
 
         initialized = true;
@@ -2408,32 +2446,40 @@ struct OpenSSL3HmacBackendImplementation
 
     ResultCryptography add(Span<const uint8_t> data)
     {
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::add - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::AddHmacData};
         if (data.empty())
             return ResultCryptography(true);
 
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
-        SC_TRY_MSG(api.macUpdate(context, data.data(), data.sizeInBytes()) == 1,
-                   "Cryptography::Hmac::add - OpenSSL MAC update failed");
+        if (api.macUpdate(context, data.data(), data.sizeInBytes()) != 1)
+            return {CryptographyError::BackendOperationFailed, CryptographyErrorDetail::OpenSSL3HmacUpdate};
         return ResultCryptography(true);
     }
 
     ResultCryptography getMac(MacResult& result)
     {
-        SC_TRY_MSG(initialized, "Cryptography::Hmac::getMac - key not set");
+        if (not initialized)
+            return {CryptographyError::KeyNotSet, CryptographyErrorDetail::FinalizeHmac};
         OpenSSL3API&       api = openSSL3API();
         OpenSSL3ErrorScope errors(api);
         size_t             written  = 0;
         const size_t       expected = digestSize(type);
-        const bool         success =
-            api.macFinal(context, result.bytes, &written, sizeof(result.bytes)) == 1 and written == expected;
+        const bool         success  = api.macFinal(context, result.bytes, &written, sizeof(result.bytes)) == 1;
         close();
         if (not success)
         {
             secureClear(result.bytes);
             result.size = 0;
-            return Result::Error("Cryptography::Hmac::getMac - OpenSSL MAC finalization failed");
+            return {CryptographyError::BackendOperationFailed, CryptographyErrorDetail::OpenSSL3HmacFinalize};
+        }
+        if (written != expected)
+        {
+            secureClear(result.bytes);
+            result.size = 0;
+            return withActualBytes(CryptographyError::UnexpectedOutputSize,
+                                   CryptographyErrorDetail::OpenSSL3HmacFinalize, written);
         }
         result.size = written;
         return ResultCryptography(true);

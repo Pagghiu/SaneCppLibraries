@@ -1005,7 +1005,8 @@ void SC::CryptographyTest::testAes128GcmWrongTag()
         memset(decrypted, 0xA5, sizeof(decrypted));
         size_t plainBytes = 0;
         auto   res        = aead.open(zeroNonce12, {}, aes128GcmExpectedCipher, badTag, decrypted, plainBytes);
-        SC_TEST_EXPECT(not res);
+        SC_TEST_EXPECT(res.isError(CryptographyError::AuthenticationFailed));
+        SC_TEST_EXPECT(res.detail != CryptographyErrorDetail::None);
         SC_TEST_EXPECT(plainBytes == 0);
         SC_TEST_EXPECT(not anyNonZero(decrypted));
     }
