@@ -63,6 +63,7 @@ struct SC::CryptographyAsyncStreamsTest : public SC::TestCase
 
             size_t* outputSize;
             bool    succeeded = true;
+            Result  error     = Result(true);
         } collector = {&stream, output, &outputSize};
         (void)stream.eventData.addListener(
             [collector = &collector](AsyncBufferView::ID bufferID)
@@ -77,10 +78,18 @@ struct SC::CryptographyAsyncStreamsTest : public SC::TestCase
                 memcpy(collector->output.data() + *collector->outputSize, data.data(), data.sizeInBytes());
                 *collector->outputSize += data.sizeInBytes();
             });
-        (void)stream.AsyncReadableStream::eventError.addListener([collector = &collector](Result)
-                                                                 { collector->succeeded = false; });
-        (void)stream.AsyncWritableStream::eventError.addListener([collector = &collector](Result)
-                                                                 { collector->succeeded = false; });
+        (void)stream.AsyncReadableStream::eventError.addListener(
+            [collector = &collector](Result result)
+            {
+                collector->succeeded = false;
+                collector->error     = result;
+            });
+        (void)stream.AsyncWritableStream::eventError.addListener(
+            [collector = &collector](Result result)
+            {
+                collector->succeeded = false;
+                collector->error     = result;
+            });
 
         SC_TRY(stream.AsyncReadableStream::start());
         size_t inputOffset = 0;
@@ -93,7 +102,8 @@ struct SC::CryptographyAsyncStreamsTest : public SC::TestCase
         }
         SC_TRY_MSG(inputOffset == input.sizeInBytes(), "runCipher - input chunks do not cover input");
         stream.AsyncWritableStream::end();
-        SC_TRY_MSG(collector.succeeded, "runCipher - stream error");
+        if (not collector.succeeded)
+            return collector.error ? Result::Error("runCipher - stream error") : collector.error;
         return Result(true);
     }
 
@@ -178,7 +188,8 @@ void SC::CryptographyAsyncStreamsTest::cbcTransformRejectsInvalidPadding()
     AsyncCipherTransformStreamT<Cryptography::Cipher> decrypt;
     SC_TEST_EXPECT(decrypt.cipher.start(Cryptography::CipherType::AES128CBCPKCS7,
                                         Cryptography::Cipher::Operation::Decrypt, ZeroKey16, ZeroIV16));
-    SC_TEST_EXPECT(not runCipher<31>(decrypt, corrupted, decryptChunks, decrypted, decryptedSize));
+    const Result failure = runCipher<31>(decrypt, corrupted, decryptChunks, decrypted, decryptedSize);
+    SC_TEST_EXPECT(failure.isError(CryptographyResultCategory, CryptographyError::InvalidCiphertext));
 }
 
 void SC::CryptographyAsyncStreamsTest::hmacPipelineFanOut()
