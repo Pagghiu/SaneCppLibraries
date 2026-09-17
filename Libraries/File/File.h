@@ -12,10 +12,10 @@
 #include "../Common/PlatformMacrosInstructionSet.h"
 #include "../Common/PlatformMacrosType.h"
 #include "../Common/PrimitiveDefinitions.h"
-#include "../Common/Result.h"
 #include "../Common/Span.h"
 #include "../Common/StringSpan.h"
 #include "../Common/UniqueHandle.h"
+#include "FileError.h"
 
 //! @defgroup group_file File
 //! @copybrief library_file (see @ref library_file for more details)
@@ -28,7 +28,7 @@ namespace detail
 struct SC_FILE_EXPORT FileDescriptorDefinition
 {
     using Handle = void*; // HANDLE
-    static Result releaseHandle(Handle& handle);
+    static ResultFile releaseHandle(Handle& handle);
 #ifdef __clang__
     static constexpr void* Invalid = __builtin_constant_p(-1) ? (void*)-1 : (void*)-1; // INVALID_HANDLE_VALUE
 #else
@@ -43,7 +43,7 @@ struct SC_FILE_EXPORT FileDescriptorDefinition
 struct SC_FILE_EXPORT FileDescriptorDefinition
 {
     using Handle = int; // fd
-    static Result releaseHandle(Handle& handle);
+    static ResultFile releaseHandle(Handle& handle);
 
     static constexpr Handle Invalid = -1; // invalid fd
 };
@@ -135,57 +135,57 @@ struct SC_FILE_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescripto
 
     /// @brief Opens a file descriptor handle for writing to /dev/null or equivalent on current OS.
     /// @return `true` if file has been opened successfully
-    Result openForWriteToDevNull();
+    ResultFile openForWriteToDevNull();
 
     /// @brief Opens a duplicated file descriptor handle for reading from stdout.
     /// @note The returned handle CAN be closed because it will be a duplicate of the original handle.
-    Result openStdOutDuplicate();
+    ResultFile openStdOutDuplicate();
 
     /// @brief Opens a duplicated file descriptor handle for reading from stderr.
     /// @note The returned handle CAN be closed because it will be a duplicate of the original handle.
-    Result openStdErrDuplicate();
+    ResultFile openStdErrDuplicate();
 
     /// @brief Opens a duplicated file descriptor handle for reading from stdin.
     /// @note The returned handle CAN be closed because it will be a duplicate of the original handle.
-    Result openStdInDuplicate();
+    ResultFile openStdInDuplicate();
 
     /// @brief Opens a file descriptor handle from a file system path.
     /// @param path The absolute path to file. It MUST be encoded in ASCII,UTF-8/16 on Windows, ASCII,UTF-8 on POSIX.
     /// @param mode The mode used to open file (read-only, write-append etc.)
     /// @return Valid Result if file is opened successfully
-    Result open(StringSpan path, FileOpen mode);
+    ResultFile open(StringSpan path, FileOpen mode);
 
     /// @brief Reads bytes at offset into user supplied span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @param offset Offset from begin of the file descriptor where read should be started
     /// @return Valid result if read succeeded
-    Result read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
+    ResultFile read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
 
     /// @brief Reads bytes at offset into user supplied span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @param offset Offset from begin of the file descriptor where read should be started
     /// @return Valid result if read succeeded
-    Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset);
+    ResultFile read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset);
 
     /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @return Valid result if read succeeded
-    Result read(Span<char> data, Span<char>& actuallyRead);
+    ResultFile read(Span<char> data, Span<char>& actuallyRead);
 
     /// @brief Reads bytes from current position (FileDescriptor::seek) into Span, until full or EOF is reached
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @return Valid result if read succeeded
-    Result readUntilFullOrEOF(Span<char> data, Span<char>& actuallyRead);
+    ResultFile readUntilFullOrEOF(Span<char> data, Span<char>& actuallyRead);
 
     /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @return Valid result if read succeeded
-    Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead);
+    ResultFile read(Span<uint8_t> data, Span<uint8_t>& actuallyRead);
 
     /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
     ///        It works also for non-seekable file descriptors (stdout / in / err).
@@ -193,7 +193,7 @@ struct SC_FILE_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescripto
     /// @param destination A destination buffer to write to (it will be resized as needed)
     /// @return Valid result if read succeeded until EOF
     template <typename T>
-    Result readUntilEOF(T& destination)
+    ResultFile readUntilEOF(T& destination)
     {
         return readUntilEOF(GrowableBuffer<T>{destination});
     }
@@ -202,34 +202,34 @@ struct SC_FILE_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescripto
     ///        It works also for non-seekable file descriptors (stdout / in / err).
     /// @param buffer A destination buffer to write to (it will be resized as needed)
     /// @return Valid result if read succeeded until EOF
-    Result readUntilEOF(IGrowableBuffer&& buffer);
+    ResultFile readUntilEOF(IGrowableBuffer&& buffer);
 
     /// @brief Writes a string to the file descriptor
     /// @param data The string data to write
     /// @return Valid result if write succeeded
-    Result writeString(StringSpan data);
+    ResultFile writeString(StringSpan data);
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @param offset Offset from begin of file descriptor to start writing
     /// @return Valid result if write succeeded
-    Result write(Span<const char> data, uint64_t offset);
+    ResultFile write(Span<const char> data, uint64_t offset);
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @param offset Offset from begin of file descriptor to start writing
     /// @return Valid result if write succeeded
-    Result write(Span<const uint8_t> data, uint64_t offset);
+    ResultFile write(Span<const uint8_t> data, uint64_t offset);
 
     /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @return Valid result if write succeeded
-    Result write(Span<const char> data);
+    ResultFile write(Span<const char> data);
 
     /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @return Valid result if write succeeded
-    Result write(Span<const uint8_t> data);
+    ResultFile write(Span<const uint8_t> data);
 
     /// @brief How the offset to FileDescriptor::seek is defined
     enum SeekMode
@@ -243,46 +243,46 @@ struct SC_FILE_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescripto
     /// @param seekMode How the offset is defined (from start, end, current)
     /// @param offset An offset to be applied according to seekMode to this descriptor (can be negative)
     /// @return Valid result if seek succeeds
-    Result seek(SeekMode seekMode, int64_t offset);
+    ResultFile seek(SeekMode seekMode, int64_t offset);
 
     /// @brief Gets current descriptor position (if seekable)
     /// @param position (output) current position of file descriptor
     /// @return Valid result if seek succeeds
-    Result currentPosition(size_t& position) const;
+    ResultFile currentPosition(size_t& position) const;
 
     /// @brief Gets total file size in bytes (if seekable)
     /// @param sizeInBytes (output) total size of file
     /// @return Valid result if seek succeeds
-    Result sizeInBytes(size_t& sizeInBytes) const;
+    ResultFile sizeInBytes(size_t& sizeInBytes) const;
 
     /// @brief Obtains richer metadata associated with the currently open descriptor
     /// @param[out] fileStat Destination structure receiving descriptor metadata
     /// @return Valid result if metadata was read successfully
-    Result stat(FileDescriptorStat& fileStat) const;
+    ResultFile stat(FileDescriptorStat& fileStat) const;
 
     /// @brief Change file permission bits for the currently open descriptor
     /// @param mode Platform-native numeric mode bits
     /// @return Valid result if permissions were updated successfully
-    Result chmod(uint32_t mode);
+    ResultFile chmod(uint32_t mode);
 
     /// @brief Change owner and group for the currently open descriptor
     /// @param uid Platform-native numeric owner identifier
     /// @param gid Platform-native numeric group identifier
     /// @return Valid result if ownership was updated successfully
-    Result chown(uint32_t uid, uint32_t gid);
+    ResultFile chown(uint32_t uid, uint32_t gid);
 
     /// @brief Flush file data and metadata to stable storage
     /// @return Valid result if synchronization succeeded
-    Result sync();
+    ResultFile sync();
 
     /// @brief Flush file data to stable storage
     /// @return Valid result if synchronization succeeded
-    Result syncData();
+    ResultFile syncData();
 
     /// @brief Resize the underlying file to the specified size in bytes
     /// @param sizeInBytes New desired file size
     /// @return Valid result if truncation succeeded
-    Result truncate(uint64_t sizeInBytes);
+    ResultFile truncate(uint64_t sizeInBytes);
 
   private:
     friend struct File;
@@ -305,11 +305,11 @@ struct SC_FILE_EXPORT PipeDescriptor
 
     /// @brief Creates a Pipe. File descriptors are created as blocking and non-inheritable
     /// @return Valid Result if pipe creation succeeded
-    Result createPipe(PipeOptions options = {});
+    ResultFile createPipe(PipeOptions options = {});
 
     /// @brief Closes the pipe
     /// @return Valid Result if pipe destruction succeeded
-    Result close();
+    ResultFile close();
 };
 
 struct SC_FILE_EXPORT NamedPipeNameOptions
@@ -325,7 +325,7 @@ struct SC_FILE_EXPORT NamedPipeName
     /// @param outName Destination receiving native endpoint path.
     /// @param options Optional path generation options.
     /// @return Valid Result on success.
-    static Result build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options = {});
+    static ResultFile build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options = {});
 };
 
 struct SC_FILE_EXPORT NamedPipeServerOptions
@@ -361,15 +361,15 @@ struct SC_FILE_EXPORT NamedPipeServer
     ///             See SC::NamedPipeName::build for a cross-platform helper.
     /// @param options Server creation options.
     /// @return Valid Result if create succeeds.
-    Result create(StringSpan name, NamedPipeServerOptions options = {});
+    ResultFile create(StringSpan name, NamedPipeServerOptions options = {});
     /// @brief Accept one client connection and return it as a connected PipeDescriptor.
     /// @param[out] outConnection Connected read/write pipe handles.
     /// @return Valid Result on success.
-    Result accept(PipeDescriptor& outConnection);
+    ResultFile accept(PipeDescriptor& outConnection);
     /// @brief Closes the listening endpoint.
     /// @note Safe to call multiple times.
     /// @return Valid Result on success.
-    Result close();
+    ResultFile close();
 
   private:
     NamedPipeServerOptions options;
@@ -393,7 +393,7 @@ struct SC_FILE_EXPORT NamedPipeClient
     /// @param[out] outConnection Connected read/write pipe handles.
     /// @param options Client connection options.
     /// @return Valid Result on success.
-    static Result connect(StringSpan name, PipeDescriptor& outConnection, NamedPipeClientOptions options = {});
+    static ResultFile connect(StringSpan name, PipeDescriptor& outConnection, NamedPipeClientOptions options = {});
 };
 //! @}
 } // namespace SC

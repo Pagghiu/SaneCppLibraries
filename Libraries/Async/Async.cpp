@@ -758,7 +758,7 @@ SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringS
         return eventLoop.start(*this);
     }
 
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         FileDescriptor fd;
         SC_TRY(fd.open(openData.path, openData.mode));
@@ -780,7 +780,7 @@ SC::Result SC::AsyncFileSystemOperation::close(AsyncEventLoop& eventLoop, FileDe
         return eventLoop.start(*this);
     }
 
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         FileDescriptor fd(closeData.handle);
         return fd.close();

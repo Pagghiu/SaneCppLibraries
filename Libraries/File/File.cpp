@@ -52,7 +52,7 @@ static SC::FileDescriptorEntryType fileDescriptorWindowsEntryTypeFromAttributes(
     return SC::FileDescriptorEntryType::File;
 }
 
-static SC::Result fillFileDescriptorWindowsStat(HANDLE fileHandle, SC::FileDescriptorStat& fileStat)
+static SC::ResultFile fillFileDescriptorWindowsStat(HANDLE fileHandle, SC::FileDescriptorStat& fileStat)
 {
     fileStat = {};
 
@@ -90,7 +90,7 @@ static SC::Result fillFileDescriptorWindowsStat(HANDLE fileHandle, SC::FileDescr
 //-------------------------------------------------------------------------------------------------------
 // FileDescriptorDefinition
 //-------------------------------------------------------------------------------------------------------
-SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
+SC::ResultFile SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     BOOL res;
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
@@ -117,7 +117,7 @@ SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 //-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
-    static Result translateReadError(DWORD errorCode)
+    static ResultFile translateReadError(DWORD errorCode)
     {
         switch (errorCode)
         {
@@ -135,8 +135,8 @@ struct SC::FileDescriptor::Internal
         return Result::Error("Unknown");
     }
 
-    static Result readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer, Span<char> fallbackBuffer,
-                             bool& isEOF)
+    static ResultFile readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer,
+                                 Span<char> fallbackBuffer, bool& isEOF)
     {
         auto  bufferData   = buffer.getDirectAccess();
         DWORD numReadBytes = 0xffffffff;
@@ -208,7 +208,7 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::Result SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
+SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
     int flags = 0;
     switch (seekMode)
@@ -224,7 +224,7 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
+SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 {
     LARGE_INTEGER li, source;
     memset(&source, 0, sizeof(source));
@@ -236,7 +236,7 @@ SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
     return Result::Error("SetFilePointerEx failed");
 }
 
-SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
+SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 {
     LARGE_INTEGER li;
     if (GetFileSizeEx(handle, &li) != 0)
@@ -247,13 +247,13 @@ SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
     return Result::Error("GetFileSizeEx failed");
 }
 
-SC::Result SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
+SC::ResultFile SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::stat - Invalid handle");
     return fillFileDescriptorWindowsStat(handle, fileStat);
 }
 
-SC::Result SC::FileDescriptor::chmod(uint32_t mode)
+SC::ResultFile SC::FileDescriptor::chmod(uint32_t mode)
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::chmod - Invalid handle");
 
@@ -275,7 +275,7 @@ SC::Result SC::FileDescriptor::chmod(uint32_t mode)
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
+SC::ResultFile SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
 {
     (void)uid;
     (void)gid;
@@ -284,16 +284,16 @@ SC::Result SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
     return stat(ignored);
 }
 
-SC::Result SC::FileDescriptor::sync()
+SC::ResultFile SC::FileDescriptor::sync()
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::sync - Invalid handle");
     SC_TRY_MSG(::FlushFileBuffers(handle) != FALSE, "FlushFileBuffers failed");
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::syncData() { return sync(); }
+SC::ResultFile SC::FileDescriptor::syncData() { return sync(); }
 
-SC::Result SC::FileDescriptor::truncate(uint64_t sizeInBytes)
+SC::ResultFile SC::FileDescriptor::truncate(uint64_t sizeInBytes)
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::truncate - Invalid handle");
 
@@ -311,13 +311,13 @@ SC::Result SC::FileDescriptor::truncate(uint64_t sizeInBytes)
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
+SC::ResultFile SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
     return write(data);
 }
 
-SC::Result SC::FileDescriptor::write(Span<const char> data)
+SC::ResultFile SC::FileDescriptor::write(Span<const char> data)
 {
     DWORD      numberOfWrittenBytes;
     const BOOL res =
@@ -326,13 +326,13 @@ SC::Result SC::FileDescriptor::write(Span<const char> data)
     return Result(static_cast<size_t>(numberOfWrittenBytes) == data.sizeInBytes());
 }
 
-SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
+SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
     return read(data, actuallyRead);
 }
 
-SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
+SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
     DWORD      numberOfReadBytes = 0;
     const BOOL res =
@@ -344,7 +344,7 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
     return Result(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
 }
 
-SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
+SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     StringPath logicalPath;
     SC_TRY(FileWindowsDetail::WindowsPath::makeLogicalPath(filePath, logicalPath));
@@ -450,7 +450,7 @@ static SC::FileDescriptorEntryType fileDescriptorPosixEntryTypeFromMode(mode_t m
     return SC::FileDescriptorEntryType::Other;
 }
 
-static SC::Result fillFileDescriptorPosixStat(const struct stat& pathStat, SC::FileDescriptorStat& fileStat)
+static SC::ResultFile fillFileDescriptorPosixStat(const struct stat& pathStat, SC::FileDescriptorStat& fileStat)
 {
     fileStat               = {};
     fileStat.entryType     = fileDescriptorPosixEntryTypeFromMode(pathStat.st_mode);
@@ -488,7 +488,7 @@ static SC::Result fillFileDescriptorPosixStat(const struct stat& pathStat, SC::F
 //-------------------------------------------------------------------------------------------------------
 // FileDescriptorDefinition
 //-------------------------------------------------------------------------------------------------------
-SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
+SC::ResultFile SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     if (::close(handle) != 0)
     {
@@ -503,7 +503,7 @@ SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 //-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
-    static Result translateReadError(int errorCode)
+    static ResultFile translateReadError(int errorCode)
     {
         switch (errorCode)
         {
@@ -522,8 +522,8 @@ struct SC::FileDescriptor::Internal
         return Result::Error("Unknown");
     }
 
-    static Result readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer, Span<char> fallbackBuffer,
-                             bool& isEOF)
+    static ResultFile readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer,
+                                 Span<char> fallbackBuffer, bool& isEOF)
     {
         auto       bufferData = buffer.getDirectAccess();
         ssize_t    numReadBytes;
@@ -571,8 +571,8 @@ struct SC::FileDescriptor::Internal
         }
     }
 
-    static Result setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
-                               const int flag)
+    static ResultFile setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
+                                   const int flag)
     {
         int oldFlags;
         do
@@ -594,7 +594,7 @@ struct SC::FileDescriptor::Internal
     }
 
     template <int flag>
-    static Result setFileDescriptorFlags(int fileDescriptor, bool setFlag)
+    static ResultFile setFileDescriptorFlags(int fileDescriptor, bool setFlag)
     {
         // We can OR the allowed flags here to provide some safety
         static_assert(flag == FD_CLOEXEC, "setFileStatusFlags invalid value");
@@ -602,7 +602,7 @@ struct SC::FileDescriptor::Internal
     }
 
     template <int flag>
-    static Result setFileStatusFlags(int fileDescriptor, bool setFlag)
+    static ResultFile setFileStatusFlags(int fileDescriptor, bool setFlag)
     {
         // We can OR the allowed flags here to provide some safety
         static_assert(flag == O_NONBLOCK, "setFileStatusFlags invalid value");
@@ -642,7 +642,7 @@ int SC::FileOpen::toPosixFlags() const
 
 int SC::FileOpen::toPosixAccess() const { return S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; }
 
-SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
+SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     SC_TRY_MSG(filePath.getEncoding() != StringEncoding::Utf16,
                "FileDescriptor::open: POSIX supports only UTF8 and ASCII encoding");
@@ -663,7 +663,7 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
+SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
     int flags = 0;
     switch (seekMode)
@@ -677,7 +677,7 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
+SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 {
     const off_t fileSize = ::lseek(handle, 0, SEEK_CUR);
     SC_TRY_MSG(fileSize >= 0, "lseek failed");
@@ -685,7 +685,7 @@ SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
+SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 {
     struct stat fileStat;
     SC_TRY_MSG(::fstat(handle, &fileStat) == 0, "fstat failed");
@@ -693,7 +693,7 @@ SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
+SC::ResultFile SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::stat - Invalid handle");
     struct stat nativeStat;
@@ -701,28 +701,28 @@ SC::Result SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
     return fillFileDescriptorPosixStat(nativeStat, fileStat);
 }
 
-SC::Result SC::FileDescriptor::chmod(uint32_t mode)
+SC::ResultFile SC::FileDescriptor::chmod(uint32_t mode)
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::chmod - Invalid handle");
     SC_TRY_MSG(::fchmod(handle, static_cast<mode_t>(mode)) == 0, "fchmod failed");
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
+SC::ResultFile SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::chown - Invalid handle");
     SC_TRY_MSG(::fchown(handle, static_cast<uid_t>(uid), static_cast<gid_t>(gid)) == 0, "fchown failed");
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::sync()
+SC::ResultFile SC::FileDescriptor::sync()
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::sync - Invalid handle");
     SC_TRY_MSG(::fsync(handle) == 0, "fsync failed");
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::syncData()
+SC::ResultFile SC::FileDescriptor::syncData()
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::syncData - Invalid handle");
 #if __APPLE__
@@ -733,14 +733,14 @@ SC::Result SC::FileDescriptor::syncData()
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::truncate(uint64_t sizeInBytes)
+SC::ResultFile SC::FileDescriptor::truncate(uint64_t sizeInBytes)
 {
     SC_TRY_MSG(isValid(), "FileDescriptor::truncate - Invalid handle");
     SC_TRY_MSG(::ftruncate(handle, static_cast<off_t>(sizeInBytes)) == 0, "ftruncate failed");
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
+SC::ResultFile SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     ssize_t res;
     do
@@ -751,7 +751,7 @@ SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
     return Result(static_cast<size_t>(res) == data.sizeInBytes());
 }
 
-SC::Result SC::FileDescriptor::write(Span<const char> data)
+SC::ResultFile SC::FileDescriptor::write(Span<const char> data)
 {
     ssize_t res;
     do
@@ -762,7 +762,7 @@ SC::Result SC::FileDescriptor::write(Span<const char> data)
     return Result(static_cast<size_t>(res) == data.sizeInBytes());
 }
 
-SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
+SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
     ssize_t res;
     do
@@ -773,7 +773,7 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, u
     return Result(data.sliceStartLength(0, static_cast<size_t>(res), actuallyRead));
 }
 
-SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
+SC::ResultFile SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
     ssize_t res;
     do
@@ -789,7 +789,7 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 // FileDescriptor (shared)
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::FileDescriptor::openForWriteToDevNull()
+SC::ResultFile SC::FileDescriptor::openForWriteToDevNull()
 {
 #if SC_PLATFORM_WINDOWS
     return open(L"NUL", FileOpen::Append);
@@ -798,7 +798,7 @@ SC::Result SC::FileDescriptor::openForWriteToDevNull()
 #endif
 }
 
-SC::Result SC::FileDescriptor::openStdOutDuplicate()
+SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
     HANDLE stdHandle = ::GetStdHandle(STD_OUTPUT_HANDLE);
@@ -821,7 +821,7 @@ SC::Result SC::FileDescriptor::openStdOutDuplicate()
 #endif
 }
 
-SC::Result SC::FileDescriptor::openStdErrDuplicate()
+SC::ResultFile SC::FileDescriptor::openStdErrDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
     HANDLE stdHandle = ::GetStdHandle(STD_ERROR_HANDLE);
@@ -844,7 +844,7 @@ SC::Result SC::FileDescriptor::openStdErrDuplicate()
 #endif
 }
 
-SC::Result SC::FileDescriptor::openStdInDuplicate()
+SC::ResultFile SC::FileDescriptor::openStdInDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
     HANDLE stdHandle = ::GetStdHandle(STD_INPUT_HANDLE);
@@ -867,14 +867,14 @@ SC::Result SC::FileDescriptor::openStdInDuplicate()
 #endif
 }
 
-SC::Result SC::FileDescriptor::writeString(StringSpan data) { return write(data.toCharSpan()); }
+SC::ResultFile SC::FileDescriptor::writeString(StringSpan data) { return write(data.toCharSpan()); }
 
-SC::Result SC::FileDescriptor::write(Span<const uint8_t> data, uint64_t offset)
+SC::ResultFile SC::FileDescriptor::write(Span<const uint8_t> data, uint64_t offset)
 {
     return write({reinterpret_cast<const char*>(data.data()), data.sizeInBytes()}, offset);
 }
 
-SC::Result SC::FileDescriptor::read(Span<uint8_t> data, Span<uint8_t>& actuallyRead)
+SC::ResultFile SC::FileDescriptor::read(Span<uint8_t> data, Span<uint8_t>& actuallyRead)
 {
     Span<char> readBytes;
     SC_TRY(read({reinterpret_cast<char*>(data.data()), data.sizeInBytes()}, readBytes));
@@ -882,7 +882,7 @@ SC::Result SC::FileDescriptor::read(Span<uint8_t> data, Span<uint8_t>& actuallyR
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset)
+SC::ResultFile SC::FileDescriptor::read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset)
 {
     Span<char> readBytes;
     SC_TRY(read({reinterpret_cast<char*>(data.data()), data.sizeInBytes()}, readBytes, offset));
@@ -890,12 +890,12 @@ SC::Result SC::FileDescriptor::read(Span<uint8_t> data, Span<uint8_t>& actuallyR
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::write(Span<const uint8_t> data)
+SC::ResultFile SC::FileDescriptor::write(Span<const uint8_t> data)
 {
     return write({reinterpret_cast<const char*>(data.data()), data.sizeInBytes()});
 }
 
-SC::Result SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char>& actuallyRead)
+SC::ResultFile SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char>& actuallyRead)
 {
     auto availableData = data;
     while (not availableData.empty())
@@ -911,7 +911,7 @@ SC::Result SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char>& a
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
+SC::ResultFile SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
 {
     char buffer[1024];
     SC_TRY_MSG(isValid(), "FileDescriptor::readUntilEOFGrowable - Invalid handle");
@@ -929,7 +929,7 @@ SC::Result SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
 //-------------------------------------------------------------------------------------------------------
 #if SC_PLATFORM_WINDOWS
 #include <stdio.h>
-SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
+SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
 {
     // On Windows to inherit flags they must be flagged as inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
@@ -1009,7 +1009,7 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 #else
 namespace
 {
-static SC::Result movePosixDescriptorAboveStandardRange(int& descriptor)
+static SC::ResultFile movePosixDescriptorAboveStandardRange(int& descriptor)
 {
     if (descriptor >= 3)
     {
@@ -1036,7 +1036,7 @@ static SC::Result movePosixDescriptorAboveStandardRange(int& descriptor)
 }
 } // namespace
 
-SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
+SC::ResultFile SC::PipeDescriptor::createPipe(PipeOptions options)
 {
     int  pipes[2];
     int  res                     = -1;
@@ -1108,7 +1108,7 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 }
 #endif
 
-SC::Result SC::PipeDescriptor::close()
+SC::ResultFile SC::PipeDescriptor::close()
 {
     SC_TRY(readPipe.close());
     return writePipe.close();
@@ -1116,7 +1116,7 @@ SC::Result SC::PipeDescriptor::close()
 
 namespace
 {
-static SC::Result validateNamedPipeLogicalName(SC::StringSpan logicalName)
+static SC::ResultFile validateNamedPipeLogicalName(SC::StringSpan logicalName)
 {
     SC_TRY_MSG(logicalName.getEncoding() != SC::StringEncoding::Utf16,
                "NamedPipeName::build logicalName only ASCII/UTF8");
@@ -1134,7 +1134,7 @@ static SC::Result validateNamedPipeLogicalName(SC::StringSpan logicalName)
 }
 } // namespace
 
-SC::Result SC::NamedPipeName::build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options)
+SC::ResultFile SC::NamedPipeName::build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options)
 {
     SC_TRY(validateNamedPipeLogicalName(logicalName));
 
@@ -1173,6 +1173,7 @@ using SC::NamedPipeServerOptions;
 using SC::PipeDescriptor;
 using SC::PipeOptions;
 using SC::Result;
+using SC::ResultFile;
 using SC::StringSpan;
 
 static bool hasWindowsNamedPipePrefix(const wchar_t* fullName)
@@ -1182,7 +1183,8 @@ static bool hasWindowsNamedPipePrefix(const wchar_t* fullName)
     return ::wcsncmp(fullName, dotPrefix, 9) == 0 or ::wcsncmp(fullName, questionPrefix, 9) == 0;
 }
 
-static Result duplicateConnectedPipeHandle(HANDLE connectedHandle, PipeOptions options, PipeDescriptor& outConnection)
+static ResultFile duplicateConnectedPipeHandle(HANDLE connectedHandle, PipeOptions options,
+                                               PipeDescriptor& outConnection)
 {
     HANDLE readHandle  = INVALID_HANDLE_VALUE;
     HANDLE writeHandle = INVALID_HANDLE_VALUE;
@@ -1204,8 +1206,8 @@ static Result duplicateConnectedPipeHandle(HANDLE connectedHandle, PipeOptions o
     return Result(true);
 }
 
-static Result createPendingServerInstance(StringSpan pipeName, const NamedPipeServerOptions& options,
-                                          bool firstInstance, FileDescriptor& pendingConnection)
+static ResultFile createPendingServerInstance(StringSpan pipeName, const NamedPipeServerOptions& options,
+                                              bool firstInstance, FileDescriptor& pendingConnection)
 {
     const wchar_t* nullTerminatedName = pipeName.getNullTerminatedNative();
 
@@ -1239,7 +1241,7 @@ static Result createPendingServerInstance(StringSpan pipeName, const NamedPipeSe
 }
 } // namespace
 
-SC::Result SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptions pipeOptions)
+SC::ResultFile SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptions pipeOptions)
 {
     SC_TRY_MSG(not created, "NamedPipeServer::create already created");
     SC_TRY_MSG(name.assign(pipeName), "NamedPipeServer::create invalid pipe name");
@@ -1256,7 +1258,7 @@ SC::Result SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptio
     return Result(true);
 }
 
-SC::Result SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
+SC::ResultFile SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
 {
     SC_TRY_MSG(created and pendingConnection.isValid(), "NamedPipeServer::accept called before create");
     HANDLE pendingHandle;
@@ -1277,7 +1279,7 @@ SC::Result SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
     return Result(true);
 }
 
-SC::Result SC::NamedPipeServer::close()
+SC::ResultFile SC::NamedPipeServer::close()
 {
     if (not created)
     {
@@ -1288,8 +1290,8 @@ SC::Result SC::NamedPipeServer::close()
     return pendingConnection.close();
 }
 
-SC::Result SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor& outConnection,
-                                        NamedPipeClientOptions options)
+SC::ResultFile SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor& outConnection,
+                                            NamedPipeClientOptions options)
 {
     StringPath nullTerminatedPath;
     SC_TRY_MSG(nullTerminatedPath.assign(pipeName), "NamedPipeClient::connect invalid pipe name");
@@ -1329,8 +1331,9 @@ namespace
 using SC::PipeDescriptor;
 using SC::PipeOptions;
 using SC::Result;
+using SC::ResultFile;
 
-static Result setPosixDescriptorInheritable(int descriptor, bool inheritable)
+static ResultFile setPosixDescriptorInheritable(int descriptor, bool inheritable)
 {
     int flags;
     do
@@ -1352,7 +1355,7 @@ static Result setPosixDescriptorInheritable(int descriptor, bool inheritable)
     return Result(true);
 }
 
-static Result setPosixDescriptorBlocking(int descriptor, bool blocking)
+static ResultFile setPosixDescriptorBlocking(int descriptor, bool blocking)
 {
     int flags;
     do
@@ -1374,7 +1377,7 @@ static Result setPosixDescriptorBlocking(int descriptor, bool blocking)
     return Result(true);
 }
 
-static Result duplicateConnectedSocket(int connectedDescriptor, PipeOptions options, PipeDescriptor& outConnection)
+static ResultFile duplicateConnectedSocket(int connectedDescriptor, PipeOptions options, PipeDescriptor& outConnection)
 {
     int readDescriptor;
     do
@@ -1412,7 +1415,7 @@ static Result duplicateConnectedSocket(int connectedDescriptor, PipeOptions opti
 }
 } // namespace
 
-SC::Result SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptions pipeOptions)
+SC::ResultFile SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptions pipeOptions)
 {
     SC_TRY_MSG(not created, "NamedPipeServer::create already created");
     SC_TRY_MSG(pipeName.getEncoding() != StringEncoding::Utf16, "NamedPipeServer::create only ASCII/UTF8 paths");
@@ -1471,7 +1474,7 @@ SC::Result SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptio
     return Result(true);
 }
 
-SC::Result SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
+SC::ResultFile SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
 {
     SC_TRY_MSG(created and listeningSocket.isValid(), "NamedPipeServer::accept called before create");
     int listeningDescriptor;
@@ -1495,7 +1498,7 @@ SC::Result SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
     return Result(true);
 }
 
-SC::Result SC::NamedPipeServer::close()
+SC::ResultFile SC::NamedPipeServer::close()
 {
     if (not created)
     {
@@ -1517,8 +1520,8 @@ SC::Result SC::NamedPipeServer::close()
     return closeResult;
 }
 
-SC::Result SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor& outConnection,
-                                        NamedPipeClientOptions options)
+SC::ResultFile SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor& outConnection,
+                                            NamedPipeClientOptions options)
 {
     SC_TRY_MSG(pipeName.getEncoding() != StringEncoding::Utf16, "NamedPipeClient::connect only ASCII/UTF8 paths");
 
