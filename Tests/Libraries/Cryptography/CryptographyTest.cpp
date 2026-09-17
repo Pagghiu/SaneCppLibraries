@@ -675,8 +675,12 @@ void CryptographyTest::testCbcOutputRetry()
     SC_TEST_EXPECT(cipher.update(Span<const uint8_t>(zeroPlain16, 5), {}, written));
     SC_TEST_EXPECT(written == 0);
 
-    uint8_t tooSmall[15] = {0};
-    SC_TEST_EXPECT(not cipher.update(Span<const uint8_t>(zeroPlain16 + 5, 11), tooSmall, written));
+    uint8_t            tooSmall[15] = {0};
+    ResultCryptography failure      = cipher.update(Span<const uint8_t>(zeroPlain16 + 5, 11), tooSmall, written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::OutputCapacityExceeded));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateCipherOutput);
+    SC_TEST_EXPECT(failure.contextKind == CryptographyErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(failure.context.requiredBytes == 16);
     SC_TEST_EXPECT(written == 0);
 
     uint8_t ciphertext[32] = {0};
@@ -690,7 +694,11 @@ void CryptographyTest::testCbcOutputRetry()
     Cryptography::Cipher decrypt(backend);
     SC_TEST_EXPECT(decrypt.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                  zeroKey16, zeroIV16));
-    SC_TEST_EXPECT(not decrypt.update(aes128CbcExpected, tooSmall, written));
+    failure = decrypt.update(aes128CbcExpected, tooSmall, written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::OutputCapacityExceeded));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateCipherOutput);
+    SC_TEST_EXPECT(failure.contextKind == CryptographyErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(failure.context.requiredBytes == 16);
     SC_TEST_EXPECT(written == 0);
     uint8_t plaintext[16] = {0};
     SC_TEST_EXPECT(decrypt.update(aes128CbcExpected, plaintext, written));
@@ -734,8 +742,12 @@ void CryptographyTest::testCbcEmptyAndMalformed()
     SC_TEST_EXPECT(malformed.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Decrypt,
                                    zeroKey16, zeroIV16));
     SC_TEST_EXPECT(malformed.update(Span<const uint8_t>(emptyCipher, 15), {}, written));
-    SC_TEST_EXPECT(not malformed.finish(emptyPlain, written));
-    SC_TEST_EXPECT(not malformed.update({}, {}, written));
+    ResultCryptography failure = malformed.finish(emptyPlain, written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::InvalidCiphertext));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateCipherFinalBlock);
+    failure = malformed.update({}, {}, written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::UpdateCipher);
 }
 
 void CryptographyTest::testCbcInvalidPaddingConsumesSession()
@@ -757,8 +769,12 @@ void CryptographyTest::testCbcInvalidPaddingConsumesSession()
     size_t  written    = 0;
     SC_TEST_EXPECT(cipher.update(corrupted, output, written));
     SC_TEST_EXPECT(written == 16);
-    SC_TEST_EXPECT(not cipher.finish(Span<uint8_t>(output + written, sizeof(output) - written), written));
-    SC_TEST_EXPECT(not cipher.update({}, output, written));
+    ResultCryptography failure = cipher.finish(Span<uint8_t>(output + written, sizeof(output) - written), written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::InvalidCiphertext));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateCipherPadding);
+    failure = cipher.update({}, output, written);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::UpdateCipher);
 }
 
 void CryptographyTest::testCbcDeterministicStress()
@@ -1881,7 +1897,9 @@ void CryptographyTest::testInvalidInputs()
         SC_TEST_EXPECT(hmac.setType(Cryptography::HashType::SHA256));
         SC_TEST_EXPECT(hmac.setKey(zeroKey16));
         SC_TEST_EXPECT(not hmac.setType(static_cast<Cryptography::HashType>(255)));
-        SC_TEST_EXPECT(not hmac.add({}));
+        failure = hmac.add({});
+        SC_TEST_EXPECT(failure.isError(CryptographyError::KeyNotSet));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::AddHmacData);
     }
 
     Cryptography::Aead aead(backend);
@@ -1932,7 +1950,11 @@ void CryptographyTest::testInvalidInputs()
         written            = 0;
         memset(output, 0xa5, sizeof(output));
         memset(tag, 0x5a, sizeof(tag));
-        SC_TEST_EXPECT(not aead.seal(Span<const uint8_t>(zeroNonce12, 11), {}, zeroPlain16, output, tag, written));
+        failure = aead.seal(Span<const uint8_t>(zeroNonce12, 11), {}, zeroPlain16, output, tag, written);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::InvalidNonceSize));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateAeadNonce);
+        SC_TEST_EXPECT(failure.contextKind == CryptographyErrorContextKind::ExpectedBytes);
+        SC_TEST_EXPECT(failure.context.expectedBytes == 12);
         for (auto value : output)
             SC_TEST_EXPECT(value == 0xa5);
         for (auto value : tag)
@@ -1941,22 +1963,38 @@ void CryptographyTest::testInvalidInputs()
                                      aes128GcmExpectedTag, output, written));
         for (auto value : output)
             SC_TEST_EXPECT(value == 0xa5);
-        SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, zeroPlain16, Span<uint8_t>(output, 15), tag, written));
-        SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, zeroPlain16, output, Span<uint8_t>(tag, 15), written));
+        failure = aead.seal(zeroNonce12, {}, zeroPlain16, Span<uint8_t>(output, 15), tag, written);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::OutputCapacityExceeded));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateAeadOutput);
+        SC_TEST_EXPECT(failure.contextKind == CryptographyErrorContextKind::RequiredBytes);
+        SC_TEST_EXPECT(failure.context.requiredBytes == 16);
+        failure = aead.seal(zeroNonce12, {}, zeroPlain16, output, Span<uint8_t>(tag, 15), written);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::InvalidTagSize));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateAeadTag);
+        SC_TEST_EXPECT(failure.contextKind == CryptographyErrorContextKind::ExpectedBytes);
+        SC_TEST_EXPECT(failure.context.expectedBytes == 16);
 
         uint8_t overlap[32] = {0};
-        SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, Span<const uint8_t>(overlap, 16), Span<uint8_t>(overlap + 1, 16),
-                                     tag, written));
-        SC_TEST_EXPECT(not aead.open(zeroNonce12, {}, Span<const uint8_t>(overlap, 16), tag,
-                                     Span<uint8_t>(overlap + 1, 16), written));
+        failure =
+            aead.seal(zeroNonce12, {}, Span<const uint8_t>(overlap, 16), Span<uint8_t>(overlap + 1, 16), tag, written);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::BufferOverlap));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateAeadPartialOverlap);
+        failure =
+            aead.open(zeroNonce12, {}, Span<const uint8_t>(overlap, 16), tag, Span<uint8_t>(overlap + 1, 16), written);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::BufferOverlap));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateAeadPartialOverlap);
 
         SC_TEST_EXPECT(not aead.init(Cryptography::AeadType::AES128GCM, Span<const uint8_t>(zeroKey32, 15)));
         SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, zeroPlain16, output, tag, written));
         SC_TEST_EXPECT(written == 0);
         SC_TEST_EXPECT(aead.init(Cryptography::AeadType::AES128GCM, zeroKey16));
         SC_TEST_EXPECT(aead.seal(zeroNonce12, {}, zeroPlain16, output, tag, written));
-        SC_TEST_EXPECT(not aead.init(static_cast<Cryptography::AeadType>(255), zeroKey16));
-        SC_TEST_EXPECT(not aead.seal(zeroNonce12, {}, zeroPlain16, output, tag, written));
+        failure = aead.init(static_cast<Cryptography::AeadType>(255), zeroKey16);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::InvalidAeadType));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::InitializeAead);
+        failure = aead.seal(zeroNonce12, {}, zeroPlain16, output, tag, written);
+        SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
+        SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::SealAead);
         SC_TEST_EXPECT(written == 0);
 
 #if SC_PLATFORM_APPLE
@@ -1982,15 +2020,19 @@ void CryptographyTest::testOverlapRejected()
     Cryptography::Cipher partialOverlap(backend);
     SC_TEST_EXPECT(partialOverlap.start(Cryptography::CipherType::AES128CBCPKCS7,
                                         Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
-    size_t bytesWritten = 0;
-    SC_TEST_EXPECT(not partialOverlap.update(Span<const uint8_t>(buffer, sizeof(zeroPlain16)),
-                                             Span<uint8_t>(buffer + 4, sizeof(zeroPlain16)), bytesWritten));
+    size_t             bytesWritten = 0;
+    ResultCryptography failure      = partialOverlap.update(Span<const uint8_t>(buffer, sizeof(zeroPlain16)),
+                                                            Span<uint8_t>(buffer + 4, sizeof(zeroPlain16)), bytesWritten);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::BufferOverlap));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateCipherOverlap);
 
     Cryptography::Cipher exactOverlap(backend);
     SC_TEST_EXPECT(exactOverlap.start(Cryptography::CipherType::AES128CBCPKCS7,
                                       Cryptography::Cipher::Operation::Encrypt, zeroKey16, zeroIV16));
-    SC_TEST_EXPECT(not exactOverlap.update(Span<const uint8_t>(buffer, sizeof(zeroPlain16)),
-                                           Span<uint8_t>(buffer, sizeof(zeroPlain16)), bytesWritten));
+    failure = exactOverlap.update(Span<const uint8_t>(buffer, sizeof(zeroPlain16)),
+                                  Span<uint8_t>(buffer, sizeof(zeroPlain16)), bytesWritten);
+    SC_TEST_EXPECT(failure.isError(CryptographyError::BufferOverlap));
+    SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::ValidateCipherOverlap);
 }
 
 void runCryptographyTest(SC::TestReport& report)

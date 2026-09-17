@@ -2223,11 +2223,12 @@ struct OpenSSL3AeadBackendImplementation
 
         if (not result or bytesWritten != plaintext.sizeInBytes())
         {
-            bytesWritten = 0;
+            const size_t actualBytes = bytesWritten;
+            bytesWritten             = 0;
             secureClear(ciphertext);
             secureClear(tag);
             return result ? withActualBytes(CryptographyError::UnexpectedOutputSize,
-                                            CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate, bytesWritten)
+                                            CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate, actualBytes)
                           : result;
         }
         return ResultCryptography(true);
@@ -2268,10 +2269,11 @@ struct OpenSSL3AeadBackendImplementation
 
         if (not result or bytesWritten != ciphertext.sizeInBytes())
         {
-            bytesWritten = 0;
+            const size_t actualBytes = bytesWritten;
+            bytesWritten             = 0;
             secureClear(plaintext);
             return result ? withActualBytes(CryptographyError::UnexpectedOutputSize,
-                                            CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate, bytesWritten)
+                                            CryptographyErrorDetail::OpenSSL3AeadPayloadUpdate, actualBytes)
                           : result;
         }
         return ResultCryptography(true);
