@@ -227,6 +227,8 @@ struct SC::FileDescriptor::Internal
 
 SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
+    if (not isValid())
+        return {FileError::InvalidHandle, FileErrorDetail::SeekDescriptor};
     DWORD flags = 0;
     switch (seekMode)
     {
@@ -243,6 +245,8 @@ SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 
 SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 {
+    if (not isValid())
+        return {FileError::InvalidHandle, FileErrorDetail::QueryDescriptorPosition};
     LARGE_INTEGER li, source;
     memset(&source, 0, sizeof(source));
     if (::SetFilePointerEx(handle, source, &li, FILE_CURRENT) != 0)
@@ -256,6 +260,8 @@ SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 
 SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 {
+    if (not isValid())
+        return {FileError::InvalidHandle, FileErrorDetail::QueryDescriptorSize};
     LARGE_INTEGER li;
     if (GetFileSizeEx(handle, &li) != 0)
     {
@@ -777,6 +783,8 @@ SC::ResultFile SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 
 SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
+    if (not isValid())
+        return {FileError::InvalidHandle, FileErrorDetail::SeekDescriptor};
     int flags = 0;
     switch (seekMode)
     {
@@ -793,6 +801,8 @@ SC::ResultFile SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 
 SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 {
+    if (not isValid())
+        return {FileError::InvalidHandle, FileErrorDetail::QueryDescriptorPosition};
     const off_t fileSize = ::lseek(handle, 0, SEEK_CUR);
     if (fileSize < 0)
         return ResultFile::withNativeError(FileError::SeekFailed, FileErrorDetail::QueryDescriptorPosition,
@@ -803,6 +813,8 @@ SC::ResultFile SC::FileDescriptor::currentPosition(size_t& position) const
 
 SC::ResultFile SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 {
+    if (not isValid())
+        return {FileError::InvalidHandle, FileErrorDetail::QueryDescriptorSize};
     struct stat fileStat;
     if (::fstat(handle, &fileStat) != 0)
         return ResultFile::withNativeError(FileError::MetadataQueryFailed, FileErrorDetail::QueryDescriptorSize,

@@ -127,6 +127,17 @@ void SC::FileTest::structuredErrorsAndFormatter()
     SC_TEST_EXPECT(actual.contextKind == FileErrorContextKind::ActualBytes);
     SC_TEST_EXPECT(actual.context.actualBytes == 3);
 
+    const auto propagate = [](ResultFile result) -> ResultFile
+    {
+        SC_TRY(result);
+        return ResultFile(true);
+    };
+    const ResultFile propagated = propagate(detailed);
+    SC_TEST_EXPECT(propagated.isError(FileError::ReadFailed));
+    SC_TEST_EXPECT(propagated.detail == FileErrorDetail::ReadDescriptor);
+    SC_TEST_EXPECT(propagated.contextKind == FileErrorContextKind::NativeError);
+    SC_TEST_EXPECT(propagated.context.nativeError == 12345);
+
     constexpr char    expected[] = "Failed to read file descriptor (detail: read descriptor) (native error: 12345)";
     char              message[sizeof(expected)];
     ResultErrorFormat formatted = formatFileError(detailed, message);
@@ -259,6 +270,25 @@ void SC::FileTest::structuredProducerFailures()
     SC_TEST_EXPECT(result.detail == FileErrorDetail::TruncateDescriptor);
 #endif
 
+    size_t position = 0;
+    result          = descriptor.seek(FileDescriptor::SeekStart, 0);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::SeekDescriptor);
+    result = descriptor.currentPosition(position);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::QueryDescriptorPosition);
+    result = descriptor.sizeInBytes(position);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::QueryDescriptorSize);
+    char       byte = 0;
+    Span<char> read;
+    result = descriptor.read({&byte, 1}, read);
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::ReadDescriptor);
+    result = descriptor.write({&byte, 1});
+    SC_TEST_EXPECT(result.isError(FileError::InvalidHandle));
+    SC_TEST_EXPECT(result.detail == FileErrorDetail::WriteDescriptor);
+
     PipeDescriptor closeFailurePipe;
     SC_TEST_EXPECT(closeFailurePipe.createPipe());
     FileDescriptor::Handle externallyClosedRead = FileDescriptor::Invalid;
@@ -280,6 +310,14 @@ void SC::FileTest::structuredProducerFailures()
     const ResultFile acceptResult = uncreatedServer.accept(unacceptedConnection);
     SC_TEST_EXPECT(acceptResult.isError(FileError::InvalidState));
     SC_TEST_EXPECT(acceptResult.detail == FileErrorDetail::AcceptNamedPipeConnection);
+
+    PipeDescriptor eofPipe;
+    SC_TEST_EXPECT(eofPipe.createPipe());
+    SC_TEST_EXPECT(eofPipe.writePipe.close());
+    Span<char> eofRead;
+    SC_TEST_EXPECT(eofPipe.readPipe.read({&byte, 1}, eofRead));
+    SC_TEST_EXPECT(eofRead.empty());
+    SC_TEST_EXPECT(eofPipe.close());
 }
 
 void SC::FileTest::testOpen()
