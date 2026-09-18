@@ -119,12 +119,12 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @brief Call init function when instantiating the class to set directory for all operations using relative paths.
     /// @param initialDirectory The wanted directory
     /// @return Valid Result if `initialDirectory` exists and it's accessible
-    Result init(StringSpan initialDirectory);
+    ResultFileSystem init(StringSpan initialDirectory);
 
     /// @brief Changes current directory. All operations with relative paths will be relative to this directory.
     /// @param newDirectory The wanted directory
     /// @return Valid Result if `initialWorkingDirectory` exists and it's accessible
-    Result changeDirectory(StringSpan newDirectory);
+    ResultFileSystem changeDirectory(StringSpan newDirectory);
 
     /// @brief Specify copy options like overwriting existing files
     using CopyFlags = FileSystemCopyFlags;
@@ -143,7 +143,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     ///
     /// Example:
     /// @see copyFile (for an usage example)
-    Result copyFiles(Span<const CopyOperation> sourceDestination);
+    ResultFileSystem copyFiles(Span<const CopyOperation> sourceDestination);
 
     /// @brief Copy a single file
     /// @param source Source file path
@@ -153,7 +153,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     ///
     /// Example:
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp copyExistsFileSnippet
-    Result copyFile(StringSpan source, StringSpan destination, CopyFlags copyFlags = CopyFlags())
+    ResultFileSystem copyFile(StringSpan source, StringSpan destination, CopyFlags copyFlags = CopyFlags())
     {
         return copyFiles(CopyOperation{source, destination, copyFlags});
     }
@@ -162,7 +162,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @param sourceDestination View over a sequence of CopyOperation describing copies to be done
     /// @return Valid Result if all copies succeeded
     /// @see copyDirectory (for an usage example)
-    Result copyDirectories(Span<const CopyOperation> sourceDestination);
+    ResultFileSystem copyDirectories(Span<const CopyOperation> sourceDestination);
 
     /// @brief Copy a single directory
     /// @param source Source directory path
@@ -172,7 +172,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     ///
     /// Example:
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp copyDirectoryRecursiveSnippet
-    Result copyDirectory(StringSpan source, StringSpan destination, CopyFlags copyFlags = CopyFlags())
+    ResultFileSystem copyDirectory(StringSpan source, StringSpan destination, CopyFlags copyFlags = CopyFlags())
     {
         return copyDirectories(CopyOperation{source, destination, copyFlags});
     }
@@ -185,34 +185,34 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// Example:
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp renameFileSnippet
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp renameDirectorySnippet
-    Result rename(StringSpan path, StringSpan newPath);
+    ResultFileSystem rename(StringSpan path, StringSpan newPath);
 
     /// @brief Remove multiple files
     /// @param files View over a list of paths
     /// @return Valid Result if file was removed
-    Result removeFiles(Span<const StringSpan> files);
+    ResultFileSystem removeFiles(Span<const StringSpan> files);
 
     /// @brief Remove a single file
     /// @param source A single file path to be removed
     /// @return Valid Result if file was existing and it has been removed successfully
     /// @see write (for an usage example)
-    Result removeFile(StringSpan source) { return removeFiles({source}); }
+    ResultFileSystem removeFile(StringSpan source) { return removeFiles({source}); }
 
     /// @brief Remove a single file, giving no error if it doesn't exist
     /// @param source The file to be removed if it exists
     /// @return Valid Result if the file doesn't exist or if it exists and it has been successfully removed.
-    Result removeFileIfExists(StringSpan source);
+    ResultFileSystem removeFileIfExists(StringSpan source);
 
     /// @brief Remove a single link, giving no error if it doesn't exist
     /// @param source The link to be removed if it exists
     /// @return Valid Result if the file doesn't exist or if it exists and it has been successfully removed.
-    Result removeLinkIfExists(StringSpan source);
+    ResultFileSystem removeLinkIfExists(StringSpan source);
 
     /// @brief Remove multiple directories with their entire content (like posix `rm -rf`)
     /// @param directories List of directories to remove
     /// @return Valid Result if all directories and their contents have been successfully removed
     /// @see removeDirectoryRecursive (for an usage example)
-    Result removeDirectoriesRecursive(Span<const StringSpan> directories);
+    ResultFileSystem removeDirectoriesRecursive(Span<const StringSpan> directories);
 
     /// @brief Remove single directory with its entire content (like posix `rm -rf`)
     /// @param directory Directory to remove
@@ -220,65 +220,65 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     ///
     /// Example:
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp removeDirectoryRecursiveSnippet
-    Result removeDirectoryRecursive(StringSpan directory) { return removeDirectoriesRecursive({directory}); }
+    ResultFileSystem removeDirectoryRecursive(StringSpan directory) { return removeDirectoriesRecursive({directory}); }
 
     /// @brief Removes multiple empty directories
     /// @param directories List of empty directories to remove
     /// @return Invalid Result if one of the directories doesn't exist or it's not empty
     /// @see makeDirectoryRecursive (for an usage example)
-    Result removeEmptyDirectories(Span<const StringSpan> directories);
+    ResultFileSystem removeEmptyDirectories(Span<const StringSpan> directories);
 
     /// @brief Removes an empty directory
     /// @param directory Empty directory to remove
     /// @return Invalid Result if the directory doesn't exist or it's not empty
     /// @see makeDirectoryRecursive (for an usage example)
-    Result removeEmptyDirectory(StringSpan directory) { return removeEmptyDirectories({directory}); }
+    ResultFileSystem removeEmptyDirectory(StringSpan directory) { return removeEmptyDirectories({directory}); }
 
     /// @brief  Creates new directories that do not already exist
     /// @param directories List of paths where to create such directories
     /// @return Invalid Results if directories already exist
     /// @see makeDirectoryRecursive (for an usage example)
-    Result makeDirectories(Span<const StringSpan> directories);
+    ResultFileSystem makeDirectories(Span<const StringSpan> directories);
 
     /// @brief  Creates a new directory that does not already exist
     /// @param directory Path where the directory should be created
     /// @return Invalid Results if directory already exist
     /// @see makeDirectoryRecursive (for an usage example)
-    Result makeDirectory(StringSpan directory) { return makeDirectories({directory}); }
+    ResultFileSystem makeDirectory(StringSpan directory) { return makeDirectories({directory}); }
 
     /// @brief Creates new directories, if they don't already exist at the given path
     /// @param directories List of paths where to create such directories
     /// @return Invalid Results in case of I/O or access error
-    Result makeDirectoriesIfNotExists(Span<const StringSpan> directories);
+    ResultFileSystem makeDirectoriesIfNotExists(Span<const StringSpan> directories);
 
     /// @brief Creates a new directory, if it doesn't already exists at the given path
     /// @param directory Path where to create the new directory
     /// @return Invalid Results in case of I/O or access error
-    Result makeDirectoryIfNotExists(StringSpan directory) { return makeDirectoriesIfNotExists({directory}); }
+    ResultFileSystem makeDirectoryIfNotExists(StringSpan directory) { return makeDirectoriesIfNotExists({directory}); }
 
     /// @brief Create new directories, creating also intermediate non existing directories (like posix `mkdir -p`)
     /// @param directories List of paths where to create such directories
     /// @return Invalid Result in case of I/O or access error
     /// @see makeDirectoryRecursive (for an usage example)
-    Result makeDirectoriesRecursive(Span<const StringSpan> directories);
+    ResultFileSystem makeDirectoriesRecursive(Span<const StringSpan> directories);
 
     /// @brief Create a new directory, creating also intermediate non existing directories (like posix `mkdir -p`)
     /// @param directory Path where to create such directory
     /// @return Invalid Result in case of I/O or access error
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp makeDirectoryRecursive
-    Result makeDirectoryRecursive(StringSpan directory) { return makeDirectoriesRecursive({directory}); }
+    ResultFileSystem makeDirectoryRecursive(StringSpan directory) { return makeDirectoriesRecursive({directory}); }
 
     /// @brief Creates a symbolic link at location linkFile pointing at sourceFileOrDirectory
     /// @param sourceFileOrDirectory The target of the link (can be a folder or directory)
     /// @param linkFile The location where the symbolic link will be created
     /// @return Invalid result if it's not possible creating the requested symbolic link
-    Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
+    ResultFileSystem createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
 
     /// @brief Creates a hard link at location linkFile pointing at sourceFile
     /// @param sourceFile The target file of the hard link
     /// @param linkFile The location where the hard link will be created
     /// @return Invalid result if it's not possible creating the requested hard link
-    Result createHardLink(StringSpan sourceFile, StringSpan linkFile);
+    ResultFileSystem createHardLink(StringSpan sourceFile, StringSpan linkFile);
 
     /// @brief Check if a file or directory exists at a given path
     /// @param fileOrDirectory Path to check
@@ -323,21 +323,21 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     ///
     /// Example:
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp writeReadRemoveFileSnippet
-    Result write(StringSpan file, Span<const char> data);
-    Result write(StringSpan file, Span<const uint8_t> data);
+    ResultFileSystem write(StringSpan file, Span<const char> data);
+    ResultFileSystem write(StringSpan file, Span<const uint8_t> data);
 
     /// @brief Replace the entire content of a file with the provided StringSpan
     /// @param file Path to the file that is meant to be written
     /// @param text Text to be written
     /// @return Valid Result if the memory was successfully written
     /// @see write (for an usage example)
-    Result writeString(StringSpan file, StringSpan text);
+    ResultFileSystem writeString(StringSpan file, StringSpan text);
 
     /// @brief Appends a StringSpan to a file
     /// @param file Path to the file that is meant to be appended
     /// @param text Text to be appended
     /// @return Valid Result if the memory was successfully appended
-    Result writeStringAppend(StringSpan file, StringSpan text);
+    ResultFileSystem writeStringAppend(StringSpan file, StringSpan text);
 
     /// @brief Read contents of a file into a String or Buffer
     /// @param[in] file Path to the file to read
@@ -345,7 +345,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @return Valid Result if the entire file has been read successfully
     /// @see write (for an usage example)
     template <typename T>
-    Result read(StringSpan file, T& data)
+    ResultFileSystem read(StringSpan file, T& data)
     {
         return read(file, GrowableBuffer<T>{data});
     }
@@ -354,7 +354,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @param[in] file Path to the file to read
     /// @param[out] buffer Destination IGrowableBuffer that will receive file contents
     /// @return Valid Result if the entire file has been read successfully
-    Result read(StringSpan file, IGrowableBuffer&& buffer);
+    ResultFileSystem read(StringSpan file, IGrowableBuffer&& buffer);
 
     /// @brief A structure to describe modified time
     using FileStat = FileSystemStat;
@@ -363,87 +363,87 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @param file Path to the file of interest
     /// @param[out] fileStat Destination structure that will receive statistics about the file
     /// @return Valid Result if file stats for the given file was successfully read
-    Result stat(StringSpan file, FileStat& fileStat);
+    ResultFileSystem stat(StringSpan file, FileStat& fileStat);
 
     /// @brief Obtains richer metadata about a path without following symbolic links
     /// @param file Path to the file of interest
     /// @param[out] fileStat Destination structure that will receive statistics about the file
     /// @return Valid Result if file stats for the given file was successfully read
-    Result lstat(StringSpan file, FileStat& fileStat);
+    ResultFileSystem lstat(StringSpan file, FileStat& fileStat);
 
     /// @brief Legacy convenience alias for stat(StringSpan, FileStat&)
     /// @param file Path to the file of interest
     /// @param[out] fileStat Destination structure that will receive statistics about the file
     /// @return Valid Result if file stats for the given file was successfully read
-    Result getFileStat(StringSpan file, FileStat& fileStat);
+    ResultFileSystem getFileStat(StringSpan file, FileStat& fileStat);
 
     /// @brief Reads the target path stored by a symbolic link
     /// @param linkFile Path to the symbolic link
     /// @param[out] destination Destination receiving the native-encoded target path
     /// @return Valid Result if link target was successfully read
-    Result readSymbolicLink(StringSpan linkFile, StringPath& destination);
+    ResultFileSystem readSymbolicLink(StringSpan linkFile, StringPath& destination);
 
     /// @brief Change file permission bits for a path, following symbolic links
     /// @param path Path to the file or directory of interest
     /// @param mode Platform-native numeric mode bits
     /// @return Valid Result if permissions were updated successfully
-    Result chmod(StringSpan path, uint32_t mode);
+    ResultFileSystem chmod(StringSpan path, uint32_t mode);
 
     /// @brief Change owner and group for a path, following symbolic links
     /// @param path Path to the file or directory of interest
     /// @param uid Platform-native numeric owner identifier
     /// @param gid Platform-native numeric group identifier
     /// @return Valid Result if ownership was updated successfully
-    Result chown(StringSpan path, uint32_t uid, uint32_t gid);
+    ResultFileSystem chown(StringSpan path, uint32_t uid, uint32_t gid);
 
     /// @brief Change owner and group for a path without following symbolic links
     /// @param path Path to the file or directory of interest
     /// @param uid Platform-native numeric owner identifier
     /// @param gid Platform-native numeric group identifier
     /// @return Valid Result if ownership was updated successfully
-    Result lchown(StringSpan path, uint32_t uid, uint32_t gid);
+    ResultFileSystem lchown(StringSpan path, uint32_t uid, uint32_t gid);
 
     /// @brief Change file permission bits for a symbolic link without following it
     /// @param path Path to the symbolic link of interest
     /// @param mode Platform-native numeric mode bits
     /// @return Valid Result if permissions were updated successfully
-    Result lchmod(StringSpan path, uint32_t mode);
+    ResultFileSystem lchmod(StringSpan path, uint32_t mode);
 
     /// @brief Change last modified time of a given file
     /// @param file Path to the file of interest
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
     /// @return Valid Result if file time for the given file was successfully set
-    Result setLastModifiedTime(StringSpan file, TimeMs time);
+    ResultFileSystem setLastModifiedTime(StringSpan file, TimeMs time);
 
     /// @brief Low level filesystem API, requiring paths in native encoding (UTF-16 on Windows, UTF-8 elsewhere)
     /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
     struct SC_FILE_SYSTEM_EXPORT Operations
     {
-        static Result access(StringSpan path, AccessMode accessMode);
-        static Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
-        static Result createHardLink(StringSpan sourceFile, StringSpan linkFile);
-        static Result makeDirectory(StringSpan dir);
-        static Result exists(StringSpan path);
-        static Result existsAndIsDirectory(StringSpan path);
-        static Result existsAndIsFile(StringSpan path);
-        static Result existsAndIsLink(StringSpan path);
-        static Result makeDirectoryRecursive(StringSpan path);
-        static Result removeEmptyDirectory(StringSpan path);
-        static Result moveDirectory(StringSpan source, StringSpan destination);
-        static Result removeFile(StringSpan path);
-        static Result copyFile(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
-        static Result rename(StringSpan path, StringSpan newPath);
-        static Result copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
-        static Result removeDirectoryRecursive(StringSpan directory);
-        static Result stat(StringSpan path, FileSystemStat& fileStat);
-        static Result lstat(StringSpan path, FileSystemStat& fileStat);
-        static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
-        static Result readSymbolicLink(StringSpan path, StringPath& destination);
-        static Result chmod(StringSpan path, uint32_t mode);
-        static Result chown(StringSpan path, uint32_t uid, uint32_t gid);
-        static Result lchown(StringSpan path, uint32_t uid, uint32_t gid);
-        static Result lchmod(StringSpan path, uint32_t mode);
-        static Result setLastModifiedTime(StringSpan path, TimeMs time);
+        static Result           access(StringSpan path, AccessMode accessMode);
+        static ResultFileSystem createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
+        static ResultFileSystem createHardLink(StringSpan sourceFile, StringSpan linkFile);
+        static ResultFileSystem makeDirectory(StringSpan dir);
+        static Result           exists(StringSpan path);
+        static Result           existsAndIsDirectory(StringSpan path);
+        static Result           existsAndIsFile(StringSpan path);
+        static Result           existsAndIsLink(StringSpan path);
+        static ResultFileSystem makeDirectoryRecursive(StringSpan path);
+        static ResultFileSystem removeEmptyDirectory(StringSpan path);
+        static ResultFileSystem moveDirectory(StringSpan source, StringSpan destination);
+        static ResultFileSystem removeFile(StringSpan path);
+        static ResultFileSystem copyFile(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
+        static ResultFileSystem rename(StringSpan path, StringSpan newPath);
+        static ResultFileSystem copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
+        static ResultFileSystem removeDirectoryRecursive(StringSpan directory);
+        static ResultFileSystem stat(StringSpan path, FileSystemStat& fileStat);
+        static ResultFileSystem lstat(StringSpan path, FileSystemStat& fileStat);
+        static ResultFileSystem getFileStat(StringSpan path, FileSystemStat& fileStat);
+        static ResultFileSystem readSymbolicLink(StringSpan path, StringPath& destination);
+        static ResultFileSystem chmod(StringSpan path, uint32_t mode);
+        static ResultFileSystem chown(StringSpan path, uint32_t uid, uint32_t gid);
+        static ResultFileSystem lchown(StringSpan path, uint32_t uid, uint32_t gid);
+        static ResultFileSystem lchmod(StringSpan path, uint32_t mode);
+        static ResultFileSystem setLastModifiedTime(StringSpan path, TimeMs time);
 
         static StringSpan getExecutablePath(StringPath& executablePath);
         static StringSpan getCurrentWorkingDirectory(StringPath& currentWorkingDirectory);
@@ -456,9 +456,9 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
   private:
     static constexpr size_t WindowsPathTransportCapacity = StringPath::MaxPath + 6;
 
-    [[nodiscard]] Result convert(const StringSpan file, StringPath& destination,
-                                 StringNativeBuffer<WindowsPathTransportCapacity + 1>& transportPath,
-                                 StringSpan*                                           encodedPath = nullptr);
+    [[nodiscard]] ResultFileSystem convert(const StringSpan file, StringPath& destination,
+                                           StringNativeBuffer<WindowsPathTransportCapacity + 1>& transportPath,
+                                           StringSpan*                                           encodedPath = nullptr);
 
     StringPath fileFormatBuffer1;
     StringPath fileFormatBuffer2;
@@ -469,7 +469,7 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
 
     char errorMessageBuffer[256] = {0};
 
-    Result formatError(int errorNumber, StringSpan item, bool isWindowsNativeError);
+    ResultFileSystem formatError(int errorNumber, StringSpan item, bool isWindowsNativeError);
     struct Internal;
 };
 //! @}

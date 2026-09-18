@@ -845,7 +845,7 @@ SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, Str
     operation = Operation::CopyFile;
     new (&copyFileData, PlacementNew()) CopyFileData({path, destinationPath, copyFlags});
     // TODO: Implement this on io_uring using two splice submissions with IOSQE_IO_LINK
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         SC_TRY(
             FileSystem::Operations::copyFile(copyFileData.path, copyFileData.destinationPath, copyFileData.copyFlags));
@@ -865,7 +865,7 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
         return eventLoop.start(*this);
     }
 
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         SC_TRY(FileSystem::Operations::rename(renameData.path, renameData.newPath));
         return SC::Result(true);
@@ -884,7 +884,7 @@ SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& ev
         return eventLoop.start(*this);
     }
 
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         SC_TRY(FileSystem::Operations::removeEmptyDirectory(removeData.path));
         return SC::Result(true);
@@ -903,7 +903,7 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
         return eventLoop.start(*this);
     }
 
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         SC_TRY(FileSystem::Operations::removeFile(removeData.path));
         return SC::Result(true);
@@ -918,7 +918,7 @@ SC::Result SC::AsyncFileSystemOperation::copyDirectory(AsyncEventLoop& eventLoop
     SC_TRY(checkState());
     operation = Operation::CopyDirectory;
     new (&copyDirectoryData, PlacementNew()) CopyDirectoryData({path, destinationPath, copyFlags});
-    loopWork.work = [&]()
+    loopWork.work = [&]() -> SC::Result
     {
         SC_TRY(FileSystem::Operations::copyDirectory(copyDirectoryData.path, copyDirectoryData.destinationPath,
                                                      copyDirectoryData.copyFlags));

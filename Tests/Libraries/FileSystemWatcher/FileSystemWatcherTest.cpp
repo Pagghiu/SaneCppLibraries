@@ -186,7 +186,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             // due to the SC_TEST_EXPECT calls inside the lambda that runs in the thread
             watcher.notifyCallback  = lambda;
             const Result res        = fileEventsWatcher.watch(watcher, path.view());
-            const bool   fsWriteRes = fs.write("FileSystemWatcherThreadRunner/test.txt", "content");
+            const bool   fsWriteRes = static_cast<bool>(fs.write("FileSystemWatcherThreadRunner/test.txt", "content"));
             SC_TEST_EXPECT(fsWriteRes);
             SC_TEST_EXPECT(res);
             params.eventObject.wait();

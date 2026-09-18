@@ -135,9 +135,12 @@ struct SC::FileSystem::Internal
     }
 };
 #endif
-SC::Result SC::FileSystem::init(StringSpan currentWorkingDirectory) { return changeDirectory(currentWorkingDirectory); }
+SC::ResultFileSystem SC::FileSystem::init(StringSpan currentWorkingDirectory)
+{
+    return changeDirectory(currentWorkingDirectory);
+}
 
-SC::Result SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
+SC::ResultFileSystem SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
 {
 #if SC_PLATFORM_WINDOWS
     SC_TRY(FileSystemWindowsDetail::WindowsPath::makeAbsoluteLogicalPath(currentWorkingDirectory,
@@ -151,9 +154,9 @@ SC::Result SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
 #endif
 }
 
-SC::Result SC::FileSystem::convert(const StringSpan file, StringPath& destination,
-                                   StringNativeBuffer<StringPath::MaxPath + 6 + 1>& transportPath,
-                                   StringSpan*                                      encodedPath)
+SC::ResultFileSystem SC::FileSystem::convert(const StringSpan file, StringPath& destination,
+                                             StringNativeBuffer<StringPath::MaxPath + 6 + 1>& transportPath,
+                                             StringSpan*                                      encodedPath)
 {
 #if SC_PLATFORM_WINDOWS
     SC_TRY(FileSystemWindowsDetail::WindowsPath::makeTransportPath(file, currentDirectory.view(), destination,
@@ -249,7 +252,7 @@ SC::Result SC::FileSystem::convert(const StringSpan file, StringPath& destinatio
     }
 #endif
 
-SC::Result SC::FileSystem::write(StringSpan path, Span<const char> data)
+SC::ResultFileSystem SC::FileSystem::write(StringSpan path, Span<const char> data)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -293,14 +296,17 @@ SC::Result SC::FileSystem::write(StringSpan path, Span<const char> data)
 #endif
 }
 
-SC::Result SC::FileSystem::write(StringSpan path, Span<const uint8_t> data)
+SC::ResultFileSystem SC::FileSystem::write(StringSpan path, Span<const uint8_t> data)
 {
     return write(path, {reinterpret_cast<const char*>(data.data()), data.sizeInBytes()});
 }
 
-SC::Result SC::FileSystem::writeString(StringSpan path, StringSpan text) { return write(path, text.toCharSpan()); }
+SC::ResultFileSystem SC::FileSystem::writeString(StringSpan path, StringSpan text)
+{
+    return write(path, text.toCharSpan());
+}
 
-SC::Result SC::FileSystem::writeStringAppend(StringSpan path, StringSpan text)
+SC::ResultFileSystem SC::FileSystem::writeStringAppend(StringSpan path, StringSpan text)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -345,7 +351,7 @@ SC::Result SC::FileSystem::writeStringAppend(StringSpan path, StringSpan text)
 #endif
 }
 
-SC::Result SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buffer)
+SC::ResultFileSystem SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buffer)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -421,7 +427,7 @@ SC::Result SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buffer)
 #endif
 }
 
-SC::Result SC::FileSystem::formatError(int errorNumber, StringSpan item, bool isWindowsNativeError)
+SC::ResultFileSystem SC::FileSystem::formatError(int errorNumber, StringSpan item, bool isWindowsNativeError)
 {
 #if SC_PLATFORM_WINDOWS
     if (isWindowsNativeError)
@@ -452,7 +458,7 @@ SC::Result SC::FileSystem::formatError(int errorNumber, StringSpan item, bool is
     return Result::FromStableCharPointer(errorMessageBuffer);
 }
 
-SC::Result SC::FileSystem::rename(StringSpan path, StringSpan newPath)
+SC::ResultFileSystem SC::FileSystem::rename(StringSpan path, StringSpan newPath)
 {
     StringSpan encodedPath1, encodedPath2;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
@@ -460,7 +466,7 @@ SC::Result SC::FileSystem::rename(StringSpan path, StringSpan newPath)
     return FileSystem::Operations::rename(encodedPath1, encodedPath2);
 }
 
-SC::Result SC::FileSystem::removeFiles(Span<const StringSpan> files)
+SC::ResultFileSystem SC::FileSystem::removeFiles(Span<const StringSpan> files)
 {
     StringSpan encodedPath;
     for (auto& path : files)
@@ -471,14 +477,14 @@ SC::Result SC::FileSystem::removeFiles(Span<const StringSpan> files)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeFileIfExists(StringSpan source)
+SC::ResultFileSystem SC::FileSystem::removeFileIfExists(StringSpan source)
 {
     if (existsAndIsFile(source))
         return removeFiles(Span<const StringSpan>{source});
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeLinkIfExists(StringSpan source)
+SC::ResultFileSystem SC::FileSystem::removeLinkIfExists(StringSpan source)
 {
     if (existsAndIsLink(source))
     {
@@ -493,7 +499,7 @@ SC::Result SC::FileSystem::removeLinkIfExists(StringSpan source)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringSpan> directories)
+SC::ResultFileSystem SC::FileSystem::removeDirectoriesRecursive(Span<const StringSpan> directories)
 {
     for (auto& path : directories)
     {
@@ -504,7 +510,7 @@ SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringSpan> dir
     return Result(true);
 }
 
-SC::Result SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination)
+SC::ResultFileSystem SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.view().isEmpty())
         return Result(false);
@@ -518,7 +524,7 @@ SC::Result SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination
     return Result(true);
 }
 
-SC::Result SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDestination)
+SC::ResultFileSystem SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.view().isEmpty())
         return Result(false);
@@ -534,7 +540,7 @@ SC::Result SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDesti
     return Result(true);
 }
 
-SC::Result SC::FileSystem::removeEmptyDirectories(Span<const StringSpan> directories)
+SC::ResultFileSystem SC::FileSystem::removeEmptyDirectories(Span<const StringSpan> directories)
 {
     StringSpan encodedPath;
     for (StringSpan path : directories)
@@ -545,7 +551,7 @@ SC::Result SC::FileSystem::removeEmptyDirectories(Span<const StringSpan> directo
     return Result(true);
 }
 
-SC::Result SC::FileSystem::makeDirectories(Span<const StringSpan> directories)
+SC::ResultFileSystem SC::FileSystem::makeDirectories(Span<const StringSpan> directories)
 {
     StringSpan encodedPath;
     for (auto& path : directories)
@@ -556,7 +562,7 @@ SC::Result SC::FileSystem::makeDirectories(Span<const StringSpan> directories)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::makeDirectoriesRecursive(Span<const StringSpan> directories)
+SC::ResultFileSystem SC::FileSystem::makeDirectoriesRecursive(Span<const StringSpan> directories)
 {
     for (const auto& path : directories)
     {
@@ -567,7 +573,7 @@ SC::Result SC::FileSystem::makeDirectoriesRecursive(Span<const StringSpan> direc
     return Result(true);
 }
 
-SC::Result SC::FileSystem::makeDirectoriesIfNotExists(Span<const StringSpan> directories)
+SC::ResultFileSystem SC::FileSystem::makeDirectoriesIfNotExists(Span<const StringSpan> directories)
 {
     for (const auto& path : directories)
     {
@@ -579,7 +585,7 @@ SC::Result SC::FileSystem::makeDirectoriesIfNotExists(Span<const StringSpan> dir
     return Result(true);
 }
 
-SC::Result SC::FileSystem::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
+SC::ResultFileSystem SC::FileSystem::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
 {
     StringSpan sourceFileNative, linkFileNative;
     SC_TRY(convert(sourceFileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &sourceFileNative));
@@ -588,7 +594,7 @@ SC::Result SC::FileSystem::createSymbolicLink(StringSpan sourceFileOrDirectory, 
     return Result(true);
 }
 
-SC::Result SC::FileSystem::createHardLink(StringSpan sourceFile, StringSpan linkFile)
+SC::ResultFileSystem SC::FileSystem::createHardLink(StringSpan sourceFile, StringSpan linkFile)
 {
     StringSpan sourceFileNative, linkFileNative;
     SC_TRY(convert(sourceFile, fileFormatBuffer1, fileTransportBuffer1, &sourceFileNative));
@@ -600,35 +606,40 @@ SC::Result SC::FileSystem::createHardLink(StringSpan sourceFile, StringSpan link
 bool SC::FileSystem::exists(StringSpan fileOrDirectory)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    if (not convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
+        return false;
     return FileSystem::Operations::exists(encodedPath);
 }
 
 bool SC::FileSystem::existsAndIsDirectory(StringSpan directory)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(directory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    if (not convert(directory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
+        return false;
     return FileSystem::Operations::existsAndIsDirectory(encodedPath);
 }
 
 bool SC::FileSystem::existsAndIsFile(StringSpan file)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    if (not convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
+        return false;
     return FileSystem::Operations::existsAndIsFile(encodedPath);
 }
 
 bool SC::FileSystem::existsAndIsLink(StringSpan file)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    if (not convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
+        return false;
     return FileSystem::Operations::existsAndIsLink(encodedPath);
 }
 
 bool SC::FileSystem::canAccess(StringSpan fileOrDirectory, AccessMode accessMode)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    if (not convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
+        return false;
     return FileSystem::Operations::access(encodedPath, accessMode);
 }
 
@@ -636,14 +647,16 @@ bool SC::FileSystem::moveDirectory(StringSpan sourceDirectory, StringSpan destin
 {
     StringSpan encodedPath1;
     StringSpan encodedPath2;
-    SC_TRY(convert(sourceDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
-    SC_TRY(convert(destinationDirectory, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
-    return FileSystem::Operations::moveDirectory(encodedPath1, encodedPath2);
+    if (not convert(sourceDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1))
+        return false;
+    if (not convert(destinationDirectory, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2))
+        return false;
+    return static_cast<bool>(FileSystem::Operations::moveDirectory(encodedPath1, encodedPath2));
 }
 
-SC::Result SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat) { return stat(file, fileStat); }
+SC::ResultFileSystem SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat) { return stat(file, fileStat); }
 
-SC::Result SC::FileSystem::stat(StringSpan file, FileStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::stat(StringSpan file, FileStat& fileStat)
 {
     StringSpan encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -651,7 +664,7 @@ SC::Result SC::FileSystem::stat(StringSpan file, FileStat& fileStat)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::lstat(StringSpan file, FileStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::lstat(StringSpan file, FileStat& fileStat)
 {
     StringSpan encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -659,7 +672,7 @@ SC::Result SC::FileSystem::lstat(StringSpan file, FileStat& fileStat)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& destination)
+SC::ResultFileSystem SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& destination)
 {
     StringSpan encodedPath;
     SC_TRY(convert(linkFile, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -667,35 +680,35 @@ SC::Result SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& des
     return Result(true);
 }
 
-SC::Result SC::FileSystem::chmod(StringSpan path, uint32_t mode)
+SC::ResultFileSystem SC::FileSystem::chmod(StringSpan path, uint32_t mode)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::chmod(encodedPath, mode);
 }
 
-SC::Result SC::FileSystem::chown(StringSpan path, uint32_t uid, uint32_t gid)
+SC::ResultFileSystem SC::FileSystem::chown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::chown(encodedPath, uid, gid);
 }
 
-SC::Result SC::FileSystem::lchown(StringSpan path, uint32_t uid, uint32_t gid)
+SC::ResultFileSystem SC::FileSystem::lchown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::lchown(encodedPath, uid, gid);
 }
 
-SC::Result SC::FileSystem::lchmod(StringSpan path, uint32_t mode)
+SC::ResultFileSystem SC::FileSystem::lchmod(StringSpan path, uint32_t mode)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::lchmod(encodedPath, mode);
 }
 
-SC::Result SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs time)
+SC::ResultFileSystem SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs time)
 {
     StringSpan encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
@@ -707,7 +720,7 @@ SC::Result SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs time)
 
 struct SC::FileSystem::Operations::Internal
 {
-    static Result validatePath(StringSpan path)
+    static ResultFileSystem validatePath(StringSpan path)
     {
         if (path.sizeInBytes() == 0)
             return Result::Error("Path is empty");
@@ -763,12 +776,13 @@ struct SC::FileSystem::Operations::Internal
         return 0;
     }
 
-    static Result copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
-                           bool isDirectory = false);
+    static ResultFileSystem copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
+                                     bool isDirectory = false);
 
-    static Result copyDirectoryRecursive(const wchar_t* source, const wchar_t* destination, FileSystemCopyFlags flags);
+    static ResultFileSystem copyDirectoryRecursive(const wchar_t* source, const wchar_t* destination,
+                                                   FileSystemCopyFlags flags);
 
-    static Result removeDirectoryRecursiveInternal(const wchar_t* path);
+    static ResultFileSystem removeDirectoryRecursiveInternal(const wchar_t* path);
 };
 
 static SC::TimeMs windowsFileTimeToTimeMs(const FILETIME& fileTime)
@@ -894,7 +908,8 @@ struct WindowsReparseDataBuffer
         }                                                                                                              \
     }
 
-SC::Result SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
+SC::ResultFileSystem SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileOrDirectory,
+                                                                    StringSpan linkFile)
 {
     SC_TRY_MSG(Internal::validatePath(sourceFileOrDirectory), "createSymbolicLink: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(linkFile), "createSymbolicLink: Invalid link path");
@@ -907,7 +922,7 @@ SC::Result SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileO
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
+SC::ResultFileSystem SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
 {
     SC_TRY_MSG(Internal::validatePath(sourceFile), "createHardLink: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(linkFile), "createHardLink: Invalid link path");
@@ -931,7 +946,7 @@ SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode access
     return Result(::_waccess(path.getNullTerminatedNative(), mode) == 0);
 }
 
-SC::Result SC::FileSystem::Operations::makeDirectory(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::makeDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
     SC_TRY_WIN32(::CreateDirectoryW(path.getNullTerminatedNative(), nullptr),
@@ -939,7 +954,7 @@ SC::Result SC::FileSystem::Operations::makeDirectory(StringSpan path)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::makeDirectoryRecursive(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
     const size_t pathLength = path.sizeInBytes() / sizeof(wchar_t);
@@ -1017,7 +1032,7 @@ SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
     return Result((res & FILE_ATTRIBUTE_REPARSE_POINT) != 0);
 }
 
-SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
+SC::ResultFileSystem SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
 {
     SC_TRY_MSG(Internal::validatePath(path), "readSymbolicLink: Invalid path");
 
@@ -1086,7 +1101,7 @@ SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringP
     return FileSystemWindowsDetail::WindowsPath::makeLogicalPath(destination.view(), destination);
 }
 
-SC::Result SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
+SC::ResultFileSystem SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
 {
     SC_TRY_MSG(Internal::validatePath(path), "chmod: Invalid path");
     DWORD attributes = ::GetFileAttributesW(path.getNullTerminatedNative());
@@ -1106,7 +1121,7 @@ SC::Result SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
+SC::ResultFileSystem SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     (void)uid;
     (void)gid;
@@ -1116,7 +1131,7 @@ SC::Result SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
+SC::ResultFileSystem SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     (void)uid;
     (void)gid;
@@ -1126,14 +1141,14 @@ SC::Result SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uin
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
+SC::ResultFileSystem SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
 {
     (void)path;
     (void)mode;
     return Result::Error("ENOTSUP");
 }
 
-SC::Result SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeEmptyDirectory: Invalid path");
     SC_TRY_WIN32(::RemoveDirectoryW(path.getNullTerminatedNative()),
@@ -1141,7 +1156,7 @@ SC::Result SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSpan destination)
+SC::ResultFileSystem SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSpan destination)
 {
     SC_TRY_MSG(Internal::validatePath(source), "moveDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "moveDirectory: Invalid destination path");
@@ -1151,31 +1166,31 @@ SC::Result SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSp
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::removeFile(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeFile(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeFile: Invalid path");
     SC_TRY_WIN32(::DeleteFileW(path.getNullTerminatedNative()), "removeFile: Failed to remove file");
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
 {
     SC_TRY_MSG(Internal::validatePath(path), "stat: Invalid path");
     return windowsStat(path, true, fileStat);
 }
 
-SC::Result SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
 {
     SC_TRY_MSG(Internal::validatePath(path), "lstat: Invalid path");
     return windowsStat(path, false, fileStat);
 }
 
-SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemStat& fileStat)
 {
     return stat(path, fileStat);
 }
 
-SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
+SC::ResultFileSystem SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
 {
     SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
 
@@ -1204,7 +1219,7 @@ SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, Time
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPath)
+SC::ResultFileSystem SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPath)
 {
     SC_TRY_MSG(Internal::validatePath(path), "rename: Invalid path");
     SC_TRY_MSG(Internal::validatePath(newPath), "rename: Invalid new path");
@@ -1213,7 +1228,8 @@ SC::Result SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPat
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags flags)
+SC::ResultFileSystem SC::FileSystem::Operations::copyFile(StringSpan source, StringSpan destination,
+                                                          FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(source), "copyFile: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "copyFile: Invalid destination path");
@@ -1228,8 +1244,8 @@ SC::Result SC::FileSystem::Operations::copyFile(StringSpan source, StringSpan de
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::copyDirectory(StringSpan source, StringSpan destination,
-                                                     FileSystemCopyFlags flags)
+SC::ResultFileSystem SC::FileSystem::Operations::copyDirectory(StringSpan source, StringSpan destination,
+                                                               FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(source), "copyDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "copyDirectory: Invalid destination path");
@@ -1243,15 +1259,15 @@ SC::Result SC::FileSystem::Operations::copyDirectory(StringSpan source, StringSp
                                             flags);
 }
 
-SC::Result SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
     return Internal::removeDirectoryRecursiveInternal(path.getNullTerminatedNative());
 }
 
-SC::Result SC::FileSystem::Operations::Internal::copyDirectoryRecursive(const wchar_t*      source,
-                                                                        const wchar_t*      destination,
-                                                                        FileSystemCopyFlags flags)
+SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyDirectoryRecursive(const wchar_t*      source,
+                                                                                  const wchar_t*      destination,
+                                                                                  FileSystemCopyFlags flags)
 {
     // Create destination directory if it doesn't exist
     if (::CreateDirectoryW(destination, nullptr) == FALSE)
@@ -1320,7 +1336,7 @@ SC::Result SC::FileSystem::Operations::Internal::copyDirectoryRecursive(const wc
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::Internal::removeDirectoryRecursiveInternal(const wchar_t* path)
+SC::ResultFileSystem SC::FileSystem::Operations::Internal::removeDirectoryRecursiveInternal(const wchar_t* path)
 {
     // Prepare search pattern
     wchar_t searchPattern[StringPath::MaxPath + 6 + 1] = {};
@@ -1450,7 +1466,7 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #endif
 struct SC::FileSystem::Operations::Internal
 {
-    static Result validatePath(StringSpan path)
+    static ResultFileSystem validatePath(StringSpan path)
     {
         if (path.sizeInBytes() == 0)
             return Result::Error("Path is empty");
@@ -1458,8 +1474,8 @@ struct SC::FileSystem::Operations::Internal
             return Result::Error("Path is not native (UTF8)");
         return Result(true);
     }
-    static Result copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
-                           bool isDirectory = false);
+    static ResultFileSystem copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
+                                     bool isDirectory = false);
 };
 
 static SC::TimeMs posixTimespecToTimeMs(const struct timespec& ts)
@@ -1524,7 +1540,8 @@ static SC::Result fillPosixFileStat(const struct stat& pathStat, SC::FileSystemS
         }                                                                                                              \
     }
 
-SC::Result SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
+SC::ResultFileSystem SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileOrDirectory,
+                                                                    StringSpan linkFile)
 {
     SC_TRY_MSG(Internal::validatePath(sourceFileOrDirectory),
                "createSymbolicLink: Invalid source file or directory path");
@@ -1546,7 +1563,7 @@ static int posixAccessMode(SC::FileSystemAccessMode accessMode)
     return F_OK;
 }
 
-SC::Result SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
+SC::ResultFileSystem SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
 {
     SC_TRY_MSG(Internal::validatePath(sourceFile), "createHardLink: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(linkFile), "createHardLink: Invalid link path");
@@ -1561,7 +1578,7 @@ SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode access
     return Result(::access(path.getNullTerminatedNative(), posixAccessMode(accessMode)) == 0);
 }
 
-SC::Result SC::FileSystem::Operations::makeDirectory(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::makeDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
     SC_TRY_POSIX(::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH),
@@ -1569,7 +1586,7 @@ SC::Result SC::FileSystem::Operations::makeDirectory(StringSpan path)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::makeDirectoryRecursive(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
     const size_t pathLength = path.sizeInBytes();
@@ -1639,14 +1656,14 @@ SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
     return Result(S_ISLNK(path_stat.st_mode));
 }
 
-SC::Result SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeEmptyDirectory: Invalid path");
     SC_TRY_POSIX(::rmdir(path.getNullTerminatedNative()), "removeEmptyDirectory: Failed to remove directory");
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSpan destination)
+SC::ResultFileSystem SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSpan destination)
 {
     SC_TRY_MSG(Internal::validatePath(source), "moveDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "moveDirectory: Invalid destination path");
@@ -1655,14 +1672,14 @@ SC::Result SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSp
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::removeFile(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeFile(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeFile: Invalid path");
     SC_TRY_POSIX(::remove(path.getNullTerminatedNative()), "removeFile: Failed to remove file");
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
 {
     SC_TRY_MSG(Internal::validatePath(path), "stat: Invalid path");
     struct stat path_stat;
@@ -1670,7 +1687,7 @@ SC::Result SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fil
     return fillPosixFileStat(path_stat, fileStat);
 }
 
-SC::Result SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
 {
     SC_TRY_MSG(Internal::validatePath(path), "lstat: Invalid path");
     struct stat path_stat;
@@ -1678,12 +1695,12 @@ SC::Result SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fi
     return fillPosixFileStat(path_stat, fileStat);
 }
 
-SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemStat& fileStat)
+SC::ResultFileSystem SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemStat& fileStat)
 {
     return stat(path, fileStat);
 }
 
-SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
+SC::ResultFileSystem SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
 {
     SC_TRY_MSG(Internal::validatePath(path), "readSymbolicLink: Invalid path");
 
@@ -1702,14 +1719,14 @@ SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringP
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
+SC::ResultFileSystem SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
 {
     SC_TRY_MSG(Internal::validatePath(path), "chmod: Invalid path");
     SC_TRY_POSIX(::chmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)), "chmod: Failed to change mode");
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
+SC::ResultFileSystem SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     SC_TRY_MSG(Internal::validatePath(path), "chown: Invalid path");
     SC_TRY_POSIX(::chown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)),
@@ -1717,7 +1734,7 @@ SC::Result SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
+SC::ResultFileSystem SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     SC_TRY_MSG(Internal::validatePath(path), "lchown: Invalid path");
     SC_TRY_POSIX(::lchown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)),
@@ -1725,7 +1742,7 @@ SC::Result SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uin
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
+SC::ResultFileSystem SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
 {
     SC_TRY_MSG(Internal::validatePath(path), "lchmod: Invalid path");
 #if SC_PLATFORM_APPLE
@@ -1737,7 +1754,7 @@ SC::Result SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
 #endif
 }
 
-SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
+SC::ResultFileSystem SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
 {
     SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
     struct timespec times[2];
@@ -1750,7 +1767,7 @@ SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, Time
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPath)
+SC::ResultFileSystem SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPath)
 {
     SC_TRY_MSG(Internal::validatePath(path), "rename: Invalid path");
     SC_TRY_MSG(Internal::validatePath(newPath), "rename: Invalid new path");
@@ -1759,7 +1776,8 @@ SC::Result SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPat
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::copyFile(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags)
+SC::ResultFileSystem SC::FileSystem::Operations::copyFile(StringSpan srcPath, StringSpan destPath,
+                                                          FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(srcPath), "copyFile: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destPath), "copyFile: Invalid destination path");
@@ -1767,7 +1785,8 @@ SC::Result SC::FileSystem::Operations::copyFile(StringSpan srcPath, StringSpan d
     return Result(Internal::copyFile(srcPath, destPath, flags, false));
 }
 
-SC::Result SC::FileSystem::Operations::copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags)
+SC::ResultFileSystem SC::FileSystem::Operations::copyDirectory(StringSpan srcPath, StringSpan destPath,
+                                                               FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(srcPath), "copyDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destPath), "copyDirectory: Invalid destination path");
@@ -1775,8 +1794,8 @@ SC::Result SC::FileSystem::Operations::copyDirectory(StringSpan srcPath, StringS
 }
 
 #if __APPLE__
-SC::Result SC::FileSystem::Operations::Internal::copyFile(StringSpan source, StringSpan destination,
-                                                          FileSystemCopyFlags options, bool isDirectory)
+SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan source, StringSpan destination,
+                                                                    FileSystemCopyFlags options, bool isDirectory)
 {
     const char* sourceFile      = source.getNullTerminatedNative();
     const char* destinationFile = destination.getNullTerminatedNative();
@@ -1833,7 +1852,7 @@ SC::Result SC::FileSystem::Operations::Internal::copyFile(StringSpan source, Str
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
     auto state     = ::removefile_state_alloc();
@@ -1910,8 +1929,8 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 }
 
 #else
-SC::Result SC::FileSystem::Operations::Internal::copyFile(StringSpan source, StringSpan destination,
-                                                          FileSystemCopyFlags options, bool isDirectory)
+SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan source, StringSpan destination,
+                                                                    FileSystemCopyFlags options, bool isDirectory)
 {
     if (isDirectory)
     {
@@ -2020,7 +2039,7 @@ SC::Result SC::FileSystem::Operations::Internal::copyFile(StringSpan source, Str
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
 

@@ -430,7 +430,8 @@ static constexpr SC::StringView ALL_SC_EXPORT_LIBRARIES[] = {
 bool SC::Build::Project::addExportLibraries(Span<const StringView> libraries)
 {
     FileSystem fs;
-    SC_TRY(fs.init("."));
+    if (not fs.init("."))
+        return false;
 
     for (const StringView library : libraries)
     {
