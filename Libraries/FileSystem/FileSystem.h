@@ -111,8 +111,6 @@ struct FileSystemCopyFlags
 /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
 struct SC_FILE_SYSTEM_EXPORT FileSystem
 {
-    bool preciseErrorMessages = false; ///< Formats errors in an internal buffer when returning failed Result
-
     /// @brief Access mode for path checks
     using AccessMode = FileSystemAccessMode;
 
@@ -466,11 +464,6 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
 
     StringNativeBuffer<WindowsPathTransportCapacity + 1> fileTransportBuffer1;
     StringNativeBuffer<WindowsPathTransportCapacity + 1> fileTransportBuffer2;
-
-    char errorMessageBuffer[256] = {0};
-
-    ResultFileSystem formatError(int errorNumber, StringSpan item, bool isWindowsNativeError);
-    struct Internal;
 };
 //! @}
 } // namespace SC

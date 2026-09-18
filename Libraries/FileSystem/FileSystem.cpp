@@ -21,69 +21,79 @@ namespace FileSystemWindowsDetail
 {
 #include "../Common/WindowsPath.inl"
 }
-
-static constexpr const SC::Result getErrorCode(int errorCode)
-{
-    switch (errorCode)
-    {
-    case EACCES: return Result::Error("EACCES");
-#if !SC_PLATFORM_WINDOWS
-    case EDQUOT: return Result::Error("EDQUOT");
-#endif
-    case EEXIST: return Result::Error("EEXIST");
-    case EFAULT: return Result::Error("EFAULT");
-    case EIO: return Result::Error("EIO");
-    case ELOOP: return Result::Error("ELOOP");
-    case EMLINK: return Result::Error("EMLINK");
-    case ENAMETOOLONG: return Result::Error("ENAMETOOLONG");
-    case ENOENT: return Result::Error("ENOENT");
-    case ENOSPC: return Result::Error("ENOSPC");
-    case ENOTDIR: return Result::Error("ENOTDIR");
-    case EROFS: return Result::Error("EROFS");
-    case EBADF: return Result::Error("EBADF");
-    case EPERM: return Result::Error("EPERM");
-    case ENOMEM: return Result::Error("ENOMEM");
-    case ENOTSUP: return Result::Error("ENOTSUP");
-    case EINVAL: return Result::Error("EINVAL");
-    }
-    return Result::Error("Unknown");
-}
 } // namespace SC
 
-struct SC::FileSystem::Internal
+namespace
 {
-    static Result formatWindowsError(int errorNumber, Span<char> buffer)
+static SC::ResultFileSystem fileSystemResultFromNative(SC::uint32_t nativeError, SC::FileSystemErrorDetail detail)
+{
+    using SC::FileSystemError;
+    switch (nativeError)
     {
-        LPWSTR messageBuffer = nullptr;
-        size_t size          = ::FormatMessageW(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-            errorNumber, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(&messageBuffer), 0, NULL);
-        auto deferFree = MakeDeferred([&]() { LocalFree(messageBuffer); });
-
-        // TODO: Write buffer from messageBuffer converting from UTF-16 to UTF-8
-        if (size == 0)
-        {
-            return Result::Error("SC::FileSystem::Internal::formatWindowsError - Cannot format error");
-        }
-        int res = ::WideCharToMultiByte(CP_UTF8, 0, messageBuffer, static_cast<int>(size), buffer.data(),
-                                        static_cast<int>(buffer.sizeInBytes()), nullptr, nullptr);
-        return Result(res > 0);
+    case ERROR_FILE_NOT_FOUND:
+    case ERROR_PATH_NOT_FOUND:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::EntryNotFound, detail, nativeError);
+    case ERROR_ALREADY_EXISTS:
+    case ERROR_FILE_EXISTS:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::EntryAlreadyExists, detail, nativeError);
+    case ERROR_ACCESS_DENIED:
+    case ERROR_PRIVILEGE_NOT_HELD:
+    case ERROR_SHARING_VIOLATION:
+    case ERROR_LOCK_VIOLATION:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::AccessDenied, detail, nativeError);
+    case ERROR_WRITE_PROTECT:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::ReadOnlyFileSystem, detail, nativeError);
+    case ERROR_DISK_FULL:
+    case ERROR_HANDLE_DISK_FULL:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::StorageCapacityExceeded, detail, nativeError);
+    case ERROR_DIR_NOT_EMPTY:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::DirectoryNotEmpty, detail, nativeError);
+    case ERROR_TOO_MANY_LINKS:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::TooManyLinks, detail, nativeError);
+    case ERROR_CANT_RESOLVE_FILENAME:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::SymbolicLinkLoop, detail, nativeError);
+    case ERROR_NOT_SAME_DEVICE:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::CrossDeviceOperation, detail, nativeError);
+    case ERROR_INVALID_PARAMETER:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::InvalidArgument, detail, nativeError);
+    case ERROR_NOT_SUPPORTED:
+    case ERROR_CALL_NOT_IMPLEMENTED:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::OperationUnsupported, detail, nativeError);
+    case ERROR_NOT_ENOUGH_MEMORY:
+    case ERROR_OUTOFMEMORY:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::OutOfMemory, detail, nativeError);
+    case ERROR_FILENAME_EXCED_RANGE:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::PathCapacityExceeded, detail, nativeError);
+    case ERROR_FILE_TOO_LARGE:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::FileTooLarge, detail, nativeError);
+    case ERROR_DIRECTORY:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::EntryTypeMismatch, detail, nativeError);
+    case ERROR_IO_DEVICE:
+    case ERROR_CRC:
+    case ERROR_READ_FAULT:
+    case ERROR_WRITE_FAULT:
+    case ERROR_SEEK: return SC::ResultFileSystem::withNativeError(FileSystemError::IoFailure, detail, nativeError);
     }
-    static bool formatError(int errorNumber, Span<char> buffer)
+    return SC::ResultFileSystem::withNativeError(FileSystemError::OperationFailed, detail, nativeError);
+}
+
+static SC::ResultFileSystem translateWindowsPathError(SC::FileSystemWindowsDetail::WindowsPathResult result,
+                                                      SC::FileSystemErrorDetail                      detail)
+{
+    using SC::FileSystemError;
+    using SC::FileSystemWindowsDetail::WindowsPathError;
+    switch (result.error)
     {
-        wchar_t   messageBuffer[1024];
-        const int err = ::_wcserror_s(messageBuffer, sizeof(messageBuffer) / sizeof(wchar_t), errorNumber);
-        if (err == 0)
-        {
-            const int messageLength = static_cast<int>(::wcsnlen_s(messageBuffer, 1024));
-
-            const int res = ::WideCharToMultiByte(CP_UTF8, 0, messageBuffer, messageLength, buffer.data(),
-                                                  static_cast<int>(buffer.sizeInBytes()), nullptr, nullptr);
-            return Result(res > 0);
-        }
-        return false;
+    case WindowsPathError::CapacityExceeded: return {FileSystemError::PathCapacityExceeded, detail};
+    case WindowsPathError::BasePathNotAbsolute: return {FileSystemError::PathMustBeAbsolute, detail};
+    case WindowsPathError::MalformedPath: return {FileSystemError::InvalidPath, detail};
+    case WindowsPathError::NativeCallFailed:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::OperationFailed, detail, result.nativeError);
+    case WindowsPathError::None: return {};
     }
-};
+    return {FileSystemError::InvalidPath, detail};
+}
+} // namespace
 
 #else
 #include <errno.h>    // errno
@@ -91,49 +101,44 @@ struct SC::FileSystem::Internal
 #include <string.h>   // strerror_r
 #include <sys/stat.h> // stat, fstat
 #include <unistd.h>   // write, close, read
-namespace SC
+
+namespace
 {
-// This is shared with FileSystemIterator
-Result getErrorCode(int errorCode)
+static SC::ResultFileSystem fileSystemResultFromNative(SC::uint32_t nativeError, SC::FileSystemErrorDetail detail)
 {
-    switch (errorCode)
+    using SC::FileSystemError;
+    switch (static_cast<int>(nativeError))
     {
-    case EACCES: return Result::Error("EACCES");
-    case EDQUOT: return Result::Error("EDQUOT");
-    case EEXIST: return Result::Error("EEXIST");
-    case EFAULT: return Result::Error("EFAULT");
-    case EIO: return Result::Error("EIO");
-    case ELOOP: return Result::Error("ELOOP");
-    case EMLINK: return Result::Error("EMLINK");
-    case ENAMETOOLONG: return Result::Error("ENAMETOOLONG");
-    case ENOENT: return Result::Error("ENOENT");
-    case ENOSPC: return Result::Error("ENOSPC");
-    case ENOTDIR: return Result::Error("ENOTDIR");
-    case EROFS: return Result::Error("EROFS");
-    case EBADF: return Result::Error("EBADF");
-    case EPERM: return Result::Error("EPERM");
-    case ENOMEM: return Result::Error("ENOMEM");
-    case ENOTSUP: return Result::Error("ENOTSUP");
-    case EINVAL: return Result::Error("EINVAL");
+    case EACCES:
+    case EPERM: return SC::ResultFileSystem::withNativeError(FileSystemError::AccessDenied, detail, nativeError);
+    case EDQUOT:
+    case ENOSPC:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::StorageCapacityExceeded, detail, nativeError);
+    case EEXIST: return SC::ResultFileSystem::withNativeError(FileSystemError::EntryAlreadyExists, detail, nativeError);
+    case EFAULT:
+    case EINVAL: return SC::ResultFileSystem::withNativeError(FileSystemError::InvalidArgument, detail, nativeError);
+    case EIO: return SC::ResultFileSystem::withNativeError(FileSystemError::IoFailure, detail, nativeError);
+    case ELOOP: return SC::ResultFileSystem::withNativeError(FileSystemError::SymbolicLinkLoop, detail, nativeError);
+    case EMLINK: return SC::ResultFileSystem::withNativeError(FileSystemError::TooManyLinks, detail, nativeError);
+    case ENAMETOOLONG:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::PathCapacityExceeded, detail, nativeError);
+    case ENOENT: return SC::ResultFileSystem::withNativeError(FileSystemError::EntryNotFound, detail, nativeError);
+    case ENOTDIR:
+    case EISDIR: return SC::ResultFileSystem::withNativeError(FileSystemError::EntryTypeMismatch, detail, nativeError);
+    case EROFS: return SC::ResultFileSystem::withNativeError(FileSystemError::ReadOnlyFileSystem, detail, nativeError);
+    case EBADF: return SC::ResultFileSystem::withNativeError(FileSystemError::InvalidState, detail, nativeError);
+    case ENOMEM: return SC::ResultFileSystem::withNativeError(FileSystemError::OutOfMemory, detail, nativeError);
+    case ENOTSUP:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::OperationUnsupported, detail, nativeError);
+    case EFBIG: return SC::ResultFileSystem::withNativeError(FileSystemError::FileTooLarge, detail, nativeError);
+    case ENOTEMPTY:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::DirectoryNotEmpty, detail, nativeError);
+    case EXDEV:
+        return SC::ResultFileSystem::withNativeError(FileSystemError::CrossDeviceOperation, detail, nativeError);
     }
-    return Result::Error("Unknown");
+    return SC::ResultFileSystem::withNativeError(FileSystemError::OperationFailed, detail, nativeError);
 }
-} // namespace SC
-
-struct SC::FileSystem::Internal
-{
-
-    static bool formatError(int errorNumber, Span<native_char_t> buffer)
-    {
-#if SC_PLATFORM_APPLE || (SC_PLATFORM_LINUX && !defined(__GLIBC__))
-        const int res = ::strerror_r(errorNumber, buffer.data(), buffer.sizeInBytes());
-        return res == 0;
-#else
-        char* res = ::strerror_r(errorNumber, buffer.data(), buffer.sizeInBytes());
-        return res != buffer.data();
-#endif
-    }
-};
+} // namespace
 #endif
 SC::ResultFileSystem SC::FileSystem::init(StringSpan currentWorkingDirectory)
 {
@@ -143,15 +148,17 @@ SC::ResultFileSystem SC::FileSystem::init(StringSpan currentWorkingDirectory)
 SC::ResultFileSystem SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
 {
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(FileSystemWindowsDetail::WindowsPath::makeAbsoluteLogicalPath(currentWorkingDirectory,
-                                                                         currentDirectory.view(), currentDirectory));
-    return Result(existsAndIsDirectory(currentDirectory.view()));
+    const auto pathResult = FileSystemWindowsDetail::WindowsPath::makeAbsoluteLogicalPath(
+        currentWorkingDirectory, currentDirectory.view(), currentDirectory);
+    if (not pathResult)
+        return translateWindowsPathError(pathResult, FileSystemErrorDetail::NormalizePath);
 #else
-    SC_TRY_MSG(currentDirectory.assign(currentWorkingDirectory),
-               "FileSystem::changeDirectory - Cannot assign working directory");
-    // TODO: Assert if path is not absolute
-    return Result(existsAndIsDirectory("."));
+    if (not currentDirectory.assign(currentWorkingDirectory))
+        return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::ChangeDirectory};
 #endif
+    if (not existsAndIsDirectory("."))
+        return {FileSystemError::EntryNotFound, FileSystemErrorDetail::ChangeDirectory};
+    return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::convert(const StringSpan file, StringPath& destination,
@@ -159,8 +166,18 @@ SC::ResultFileSystem SC::FileSystem::convert(const StringSpan file, StringPath& 
                                              StringSpan*                                      encodedPath)
 {
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(FileSystemWindowsDetail::WindowsPath::makeTransportPath(file, currentDirectory.view(), destination,
-                                                                   transportPath));
+    if (currentDirectory.view().isEmpty())
+    {
+        const auto logicalPathResult = FileSystemWindowsDetail::WindowsPath::makeLogicalPath(file, destination);
+        if (not logicalPathResult)
+            return translateWindowsPathError(logicalPathResult, FileSystemErrorDetail::NormalizePath);
+        if (not FileSystemWindowsDetail::WindowsPath::isAbsolute(destination.view()))
+            return {FileSystemError::NotInitialized, FileSystemErrorDetail::BuildTransportPath};
+    }
+    const auto pathResult = FileSystemWindowsDetail::WindowsPath::makeTransportPath(file, currentDirectory.view(),
+                                                                                    destination, transportPath);
+    if (not pathResult)
+        return translateWindowsPathError(pathResult, FileSystemErrorDetail::BuildTransportPath);
     if (encodedPath != nullptr)
     {
         *encodedPath = transportPath.view();
@@ -168,7 +185,8 @@ SC::ResultFileSystem SC::FileSystem::convert(const StringSpan file, StringPath& 
     return Result(true);
 #else
     (void)(transportPath);
-    SC_TRY(destination.assign(file));
+    if (not destination.assign(file))
+        return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildTransportPath};
     if (encodedPath)
     {
         *encodedPath = destination.view();
@@ -185,24 +203,28 @@ SC::ResultFileSystem SC::FileSystem::convert(const StringSpan file, StringPath& 
         return Result(true);
     }
     if (currentDirectory.view().isEmpty())
-        return Result(false);
+        return {FileSystemError::NotInitialized, FileSystemErrorDetail::BuildTransportPath};
 
-    StringPath relative = destination;
-    destination         = currentDirectory;
-#if SC_PLATFORM_WINDOWS
-    const size_t destLen       = destination.view().sizeInBytes() / sizeof(wchar_t);
-    const size_t relLen        = relative.view().sizeInBytes() / sizeof(wchar_t);
-    destinationBuffer[destLen] = L'\\';
-    ::memcpy(destinationBuffer + destLen + 1, relative.view().bytesIncludingTerminator(), relLen * sizeof(wchar_t));
-#else
+    StringPath   relative = destination;
+    const size_t requiredBytes =
+        currentDirectory.view().sizeInBytes() + sizeof(native_char_t) + relative.view().sizeInBytes();
+    if (requiredBytes / sizeof(native_char_t) > StringPath::MaxPath)
+    {
+        if (requiredBytes <= 0xffffffffu)
+            return ResultFileSystem::withRequiredBytes(FileSystemError::PathCapacityExceeded,
+                                                       FileSystemErrorDetail::BuildTransportPath,
+                                                       static_cast<uint32_t>(requiredBytes));
+        return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildTransportPath};
+    }
+    if (not destination.assign(currentDirectory.view()))
+        return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildTransportPath};
     destinationBuffer[destination.view().sizeInBytes()] = '/';
     ::memcpy(destinationBuffer + destination.view().sizeInBytes() + 1, relative.view().bytesWithoutTerminator(),
              relative.view().sizeInBytes());
-#endif
-    const size_t lastPos =
-        (destination.view().sizeInBytes() + relative.view().sizeInBytes()) / sizeof(native_char_t) + 1;
+    const size_t lastPos       = destination.view().sizeInBytes() + relative.view().sizeInBytes() + 1;
     destinationBuffer[lastPos] = 0;
-    (void)destination.resize(lastPos);
+    if (not destination.resize(lastPos))
+        return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildTransportPath};
     if (encodedPath != nullptr)
     {
         *encodedPath = destination.view();
@@ -210,47 +232,6 @@ SC::ResultFileSystem SC::FileSystem::convert(const StringSpan file, StringPath& 
     return Result(true);
 #endif
 }
-
-#define SC_TRY_FORMAT_ERRNO(path, func)                                                                                \
-    {                                                                                                                  \
-        if (not func)                                                                                                  \
-        {                                                                                                              \
-            return formatError(errno, path, false);                                                                    \
-        }                                                                                                              \
-    }
-#if SC_PLATFORM_WINDOWS
-#define SC_TRY_FORMAT_NATIVE(path, func)                                                                               \
-    {                                                                                                                  \
-        auto tempRes = func;                                                                                           \
-        if (not tempRes)                                                                                               \
-        {                                                                                                              \
-            if (TypeTraits::IsSame<decltype(tempRes), Result>::value)                                                  \
-            {                                                                                                          \
-                return Result(tempRes);                                                                                \
-            }                                                                                                          \
-            else                                                                                                       \
-            {                                                                                                          \
-                return formatError(GetLastError(), path, true);                                                        \
-            }                                                                                                          \
-        }                                                                                                              \
-    }
-#else
-#define SC_TRY_FORMAT_NATIVE(path, func)                                                                               \
-    {                                                                                                                  \
-        auto tempRes = func;                                                                                           \
-        if (not tempRes)                                                                                               \
-        {                                                                                                              \
-            if (SC::TypeTraits::IsSame<decltype(tempRes), Result>::value)                                              \
-            {                                                                                                          \
-                return Result(tempRes);                                                                                \
-            }                                                                                                          \
-            else                                                                                                       \
-            {                                                                                                          \
-                return formatError(errno, path, false);                                                                \
-            }                                                                                                          \
-        }                                                                                                              \
-    }
-#endif
 
 SC::ResultFileSystem SC::FileSystem::write(StringSpan path, Span<const char> data)
 {
@@ -261,18 +242,20 @@ SC::ResultFileSystem SC::FileSystem::write(StringSpan path, Span<const char> dat
                                  FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(::GetLastError(), FileSystemErrorDetail::OpenFileForWrite);
     }
     DWORD bytesWritten;
     if (!::WriteFile(hFile, data.data(), static_cast<DWORD>(data.sizeInBytes()), &bytesWritten, nullptr))
     {
+        const DWORD nativeError = ::GetLastError();
         ::CloseHandle(hFile);
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(nativeError, FileSystemErrorDetail::WriteFileContent);
     }
     ::CloseHandle(hFile);
     if (bytesWritten != data.sizeInBytes())
     {
-        return Result::Error("Write incomplete");
+        return ResultFileSystem::withActualBytes(FileSystemError::IncompleteWrite,
+                                                 FileSystemErrorDetail::WriteFileContent, bytesWritten);
     }
     return Result(true);
 #else
@@ -280,17 +263,22 @@ SC::ResultFileSystem SC::FileSystem::write(StringSpan path, Span<const char> dat
                     S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenFileForWrite);
     }
-    ssize_t bytesWritten = ::write(fd, data.data(), data.sizeInBytes());
+    ssize_t   bytesWritten = ::write(fd, data.data(), data.sizeInBytes());
+    const int nativeError  = errno;
     ::close(fd);
     if (bytesWritten == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(nativeError), FileSystemErrorDetail::WriteFileContent);
     }
     if (static_cast<size_t>(bytesWritten) != data.sizeInBytes())
     {
-        return Result::Error("Write incomplete");
+        if (static_cast<uint64_t>(bytesWritten) <= 0xffffffffu)
+            return ResultFileSystem::withActualBytes(FileSystemError::IncompleteWrite,
+                                                     FileSystemErrorDetail::WriteFileContent,
+                                                     static_cast<uint32_t>(bytesWritten));
+        return {FileSystemError::IncompleteWrite, FileSystemErrorDetail::WriteFileContent};
     }
     return Result(true);
 #endif
@@ -315,19 +303,21 @@ SC::ResultFileSystem SC::FileSystem::writeStringAppend(StringSpan path, StringSp
                                  FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(::GetLastError(), FileSystemErrorDetail::OpenFileForWrite);
     }
     DWORD bytesWritten;
     if (!::WriteFile(hFile, text.bytesWithoutTerminator(), static_cast<DWORD>(text.sizeInBytes()), &bytesWritten,
                      nullptr))
     {
+        const DWORD nativeError = ::GetLastError();
         ::CloseHandle(hFile);
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(nativeError, FileSystemErrorDetail::AppendFileContent);
     }
     ::CloseHandle(hFile);
     if (bytesWritten != text.sizeInBytes())
     {
-        return Result::Error("Write incomplete");
+        return ResultFileSystem::withActualBytes(FileSystemError::IncompleteWrite,
+                                                 FileSystemErrorDetail::AppendFileContent, bytesWritten);
     }
     return Result(true);
 #else
@@ -335,17 +325,22 @@ SC::ResultFileSystem SC::FileSystem::writeStringAppend(StringSpan path, StringSp
                     S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenFileForWrite);
     }
-    ssize_t bytesWritten = ::write(fd, text.bytesWithoutTerminator(), text.sizeInBytes());
+    ssize_t   bytesWritten = ::write(fd, text.bytesWithoutTerminator(), text.sizeInBytes());
+    const int nativeError  = errno;
     ::close(fd);
     if (bytesWritten == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(nativeError), FileSystemErrorDetail::AppendFileContent);
     }
     if (static_cast<size_t>(bytesWritten) != text.sizeInBytes())
     {
-        return Result::Error("Write incomplete");
+        if (static_cast<uint64_t>(bytesWritten) <= 0xffffffffu)
+            return ResultFileSystem::withActualBytes(FileSystemError::IncompleteWrite,
+                                                     FileSystemErrorDetail::AppendFileContent,
+                                                     static_cast<uint32_t>(bytesWritten));
+        return {FileSystemError::IncompleteWrite, FileSystemErrorDetail::AppendFileContent};
     }
     return Result(true);
 #endif
@@ -360,7 +355,7 @@ SC::ResultFileSystem SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buf
                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(::GetLastError(), FileSystemErrorDetail::OpenFileForRead);
     }
     auto deferClose = MakeDeferred([&]() { ::CloseHandle(hFile); });
 
@@ -368,25 +363,30 @@ SC::ResultFileSystem SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buf
     LARGE_INTEGER fileSize;
     if (!::GetFileSizeEx(hFile, &fileSize))
     {
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(::GetLastError(), FileSystemErrorDetail::QueryFileSize);
     }
 
     // Grow buffer to accommodate the file
     if (!buffer.resizeWithoutInitializing(static_cast<size_t>(fileSize.QuadPart)))
     {
-        return Result::Error("Failed to grow buffer");
+        if (fileSize.QuadPart >= 0 and static_cast<uint64_t>(fileSize.QuadPart) <= 0xffffffffu)
+            return ResultFileSystem::withRequiredBytes(FileSystemError::BufferCapacityExceeded,
+                                                       FileSystemErrorDetail::GrowReadBuffer,
+                                                       static_cast<uint32_t>(fileSize.QuadPart));
+        return {FileSystemError::BufferCapacityExceeded, FileSystemErrorDetail::GrowReadBuffer};
     }
 
     // Read the file
     DWORD bytesRead;
     if (!::ReadFile(hFile, buffer.data(), static_cast<DWORD>(fileSize.QuadPart), &bytesRead, nullptr))
     {
-        return formatError(GetLastError(), path, true);
+        return fileSystemResultFromNative(::GetLastError(), FileSystemErrorDetail::ReadFileContent);
     }
 
     if (bytesRead != static_cast<DWORD>(fileSize.QuadPart))
     {
-        return Result::Error("Read incomplete");
+        return ResultFileSystem::withActualBytes(FileSystemError::IncompleteRead,
+                                                 FileSystemErrorDetail::ReadFileContent, bytesRead);
     }
 
     return Result(true);
@@ -394,7 +394,7 @@ SC::ResultFileSystem SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buf
     int fd = ::open(encodedPath.getNullTerminatedNative(), O_RDONLY);
     if (fd == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenFileForRead);
     }
     auto deferClose = MakeDeferred([&]() { ::close(fd); });
 
@@ -402,60 +402,37 @@ SC::ResultFileSystem SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buf
     struct stat fileStat;
     if (::fstat(fd, &fileStat) == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::QueryFileSize);
     }
 
     // Grow buffer to accommodate the file
     if (!buffer.resizeWithoutInitializing(static_cast<size_t>(fileStat.st_size)))
     {
-        return Result::Error("Failed to grow buffer");
+        if (fileStat.st_size >= 0 and static_cast<uint64_t>(fileStat.st_size) <= 0xffffffffu)
+            return ResultFileSystem::withRequiredBytes(FileSystemError::BufferCapacityExceeded,
+                                                       FileSystemErrorDetail::GrowReadBuffer,
+                                                       static_cast<uint32_t>(fileStat.st_size));
+        return {FileSystemError::BufferCapacityExceeded, FileSystemErrorDetail::GrowReadBuffer};
     }
 
     // Read the file
     ssize_t bytesRead = ::read(fd, buffer.data(), static_cast<size_t>(fileStat.st_size));
     if (bytesRead == -1)
     {
-        return formatError(errno, path, false);
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ReadFileContent);
     }
 
     if (static_cast<size_t>(bytesRead) != static_cast<size_t>(fileStat.st_size))
     {
-        return Result::Error("Read incomplete");
+        if (static_cast<uint64_t>(bytesRead) <= 0xffffffffu)
+            return ResultFileSystem::withActualBytes(FileSystemError::IncompleteRead,
+                                                     FileSystemErrorDetail::ReadFileContent,
+                                                     static_cast<uint32_t>(bytesRead));
+        return {FileSystemError::IncompleteRead, FileSystemErrorDetail::ReadFileContent};
     }
 
     return Result(true);
 #endif
-}
-
-SC::ResultFileSystem SC::FileSystem::formatError(int errorNumber, StringSpan item, bool isWindowsNativeError)
-{
-#if SC_PLATFORM_WINDOWS
-    if (isWindowsNativeError)
-    {
-        if (not preciseErrorMessages)
-        {
-            return Result::Error("Windows Error");
-        }
-        if (not Internal::formatWindowsError(errorNumber, errorMessageBuffer))
-        {
-            return Result::Error("SC::FileSystem::formatError - Cannot format error");
-        }
-    }
-    else
-#endif
-    {
-        (void)(isWindowsNativeError);
-        if (not preciseErrorMessages)
-        {
-            return getErrorCode(errorNumber);
-        }
-        if (not Internal::formatError(errorNumber, errorMessageBuffer))
-        {
-            return Result::Error("SC::FileSystem::formatError - Cannot format error");
-        }
-    }
-    (void)item; // TODO: Append item name
-    return Result::FromStableCharPointer(errorMessageBuffer);
 }
 
 SC::ResultFileSystem SC::FileSystem::rename(StringSpan path, StringSpan newPath)
@@ -472,7 +449,7 @@ SC::ResultFileSystem SC::FileSystem::removeFiles(Span<const StringSpan> files)
     for (auto& path : files)
     {
         SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
-        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeFile(encodedPath));
+        SC_TRY(FileSystem::Operations::removeFile(encodedPath));
     }
     return Result(true);
 }
@@ -505,7 +482,7 @@ SC::ResultFileSystem SC::FileSystem::removeDirectoriesRecursive(Span<const Strin
     {
         StringSpan encodedPath;
         SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
-        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeDirectoryRecursive(encodedPath));
+        SC_TRY(FileSystem::Operations::removeDirectoryRecursive(encodedPath));
     }
     return Result(true);
 }
@@ -519,7 +496,7 @@ SC::ResultFileSystem SC::FileSystem::copyFiles(Span<const CopyOperation> sourceD
     {
         SC_TRY(convert(op.source, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
         SC_TRY(convert(op.destination, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
-        SC_TRY_FORMAT_NATIVE(op.source, FileSystem::Operations::copyFile(encodedPath1, encodedPath2, op.copyFlags));
+        SC_TRY(FileSystem::Operations::copyFile(encodedPath1, encodedPath2, op.copyFlags));
     }
     return Result(true);
 }
@@ -534,8 +511,7 @@ SC::ResultFileSystem SC::FileSystem::copyDirectories(Span<const CopyOperation> s
         StringSpan encodedPath2;
         SC_TRY(convert(op.source, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
         SC_TRY(convert(op.destination, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
-        SC_TRY_FORMAT_NATIVE(op.source,
-                             FileSystem::Operations::copyDirectory(encodedPath1, encodedPath2, op.copyFlags));
+        SC_TRY(FileSystem::Operations::copyDirectory(encodedPath1, encodedPath2, op.copyFlags));
     }
     return Result(true);
 }
@@ -546,7 +522,7 @@ SC::ResultFileSystem SC::FileSystem::removeEmptyDirectories(Span<const StringSpa
     for (StringSpan path : directories)
     {
         SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
-        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeEmptyDirectory(encodedPath));
+        SC_TRY(FileSystem::Operations::removeEmptyDirectory(encodedPath));
     }
     return Result(true);
 }
@@ -557,7 +533,7 @@ SC::ResultFileSystem SC::FileSystem::makeDirectories(Span<const StringSpan> dire
     for (auto& path : directories)
     {
         SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
-        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::makeDirectory(encodedPath));
+        SC_TRY(FileSystem::Operations::makeDirectory(encodedPath));
     }
     return Result(true);
 }
@@ -715,7 +691,6 @@ SC::ResultFileSystem SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs
     return FileSystem::Operations::setLastModifiedTime(encodedPath, time);
 }
 
-#undef SC_TRY_FORMAT_ERRNO
 #ifdef _WIN32
 
 struct SC::FileSystem::Operations::Internal

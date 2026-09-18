@@ -40,9 +40,9 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             structuredErrorsAndFormatter();
         }
-        if (test_section("formatError"))
+        if (test_section("structured facade failures"))
         {
-            formatError();
+            structuredFacadeFailures();
         }
         if (test_section("makeDirectory / isDirectory / removeEmptyDirectory"))
         {
@@ -126,7 +126,7 @@ struct SC::FileSystemTest : public SC::TestCase
     }
 
     void structuredErrorsAndFormatter();
-    void formatError();
+    void structuredFacadeFailures();
     void makeRemoveIsDirectory();
     void makeDirectoryRecursive();
     void writeReadRemoveFile();
@@ -238,18 +238,30 @@ void SC::FileSystemTest::structuredErrorsAndFormatter()
                        .status == ResultErrorFormatStatus::UnknownError);
 }
 
-void SC::FileSystemTest::formatError()
+void SC::FileSystemTest::structuredFacadeFailures()
 {
-    FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
-    fs.preciseErrorMessages = true;
+    FileSystem       uninitialized;
+    ResultFileSystem result = uninitialized.writeString("__sc_filesystem_uninitialized__", "content");
+    SC_TEST_EXPECT(result.isError(FileSystemError::NotInitialized));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::BuildTransportPath);
+    SC_TEST_EXPECT(result.contextKind == FileSystemErrorContextKind::None);
 
-    Result res = fs.removeEmptyDirectory("randomNonExistingDirectory");
-    SC_TEST_EXPECT(not res);
-    fs.preciseErrorMessages = false;
+    FileSystem fileSystem;
+    SC_TEST_EXPECT(fileSystem.init(report.applicationRootDirectory.view()));
 
-    res = fs.removeEmptyDirectory("randomNonExistingDirectory");
-    SC_TEST_EXPECT(not res);
+    String contents;
+    result = fileSystem.read("__sc_filesystem_missing_5423__", contents);
+    SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::OpenFileForRead);
+    SC_TEST_EXPECT(result.contextKind == FileSystemErrorContextKind::NativeError);
+    SC_TEST_EXPECT(result.context.nativeError != 0);
+
+    String missingDirectory = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(missingDirectory,
+                              {report.applicationRootDirectory.view(), "__sc_filesystem_missing_directory_5423__"}));
+    result = fileSystem.changeDirectory(missingDirectory.view());
+    SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::ChangeDirectory);
 }
 
 void SC::FileSystemTest::makeRemoveIsDirectory()
