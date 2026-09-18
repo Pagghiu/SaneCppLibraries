@@ -77,6 +77,11 @@ static SC::ResultFileSystem fileSystemResultFromNative(SC::uint32_t nativeError,
     return SC::ResultFileSystem::withNativeError(FileSystemError::OperationFailed, detail, nativeError);
 }
 
+static bool isMissingWindowsError(SC::uint32_t nativeError)
+{
+    return nativeError == ERROR_FILE_NOT_FOUND or nativeError == ERROR_PATH_NOT_FOUND;
+}
+
 static SC::ResultFileSystem translateWindowsPathError(SC::FileSystemWindowsDetail::WindowsPathResult result,
                                                       SC::FileSystemErrorDetail                      detail)
 {
@@ -138,6 +143,8 @@ static SC::ResultFileSystem fileSystemResultFromNative(SC::uint32_t nativeError,
     }
     return SC::ResultFileSystem::withNativeError(FileSystemError::OperationFailed, detail, nativeError);
 }
+
+static bool isMissingPosixError(int nativeError) { return nativeError == ENOENT or nativeError == ENOTDIR; }
 } // namespace
 #endif
 SC::ResultFileSystem SC::FileSystem::init(StringSpan currentWorkingDirectory)
@@ -156,7 +163,9 @@ SC::ResultFileSystem SC::FileSystem::changeDirectory(StringSpan currentWorkingDi
     if (not currentDirectory.assign(currentWorkingDirectory))
         return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::ChangeDirectory};
 #endif
-    if (not existsAndIsDirectory("."))
+    bool isDirectory;
+    SC_TRY(existsAndIsDirectory(".", isDirectory));
+    if (not isDirectory)
         return {FileSystemError::EntryNotFound, FileSystemErrorDetail::ChangeDirectory};
     return Result(true);
 }
@@ -456,17 +465,23 @@ SC::ResultFileSystem SC::FileSystem::removeFiles(Span<const StringSpan> files)
 
 SC::ResultFileSystem SC::FileSystem::removeFileIfExists(StringSpan source)
 {
-    if (existsAndIsFile(source))
+    bool isFile;
+    SC_TRY(existsAndIsFile(source, isFile));
+    if (isFile)
         return removeFiles(Span<const StringSpan>{source});
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::removeLinkIfExists(StringSpan source)
 {
-    if (existsAndIsLink(source))
+    bool isLink;
+    SC_TRY(existsAndIsLink(source, isLink));
+    if (isLink)
     {
 #if SC_PLATFORM_WINDOWS
-        if (existsAndIsDirectory(source))
+        bool isDirectory;
+        SC_TRY(existsAndIsDirectory(source, isDirectory));
+        if (isDirectory)
         {
             return removeEmptyDirectories(Span<const StringSpan>{source});
         }
@@ -490,7 +505,7 @@ SC::ResultFileSystem SC::FileSystem::removeDirectoriesRecursive(Span<const Strin
 SC::ResultFileSystem SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.view().isEmpty())
-        return Result(false);
+        return {FileSystemError::NotInitialized, FileSystemErrorDetail::BuildTransportPath};
     StringSpan encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
     {
@@ -504,7 +519,7 @@ SC::ResultFileSystem SC::FileSystem::copyFiles(Span<const CopyOperation> sourceD
 SC::ResultFileSystem SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDestination)
 {
     if (currentDirectory.view().isEmpty())
-        return Result(false);
+        return {FileSystemError::NotInitialized, FileSystemErrorDetail::BuildTransportPath};
     for (const CopyOperation& op : sourceDestination)
     {
         StringSpan encodedPath1;
@@ -553,7 +568,9 @@ SC::ResultFileSystem SC::FileSystem::makeDirectoriesIfNotExists(Span<const Strin
 {
     for (const auto& path : directories)
     {
-        if (not existsAndIsDirectory(path))
+        bool isDirectory;
+        SC_TRY(existsAndIsDirectory(path, isDirectory));
+        if (not isDirectory)
         {
             SC_TRY(makeDirectory({path}));
         }
@@ -581,53 +598,81 @@ SC::ResultFileSystem SC::FileSystem::createHardLink(StringSpan sourceFile, Strin
 
 bool SC::FileSystem::exists(StringSpan fileOrDirectory)
 {
+    bool doesExist = false;
+    return exists(fileOrDirectory, doesExist) and doesExist;
+}
+
+SC::ResultFileSystem SC::FileSystem::exists(StringSpan fileOrDirectory, bool& doesExist)
+{
+    doesExist = false;
     StringSpan encodedPath;
-    if (not convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
-        return false;
-    return FileSystem::Operations::exists(encodedPath);
+    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    return FileSystem::Operations::exists(encodedPath, doesExist);
 }
 
 bool SC::FileSystem::existsAndIsDirectory(StringSpan directory)
 {
+    bool isDirectory = false;
+    return existsAndIsDirectory(directory, isDirectory) and isDirectory;
+}
+
+SC::ResultFileSystem SC::FileSystem::existsAndIsDirectory(StringSpan directory, bool& isDirectory)
+{
+    isDirectory = false;
     StringSpan encodedPath;
-    if (not convert(directory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
-        return false;
-    return FileSystem::Operations::existsAndIsDirectory(encodedPath);
+    SC_TRY(convert(directory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    return FileSystem::Operations::existsAndIsDirectory(encodedPath, isDirectory);
 }
 
 bool SC::FileSystem::existsAndIsFile(StringSpan file)
 {
+    bool isFile = false;
+    return existsAndIsFile(file, isFile) and isFile;
+}
+
+SC::ResultFileSystem SC::FileSystem::existsAndIsFile(StringSpan file, bool& isFile)
+{
+    isFile = false;
     StringSpan encodedPath;
-    if (not convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
-        return false;
-    return FileSystem::Operations::existsAndIsFile(encodedPath);
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    return FileSystem::Operations::existsAndIsFile(encodedPath, isFile);
 }
 
 bool SC::FileSystem::existsAndIsLink(StringSpan file)
 {
+    bool isLink = false;
+    return existsAndIsLink(file, isLink) and isLink;
+}
+
+SC::ResultFileSystem SC::FileSystem::existsAndIsLink(StringSpan file, bool& isLink)
+{
+    isLink = false;
     StringSpan encodedPath;
-    if (not convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
-        return false;
-    return FileSystem::Operations::existsAndIsLink(encodedPath);
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    return FileSystem::Operations::existsAndIsLink(encodedPath, isLink);
 }
 
 bool SC::FileSystem::canAccess(StringSpan fileOrDirectory, AccessMode accessMode)
 {
-    StringSpan encodedPath;
-    if (not convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath))
-        return false;
-    return FileSystem::Operations::access(encodedPath, accessMode);
+    bool canAccessPath = false;
+    return canAccess(fileOrDirectory, accessMode, canAccessPath) and canAccessPath;
 }
 
-bool SC::FileSystem::moveDirectory(StringSpan sourceDirectory, StringSpan destinationDirectory)
+SC::ResultFileSystem SC::FileSystem::canAccess(StringSpan fileOrDirectory, AccessMode accessMode, bool& canAccessPath)
+{
+    canAccessPath = false;
+    StringSpan encodedPath;
+    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+    return FileSystem::Operations::access(encodedPath, accessMode, canAccessPath);
+}
+
+SC::ResultFileSystem SC::FileSystem::moveDirectory(StringSpan sourceDirectory, StringSpan destinationDirectory)
 {
     StringSpan encodedPath1;
     StringSpan encodedPath2;
-    if (not convert(sourceDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1))
-        return false;
-    if (not convert(destinationDirectory, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2))
-        return false;
-    return static_cast<bool>(FileSystem::Operations::moveDirectory(encodedPath1, encodedPath2));
+    SC_TRY(convert(sourceDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
+    SC_TRY(convert(destinationDirectory, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
+    return FileSystem::Operations::moveDirectory(encodedPath1, encodedPath2);
 }
 
 SC::ResultFileSystem SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat) { return stat(file, fileStat); }
@@ -882,7 +927,9 @@ SC::ResultFileSystem SC::FileSystem::Operations::createSymbolicLink(StringSpan s
     SC_TRY(Internal::validatePath(sourceFileOrDirectory));
     SC_TRY(Internal::validatePath(linkFile));
 
-    DWORD dwFlags = existsAndIsDirectory(sourceFileOrDirectory) ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
+    bool isDirectory;
+    SC_TRY(existsAndIsDirectory(sourceFileOrDirectory, isDirectory));
+    DWORD dwFlags = isDirectory ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
     dwFlags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
     if (::CreateSymbolicLinkW(linkFile.getNullTerminatedNative(), sourceFileOrDirectory.getNullTerminatedNative(),
                               dwFlags) == FALSE)
@@ -899,9 +946,16 @@ SC::ResultFileSystem SC::FileSystem::Operations::createHardLink(StringSpan sourc
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode)
+bool SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "access: Invalid path");
+    bool canAccessPath = false;
+    return access(path, accessMode, canAccessPath) and canAccessPath;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode, bool& canAccessPath)
+{
+    canAccessPath = false;
+    SC_TRY(Internal::validatePath(path));
 
     int mode = 0;
     switch (accessMode)
@@ -911,7 +965,19 @@ SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode access
     case AccessMode::Write: mode = 2; break;
     case AccessMode::Execute: mode = 0; break;
     }
-    return Result(::_waccess(path.getNullTerminatedNative(), mode) == 0);
+    if (::_waccess(path.getNullTerminatedNative(), mode) == 0)
+    {
+        canAccessPath = true;
+        return Result(true);
+    }
+    const int nativeError = errno;
+    if (nativeError == EACCES or nativeError == ENOENT)
+        return Result(true);
+    if (nativeError == EINVAL)
+        return ResultFileSystem::withNativeError(FileSystemError::InvalidArgument, FileSystemErrorDetail::CheckAccess,
+                                                 static_cast<uint32_t>(nativeError));
+    return ResultFileSystem::withNativeError(FileSystemError::OperationFailed, FileSystemErrorDetail::CheckAccess,
+                                             static_cast<uint32_t>(nativeError));
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::makeDirectory(StringSpan path)
@@ -966,38 +1032,91 @@ SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSp
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::exists(StringSpan path)
+bool SC::FileSystem::Operations::exists(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "exists: Invalid path");
-    const DWORD res = ::GetFileAttributesW(path.getNullTerminatedNative());
-    return Result(res != INVALID_FILE_ATTRIBUTES);
+    bool doesExist = false;
+    return exists(path, doesExist) and doesExist;
 }
 
-SC::Result SC::FileSystem::Operations::existsAndIsDirectory(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::exists(StringSpan path, bool& doesExist)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "existsAndIsDirectory: Invalid path");
+    doesExist = false;
+    SC_TRY(Internal::validatePath(path));
+    if (::GetFileAttributesW(path.getNullTerminatedNative()) != INVALID_FILE_ATTRIBUTES)
+    {
+        doesExist = true;
+        return Result(true);
+    }
+    const DWORD nativeError = ::GetLastError();
+    if (isMissingWindowsError(nativeError))
+        return Result(true);
+    return fileSystemResultFromNative(nativeError, FileSystemErrorDetail::QueryEntryMetadata);
+}
+
+bool SC::FileSystem::Operations::existsAndIsDirectory(StringSpan path)
+{
+    bool isDirectory = false;
+    return existsAndIsDirectory(path, isDirectory) and isDirectory;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::existsAndIsDirectory(StringSpan path, bool& isDirectory)
+{
+    isDirectory = false;
+    SC_TRY(Internal::validatePath(path));
     const DWORD res = ::GetFileAttributesW(path.getNullTerminatedNative());
     if (res == INVALID_FILE_ATTRIBUTES)
-        return Result(false);
-    return Result((res & FILE_ATTRIBUTE_DIRECTORY) != 0);
+    {
+        const DWORD nativeError = ::GetLastError();
+        if (isMissingWindowsError(nativeError))
+            return Result(true);
+        return fileSystemResultFromNative(nativeError, FileSystemErrorDetail::QueryEntryMetadata);
+    }
+    isDirectory = (res & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::existsAndIsFile(StringSpan path)
+bool SC::FileSystem::Operations::existsAndIsFile(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "existsAndIsFile: Invalid path");
+    bool isFile = false;
+    return existsAndIsFile(path, isFile) and isFile;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::existsAndIsFile(StringSpan path, bool& isFile)
+{
+    isFile = false;
+    SC_TRY(Internal::validatePath(path));
     const DWORD res = GetFileAttributesW(path.getNullTerminatedNative());
     if (res == INVALID_FILE_ATTRIBUTES)
-        return Result(false);
-    return Result((res & FILE_ATTRIBUTE_DIRECTORY) == 0);
+    {
+        const DWORD nativeError = ::GetLastError();
+        if (isMissingWindowsError(nativeError))
+            return Result(true);
+        return fileSystemResultFromNative(nativeError, FileSystemErrorDetail::QueryEntryMetadata);
+    }
+    isFile = (res & FILE_ATTRIBUTE_DIRECTORY) == 0;
+    return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
+bool SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "existsAndIsLink: Invalid path");
+    bool isLink = false;
+    return existsAndIsLink(path, isLink) and isLink;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::existsAndIsLink(StringSpan path, bool& isLink)
+{
+    isLink = false;
+    SC_TRY(Internal::validatePath(path));
     const DWORD res = ::GetFileAttributesW(path.getNullTerminatedNative());
     if (res == INVALID_FILE_ATTRIBUTES)
-        return Result(false);
-    return Result((res & FILE_ATTRIBUTE_REPARSE_POINT) != 0);
+    {
+        const DWORD nativeError = ::GetLastError();
+        if (isMissingWindowsError(nativeError))
+            return Result(true);
+        return fileSystemResultFromNative(nativeError, FileSystemErrorDetail::QueryEntryMetadata);
+    }
+    isLink = (res & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+    return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
@@ -1225,7 +1344,9 @@ SC::ResultFileSystem SC::FileSystem::Operations::copyDirectory(StringSpan source
     SC_TRY(Internal::validatePath(source));
     SC_TRY(Internal::validatePath(destination));
 
-    if (flags.overwrite == false and existsAndIsDirectory(destination))
+    bool destinationIsDirectory;
+    SC_TRY(existsAndIsDirectory(destination, destinationIsDirectory));
+    if (flags.overwrite == false and destinationIsDirectory)
     {
         return {FileSystemError::EntryAlreadyExists, FileSystemErrorDetail::CopyDirectoryTree};
     }
@@ -1507,15 +1628,6 @@ static SC::Result fillPosixFileStat(const struct stat& pathStat, SC::FileSystemS
     return SC::Result(true);
 }
 
-// Kept only for the legacy Result-valued predicates below. The structured predicate overloads remove this bridge.
-#define SC_TRY_POSIX(func, msg)                                                                                        \
-    {                                                                                                                  \
-        if (func != 0)                                                                                                 \
-        {                                                                                                              \
-            return Result::Error(msg);                                                                                 \
-        }                                                                                                              \
-    }
-
 SC::ResultFileSystem SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileOrDirectory,
                                                                     StringSpan linkFile)
 {
@@ -1547,10 +1659,25 @@ SC::ResultFileSystem SC::FileSystem::Operations::createHardLink(StringSpan sourc
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode)
+bool SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "access: Invalid path");
-    return Result(::access(path.getNullTerminatedNative(), posixAccessMode(accessMode)) == 0);
+    bool canAccessPath = false;
+    return access(path, accessMode, canAccessPath) and canAccessPath;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode, bool& canAccessPath)
+{
+    canAccessPath = false;
+    SC_TRY(Internal::validatePath(path));
+    if (::access(path.getNullTerminatedNative(), posixAccessMode(accessMode)) == 0)
+    {
+        canAccessPath = true;
+        return Result(true);
+    }
+    const int nativeError = errno;
+    if (nativeError == EACCES or isMissingPosixError(nativeError))
+        return Result(true);
+    return fileSystemResultFromNative(static_cast<uint32_t>(nativeError), FileSystemErrorDetail::CheckAccess);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::makeDirectory(StringSpan path)
@@ -1603,36 +1730,95 @@ SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSp
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::exists(StringSpan path)
+bool SC::FileSystem::Operations::exists(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "exists: Invalid path");
+    bool doesExist = false;
+    return exists(path, doesExist) and doesExist;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::exists(StringSpan path, bool& doesExist)
+{
+    doesExist = false;
+    SC_TRY(Internal::validatePath(path));
     struct stat path_stat;
-    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "exists: Failed to get file stats");
+    if (::stat(path.getNullTerminatedNative(), &path_stat) == 0)
+    {
+        doesExist = true;
+        return Result(true);
+    }
+    const int nativeError = errno;
+    if (isMissingPosixError(nativeError))
+        return Result(true);
+    return fileSystemResultFromNative(static_cast<uint32_t>(nativeError), FileSystemErrorDetail::QueryEntryMetadata);
+}
+
+bool SC::FileSystem::Operations::existsAndIsDirectory(StringSpan path)
+{
+    bool isDirectory = false;
+    return existsAndIsDirectory(path, isDirectory) and isDirectory;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::existsAndIsDirectory(StringSpan path, bool& isDirectory)
+{
+    isDirectory = false;
+    SC_TRY(Internal::validatePath(path));
+    struct stat path_stat;
+    if (::stat(path.getNullTerminatedNative(), &path_stat) != 0)
+    {
+        const int nativeError = errno;
+        if (isMissingPosixError(nativeError))
+            return Result(true);
+        return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                          FileSystemErrorDetail::QueryEntryMetadata);
+    }
+    isDirectory = S_ISDIR(path_stat.st_mode);
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::existsAndIsDirectory(StringSpan path)
+bool SC::FileSystem::Operations::existsAndIsFile(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "existsAndIsDirectory: Invalid path");
-    struct stat path_stat;
-    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "existsAndIsDirectory: Failed to get file stats");
-    return Result(S_ISDIR(path_stat.st_mode));
+    bool isFile = false;
+    return existsAndIsFile(path, isFile) and isFile;
 }
 
-SC::Result SC::FileSystem::Operations::existsAndIsFile(StringSpan path)
+SC::ResultFileSystem SC::FileSystem::Operations::existsAndIsFile(StringSpan path, bool& isFile)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "existsAndIsFile: Invalid path");
+    isFile = false;
+    SC_TRY(Internal::validatePath(path));
     struct stat path_stat;
-    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "existsAndIsFile: Failed to get file stats");
-    return Result(S_ISREG(path_stat.st_mode));
+    if (::stat(path.getNullTerminatedNative(), &path_stat) != 0)
+    {
+        const int nativeError = errno;
+        if (isMissingPosixError(nativeError))
+            return Result(true);
+        return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                          FileSystemErrorDetail::QueryEntryMetadata);
+    }
+    isFile = S_ISREG(path_stat.st_mode);
+    return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
+bool SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "existsAndIsLink: Invalid path");
+    bool isLink = false;
+    return existsAndIsLink(path, isLink) and isLink;
+}
+
+SC::ResultFileSystem SC::FileSystem::Operations::existsAndIsLink(StringSpan path, bool& isLink)
+{
+    isLink = false;
+    SC_TRY(Internal::validatePath(path));
     struct stat path_stat;
-    SC_TRY_POSIX(::lstat(path.getNullTerminatedNative(), &path_stat), "existsAndIsLink: Failed to get file stats");
-    return Result(S_ISLNK(path_stat.st_mode));
+    if (::lstat(path.getNullTerminatedNative(), &path_stat) != 0)
+    {
+        const int nativeError = errno;
+        if (isMissingPosixError(nativeError))
+            return Result(true);
+        return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                          FileSystemErrorDetail::QueryEntryMetadata);
+    }
+    isLink = S_ISLNK(path_stat.st_mode);
+    return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)

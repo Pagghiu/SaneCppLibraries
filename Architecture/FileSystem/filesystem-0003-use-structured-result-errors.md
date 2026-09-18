@@ -38,10 +38,11 @@ input paths and can combine them with the stable error, detail, and scalar conte
 The shared `Common/WindowsPath.inl` fragment remains category-neutral. FileSystem translates its internal path status
 at the implementation boundary into FileSystem-owned errors, details, and native context.
 
-Fallible action APIs return `ResultFileSystem`. Predicate APIs report ordinary false states as booleans rather than
-errors. Existing boolean facade queries remain compact and intentionally lossy; the low-level predicate contract is
-made unambiguous during migration. The action-like `moveDirectory` facade returns `ResultFileSystem` so its failure is
-inspectable while existing truth checks remain source-compatible.
+Fallible action APIs return `ResultFileSystem`. Predicates offer `ResultFileSystem` plus a `bool&` output: a missing
+entry, mismatched type, or denied access is a successful false answer, while validation and unexpected native failures
+remain inspectable errors. Existing one-argument boolean queries remain compact and intentionally lossy conveniences.
+The action-like `moveDirectory` facade returns `ResultFileSystem` so its failure is inspectable while existing truth
+checks remain source-compatible.
 
 The exported return-type changes are an intentional ABI transition on the unintegrated result branch and require
 clients to rebuild. During the legacy-message bridge the enriched result may be 24 bytes, returning to the 16-byte

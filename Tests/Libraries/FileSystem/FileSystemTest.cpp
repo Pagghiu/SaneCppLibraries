@@ -246,6 +246,20 @@ void SC::FileSystemTest::structuredFacadeFailures()
     SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::BuildTransportPath);
     SC_TEST_EXPECT(result.contextKind == FileSystemErrorContextKind::None);
 
+    bool predicateValue = true;
+    result              = uninitialized.exists("relative", predicateValue);
+    SC_TEST_EXPECT(result.isError(FileSystemError::NotInitialized));
+    SC_TEST_EXPECT(not predicateValue);
+
+    result = uninitialized.removeFileIfExists("relative");
+    SC_TEST_EXPECT(result.isError(FileSystemError::NotInitialized));
+    result = uninitialized.makeDirectoryIfNotExists("relative");
+    SC_TEST_EXPECT(result.isError(FileSystemError::NotInitialized));
+    result = uninitialized.copyFile("source", "destination");
+    SC_TEST_EXPECT(result.isError(FileSystemError::NotInitialized));
+    result = uninitialized.copyDirectory("source", "destination");
+    SC_TEST_EXPECT(result.isError(FileSystemError::NotInitialized));
+
     FileSystem fileSystem;
     SC_TEST_EXPECT(fileSystem.init(report.applicationRootDirectory.view()));
 
@@ -262,6 +276,23 @@ void SC::FileSystemTest::structuredFacadeFailures()
     result = fileSystem.changeDirectory(missingDirectory.view());
     SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
     SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::ChangeDirectory);
+
+    predicateValue = true;
+    result         = fileSystem.exists(missingDirectory.view(), predicateValue);
+    SC_TEST_EXPECT(result);
+    SC_TEST_EXPECT(not predicateValue);
+
+    predicateValue = true;
+    result         = fileSystem.canAccess(missingDirectory.view(), FileSystem::AccessMode::Read, predicateValue);
+    SC_TEST_EXPECT(result);
+    SC_TEST_EXPECT(not predicateValue);
+
+    String missingDestination = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(missingDestination,
+                              {report.applicationRootDirectory.view(), "__sc_filesystem_missing_destination_5423__"}));
+    result = fileSystem.moveDirectory(missingDirectory.view(), missingDestination.view());
+    SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::RenameEntry);
 
     FileSystemStat statInfo;
     result = FileSystem::Operations::stat(missingDirectory.view(), statInfo);

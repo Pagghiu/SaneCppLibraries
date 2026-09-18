@@ -283,11 +283,15 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @return `true` if a file or directory exists at the given path
     /// @see existsAndIsFile (for an usage example)
     [[nodiscard]] bool exists(StringSpan fileOrDirectory);
+    /// @brief Detailed query: a missing entry is a successful false answer; validation and I/O failures are errors.
+    ResultFileSystem exists(StringSpan fileOrDirectory, bool& doesExist);
 
     /// @brief Check if a directory exists at given path
     /// @param directory Directory path to check
     /// @return `true` if a directory exists at the given path
     [[nodiscard]] bool existsAndIsDirectory(StringSpan directory);
+    /// @brief Detailed query: absence or another entry type is a successful false answer.
+    ResultFileSystem existsAndIsDirectory(StringSpan directory, bool& isDirectory);
 
     /// @brief Check if a file exists at given path
     /// @param file File path to check
@@ -296,23 +300,29 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// Example:
     /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp copyExistsFileSnippet
     [[nodiscard]] bool existsAndIsFile(StringSpan file);
+    /// @brief Detailed query: absence or another entry type is a successful false answer.
+    ResultFileSystem existsAndIsFile(StringSpan file, bool& isFile);
 
     /// @brief Check if a link exists at given path
     /// @param file Link path to check
     /// @return `true` if a file exists at the given path
     [[nodiscard]] bool existsAndIsLink(StringSpan file);
+    /// @brief Detailed query: absence or another entry type is a successful false answer.
+    ResultFileSystem existsAndIsLink(StringSpan file, bool& isLink);
 
     /// @brief Check whether the current process can access a path with the requested mode
     /// @param fileOrDirectory Path to check
     /// @param accessMode Requested access mode
     /// @return `true` if the requested access is allowed
     [[nodiscard]] bool canAccess(StringSpan fileOrDirectory, AccessMode accessMode = AccessMode::Exists);
+    /// @brief Detailed query: denied access or absence is a successful false answer.
+    ResultFileSystem canAccess(StringSpan fileOrDirectory, AccessMode accessMode, bool& canAccessPath);
 
     /// @brief Moves a directory from source to destination
     /// @param sourceDirectory The source directory that will be moved to destination
     /// @param destinationDirectory The destination directory
-    /// @return `true` if the move succeeded
-    [[nodiscard]] bool moveDirectory(StringSpan sourceDirectory, StringSpan destinationDirectory);
+    /// @return Valid Result if the move succeeded
+    [[nodiscard]] ResultFileSystem moveDirectory(StringSpan sourceDirectory, StringSpan destinationDirectory);
 
     /// @brief Writes a block of memory to a file
     /// @param file Path to the file that is meant to be written
@@ -417,14 +427,19 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
     struct SC_FILE_SYSTEM_EXPORT Operations
     {
-        static Result           access(StringSpan path, AccessMode accessMode);
+        static bool             access(StringSpan path, AccessMode accessMode);
+        static ResultFileSystem access(StringSpan path, AccessMode accessMode, bool& canAccessPath);
         static ResultFileSystem createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
         static ResultFileSystem createHardLink(StringSpan sourceFile, StringSpan linkFile);
         static ResultFileSystem makeDirectory(StringSpan dir);
-        static Result           exists(StringSpan path);
-        static Result           existsAndIsDirectory(StringSpan path);
-        static Result           existsAndIsFile(StringSpan path);
-        static Result           existsAndIsLink(StringSpan path);
+        static bool             exists(StringSpan path);
+        static ResultFileSystem exists(StringSpan path, bool& doesExist);
+        static bool             existsAndIsDirectory(StringSpan path);
+        static ResultFileSystem existsAndIsDirectory(StringSpan path, bool& isDirectory);
+        static bool             existsAndIsFile(StringSpan path);
+        static ResultFileSystem existsAndIsFile(StringSpan path, bool& isFile);
+        static bool             existsAndIsLink(StringSpan path);
+        static ResultFileSystem existsAndIsLink(StringSpan path, bool& isLink);
         static ResultFileSystem makeDirectoryRecursive(StringSpan path);
         static ResultFileSystem removeEmptyDirectory(StringSpan path);
         static ResultFileSystem moveDirectory(StringSpan source, StringSpan destination);
