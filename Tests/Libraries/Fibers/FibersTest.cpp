@@ -784,7 +784,8 @@ struct SC::FibersTest : public SC::TestCase
                                        }),
                                    &first));
         SC_TEST_EXPECT(group.spawn(
-            pool, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Expected job error"); })));
+            pool,
+            FiberJob::Procedure([](FiberJobContext&) { return Result::Error(ResultCategory(0x80000000u), 201u); })));
         SC_TEST_EXPECT(group.pendingCount() == 2);
         SC_TEST_EXPECT(group.jobCount() == 2);
         SC_TEST_EXPECT(not group.reset());
@@ -805,7 +806,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
         SC_TEST_EXPECT(numErrors == 1);
         SC_TEST_EXPECT(errors[0].job != nullptr);
-        SC_TEST_EXPECT(not errors[0].result);
+        SC_TEST_EXPECT(errors[0].job->result().isError(ResultCategory(0x80000000u), 201u));
+        SC_TEST_EXPECT(errors[0].result.isError(ResultCategory(0x80000000u), 201u));
 
         SC_TEST_EXPECT(group.reset());
         SC_TEST_EXPECT(group.jobCount() == 0);
@@ -3789,9 +3791,10 @@ struct SC::FibersTest : public SC::TestCase
             FiberStack successfulStack({successfulStackMemory, sizeof(successfulStackMemory)});
 
             FiberTaskGroup group(scheduler);
-            SC_TEST_EXPECT(group.spawn(
-                firstFailingTask, firstFailingStack,
-                FiberTask::Procedure([](FiberScheduler&) { return Result::Error("Expected first waitAll failure"); })));
+            SC_TEST_EXPECT(
+                group.spawn(firstFailingTask, firstFailingStack,
+                            FiberTask::Procedure([](FiberScheduler&)
+                                                 { return Result::Error(ResultCategory(0x80000000u), 101u); })));
             SC_TEST_EXPECT(group.spawn(successfulTask, successfulStack,
                                        FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
             SC_TEST_EXPECT(group.spawn(secondFailingTask, secondFailingStack,
@@ -3799,7 +3802,7 @@ struct SC::FibersTest : public SC::TestCase
                                            [](FiberScheduler& scheduler)
                                            {
                                                SC_TRY(scheduler.yield());
-                                               return Result::Error("Expected second waitAll failure");
+                                               return Result::Error(ResultCategory(0x80000000u), 102u);
                                            })));
 
             Result firstError(true);
@@ -3809,6 +3812,8 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(firstFailingTask.isCompleted());
             SC_TEST_EXPECT(secondFailingTask.isCompleted());
             SC_TEST_EXPECT(successfulTask.isCompleted());
+            SC_TEST_EXPECT(firstFailingTask.result().isError(ResultCategory(0x80000000u), 101u));
+            SC_TEST_EXPECT(secondFailingTask.result().isError(ResultCategory(0x80000000u), 102u));
             SC_TEST_EXPECT(group.pending() == 0);
             SC_TEST_EXPECT(group.countErrors() == 2);
 
@@ -3824,12 +3829,12 @@ struct SC::FibersTest : public SC::TestCase
                 if (error.task == &firstFailingTask)
                 {
                     foundFirstError = true;
-                    SC_TEST_EXPECT(error.result.message == firstFailingTask.result().message);
+                    SC_TEST_EXPECT(error.result.isError(ResultCategory(0x80000000u), 101u));
                 }
                 if (error.task == &secondFailingTask)
                 {
                     foundSecondError = true;
-                    SC_TEST_EXPECT(error.result.message == secondFailingTask.result().message);
+                    SC_TEST_EXPECT(error.result.isError(ResultCategory(0x80000000u), 102u));
                 }
             }
             SC_TEST_EXPECT(foundFirstError);
