@@ -1445,9 +1445,9 @@ struct SC::FileSystem::Operations::Internal
     static ResultFileSystem validatePath(StringSpan path)
     {
         if (path.sizeInBytes() == 0)
-            return Result::Error("Path is empty");
+            return {FileSystemError::InvalidPath, FileSystemErrorDetail::NormalizePath};
         if (path.getEncoding() == StringEncoding::Utf16)
-            return Result::Error("Path is not native (UTF8)");
+            return {FileSystemError::UnsupportedPathEncoding, FileSystemErrorDetail::ValidatePathEncoding};
         return Result(true);
     }
     static ResultFileSystem copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
@@ -1507,9 +1507,9 @@ static SC::Result fillPosixFileStat(const struct stat& pathStat, SC::FileSystemS
     return SC::Result(true);
 }
 
+// Kept only for the legacy Result-valued predicates below. The structured predicate overloads remove this bridge.
 #define SC_TRY_POSIX(func, msg)                                                                                        \
     {                                                                                                                  \
-                                                                                                                       \
         if (func != 0)                                                                                                 \
         {                                                                                                              \
             return Result::Error(msg);                                                                                 \
@@ -1519,11 +1519,10 @@ static SC::Result fillPosixFileStat(const struct stat& pathStat, SC::FileSystemS
 SC::ResultFileSystem SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileOrDirectory,
                                                                     StringSpan linkFile)
 {
-    SC_TRY_MSG(Internal::validatePath(sourceFileOrDirectory),
-               "createSymbolicLink: Invalid source file or directory path");
-    SC_TRY_MSG(Internal::validatePath(linkFile), "createSymbolicLink: Invalid link file path");
-    SC_TRY_POSIX(::symlink(sourceFileOrDirectory.getNullTerminatedNative(), linkFile.getNullTerminatedNative()),
-                 "createSymbolicLink: Failed to create symbolic link");
+    SC_TRY(Internal::validatePath(sourceFileOrDirectory));
+    SC_TRY(Internal::validatePath(linkFile));
+    if (::symlink(sourceFileOrDirectory.getNullTerminatedNative(), linkFile.getNullTerminatedNative()) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::CreateSymbolicLinkEntry);
     return Result(true);
 }
 
@@ -1541,10 +1540,10 @@ static int posixAccessMode(SC::FileSystemAccessMode accessMode)
 
 SC::ResultFileSystem SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
 {
-    SC_TRY_MSG(Internal::validatePath(sourceFile), "createHardLink: Invalid source path");
-    SC_TRY_MSG(Internal::validatePath(linkFile), "createHardLink: Invalid link path");
-    SC_TRY_POSIX(::link(sourceFile.getNullTerminatedNative(), linkFile.getNullTerminatedNative()),
-                 "createHardLink: Failed to create hard link");
+    SC_TRY(Internal::validatePath(sourceFile));
+    SC_TRY(Internal::validatePath(linkFile));
+    if (::link(sourceFile.getNullTerminatedNative(), linkFile.getNullTerminatedNative()) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::CreateHardLinkEntry);
     return Result(true);
 }
 
@@ -1556,20 +1555,20 @@ SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode access
 
 SC::ResultFileSystem SC::FileSystem::Operations::makeDirectory(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
-    SC_TRY_POSIX(::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH),
-                 "makeDirectory: Failed to create directory");
+    SC_TRY(Internal::validatePath(path));
+    if (::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::CreateDirectoryEntry);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
+    SC_TRY(Internal::validatePath(path));
     const size_t pathLength = path.sizeInBytes();
     char         temp[PATH_MAX];
     // Copy path to temp, ensure null-terminated
     if (pathLength >= PATH_MAX)
-        return Result::Error("makeDirectoryRecursive: Path too long");
+        return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::CreateDirectoryEntry};
     ::memcpy(temp, path.bytesWithoutTerminator(), pathLength);
     // Iterate and create directories
     for (size_t idx = 0; idx < pathLength; ++idx)
@@ -1584,8 +1583,10 @@ SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSp
             {
                 if (::mkdir(temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
                 {
-                    if (errno != EEXIST)
-                        return Result::Error("makeDirectoryRecursive: Failed to create parent directory");
+                    const int nativeError = errno;
+                    if (nativeError != EEXIST)
+                        return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                                          FileSystemErrorDetail::CreateParentDirectory);
                 }
             }
             temp[idx] = old;
@@ -1594,8 +1595,10 @@ SC::ResultFileSystem SC::FileSystem::Operations::makeDirectoryRecursive(StringSp
     // Create the final directory
     if (::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
     {
-        if (errno != EEXIST)
-            return Result::Error("makeDirectoryRecursive: Failed to create directory");
+        const int nativeError = errno;
+        if (nativeError != EEXIST)
+            return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                              FileSystemErrorDetail::CreateDirectoryEntry);
     }
     return Result(true);
 }
@@ -1634,40 +1637,44 @@ SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
 
 SC::ResultFileSystem SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "removeEmptyDirectory: Invalid path");
-    SC_TRY_POSIX(::rmdir(path.getNullTerminatedNative()), "removeEmptyDirectory: Failed to remove directory");
+    SC_TRY(Internal::validatePath(path));
+    if (::rmdir(path.getNullTerminatedNative()) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::RemoveDirectoryEntry);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::moveDirectory(StringSpan source, StringSpan destination)
 {
-    SC_TRY_MSG(Internal::validatePath(source), "moveDirectory: Invalid source path");
-    SC_TRY_MSG(Internal::validatePath(destination), "moveDirectory: Invalid destination path");
-    SC_TRY_POSIX(::rename(source.getNullTerminatedNative(), destination.getNullTerminatedNative()),
-                 "moveDirectory: Failed to move directory");
+    SC_TRY(Internal::validatePath(source));
+    SC_TRY(Internal::validatePath(destination));
+    if (::rename(source.getNullTerminatedNative(), destination.getNullTerminatedNative()) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::RenameEntry);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::removeFile(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "removeFile: Invalid path");
-    SC_TRY_POSIX(::remove(path.getNullTerminatedNative()), "removeFile: Failed to remove file");
+    SC_TRY(Internal::validatePath(path));
+    if (::remove(path.getNullTerminatedNative()) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::RemoveFileEntry);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "stat: Invalid path");
+    SC_TRY(Internal::validatePath(path));
     struct stat path_stat;
-    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "stat: Failed to get file stats");
+    if (::stat(path.getNullTerminatedNative(), &path_stat) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::QueryEntryMetadata);
     return fillPosixFileStat(path_stat, fileStat);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "lstat: Invalid path");
+    SC_TRY(Internal::validatePath(path));
     struct stat path_stat;
-    SC_TRY_POSIX(::lstat(path.getNullTerminatedNative(), &path_stat), "lstat: Failed to get file stats");
+    if (::lstat(path.getNullTerminatedNative(), &path_stat) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::QueryEntryMetadata);
     return fillPosixFileStat(path_stat, fileStat);
 }
 
@@ -1678,95 +1685,97 @@ SC::ResultFileSystem SC::FileSystem::Operations::getFileStat(StringSpan path, Fi
 
 SC::ResultFileSystem SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "readSymbolicLink: Invalid path");
+    SC_TRY(Internal::validatePath(path));
 
     const ssize_t length =
         ::readlink(path.getNullTerminatedNative(), destination.writableSpan().data(), StringPath::MaxPath - 1);
     if (length < 0)
     {
-        return Result::Error("readSymbolicLink: Failed to read link target");
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ReadSymbolicLinkTarget);
     }
 
     destination.writableSpan().data()[length] = 0;
     if (not destination.resize(static_cast<size_t>(length)))
     {
-        return Result::Error("readSymbolicLink: Failed to store link target");
+        return {FileSystemError::BufferCapacityExceeded, FileSystemErrorDetail::StoreSymbolicLinkTarget};
     }
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "chmod: Invalid path");
-    SC_TRY_POSIX(::chmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)), "chmod: Failed to change mode");
+    SC_TRY(Internal::validatePath(path));
+    if (::chmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ChangePermissions);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "chown: Invalid path");
-    SC_TRY_POSIX(::chown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)),
-                 "chown: Failed to change owner");
+    SC_TRY(Internal::validatePath(path));
+    if (::chown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ChangeOwnership);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "lchown: Invalid path");
-    SC_TRY_POSIX(::lchown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)),
-                 "lchown: Failed to change owner");
+    SC_TRY(Internal::validatePath(path));
+    if (::lchown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ChangeLinkOwnership);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "lchmod: Invalid path");
+    SC_TRY(Internal::validatePath(path));
 #if SC_PLATFORM_APPLE
-    SC_TRY_POSIX(::lchmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)), "lchmod: Failed to change mode");
+    if (::lchmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ChangeLinkPermissions);
     return Result(true);
 #else
     (void)mode;
-    return Result::Error("ENOTSUP");
+    return {FileSystemError::OperationUnsupported, FileSystemErrorDetail::ChangeLinkPermissions};
 #endif
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
+    SC_TRY(Internal::validatePath(path));
     struct timespec times[2];
     times[0].tv_sec  = time.milliseconds / 1000;
     times[0].tv_nsec = (time.milliseconds % 1000) * 1000 * 1000;
     times[1]         = times[0];
 
-    SC_TRY_POSIX(::utimensat(AT_FDCWD, path.getNullTerminatedNative(), times, 0),
-                 "setLastModifiedTime: Failed to set last modified time");
+    if (::utimensat(AT_FDCWD, path.getNullTerminatedNative(), times, 0) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::SetFileTimes);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::rename(StringSpan path, StringSpan newPath)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "rename: Invalid path");
-    SC_TRY_MSG(Internal::validatePath(newPath), "rename: Invalid new path");
-    SC_TRY_POSIX(::rename(path.getNullTerminatedNative(), newPath.getNullTerminatedNative()),
-                 "rename: Failed to rename");
+    SC_TRY(Internal::validatePath(path));
+    SC_TRY(Internal::validatePath(newPath));
+    if (::rename(path.getNullTerminatedNative(), newPath.getNullTerminatedNative()) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::RenameEntry);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::copyFile(StringSpan srcPath, StringSpan destPath,
                                                           FileSystemCopyFlags flags)
 {
-    SC_TRY_MSG(Internal::validatePath(srcPath), "copyFile: Invalid source path");
-    SC_TRY_MSG(Internal::validatePath(destPath), "copyFile: Invalid destination path");
+    SC_TRY(Internal::validatePath(srcPath));
+    SC_TRY(Internal::validatePath(destPath));
 
-    return Result(Internal::copyFile(srcPath, destPath, flags, false));
+    return Internal::copyFile(srcPath, destPath, flags, false);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::copyDirectory(StringSpan srcPath, StringSpan destPath,
                                                                FileSystemCopyFlags flags)
 {
-    SC_TRY_MSG(Internal::validatePath(srcPath), "copyDirectory: Invalid source path");
-    SC_TRY_MSG(Internal::validatePath(destPath), "copyDirectory: Invalid destination path");
-    return Result(Internal::copyFile(srcPath, destPath, flags, true));
+    SC_TRY(Internal::validatePath(srcPath));
+    SC_TRY(Internal::validatePath(destPath));
+    return Internal::copyFile(srcPath, destPath, flags, true);
 }
 
 #if __APPLE__
@@ -1791,12 +1800,15 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
                 {
                     auto removeState = ::removefile_state_alloc();
                     auto removeFree  = MakeDeferred([&] { ::removefile_state_free(removeState); });
-                    SC_TRY_POSIX(::removefile(destinationFile, removeState, REMOVEFILE_RECURSIVE),
-                                 "copyFile: Failed to remove file (removeRes == 0)");
+                    if (::removefile(destinationFile, removeState, REMOVEFILE_RECURSIVE) != 0)
+                        return fileSystemResultFromNative(static_cast<uint32_t>(errno),
+                                                          FileSystemErrorDetail::RemoveDirectoryEntry);
                 }
                 else
                 {
-                    SC_TRY_POSIX(::remove(destinationFile), "copyFile: Failed to remove file");
+                    if (::remove(destinationFile) != 0)
+                        return fileSystemResultFromNative(static_cast<uint32_t>(errno),
+                                                          FileSystemErrorDetail::RemoveFileEntry);
                 }
                 cloneRes = ::clonefile(sourceFile, destinationFile, CLONE_NOFOLLOW | CLONE_NOOWNERCOPY);
             }
@@ -1808,7 +1820,7 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
         else if (errno != ENOTSUP and errno != EXDEV)
         {
             // We only fallback in case of ENOTSUP and EXDEV (cross-device link)
-            return Result::Error("copyFile: Failed to clone file (errno != ENOTSUP and errno != EXDEV)");
+            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::CloneEntry);
         }
     }
 
@@ -1824,17 +1836,20 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
     // TODO: Should define flags to decide if to follow symlinks on source and destination
     auto copyState = ::copyfile_state_alloc();
     auto copyFree  = MakeDeferred([&] { ::copyfile_state_free(copyState); });
-    SC_TRY_POSIX(::copyfile(sourceFile, destinationFile, copyState, flags), "copyFile: Failed to copy file");
+    if (::copyfile(sourceFile, destinationFile, copyState, flags) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), isDirectory
+                                                                            ? FileSystemErrorDetail::CopyDirectoryTree
+                                                                            : FileSystemErrorDetail::CopyFileEntry);
     return Result(true);
 }
 
 SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
+    SC_TRY(Internal::validatePath(path));
     auto state     = ::removefile_state_alloc();
     auto stateFree = MakeDeferred([&] { ::removefile_state_free(state); });
-    SC_TRY_POSIX(::removefile(path.getNullTerminatedNative(), state, REMOVEFILE_RECURSIVE),
-                 "removeDirectoryRecursive: Failed to remove directory");
+    if (::removefile(path.getNullTerminatedNative(), state, REMOVEFILE_RECURSIVE) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::RemoveDirectoryEntry);
     return Result(true);
 }
 #if SC_XCTEST
@@ -1910,24 +1925,38 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
 {
     if (isDirectory)
     {
-        // For directories, first check if source exists and is a directory
-        SC_TRY_MSG(existsAndIsDirectory(source), "copyFile: Source path is not a directory");
+        struct stat sourceStat;
+        if (::stat(source.getNullTerminatedNative(), &sourceStat) != 0)
+            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::QueryEntryMetadata);
+        if (not S_ISDIR(sourceStat.st_mode))
+            return {FileSystemError::EntryTypeMismatch, FileSystemErrorDetail::CopyDirectoryTree};
 
         // Create destination directory if it doesn't exist
-        if (not existsAndIsDirectory(destination))
+        struct stat destinationStat;
+        if (::stat(destination.getNullTerminatedNative(), &destinationStat) != 0)
         {
-            SC_TRY(makeDirectory(destination));
+            const int nativeError = errno;
+            if (nativeError != ENOENT)
+                return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                                  FileSystemErrorDetail::QueryEntryMetadata);
+            if (::mkdir(destination.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
+                return fileSystemResultFromNative(static_cast<uint32_t>(errno),
+                                                  FileSystemErrorDetail::CreateDirectoryEntry);
+        }
+        else if (not S_ISDIR(destinationStat.st_mode))
+        {
+            return {FileSystemError::EntryTypeMismatch, FileSystemErrorDetail::CopyDirectoryTree};
         }
         else if (not options.overwrite)
         {
-            return Result::Error("copyFile: Destination directory already exists and overwrite is not enabled");
+            return {FileSystemError::EntryAlreadyExists, FileSystemErrorDetail::CopyDirectoryTree};
         }
 
         // Open source directory
         DIR* dir = ::opendir(source.getNullTerminatedNative());
         if (dir == nullptr)
         {
-            return Result::Error("copyFile: Failed to open source directory");
+            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenSourceDirectory);
         }
         auto closeDir = MakeDeferred([&] { ::closedir(dir); });
 
@@ -1938,6 +1967,7 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
         struct dirent* entry;
 
         // Iterate through directory entries
+        errno = 0;
         while ((entry = ::readdir(dir)) != nullptr)
         {
             // Skip . and .. entries
@@ -1950,43 +1980,55 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
                 ::snprintf(fullDestPath, sizeof(fullDestPath), "%s/%s", destination.getNullTerminatedNative(),
                            entry->d_name) >= static_cast<int>(sizeof(fullDestPath)))
             {
-                return Result::Error("copyFile: Path too long");
+                return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildChildPath};
             }
 
             struct stat statbuf;
             if (::lstat(fullSourcePath, &statbuf) != 0)
             {
-                return Result::Error("copyFile: Failed to get file stats");
+                return fileSystemResultFromNative(static_cast<uint32_t>(errno),
+                                                  FileSystemErrorDetail::QueryChildMetadata);
             }
 
             // Recursively copy subdirectories and files
             SC_TRY(copyFile(StringSpan(fullSourcePath), StringSpan(fullDestPath), options, S_ISDIR(statbuf.st_mode)));
+            errno = 0;
         }
+
+        if (errno != 0)
+            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::EnumerateDirectory);
 
         return Result(true);
     }
 
     // Original file copying logic for non-directory files
-    if (not options.overwrite and existsAndIsFile(destination))
+    if (not options.overwrite)
     {
-        return Result::Error("copyFile: Failed to copy file (destination file already exists)");
+        struct stat destinationStat;
+        if (::stat(destination.getNullTerminatedNative(), &destinationStat) == 0)
+            return {FileSystemError::EntryAlreadyExists, FileSystemErrorDetail::CopyFileEntry};
+        const int nativeError = errno;
+        if (nativeError != ENOENT)
+            return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                              FileSystemErrorDetail::QueryEntryMetadata);
     }
     int inputDescriptor = ::open(source.getNullTerminatedNative(), O_RDONLY);
     if (inputDescriptor < 0)
     {
-        return Result::Error("copyFile: Failed to open source file");
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenSourceFile);
     }
     auto closeInput = MakeDeferred([&] { ::close(inputDescriptor); });
 
     struct stat inputStat;
 
-    SC_TRY_POSIX(::fstat(inputDescriptor, &inputStat), "copyFile: Failed to get file stats");
+    if (::fstat(inputDescriptor, &inputStat) != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::QueryEntryMetadata);
 
     int outputDescriptor = ::open(destination.getNullTerminatedNative(), O_WRONLY | O_CREAT | O_TRUNC,
                                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (outputDescriptor < 0)
     {
-        return Result::Error("copyFile: Failed to open destination file");
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenDestinationFile);
     }
     auto closeOutput = MakeDeferred([&] { ::close(outputDescriptor); });
 
@@ -2003,13 +2045,14 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
         {
             if (::write(outputDescriptor, buffer, static_cast<size_t>(bytesRead)) < 0)
             {
-                return Result::Error("copyFile: Failed to write to destination file");
+                return fileSystemResultFromNative(static_cast<uint32_t>(errno),
+                                                  FileSystemErrorDetail::WriteFileContent);
             }
         }
 
         if (bytesRead < 0)
         {
-            return Result::Error("copyFile: Failed to read from source file");
+            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ReadFileContent);
         }
     }
     return Result(true);
@@ -2017,13 +2060,13 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
 
 SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
+    SC_TRY(Internal::validatePath(path));
 
     // Open directory
     DIR* dir = ::opendir(path.getNullTerminatedNative());
     if (dir == nullptr)
     {
-        return Result::Error("removeDirectoryRecursive: Failed to open directory");
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::OpenSourceDirectory);
     }
     auto closeDir = MakeDeferred([&] { ::closedir(dir); });
 
@@ -2033,6 +2076,7 @@ SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(String
     struct dirent* entry;
 
     // Iterate through directory entries
+    errno = 0;
     while ((entry = ::readdir(dir)) != nullptr)
     {
         // Skip . and .. entries
@@ -2043,13 +2087,13 @@ SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(String
         if (::snprintf(fullPath, sizeof(fullPath), "%s/%s", path.getNullTerminatedNative(), entry->d_name) >=
             static_cast<int>(sizeof(fullPath)))
         {
-            return Result::Error("removeDirectoryRecursive: Path too long");
+            return {FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildChildPath};
         }
 
         struct stat statbuf;
         if (::lstat(fullPath, &statbuf) != 0)
         {
-            return Result::Error("removeDirectoryRecursive: Failed to get file stats");
+            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::QueryChildMetadata);
         }
 
         if (S_ISDIR(statbuf.st_mode))
@@ -2062,15 +2106,20 @@ SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(String
             // Remove file
             if (::unlink(fullPath) != 0)
             {
-                return Result::Error("removeDirectoryRecursive: Failed to remove file");
+                return fileSystemResultFromNative(static_cast<uint32_t>(errno),
+                                                  FileSystemErrorDetail::RemoveChildEntry);
             }
         }
+        errno = 0;
     }
+
+    if (errno != 0)
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::EnumerateDirectory);
 
     // Remove the now-empty directory
     if (::rmdir(path.getNullTerminatedNative()) != 0)
     {
-        return Result::Error("removeDirectoryRecursive: Failed to remove directory");
+        return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::RemoveDirectoryEntry);
     }
 
     return Result(true);

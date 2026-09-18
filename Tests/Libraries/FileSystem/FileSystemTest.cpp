@@ -263,7 +263,6 @@ void SC::FileSystemTest::structuredFacadeFailures()
     SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
     SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::ChangeDirectory);
 
-#if SC_PLATFORM_WINDOWS
     FileSystemStat statInfo;
     result = FileSystem::Operations::stat(missingDirectory.view(), statInfo);
     SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
@@ -274,10 +273,15 @@ void SC::FileSystemTest::structuredFacadeFailures()
     SC_TEST_EXPECT(result.isError(FileSystemError::EntryAlreadyExists));
     SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::CreateDirectoryEntry);
 
+#if SC_PLATFORM_WINDOWS
     result = FileSystem::Operations::stat("not-native", statInfo);
+#else
+    const char nonNativePath[] = {'n', 0, 0, 0};
+    result                     = FileSystem::Operations::stat(
+        StringSpan({nonNativePath, sizeof(nonNativePath)}, true, StringEncoding::Utf16), statInfo);
+#endif
     SC_TEST_EXPECT(result.isError(FileSystemError::UnsupportedPathEncoding));
     SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::ValidatePathEncoding);
-#endif
 }
 
 void SC::FileSystemTest::makeRemoveIsDirectory()
@@ -879,7 +883,9 @@ void SC::FileSystemTest::permissions()
     SC_TEST_EXPECT(linkStatAfterLChmod.entryType == FileSystemEntryType::SymbolicLink);
     SC_TEST_EXPECT((linkStatAfterLChmod.posix.mode & 0777u) == newLinkMode);
 #else
-    SC_TEST_EXPECT(not fs.lchmod("permissionsLink.txt", 0700u));
+    ResultFileSystem lchmodResult = fs.lchmod("permissionsLink.txt", 0700u);
+    SC_TEST_EXPECT(lchmodResult.isError(FileSystemError::OperationUnsupported));
+    SC_TEST_EXPECT(lchmodResult.detail == FileSystemErrorDetail::ChangeLinkPermissions);
 #endif
     SC_TEST_EXPECT(fs.removeLinkIfExists("permissionsLink.txt"));
 #endif
