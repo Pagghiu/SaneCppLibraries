@@ -262,6 +262,22 @@ void SC::FileSystemTest::structuredFacadeFailures()
     result = fileSystem.changeDirectory(missingDirectory.view());
     SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
     SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::ChangeDirectory);
+
+#if SC_PLATFORM_WINDOWS
+    FileSystemStat statInfo;
+    result = FileSystem::Operations::stat(missingDirectory.view(), statInfo);
+    SC_TEST_EXPECT(result.isError(FileSystemError::EntryNotFound));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::QueryEntryMetadata);
+    SC_TEST_EXPECT(result.contextKind == FileSystemErrorContextKind::NativeError);
+
+    result = FileSystem::Operations::makeDirectory(report.applicationRootDirectory.view());
+    SC_TEST_EXPECT(result.isError(FileSystemError::EntryAlreadyExists));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::CreateDirectoryEntry);
+
+    result = FileSystem::Operations::stat("not-native", statInfo);
+    SC_TEST_EXPECT(result.isError(FileSystemError::UnsupportedPathEncoding));
+    SC_TEST_EXPECT(result.detail == FileSystemErrorDetail::ValidatePathEncoding);
+#endif
 }
 
 void SC::FileSystemTest::makeRemoveIsDirectory()
@@ -806,7 +822,9 @@ void SC::FileSystemTest::permissions()
     SC_TEST_EXPECT(fs.stat("permissionsFile.txt", writableStat));
     SC_TEST_EXPECT((writableStat.windows.attributes & FILE_ATTRIBUTE_READONLY) == 0);
 
-    SC_TEST_EXPECT(fs.chown("permissionsFile.txt", 123, 456));
+    ResultFileSystem chownResult = fs.chown("permissionsFile.txt", 123, 456);
+    SC_TEST_EXPECT(chownResult.isError(FileSystemError::OperationUnsupported));
+    SC_TEST_EXPECT(chownResult.detail == FileSystemErrorDetail::ChangeOwnership);
     FileSystem::FileStat afterChownStat;
     SC_TEST_EXPECT(fs.stat("permissionsFile.txt", afterChownStat));
     SC_TEST_EXPECT(afterChownStat.windows.attributes == writableStat.windows.attributes);
@@ -814,11 +832,15 @@ void SC::FileSystemTest::permissions()
     Result createLinkResult = fs.createSymbolicLink("permissionsFile.txt", "permissionsLink.txt");
     if (createLinkResult)
     {
-        SC_TEST_EXPECT(fs.lchown("permissionsLink.txt", 123, 456));
+        ResultFileSystem lchownResult = fs.lchown("permissionsLink.txt", 123, 456);
+        SC_TEST_EXPECT(lchownResult.isError(FileSystemError::OperationUnsupported));
+        SC_TEST_EXPECT(lchownResult.detail == FileSystemErrorDetail::ChangeLinkOwnership);
         FileSystem::FileStat linkStat;
         SC_TEST_EXPECT(fs.lstat("permissionsLink.txt", linkStat));
         SC_TEST_EXPECT(linkStat.entryType == FileSystemEntryType::SymbolicLink);
-        SC_TEST_EXPECT(not fs.lchmod("permissionsLink.txt", 0200u));
+        ResultFileSystem lchmodResult = fs.lchmod("permissionsLink.txt", 0200u);
+        SC_TEST_EXPECT(lchmodResult.isError(FileSystemError::OperationUnsupported));
+        SC_TEST_EXPECT(lchmodResult.detail == FileSystemErrorDetail::ChangeLinkPermissions);
         SC_TEST_EXPECT(fs.removeLinkIfExists("permissionsLink.txt"));
     }
     else
