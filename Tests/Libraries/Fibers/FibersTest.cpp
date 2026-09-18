@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Fibers/Fibers.h"
 #include "Libraries/Common/PlacementNew.h"
+#include "Libraries/Fibers/FibersErrorFormatter.h"
 #include "Libraries/Fibers/Internal/FiberContext.h"
 #include "Libraries/Process/Process.h"
 #include "Libraries/Testing/Testing.h"
@@ -32,6 +33,8 @@ struct FibersTest;
 
 struct SC::FibersTest : public SC::TestCase
 {
+    inline void structuredErrorsAndFormatter();
+
     struct ContextState
     {
         FiberContext* main  = nullptr;
@@ -48,6 +51,10 @@ struct SC::FibersTest : public SC::TestCase
         }
         return;
 #else
+        if (test_section("structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
+        }
         if (test_section("context switch"))
         {
             contextSwitch();
@@ -9182,6 +9189,38 @@ struct SC::FibersTest : public SC::TestCase
         }
     }
 };
+
+void SC::FibersTest::structuredErrorsAndFormatter()
+{
+    static_assert(FibersResultCategory.value == 12, "Fibers category is registry value 12");
+    static_assert(static_cast<uint32_t>(FibersError::InvalidState) == 1, "Fibers error values are append-only");
+    static_assert(static_cast<uint32_t>(FibersError::ThreadAffinityApplyFailed) == 34,
+                  "Fibers error values are append-only");
+
+    const Result own = Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
+    SC_TEST_EXPECT(own.isError(FibersResultCategory, FibersError::SlotUnavailable));
+    SC_TEST_EXPECT(own.message == nullptr);
+
+    char              message[64];
+    ResultErrorFormat formatted = formatFibersError(own, message);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("No slot is available"));
+    SC_TEST_EXPECT(message[0] == 'N');
+
+    formatted = formatFibersError(FibersError::GroupNotReset, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Group must be reset before another work wave"));
+
+    char tooSmall[2] = {'x', 'x'};
+    formatted        = formatFibersError(FibersError::SlotUnavailable, tooSmall);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(tooSmall[0] == '\0');
+    SC_TEST_EXPECT(formatFibersError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatFibersError(Result::Error(ResultCategory(99), 1), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(formatFibersError(Result::Error(FibersResultCategory, 999), message).status ==
+                   ResultErrorFormatStatus::UnknownError);
+}
 
 namespace SC
 {

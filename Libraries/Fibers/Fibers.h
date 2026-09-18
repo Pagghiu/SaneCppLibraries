@@ -17,6 +17,7 @@
 #include "../Common/PrimitiveDefinitions.h"
 #include "../Common/Result.h"
 #include "../Common/Span.h"
+#include "FibersError.h"
 
 //! @defgroup group_fibers Fibers
 //! Experimental cooperative runtime for stackful fibers and stackless jobs.

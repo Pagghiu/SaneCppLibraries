@@ -76,6 +76,12 @@
       "owner": "FileSystem",
       "declaration": "Libraries/FileSystem/FileSystemError.h",
       "constant": "FileSystemResultCategory"
+    },
+    {
+      "value": 12,
+      "owner": "Fibers",
+      "declaration": "Libraries/Fibers/FibersError.h",
+      "constant": "FibersResultCategory"
     }
   ]
 }
