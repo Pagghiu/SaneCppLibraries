@@ -11,6 +11,7 @@
 #include "../Common/IGrowableBufferStringPath.h"
 #include "../Common/PrimitiveDefinitions.h"
 #include "../Common/Result.h"
+#include "FileSystemError.h"
 
 namespace SC
 {

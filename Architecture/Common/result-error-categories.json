@@ -70,6 +70,12 @@
       "owner": "File",
       "declaration": "Libraries/File/FileError.h",
       "constant": "FileResultCategory"
+    },
+    {
+      "value": 11,
+      "owner": "FileSystem",
+      "declaration": "Libraries/FileSystem/FileSystemError.h",
+      "constant": "FileSystemResultCategory"
     }
   ]
 }

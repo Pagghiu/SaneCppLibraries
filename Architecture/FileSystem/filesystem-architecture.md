@@ -55,3 +55,4 @@ Do not add hidden allocation, recursive traversal callbacks, descriptor seek/rea
 
 - [FILESYSTEM-0001 - Resolve relative operations against an explicit base directory](filesystem-0001-resolve-relative-operations-against-an-explicit-base-directory.md)
 - [FILESYSTEM-0002 - Keep FileSystem dependency-free even for file-like operations](filesystem-0002-keep-filesystem-dependency-free-even-for-file-like-operations.md)
+- [FILESYSTEM-0003 - Use structured FileSystem result errors](filesystem-0003-use-structured-result-errors.md)

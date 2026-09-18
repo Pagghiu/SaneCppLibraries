@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Common/TypeTraits.h"
+#include "Libraries/FileSystem/FileSystemErrorFormatter.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -8,7 +10,6 @@
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <string.h>
 #include <wchar.h>
 #include <wctype.h>
 
@@ -23,6 +24,7 @@ namespace FileSystemTestWindowsDetail
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
+#include <string.h>
 
 namespace SC
 {
@@ -34,6 +36,10 @@ struct SC::FileSystemTest : public SC::TestCase
     FileSystemTest(SC::TestReport& report) : TestCase(report, "FileSystemTest")
     {
         using namespace SC;
+        if (test_section("structured errors and formatter"))
+        {
+            structuredErrorsAndFormatter();
+        }
         if (test_section("formatError"))
         {
             formatError();
@@ -119,6 +125,7 @@ struct SC::FileSystemTest : public SC::TestCase
 #endif
     }
 
+    void structuredErrorsAndFormatter();
     void formatError();
     void makeRemoveIsDirectory();
     void makeDirectoryRecursive();
@@ -140,6 +147,96 @@ struct SC::FileSystemTest : public SC::TestCase
 #endif
     void snippet();
 };
+
+void SC::FileSystemTest::structuredErrorsAndFormatter()
+{
+    static_assert(FileSystemResultCategory.value == 11, "FileSystem category is registry value 11");
+    static_assert(static_cast<uint32_t>(FileSystemError::NotInitialized) == 1,
+                  "FileSystem error values are append-only");
+    static_assert(static_cast<uint32_t>(FileSystemError::OperationFailed) == 26,
+                  "FileSystem error values are append-only");
+    static_assert(static_cast<uint16_t>(FileSystemErrorDetail::None) == 0,
+                  "FileSystem detail zero is reserved for no detail");
+    static_assert(static_cast<uint16_t>(FileSystemErrorContextKind::None) == 0,
+                  "FileSystem context kind zero is reserved for no context");
+    static_assert(sizeof(Result) != 16 or sizeof(ResultFileSystem) == 24,
+                  "ResultFileSystem bridge layout must retain its 24-byte size");
+    static_assert(sizeof(Result) != 8 or sizeof(ResultFileSystem) == 16,
+                  "ResultFileSystem must meet the final 16-byte target");
+    static_assert(__is_standard_layout(ResultFileSystem), "ResultFileSystem must remain standard-layout");
+    static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystem>::value,
+                  "ResultFileSystem must remain trivially copyable");
+
+    const ResultFileSystem detailed = ResultFileSystem::withNativeError(FileSystemError::EntryNotFound,
+                                                                        FileSystemErrorDetail::OpenFileForRead, 12345);
+    const ResultFileSystem copied   = detailed;
+    SC_TEST_EXPECT(copied.isError(FileSystemError::EntryNotFound));
+    SC_TEST_EXPECT(copied.detail == FileSystemErrorDetail::OpenFileForRead);
+    SC_TEST_EXPECT(copied.contextKind == FileSystemErrorContextKind::NativeError);
+    SC_TEST_EXPECT(copied.context.nativeError == 12345);
+
+    const Result plain = detailed;
+    SC_TEST_EXPECT(plain.isError(FileSystemResultCategory, FileSystemError::EntryNotFound));
+    const ResultFileSystem fromPlain(plain);
+    SC_TEST_EXPECT(fromPlain.detail == FileSystemErrorDetail::None);
+    SC_TEST_EXPECT(fromPlain.contextKind == FileSystemErrorContextKind::None);
+    SC_TEST_EXPECT(fromPlain.context.nativeError == 0);
+
+    const Result           foreignResult = Result::Error(ResultCategory(10), 1);
+    const ResultFileSystem foreign(foreignResult);
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.toResult().isError(ResultCategory(10), 1));
+    SC_TEST_EXPECT(foreign.detail == FileSystemErrorDetail::None);
+    SC_TEST_EXPECT(foreign.contextKind == FileSystemErrorContextKind::None);
+
+    const ResultFileSystem required = ResultFileSystem::withRequiredBytes(
+        FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildTransportPath, 1031);
+    SC_TEST_EXPECT(required.contextKind == FileSystemErrorContextKind::RequiredBytes);
+    SC_TEST_EXPECT(required.context.requiredBytes == 1031);
+    const ResultFileSystem actual =
+        ResultFileSystem::withActualBytes(FileSystemError::IncompleteWrite, FileSystemErrorDetail::WriteFileContent, 3);
+    SC_TEST_EXPECT(actual.contextKind == FileSystemErrorContextKind::ActualBytes);
+    SC_TEST_EXPECT(actual.context.actualBytes == 3);
+
+    const auto propagate = [](ResultFileSystem result) -> ResultFileSystem
+    {
+        SC_TRY(result);
+        return ResultFileSystem(true);
+    };
+    const ResultFileSystem propagated = propagate(detailed);
+    SC_TEST_EXPECT(propagated.isError(FileSystemError::EntryNotFound));
+    SC_TEST_EXPECT(propagated.detail == FileSystemErrorDetail::OpenFileForRead);
+    SC_TEST_EXPECT(propagated.contextKind == FileSystemErrorContextKind::NativeError);
+    SC_TEST_EXPECT(propagated.context.nativeError == 12345);
+
+    constexpr char expected[] = "Filesystem entry was not found (detail: open file for reading) (native error: 12345)";
+    char           message[sizeof(expected)];
+    ResultErrorFormat formatted = formatFileSystemError(detailed, message);
+    SC_TEST_EXPECT(formatted);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    SC_TEST_EXPECT(::memcmp(message, expected, sizeof(expected)) == 0);
+
+    formatted = formatFileSystemError(FileSystemError::PathMustBeAbsolute, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Filesystem path must be absolute"));
+    char tooSmall[2] = {'x', 0};
+    formatted        = formatFileSystemError(FileSystemError::PathMustBeAbsolute, tooSmall);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(tooSmall[0] == 0);
+    SC_TEST_EXPECT(formatFileSystemError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatFileSystemError(Result::Error(ResultCategory(99), 1), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(formatFileSystemError(Result::Error(FileSystemResultCategory, 999), message).status ==
+                   ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(
+        formatFileSystemError(ResultFileSystem(FileSystemError::EntryNotFound, static_cast<FileSystemErrorDetail>(999)),
+                              message)
+            .status == ResultErrorFormatStatus::UnknownError);
+    SC_TEST_EXPECT(formatFileSystemError(ResultFileSystem(FileSystemError::EntryNotFound, FileSystemErrorDetail::None,
+                                                          static_cast<FileSystemErrorContextKind>(999), {}),
+                                         message)
+                       .status == ResultErrorFormatStatus::UnknownError);
+}
 
 void SC::FileSystemTest::formatError()
 {
