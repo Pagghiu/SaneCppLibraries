@@ -268,12 +268,12 @@ static Result fiberProtectNoAccess(void* memory, size_t size)
     DWORD previousProtection = 0;
     if (::VirtualProtect(memory, size, PAGE_NOACCESS, &previousProtection) == FALSE)
     {
-        return Result::Error("Failed to protect fiber stack guard page");
+        return Result::Error(FibersResultCategory, FibersError::MemoryProtectionFailed);
     }
 #else
     if (::mprotect(memory, size, PROT_NONE) != 0)
     {
-        return Result::Error("Failed to protect fiber stack guard page");
+        return Result::Error(FibersResultCategory, FibersError::MemoryProtectionFailed);
     }
 #endif
     return Result(true);
@@ -288,12 +288,12 @@ static Result fiberCommitReadWrite(void* memory, size_t size)
 #if SC_PLATFORM_WINDOWS
     if (::VirtualAlloc(memory, size, MEM_COMMIT, PAGE_READWRITE) == nullptr)
     {
-        return Result::Error("Failed to commit fiber stack pages");
+        return Result::Error(FibersResultCategory, FibersError::MemoryCommitFailed);
     }
 #else
     if (::mprotect(memory, size, PROT_READ | PROT_WRITE) != 0)
     {
-        return Result::Error("Failed to commit fiber stack pages");
+        return Result::Error(FibersResultCategory, FibersError::MemoryCommitFailed);
     }
 #endif
     fiberSanitizerUnpoisonMemory(memory, size);
@@ -309,16 +309,16 @@ static Result fiberDecommitNoAccess(void* memory, size_t size)
 #if SC_PLATFORM_WINDOWS
     if (::VirtualFree(memory, size, MEM_DECOMMIT) == FALSE)
     {
-        return Result::Error("Failed to decommit fiber stack pages");
+        return Result::Error(FibersResultCategory, FibersError::MemoryDecommitFailed);
     }
 #else
     if (::mprotect(memory, size, PROT_NONE) != 0)
     {
-        return Result::Error("Failed to decommit fiber stack pages");
+        return Result::Error(FibersResultCategory, FibersError::MemoryDecommitFailed);
     }
     if (::madvise(memory, size, MADV_DONTNEED) != 0)
     {
-        return Result::Error("Failed to release fiber stack pages");
+        return Result::Error(FibersResultCategory, FibersError::MemoryReleaseFailed);
     }
 #endif
     return Result(true);
@@ -808,11 +808,11 @@ struct FiberVirtualStackInternal
     {
         if (virtualMemory.data() != nullptr)
         {
-            return Result::Error("FiberVirtualStack is already reserved");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (options.usableSizeInBytes < FiberStackMinimumSize)
         {
-            return Result::Error("FiberVirtualStack usable size is too small");
+            return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
         }
 
         const size_t usableBytes = FiberVirtualMemory::roundUpToPageSize(options.usableSizeInBytes);
@@ -821,12 +821,12 @@ struct FiberVirtualStackInternal
 
         if (not virtualMemory.reserve(totalBytes))
         {
-            return Result::Error("Failed to reserve FiberVirtualStack memory");
+            return Result::Error(FibersResultCategory, FibersError::MemoryReservationFailed);
         }
         if (not virtualMemory.commit(totalBytes))
         {
             virtualMemory.release();
-            return Result::Error("Failed to commit FiberVirtualStack memory");
+            return Result::Error(FibersResultCategory, FibersError::MemoryCommitFailed);
         }
         if (guardSize > 0)
         {

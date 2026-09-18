@@ -8381,8 +8381,14 @@ struct SC::FibersTest : public SC::TestCase
         FiberVirtualStackOptions options;
         options.usableSizeInBytes = 64 * 1024;
 
-        FiberVirtualStack virtualStack;
+        FiberVirtualStack        virtualStack;
+        FiberVirtualStackOptions invalidOptions;
+        invalidOptions.usableSizeInBytes = 0;
+        const Result invalidSize         = virtualStack.reserve(invalidOptions);
+        SC_TEST_EXPECT(invalidSize.isError(FibersResultCategory, FibersError::StorageTooSmall));
         SC_TEST_EXPECT(virtualStack.reserve(options));
+        const Result repeatedReserve = virtualStack.reserve(options);
+        SC_TEST_EXPECT(repeatedReserve.isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(virtualStack.isReserved());
         SC_TEST_EXPECT(virtualStack.guardSizeInBytes() > 0);
         SC_TEST_EXPECT(virtualStack.usableSizeInBytes() >= options.usableSizeInBytes);
