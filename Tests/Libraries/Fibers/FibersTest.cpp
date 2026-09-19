@@ -488,9 +488,10 @@ struct SC::FibersTest : public SC::TestCase
         state.scheduler = &scheduler;
         state.child     = &child;
 
-        SC_TEST_EXPECT(not scheduler.create({readyStorage, 0}));
+        SC_TEST_EXPECT(
+            scheduler.create({readyStorage, 0}).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(scheduler.create(readyStorage));
-        SC_TEST_EXPECT(not scheduler.create(readyStorage));
+        SC_TEST_EXPECT(scheduler.create(readyStorage).isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(scheduler.isOpen());
         SC_TEST_EXPECT(scheduler.capacity() == 2);
 
@@ -516,8 +517,9 @@ struct SC::FibersTest : public SC::TestCase
                                                        state.order[state.orderSize++] = 2;
                                                        return Result::Error("Expected FiberJob failure");
                                                    })));
-        SC_TEST_EXPECT(not scheduler.spawn(child, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
-        SC_TEST_EXPECT(not scheduler.close());
+        SC_TEST_EXPECT(scheduler.spawn(child, FiberJob::Procedure([](FiberJobContext&) { return Result(true); }))
+                           .isError(FibersResultCategory, FibersError::QueueUnavailable));
+        SC_TEST_EXPECT(scheduler.close().isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(scheduler.readyJobCount() == 2);
         SC_TEST_EXPECT(scheduler.activeJobCount() == 2);
 
@@ -527,7 +529,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(first.isCompleted());
         SC_TEST_EXPECT(first.result());
         SC_TEST_EXPECT(state.sawCurrentJob);
-        SC_TEST_EXPECT(not state.nestedRunResult);
+        SC_TEST_EXPECT(state.nestedRunResult.isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(not state.nestedRanJob);
         SC_TEST_EXPECT(scheduler.readyJobCount() == 2);
         SC_TEST_EXPECT(scheduler.run());
@@ -556,7 +558,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(scheduler.run());
         SC_TEST_EXPECT(not state.canceledJobRan);
         SC_TEST_EXPECT(first.isCompleted());
-        SC_TEST_EXPECT(not first.result());
+        SC_TEST_EXPECT(first.result().isError(FibersResultCategory, FibersError::Cancelled));
 
         SC_TEST_EXPECT(scheduler.spawn(first, FiberJob::Procedure(
                                                   [](FiberJobContext& context)
@@ -565,15 +567,16 @@ struct SC::FibersTest : public SC::TestCase
                                                       return context.checkCancellation();
                                                   })));
         SC_TEST_EXPECT(scheduler.run());
-        SC_TEST_EXPECT(not first.result());
+        SC_TEST_EXPECT(first.result().isError(FibersResultCategory, FibersError::Cancelled));
 
         SC_TEST_EXPECT(scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
         SC_TEST_EXPECT(scheduler.shutdown());
         SC_TEST_EXPECT(first.isCompleted());
-        SC_TEST_EXPECT(not first.result());
+        SC_TEST_EXPECT(first.result().isError(FibersResultCategory, FibersError::Cancelled));
         SC_TEST_EXPECT(scheduler.close());
         SC_TEST_EXPECT(not scheduler.isOpen());
-        SC_TEST_EXPECT(not scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+        SC_TEST_EXPECT(scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); }))
+                           .isError(FibersResultCategory, FibersError::InvalidState));
 
         {
             FiberJob          batchJobs[4];
@@ -582,8 +585,10 @@ struct SC::FibersTest : public SC::TestCase
             int32_t           completed = 0;
 
             SC_TEST_EXPECT(batchScheduler.create(batchStorage));
-            SC_TEST_EXPECT(not batchScheduler.spawn(
-                Span<FiberJob>(), FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+            SC_TEST_EXPECT(
+                batchScheduler
+                    .spawn(Span<FiberJob>(), FiberJob::Procedure([](FiberJobContext&) { return Result(true); }))
+                    .isError(FibersResultCategory, FibersError::InvalidConfiguration));
             SC_TEST_EXPECT(
                 batchScheduler.spawn(batchJobs[1], FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
             SC_TEST_EXPECT(not batchScheduler.spawn(batchJobs, FiberJob::Procedure(

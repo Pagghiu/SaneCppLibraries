@@ -3885,7 +3885,7 @@ void FiberCancellationTokenSource::reset() { fiberAtomicStore(requested, 0); }
 
 Result FiberCancellationTokenSource::check() const
 {
-    return isCancellationRequested() ? Result::Error("Fiber cancellation requested") : Result(true);
+    return isCancellationRequested() ? Result::Error(FibersResultCategory, FibersError::Cancelled) : Result(true);
 }
 
 bool FiberCancellationTokenSource::isCancellationRequested() const { return fiberAtomicLoad(requested) != 0; }
@@ -3899,7 +3899,7 @@ FiberCancellationToken::FiberCancellationToken(const FiberCancellationTokenSourc
 
 Result FiberCancellationToken::check() const
 {
-    return isCancellationRequested() ? Result::Error("Fiber cancellation requested") : Result(true);
+    return isCancellationRequested() ? Result::Error(FibersResultCategory, FibersError::Cancelled) : Result(true);
 }
 
 bool FiberCancellationToken::isValid() const { return source != nullptr; }
@@ -3934,7 +3934,7 @@ bool FiberJobContext::isCancellationRequested() const
 
 Result FiberJobContext::checkCancellation() const
 {
-    return isCancellationRequested() ? Result::Error("FiberJob cancelled") : Result(true);
+    return isCancellationRequested() ? Result::Error(FibersResultCategory, FibersError::Cancelled) : Result(true);
 }
 
 FiberJob::FiberJob() = default;
@@ -3994,19 +3994,19 @@ Result FiberJobWorker::begin(FiberJobScheduler& scheduler)
 {
     if (workerActive or workerScheduler != nullptr or workerJob != nullptr)
     {
-        return Result::Error("FiberJobWorker is already active");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (localDeque == nullptr)
     {
-        return Result::Error("FiberJobWorker has no local deque");
+        return Result::Error(FibersResultCategory, FibersError::QueueUnavailable);
     }
     if (currentFiberJobWorker != nullptr)
     {
-        return Result::Error("Current thread is already running a FiberJobWorker");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (localQueueScheduler != nullptr and localQueueScheduler != &scheduler)
     {
-        return Result::Error("FiberJobWorker deque belongs to another scheduler");
+        return Result::Error(FibersResultCategory, FibersError::WrongScheduler);
     }
     workerScheduler       = &scheduler;
     workerActive          = true;
@@ -4050,11 +4050,11 @@ Result FiberJobScheduler::create(Span<FiberJob*> readyStorage)
 {
     if (isOpen())
     {
-        return Result::Error("FiberJobScheduler is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (readyStorage.sizeInElements() == 0)
     {
-        return Result::Error("FiberJobScheduler ready capacity is zero");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     queueStorage = readyStorage;
@@ -4076,7 +4076,7 @@ Result FiberJobScheduler::close()
 {
     if (hasActiveJobs() or runningJob != nullptr)
     {
-        return Result::Error("FiberJobScheduler still has active jobs");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     queueStorage = {};
     queueHead    = 0;
@@ -4104,19 +4104,19 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
     };
     if (not allocator.isOpen())
     {
-        return Result::Error("FiberAllocator is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (workers.empty())
     {
-        return Result::Error("FiberJobWorker storage is empty");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (capacityPerWorker == 0)
     {
-        return Result::Error("FiberJobWorker deque capacity is zero");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (capacityPerWorker > static_cast<size_t>(-1) / sizeof(FiberJob*))
     {
-        return Result::Error("FiberJobWorker deque size overflow");
+        return Result::Error(FibersResultCategory, FibersError::CapacityExceeded);
     }
 
     size_t allocatedWorkers = 0;
@@ -4129,7 +4129,7 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
             {
                 resetDiagnostics(workers[index]);
             }
-            return Result::Error("FiberJobWorker already has a local deque");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (worker.workerActive or worker.workerScheduler != nullptr or worker.localQueueScheduler != nullptr or
             worker.workerJob != nullptr)
@@ -4139,7 +4139,7 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
             {
                 resetDiagnostics(workers[index]);
             }
-            return Result::Error("FiberJobWorker is active");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
 
         const size_t dequeBytes = capacityPerWorker * sizeof(FiberJob*);
@@ -4151,7 +4151,7 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
             {
                 resetDiagnostics(workers[index]);
             }
-            return Result::Error("FiberJobWorker deque allocation failed");
+            return Result::Error(FibersResultCategory, FibersError::AllocationFailed);
         }
 
         resetDiagnostics(worker);
@@ -4333,19 +4333,19 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
 {
     if (not isOpen())
     {
-        return Result::Error("FiberJobScheduler is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (job.isActive())
     {
-        return Result::Error("FiberJob is already active");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (job.ownerPool != nullptr and (not job.poolRetained or job.status() != FiberJobStatus::Invalid))
     {
-        return Result::Error("FiberJob must be newly acquired from its pool before spawning");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (not procedure.isValid())
     {
-        return Result::Error("FiberJob procedure is not valid");
+        return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
     }
     FiberJobWorker* worker = currentJobWorkerFor(*this);
     if (worker != nullptr and worker->localDeque != nullptr)
@@ -4380,11 +4380,11 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
     QueueLockGuard guard(*this);
     if (job.isActive())
     {
-        return Result::Error("FiberJob is already active");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (queueCount == queueStorage.sizeInElements())
     {
-        return Result::Error("FiberJobScheduler ready queue is full");
+        return Result::Error(FibersResultCategory, FibersError::QueueUnavailable);
     }
     initializeJobForSpawn(job, procedure, token);
     queueStorage[queueTail] = &job;
@@ -4408,15 +4408,15 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
 {
     if (not isOpen())
     {
-        return Result::Error("FiberJobScheduler is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (jobs.empty())
     {
-        return Result::Error("FiberJobScheduler batch is empty");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (not procedure.isValid())
     {
-        return Result::Error("FiberJob procedure is not valid");
+        return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
     }
 
     FiberJobWorker* worker = currentJobWorkerFor(*this);
@@ -4431,11 +4431,11 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
             {
                 if (job.isActive())
                 {
-                    return Result::Error("FiberJob batch contains an active job");
+                    return Result::Error(FibersResultCategory, FibersError::InvalidState);
                 }
                 if (job.ownerPool != nullptr and (not job.poolRetained or job.status() != FiberJobStatus::Invalid))
                 {
-                    return Result::Error("FiberJob batch contains a job not newly acquired from its pool");
+                    return Result::Error(FibersResultCategory, FibersError::InvalidState);
                 }
             }
 
@@ -4483,17 +4483,17 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
         QueueLockGuard guard(*this);
         if (jobs.sizeInElements() > queueStorage.sizeInElements() - queueCount)
         {
-            return Result::Error("FiberJobScheduler ready queue is full");
+            return Result::Error(FibersResultCategory, FibersError::QueueUnavailable);
         }
         for (FiberJob& job : jobs)
         {
             if (job.isActive())
             {
-                return Result::Error("FiberJob batch contains an active job");
+                return Result::Error(FibersResultCategory, FibersError::InvalidState);
             }
             if (job.ownerPool != nullptr and (not job.poolRetained or job.status() != FiberJobStatus::Invalid))
             {
-                return Result::Error("FiberJob batch contains a job not newly acquired from its pool");
+                return Result::Error(FibersResultCategory, FibersError::InvalidState);
             }
         }
         for (FiberJob& job : jobs)
@@ -4531,14 +4531,14 @@ Result FiberJobScheduler::runOne(bool& outRanJob)
     outRanJob = false;
     if (not isOpen())
     {
-        return Result::Error("FiberJobScheduler is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     FiberJob* job = nullptr;
     {
         QueueLockGuard guard(*this);
         if (runningJob != nullptr)
         {
-            return Result::Error("FiberJobScheduler is already running a job");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (queueCount == 0)
         {
@@ -4559,9 +4559,9 @@ Result FiberJobScheduler::runOne(bool& outRanJob)
 
     fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
     FiberJobContext context(*this, *job);
-    const Result    result =
-        isJobCancellationRequested(*job) ? Result::Error("FiberJob cancelled") : job->procedure(context);
-    outRanJob = true;
+    const Result result = isJobCancellationRequested(*job) ? Result::Error(FibersResultCategory, FibersError::Cancelled)
+                                                           : job->procedure(context);
+    outRanJob           = true;
     return complete(*job, result);
 }
 
@@ -4572,7 +4572,7 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
     outRanJob = false;
     if (not isOpen())
     {
-        return Result::Error("FiberJobScheduler is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     SC_TRY(worker.begin(*this));
 
@@ -4655,10 +4655,11 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
     worker.workerJob = job;
     fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
     FiberJobContext context(*this, *job);
-    const Result    procedureResult =
-        isJobCancellationRequested(*job) ? Result::Error("FiberJob cancelled") : job->procedure(context);
-    outRanJob              = true;
-    const Result runResult = complete(*job, procedureResult);
+    const Result    procedureResult = isJobCancellationRequested(*job)
+                                          ? Result::Error(FibersResultCategory, FibersError::Cancelled)
+                                          : job->procedure(context);
+    outRanJob                       = true;
+    const Result runResult          = complete(*job, procedureResult);
     worker.executedJobs += 1;
     worker.end();
     return runResult;
@@ -4672,7 +4673,7 @@ Result FiberJobScheduler::run()
         SC_TRY(runOne(ranJob));
         if (not ranJob)
         {
-            return Result::Error("FiberJobScheduler has worker-local jobs; use the worker run overload");
+            return Result::Error(FibersResultCategory, FibersError::UnexpectedWorkerState);
         }
     }
     return Result(true);
@@ -4686,7 +4687,7 @@ Result FiberJobScheduler::run(FiberJobWorker& worker, Span<FiberJobWorker> worke
         SC_TRY(runOne(worker, workerGroup, ranJob));
         if (not ranJob)
         {
-            return Result::Error("FiberJobScheduler worker group made no progress");
+            return Result::Error(FibersResultCategory, FibersError::NoProgress);
         }
     }
     return Result(true);
@@ -4706,7 +4707,7 @@ Result FiberJobScheduler::requestCancel(FiberJob& job)
     }
     if (job.ownerScheduler != this)
     {
-        return Result::Error("FiberJob belongs to another scheduler");
+        return Result::Error(FibersResultCategory, FibersError::WrongScheduler);
     }
     fiberTaskCancellationStore(job.cancelRequested, true);
     return Result(true);
