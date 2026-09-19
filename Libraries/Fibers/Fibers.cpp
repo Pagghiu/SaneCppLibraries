@@ -3392,11 +3392,11 @@ Result FiberAllocator::createFixed(Span<char> storage)
 {
     if (isOpen())
     {
-        return Result::Error("FiberAllocator is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (storage.empty())
     {
-        return Result::Error("FiberAllocator fixed storage is empty");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     resetState();
@@ -3409,11 +3409,11 @@ Result FiberAllocator::createVirtual(FiberAllocatorVirtualOptions options)
 {
     if (isOpen())
     {
-        return Result::Error("FiberAllocator is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (options.reserveBytes == 0)
     {
-        return Result::Error("FiberAllocator virtual reservation is empty");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     resetState();
@@ -3431,7 +3431,7 @@ Result FiberAllocator::createVirtual(FiberAllocatorVirtualOptions options)
     if (virtualMemory == nullptr)
     {
         resetState();
-        return Result::Error("FiberAllocator virtual reservation failed");
+        return Result::Error(FibersResultCategory, FibersError::MemoryReservationFailed);
     }
 
     currentMode = FiberAllocatorMode::Virtual;
@@ -3439,7 +3439,7 @@ Result FiberAllocator::createVirtual(FiberAllocatorVirtualOptions options)
     {
         releaseVirtualMemory();
         resetState();
-        return Result::Error("FiberAllocator virtual initial commit failed");
+        return Result::Error(FibersResultCategory, FibersError::MemoryCommitFailed);
     }
     return Result(true);
 }
@@ -3448,7 +3448,7 @@ Result FiberAllocator::createMalloc()
 {
     if (isOpen())
     {
-        return Result::Error("FiberAllocator is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     resetState();
     currentMode = FiberAllocatorMode::Malloc;
@@ -3459,7 +3459,7 @@ Result FiberAllocator::createPolymorphic(FiberAllocatorInterface& customAllocato
 {
     if (isOpen())
     {
-        return Result::Error("FiberAllocator is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     resetState();
     allocatorInterface = &customAllocatorInterface;
@@ -3475,7 +3475,7 @@ Result FiberAllocator::validateClose() const
     }
     if (currentStatistics.bytesInUse != 0 or currentStatistics.numAllocations != currentStatistics.numReleases)
     {
-        return Result::Error("FiberAllocator closed with live allocations");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     return Result(true);
 }

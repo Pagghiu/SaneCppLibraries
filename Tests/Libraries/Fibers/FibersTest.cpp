@@ -2683,7 +2683,9 @@ struct SC::FibersTest : public SC::TestCase
         char fixedMemory[2048] = {};
 
         FiberAllocator fixed;
+        SC_TEST_EXPECT(fixed.createFixed({}).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(fixed.createFixed(fixedMemory));
+        SC_TEST_EXPECT(fixed.createFixed(fixedMemory).isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(fixed.mode() == FiberAllocatorMode::Fixed);
         SC_TEST_EXPECT(fixed.capacity() == sizeof(fixedMemory));
         void* fixedA = fixed.allocate(nullptr, 64, alignof(void*));
@@ -2734,7 +2736,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(polymorphic.close());
 
         FiberAllocator virtualAllocator;
-        SC_TEST_EXPECT(not virtualAllocator.createVirtual({}));
+        SC_TEST_EXPECT(
+            virtualAllocator.createVirtual({}).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(virtualAllocator.createVirtual({64 * 1024, 0}));
         SC_TEST_EXPECT(virtualAllocator.mode() == FiberAllocatorMode::Virtual);
         SC_TEST_EXPECT(virtualAllocator.reservedBytes() >= 64 * 1024);
@@ -2751,7 +2754,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(liveAllocator.createFixed(liveMemoryStorage));
         void* liveMemory = liveAllocator.allocate(nullptr, 64, alignof(void*));
         SC_TEST_EXPECT(liveMemory != nullptr);
-        SC_TEST_EXPECT(not liveAllocator.validateClose());
+        SC_TEST_EXPECT(liveAllocator.validateClose().isError(FibersResultCategory, FibersError::InvalidState));
         liveAllocator.release(liveMemory);
         SC_TEST_EXPECT(liveAllocator.validateClose());
         SC_TEST_EXPECT(liveAllocator.close());
