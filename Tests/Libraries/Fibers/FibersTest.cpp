@@ -652,9 +652,9 @@ struct SC::FibersTest : public SC::TestCase
         FiberJob*         second          = nullptr;
         size_t            completed       = 0;
 
-        SC_TEST_EXPECT(not pool.create({jobs, 0}));
+        SC_TEST_EXPECT(pool.create({jobs, 0}).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(pool.create(jobs));
-        SC_TEST_EXPECT(not pool.create(jobs));
+        SC_TEST_EXPECT(pool.create(jobs).isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(scheduler.create(readyStorage));
         SC_TEST_EXPECT(pool.capacity() == 2);
         SC_TEST_EXPECT(pool.availableCount() == 2);
@@ -731,10 +731,12 @@ struct SC::FibersTest : public SC::TestCase
         size_t               completed       = 0;
 
         options.maxJobs = 2;
-        SC_TEST_EXPECT(not jobClass.create(closedAllocator, options));
+        SC_TEST_EXPECT(
+            jobClass.create(closedAllocator, options).isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
         options.maxJobs = 0;
-        SC_TEST_EXPECT(not jobClass.create(allocator, options));
+        SC_TEST_EXPECT(
+            jobClass.create(allocator, options).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         options.maxJobs = 2;
         SC_TEST_EXPECT(jobClass.create(allocator, options));
         SC_TEST_EXPECT(not jobClass.create(allocator, options));
@@ -800,7 +802,7 @@ struct SC::FibersTest : public SC::TestCase
             FiberJob::Procedure([](FiberJobContext&) { return Result::Error(ResultCategory(0x80000000u), 201u); })));
         SC_TEST_EXPECT(group.pendingCount() == 2);
         SC_TEST_EXPECT(group.jobCount() == 2);
-        SC_TEST_EXPECT(not group.reset());
+        SC_TEST_EXPECT(group.reset().isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(not pool.release(*first));
         SC_TEST_EXPECT(not scheduler.spawn(
             *first, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Must not replace result"); })));
@@ -809,12 +811,15 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(completed == 1);
         SC_TEST_EXPECT(group.pendingCount() == 0);
         SC_TEST_EXPECT(group.countErrors() == 1);
-        SC_TEST_EXPECT(not group.spawn(
-            pool, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Group requires reset"); })));
+        SC_TEST_EXPECT(group
+                           .spawn(pool, FiberJob::Procedure([](FiberJobContext&)
+                                                            { return Result::Error("Group requires reset"); }))
+                           .isError(FibersResultCategory, FibersError::GroupNotReset));
 
         FiberJobGroupError errors[1];
         size_t             numErrors = 0;
-        SC_TEST_EXPECT(not group.collectErrors({}, numErrors));
+        SC_TEST_EXPECT(
+            group.collectErrors({}, numErrors).isError(FibersResultCategory, FibersError::GroupStorageTooSmall));
         SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
         SC_TEST_EXPECT(numErrors == 1);
         SC_TEST_EXPECT(errors[0].job != nullptr);

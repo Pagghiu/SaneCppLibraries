@@ -4856,26 +4856,26 @@ struct FiberJobClassInternal
     {
         if (isOpen())
         {
-            return Result::Error("FiberJobClass is already open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (not jobAllocator.isOpen())
         {
-            return Result::Error("FiberJobClass allocator is not open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (options.maxJobs == 0)
         {
-            return Result::Error("FiberJobClass max jobs is zero");
+            return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
         }
         if (options.maxJobs > static_cast<size_t>(-1) / sizeof(FiberJob))
         {
-            return Result::Error("FiberJobClass job storage size overflow");
+            return Result::Error(FibersResultCategory, FibersError::CapacityExceeded);
         }
 
         FiberJob* jobStorage =
             static_cast<FiberJob*>(jobAllocator.allocate(this, options.maxJobs * sizeof(FiberJob), alignof(FiberJob)));
         if (jobStorage == nullptr)
         {
-            return Result::Error("FiberJobClass job allocation failed");
+            return Result::Error(FibersResultCategory, FibersError::AllocationFailed);
         }
 
         allocator = &jobAllocator;
@@ -4893,7 +4893,7 @@ struct FiberJobClassInternal
         outJobs = {};
         if (not isOpen() or boundPool != nullptr)
         {
-            return Result::Error("FiberJobClass cannot be bound");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         boundPool = &pool;
         outJobs   = {jobs, maxJobs};
@@ -4904,7 +4904,7 @@ struct FiberJobClassInternal
     {
         if (boundPool != &pool)
         {
-            return Result::Error("FiberJobClass cannot be unbound");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         boundPool = nullptr;
         return Result(true);
@@ -4912,7 +4912,7 @@ struct FiberJobClassInternal
 
     Result validateClose() const
     {
-        return boundPool == nullptr ? Result(true) : Result::Error("FiberJobClass is bound to a pool");
+        return boundPool == nullptr ? Result(true) : Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
 
     Result close()
@@ -5014,17 +5014,17 @@ Result FiberJobPool::create(Span<FiberJob> jobStorage)
 {
     if (isOpen())
     {
-        return Result::Error("FiberJobPool is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (jobStorage.sizeInElements() == 0)
     {
-        return Result::Error("FiberJobPool capacity is zero");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     for (FiberJob& job : jobStorage)
     {
         if (job.isActive() or job.ownerPool != nullptr)
         {
-            return Result::Error("FiberJobPool storage is already in use");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
     }
 
@@ -5055,7 +5055,7 @@ Result FiberJobPool::create(FiberJobClass& newJobClass)
 {
     if (isOpen())
     {
-        return Result::Error("FiberJobPool is already open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     Span<FiberJob> jobStorage;
     SC_TRY(newJobClass.internal.get().bind(*this, jobStorage));
@@ -5073,7 +5073,7 @@ Result FiberJobPool::close()
 {
     if (retainedJobs != 0)
     {
-        return Result::Error("FiberJobPool still has retained jobs");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (jobClass != nullptr)
     {
@@ -5121,17 +5121,17 @@ Result FiberJobPool::release(FiberJob& job)
     if (job.ownerPool != this or not job.poolRetained)
     {
         fiberSchedulerUnlock(poolLock);
-        return Result::Error("FiberJob is not retained by this pool");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (not job.isCompleted())
     {
         fiberSchedulerUnlock(poolLock);
-        return Result::Error("FiberJob is not completed");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (job.originGroup != nullptr)
     {
         fiberSchedulerUnlock(poolLock);
-        return Result::Error("FiberJob is retained by FiberJobGroup");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     releaseAcquiredUnlocked(job);
     fiberSchedulerUnlock(poolLock);
@@ -5177,12 +5177,12 @@ Result FiberJobPool::acquire(FiberJob*& outJob)
     if (not isOpen())
     {
         fiberSchedulerUnlock(poolLock);
-        return Result::Error("FiberJobPool is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (availableHead == nullptr)
     {
         fiberSchedulerUnlock(poolLock);
-        return Result::Error("FiberJobPool has no available job");
+        return Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
     }
 
     FiberJob* job      = availableHead;
@@ -5295,7 +5295,7 @@ Result FiberJobGroup::run()
         SC_TRY(jobScheduler.runOne(ranJob));
         if (not ranJob)
         {
-            return Result::Error("FiberJobGroup made no progress");
+            return Result::Error(FibersResultCategory, FibersError::NoProgress);
         }
     }
     return Result(true);
@@ -5328,7 +5328,7 @@ Result FiberJobGroup::reset()
     if (pendingJobs != 0)
     {
         fiberSchedulerUnlock(groupLock);
-        return Result::Error("FiberJobGroup cannot reset with pending jobs");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
 
     FiberJob* job = jobHead;
@@ -5398,7 +5398,7 @@ Result FiberJobGroup::collectErrors(Span<FiberJobGroupError> errors, size_t& out
             if (outErrors >= errors.sizeInElements())
             {
                 fiberSchedulerUnlock(groupLock);
-                return Result::Error("FiberJobGroup error storage is too small");
+                return Result::Error(FibersResultCategory, FibersError::GroupStorageTooSmall);
             }
             errors[outErrors].job    = job;
             errors[outErrors].result = job->result();
@@ -5412,9 +5412,8 @@ Result FiberJobGroup::collectErrors(Span<FiberJobGroupError> errors, size_t& out
 
 Result FiberJobGroup::prepareSpawn() const
 {
-    return jobHead != nullptr and pendingJobs == 0
-               ? Result::Error("FiberJobGroup must be reset before starting another job wave")
-               : Result(true);
+    return jobHead != nullptr and pendingJobs == 0 ? Result::Error(FibersResultCategory, FibersError::GroupNotReset)
+                                                   : Result(true);
 }
 
 void FiberJobGroup::linkJob(FiberJob& job)
