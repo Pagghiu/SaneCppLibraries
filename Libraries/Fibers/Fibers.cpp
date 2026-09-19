@@ -2624,58 +2624,58 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
 {
     if (isRunning())
     {
-        return Result::Error("FiberWorkerPool already running");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (workerStorage.empty() or threadStorage.empty())
     {
-        return Result::Error("FiberWorkerPool storage is empty");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (workerStorage.sizeInElements() != threadStorage.sizeInElements())
     {
-        return Result::Error("FiberWorkerPool worker/thread storage size mismatch");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if ((options.dequeAllocator == nullptr) != (options.dequeCapacityPerWorker == 0))
     {
-        return Result::Error("FiberWorkerPool deque allocator and capacity must be provided together");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if ((options.injectionAllocator == nullptr) != (options.injectionCapacity == 0))
     {
-        return Result::Error("FiberWorkerPool injection allocator and capacity must be provided together");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (not options.affinityMasks.empty() and options.affinityMasks.sizeInElements() != workerStorage.sizeInElements())
     {
-        return Result::Error("FiberWorkerPool affinity mask count must match worker count");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (options.stackGrowthRuntime == nullptr and not options.stackGrowthSignalStackStorage.empty())
     {
-        return Result::Error("FiberWorkerPool stack growth signal storage requires a runtime");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (options.stackGrowthRuntime != nullptr)
     {
         if (not options.stackGrowthRuntime->isOpen())
         {
-            return Result::Error("FiberWorkerPool stack growth runtime is not open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
 #if !SC_PLATFORM_WINDOWS
         const size_t signalStackCount =
             options.stackGrowthSignalStackStorage.sizeInBytes() / FiberStackGrowthSignalStackSize;
         if (signalStackCount < workerStorage.sizeInElements())
         {
-            return Result::Error("FiberWorkerPool stack growth signal storage is too small");
+            return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
         }
 #endif
     }
 #if SC_PLATFORM_APPLE
     if (not options.affinityMasks.empty())
     {
-        return Result::Error("FiberWorkerPool affinity is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
 #endif
 #if not SC_PLATFORM_WINDOWS
     if (options.threadPriority != FiberWorkerThreadPriority::Default and
         options.threadPriority != FiberWorkerThreadPriority::Normal)
     {
-        return Result::Error("FiberWorkerPool priority is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
 #endif
 
@@ -2730,7 +2730,7 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
             threads          = {};
             idleSpinAttempts = 0;
             fiberAtomicStore(running, 0);
-            return Result::Error("FiberScheduler already has a running worker pool");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         scheduler.workerPool = this;
     }
@@ -2887,7 +2887,7 @@ Result FiberWorkerPool::workerMain(size_t workerIndex)
 {
     if (poolScheduler == nullptr or workerIndex >= workers.sizeInElements())
     {
-        return Result::Error("FiberWorkerPool worker index is invalid");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     FiberScheduler& scheduler            = *poolScheduler;
@@ -2945,39 +2945,39 @@ Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWork
 {
     if (isRunning())
     {
-        return Result::Error("FiberJobWorkerPool already running");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (not scheduler.isOpen())
     {
-        return Result::Error("FiberJobScheduler is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (workerStorage.empty() or threadStorage.empty())
     {
-        return Result::Error("FiberJobWorkerPool storage is empty");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (workerStorage.sizeInElements() != threadStorage.sizeInElements())
     {
-        return Result::Error("FiberJobWorkerPool worker/thread storage size mismatch");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (options.dequeAllocator == nullptr or options.dequeCapacityPerWorker == 0)
     {
-        return Result::Error("FiberJobWorkerPool requires deque allocator and capacity");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (not options.affinityMasks.empty() and options.affinityMasks.sizeInElements() != workerStorage.sizeInElements())
     {
-        return Result::Error("FiberJobWorkerPool affinity mask count must match worker count");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 #if SC_PLATFORM_APPLE
     if (not options.affinityMasks.empty())
     {
-        return Result::Error("FiberJobWorkerPool affinity is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
 #endif
 #if not SC_PLATFORM_WINDOWS
     if (options.threadPriority != FiberWorkerThreadPriority::Default and
         options.threadPriority != FiberWorkerThreadPriority::Normal)
     {
-        return Result::Error("FiberJobWorkerPool priority is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
 #endif
 
@@ -2987,7 +2987,7 @@ Result FiberJobWorkerPool::start(FiberJobScheduler& scheduler, Span<FiberJobWork
     {
         fiberSchedulerUnlock(scheduler.queueLock);
         scheduler.releaseWorkerDeques(workerStorage);
-        return Result::Error("FiberJobScheduler already has a running worker pool");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     scheduler.workerPool = this;
     fiberSchedulerUnlock(scheduler.queueLock);
@@ -3045,7 +3045,7 @@ Result FiberJobWorkerPool::waitIdle()
 {
     if (not isRunning() or poolScheduler == nullptr)
     {
-        return Result::Error("FiberJobWorkerPool is not running");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     while (poolScheduler->hasActiveJobs())
     {
@@ -3062,7 +3062,7 @@ Result FiberJobWorkerPool::join()
 {
     if (isRunning() and keepAliveWhenIdle and not isStopRequested())
     {
-        return Result::Error("Persistent FiberJobWorkerPool requires requestStop before join");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     Result firstError = Result(true);
     bool   hasError   = false;
@@ -3158,7 +3158,7 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
 {
     if (poolScheduler == nullptr or workerIndex >= workers.sizeInElements())
     {
-        return Result::Error("FiberJobWorkerPool worker index is invalid");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     FiberJobScheduler& scheduler = *poolScheduler;

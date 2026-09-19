@@ -1241,7 +1241,8 @@ struct SC::FibersTest : public SC::TestCase
 
             SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
             SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(not workerPool.start(scheduler, {}, threads, options));
+            SC_TEST_EXPECT(workerPool.start(scheduler, {}, threads, options)
+                               .isError(FibersResultCategory, FibersError::InvalidConfiguration));
             State* statePointer = &state;
             SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
                                                                         { return statePointer->spawnChildren(); })));
@@ -1612,12 +1613,12 @@ struct SC::FibersTest : public SC::TestCase
                 SC_TEST_EXPECT(workerPool.isRunning());
             }
 
-            SC_TEST_EXPECT(not workerPool.join());
+            SC_TEST_EXPECT(workerPool.join().isError(FibersResultCategory, FibersError::InvalidState));
             SC_TEST_EXPECT(workerPool.isRunning());
             SC_TEST_EXPECT(workerPool.requestStop());
             SC_TEST_EXPECT(workerPool.join());
             SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(not workerPool.waitIdle());
+            SC_TEST_EXPECT(workerPool.waitIdle().isError(FibersResultCategory, FibersError::InvalidState));
             SC_TEST_EXPECT(allocator.used() == 0);
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());
@@ -4528,15 +4529,15 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(not workerPool.isRunning());
 
             Result noWorkers = workerPool.start(scheduler, {}, {threads, NumWorkers});
-            SC_TEST_EXPECT(not noWorkers);
+            SC_TEST_EXPECT(noWorkers.isError(FibersResultCategory, FibersError::InvalidConfiguration));
             SC_TEST_EXPECT(not workerPool.isRunning());
 
             Result noThreads = workerPool.start(scheduler, {workers, NumWorkers}, {});
-            SC_TEST_EXPECT(not noThreads);
+            SC_TEST_EXPECT(noThreads.isError(FibersResultCategory, FibersError::InvalidConfiguration));
             SC_TEST_EXPECT(not workerPool.isRunning());
 
             Result mismatch = workerPool.start(scheduler, {workers, NumWorkers - 1}, {threads, NumWorkers});
-            SC_TEST_EXPECT(not mismatch);
+            SC_TEST_EXPECT(mismatch.isError(FibersResultCategory, FibersError::InvalidConfiguration));
             SC_TEST_EXPECT(not workerPool.isRunning());
             for (FiberWorkerThread& thread : threads)
             {
@@ -4638,7 +4639,7 @@ struct SC::FibersTest : public SC::TestCase
             badAffinityOptions.affinityMasks = {mismatchedAffinityMasks, 1};
             Result badAffinity =
                 affinityPool.start(scheduler, {workers, NumWorkers}, {affinityThreads, NumWorkers}, badAffinityOptions);
-            SC_TEST_EXPECT(not badAffinity);
+            SC_TEST_EXPECT(badAffinity.isError(FibersResultCategory, FibersError::InvalidConfiguration));
             SC_TEST_EXPECT(not affinityPool.isRunning());
 
             FiberWorkerPoolOptions priorityOptions;
@@ -4651,7 +4652,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(priorityStart);
             SC_TEST_EXPECT(priorityPool.join());
 #else
-            SC_TEST_EXPECT(not priorityStart);
+            SC_TEST_EXPECT(priorityStart.isError(FibersResultCategory, FibersError::OperationUnsupported));
             SC_TEST_EXPECT(not priorityPool.isRunning());
 #endif
         }
