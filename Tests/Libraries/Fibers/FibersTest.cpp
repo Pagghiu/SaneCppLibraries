@@ -2776,12 +2776,13 @@ struct SC::FibersTest : public SC::TestCase
         FiberTask*     task = nullptr;
 
         FiberAllocator closedAllocator;
-        SC_TEST_EXPECT(not taskClass.create(closedAllocator, {3}));
+        SC_TEST_EXPECT(taskClass.create(closedAllocator, {3}).isError(FibersResultCategory, FibersError::InvalidState));
 
         char           memory[64 * 1024] = {};
         FiberAllocator allocator;
         SC_TEST_EXPECT(allocator.createFixed(memory));
-        SC_TEST_EXPECT(not taskClass.create(allocator, {}));
+        SC_TEST_EXPECT(
+            taskClass.create(allocator, {}).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(taskClass.create(allocator, {3}));
         SC_TEST_EXPECT(taskClass.isOpen());
         SC_TEST_EXPECT(taskClass.capacity() == 3);
@@ -2795,9 +2796,9 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(tasks[0] != tasks[1]);
         SC_TEST_EXPECT(tasks[1] != tasks[2]);
         SC_TEST_EXPECT(taskClass.owns(*tasks[0]));
-        SC_TEST_EXPECT(not taskClass.acquire(task));
+        SC_TEST_EXPECT(taskClass.acquire(task).isError(FibersResultCategory, FibersError::SlotUnavailable));
         SC_TEST_EXPECT(task == nullptr);
-        SC_TEST_EXPECT(not taskClass.validateClose());
+        SC_TEST_EXPECT(taskClass.validateClose().isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(not taskClass.close());
 
         FiberTaskClassDiagnostics diagnostics;
@@ -3864,7 +3865,7 @@ struct SC::FibersTest : public SC::TestCase
             FiberTaskGroupError smallErrors[1];
             numErrors          = 0;
             Result smallResult = group.collectErrors(smallErrors, numErrors);
-            SC_TEST_EXPECT(not smallResult);
+            SC_TEST_EXPECT(smallResult.isError(FibersResultCategory, FibersError::GroupStorageTooSmall));
             SC_TEST_EXPECT(numErrors == 1);
         }
 
@@ -3890,7 +3891,7 @@ struct SC::FibersTest : public SC::TestCase
             FiberTask* noSlotTask = &tasks[0];
             Result     noSlot =
                 group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &noSlotTask);
-            SC_TEST_EXPECT(not noSlot);
+            SC_TEST_EXPECT(noSlot.isError(FibersResultCategory, FibersError::SlotUnavailable));
             SC_TEST_EXPECT(noSlotTask == nullptr);
             SC_TEST_EXPECT(group.waitAll());
         }
@@ -3907,7 +3908,7 @@ struct SC::FibersTest : public SC::TestCase
                 pool, FiberTask::Procedure([](FiberScheduler&) { return Result::Error("Expected retained error"); }),
                 &firstTask));
             SC_TEST_EXPECT(firstTask == &task);
-            SC_TEST_EXPECT(not group.reset());
+            SC_TEST_EXPECT(group.reset().isError(FibersResultCategory, FibersError::InvalidState));
 
             Result firstWait = group.waitAll();
             SC_TEST_EXPECT(not firstWait);
@@ -3931,8 +3932,9 @@ struct SC::FibersTest : public SC::TestCase
                                                FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
 
             FiberTask* nextWaveTask = &task;
-            SC_TEST_EXPECT(not group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }),
-                                           &nextWaveTask));
+            SC_TEST_EXPECT(
+                group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &nextWaveTask)
+                    .isError(FibersResultCategory, FibersError::GroupNotReset));
             SC_TEST_EXPECT(nextWaveTask == nullptr);
 
             SC_TEST_EXPECT(group.reset());
@@ -3998,7 +4000,7 @@ struct SC::FibersTest : public SC::TestCase
         FiberTask* fullPoolTask = &tasks[0];
         Result     fullPool =
             pool.spawn(scheduler, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &fullPoolTask);
-        SC_TEST_EXPECT(not fullPool);
+        SC_TEST_EXPECT(fullPool.isError(FibersResultCategory, FibersError::SlotUnavailable));
         SC_TEST_EXPECT(fullPoolTask == nullptr);
         SC_TEST_EXPECT(scheduler.run());
         SC_TEST_EXPECT(state.completed == 2);

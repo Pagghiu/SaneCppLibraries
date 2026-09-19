@@ -5532,25 +5532,25 @@ struct FiberTaskClassInternal
     {
         if (isOpen())
         {
-            return Result::Error("FiberTaskClass is already open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (not taskAllocator.isOpen())
         {
-            return Result::Error("FiberTaskClass allocator is not open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (options.maxTasks == 0)
         {
-            return Result::Error("FiberTaskClass max tasks is zero");
+            return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
         }
         if (options.maxTasks > static_cast<size_t>(-1) / sizeof(FiberTask))
         {
-            return Result::Error("FiberTaskClass task storage size overflow");
+            return Result::Error(FibersResultCategory, FibersError::CapacityExceeded);
         }
 
         uint8_t* states = static_cast<uint8_t*>(taskAllocator.allocate(this, options.maxTasks, alignof(uint8_t)));
         if (states == nullptr)
         {
-            return Result::Error("FiberTaskClass state allocation failed");
+            return Result::Error(FibersResultCategory, FibersError::AllocationFailed);
         }
 
         FiberTask* taskStorage = static_cast<FiberTask*>(
@@ -5558,7 +5558,7 @@ struct FiberTaskClassInternal
         if (taskStorage == nullptr)
         {
             taskAllocator.release(states);
-            return Result::Error("FiberTaskClass task allocation failed");
+            return Result::Error(FibersResultCategory, FibersError::AllocationFailed);
         }
 
         allocator       = &taskAllocator;
@@ -5583,7 +5583,7 @@ struct FiberTaskClassInternal
         if (not isOpen())
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass is not open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         for (size_t offset = 0; offset < maxTasks; ++offset)
         {
@@ -5605,7 +5605,7 @@ struct FiberTaskClassInternal
             return Result(true);
         }
         fiberSchedulerUnlock(availabilityQueue.lock);
-        return Result::Error("FiberTaskClass has no available task");
+        return Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
     }
 
     Result releaseTask(FiberTask& task)
@@ -5615,22 +5615,22 @@ struct FiberTaskClassInternal
         if (index >= maxTasks)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass does not own task");
+            return Result::Error(FibersResultCategory, FibersError::WrongOwner);
         }
         if (taskStates[index] == 0)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass task is not active");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (task.isActive())
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass cannot release active task");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (task.originGroup != nullptr)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass cannot release a task retained by FiberTaskGroup");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
 
         taskStates[index] = 0;
@@ -5645,7 +5645,7 @@ struct FiberTaskClassInternal
     {
         if (not isOpen())
         {
-            return Result::Error("FiberTaskClass is not open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         return availabilityQueue.wait(scheduler, hasAvailableSlot, this);
     }
@@ -5656,7 +5656,7 @@ struct FiberTaskClassInternal
         if (not isOpen() or activeTasks != 0 or boundPool != nullptr)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass cannot be bound");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         boundPool = &pool;
         fiberSchedulerUnlock(availabilityQueue.lock);
@@ -5669,7 +5669,7 @@ struct FiberTaskClassInternal
         if (boundPool != &pool or activeTasks != 0 or availabilityQueue.hasWaitersUnlocked())
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberTaskClass cannot be unbound");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         boundPool = nullptr;
         fiberSchedulerUnlock(availabilityQueue.lock);
@@ -5681,7 +5681,7 @@ struct FiberTaskClassInternal
         fiberSchedulerLock(availabilityQueue.lock);
         const bool canClose = activeTasks == 0 and not availabilityQueue.hasWaitersUnlocked() and boundPool == nullptr;
         fiberSchedulerUnlock(availabilityQueue.lock);
-        return canClose ? Result(true) : Result::Error("FiberTaskClass closed with active tasks or waiters");
+        return canClose ? Result(true) : Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
 
     Result close()
@@ -5834,7 +5834,7 @@ static Result fiberTaskGroupSpawnOptions(const FiberTaskSpawnOptions& input, Fib
 {
     if (input.counter != nullptr)
     {
-        return Result::Error("FiberTaskGroup owns the spawn counter");
+        return Result::Error(FibersResultCategory, FibersError::WrongOwner);
     }
     output         = input;
     output.counter = &counter;
@@ -5972,7 +5972,7 @@ Result FiberTaskGroup::waitCancelOnError(Result* outFirstError)
 {
     if (scheduler.currentTask() != nullptr)
     {
-        return Result::Error("FiberTaskGroup::waitCancelOnError must be called from the root scheduler");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
 
     Result firstError = Result(true);
@@ -6022,7 +6022,7 @@ Result FiberTaskGroup::reset()
 {
     if (counter.value() != 0)
     {
-        return Result::Error("FiberTaskGroup cannot reset with pending tasks");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
 
     FiberTask* task = taskHead;
@@ -6084,7 +6084,7 @@ Result FiberTaskGroup::collectErrors(Span<FiberTaskGroupError> errors, size_t& o
         {
             if (outErrors >= errors.sizeInElements())
             {
-                return Result::Error("FiberTaskGroup error storage is too small");
+                return Result::Error(FibersResultCategory, FibersError::GroupStorageTooSmall);
             }
             errors[outErrors].task   = task;
             errors[outErrors].result = task->result();
@@ -6098,7 +6098,7 @@ Result FiberTaskGroup::collectErrors(Span<FiberTaskGroupError> errors, size_t& o
 Result FiberTaskGroup::prepareSpawn() const
 {
     return taskHead != nullptr and counter.value() == 0
-               ? Result::Error("FiberTaskGroup must be reset before starting another task wave")
+               ? Result::Error(FibersResultCategory, FibersError::GroupNotReset)
                : Result(true);
 }
 
@@ -6151,7 +6151,7 @@ Result FiberTaskPool::create(FiberTaskClass& newTaskClass, FiberStackClass& newS
     if (taskClass != nullptr or stackClass != nullptr or tasks.sizeInElements() != 0 or stacks.sizeInBytes() != 0 or
         stackSize != 0)
     {
-        return Result::Error("FiberTaskPool is already configured");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     SC_TRY(newTaskClass.internal.get().bind(*this));
     Result stackBindResult = newStackClass.internal.get().bind(*this);
@@ -6173,7 +6173,7 @@ Result FiberTaskPool::close()
     }
     if (taskClass == nullptr or stackClass == nullptr)
     {
-        return Result::Error("FiberTaskPool class configuration is incomplete");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     SC_TRY(taskClass->internal.get().unbind(*this));
@@ -6243,7 +6243,7 @@ Result FiberTaskPool::spawn(FiberScheduler& scheduler, FiberTask::Procedure proc
     }
     if (stackSize == 0)
     {
-        return Result::Error("FiberTaskPool stack size is zero");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     const size_t numTasks  = capacity();
@@ -6262,17 +6262,17 @@ Result FiberTaskPool::spawn(FiberScheduler& scheduler, FiberTask::Procedure proc
     }
     if (task == nullptr)
     {
-        return Result::Error("FiberTaskPool has no available task");
+        return Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
     }
 
     if ((taskIndex + 1) * stackSize > stacks.sizeInBytes())
     {
-        return Result::Error("FiberTaskPool stack storage is too small");
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
     }
 
     Span<char> stackMemory;
-    SC_TRY_MSG(stacks.sliceStartLength(taskIndex * stackSize, stackSize, stackMemory),
-               "FiberTaskPool stack storage is too small");
+    if (not stacks.sliceStartLength(taskIndex * stackSize, stackSize, stackMemory))
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
 
     FiberTaskSpawnOptions poolOptions = options;
     poolOptions.originPool            = this;
@@ -6374,7 +6374,7 @@ Result FiberTaskPool::waitForAvailableTasks(FiberScheduler& scheduler, size_t mi
 {
     if (minimumAvailable == 0 or minimumAvailable > capacity())
     {
-        return Result::Error("FiberTaskPool minimum available count is invalid");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (taskClass != nullptr and stackClass != nullptr)
     {
@@ -6461,7 +6461,7 @@ Result FiberTaskPool::stackHighWaterUsedBytes(size_t stackIndex, size_t& outByte
 {
     if (stackClass != nullptr)
     {
-        return Result::Error("FiberTaskPool class-backed per-stack high water is unavailable");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
     FiberStack stack({nullptr, 0});
     SC_TRY(stackAt(stackIndex, stack));
@@ -6473,7 +6473,7 @@ Result FiberTaskPool::stackHighWaterUnusedBytes(size_t stackIndex, size_t& outBy
 {
     if (stackClass != nullptr)
     {
-        return Result::Error("FiberTaskPool class-backed per-stack high water is unavailable");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
     FiberStack stack({nullptr, 0});
     SC_TRY(stackAt(stackIndex, stack));
@@ -6550,11 +6550,11 @@ Result FiberTaskPool::stackAt(size_t stackIndex, FiberStack& outStack) const
 {
     if (stackIndex >= capacity())
     {
-        return Result::Error("FiberTaskPool stack index out of range");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     Span<char> stackMemory;
-    SC_TRY_MSG(stacks.sliceStartLength(stackIndex * stackSize, stackSize, stackMemory),
-               "FiberTaskPool stack storage is too small");
+    if (not stacks.sliceStartLength(stackIndex * stackSize, stackSize, stackMemory))
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
     outStack = FiberStack(stackMemory);
     return Result(true);
 }
