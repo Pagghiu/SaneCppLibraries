@@ -464,18 +464,18 @@ struct FiberStackGrowthRuntimeInternal
     {
         if (open)
         {
-            return Result::Error("FiberStackGrowthRuntime is already open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (not FiberStackGrowthRuntime::isSupported())
         {
-            return Result::Error("Fiber stack growth is unavailable under the active tooling");
+            return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
         }
 
         fiberStackGrowthLock();
         if (fiberStackGrowthRuntimeLoad() != nullptr)
         {
             fiberStackGrowthUnlock();
-            return Result::Error("Another FiberStackGrowthRuntime is already open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         fiberStackGrowthRuntimeStore(this);
 
@@ -489,14 +489,14 @@ struct FiberStackGrowthRuntimeInternal
         {
             fiberStackGrowthRuntimeStore(nullptr);
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthRuntime could not install SIGSEGV handling");
+            return Result::Error(FibersResultCategory, FibersError::SignalHandlerInstallFailed);
         }
         if (sigaction(SIGBUS, &action, &previousBusAction) != 0)
         {
             SC_FIBERS_ASSERT_RELEASE(sigaction(SIGSEGV, &previousSegmentationAction, nullptr) == 0);
             fiberStackGrowthRuntimeStore(nullptr);
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthRuntime could not install SIGBUS handling");
+            return Result::Error(FibersResultCategory, FibersError::SignalHandlerInstallFailed);
         }
 #endif
         registeredThreads = 0;
@@ -516,7 +516,7 @@ struct FiberStackGrowthRuntimeInternal
         if (registeredThreads != 0)
         {
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthRuntime still has registered threads");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
 #if !SC_PLATFORM_WINDOWS
         struct sigaction currentSegmentationAction = {};
@@ -527,13 +527,13 @@ struct FiberStackGrowthRuntimeInternal
             not fiberStackGrowthSignalMatches(currentBusAction))
         {
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthRuntime no longer owns the process signal handlers");
+            return Result::Error(FibersResultCategory, FibersError::WrongOwner);
         }
         if (sigaction(SIGBUS, &previousBusAction, nullptr) != 0 or
             sigaction(SIGSEGV, &previousSegmentationAction, nullptr) != 0)
         {
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthRuntime could not restore process signal handlers");
+            return Result::Error(FibersResultCategory, FibersError::SignalHandlerRestoreFailed);
         }
 #endif
         SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthRuntimeLoad() == this);
@@ -563,16 +563,16 @@ struct FiberStackGrowthThreadInternal
     {
         if (open)
         {
-            return Result::Error("FiberStackGrowthThread is already open");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (fiberStackGrowthThread != nullptr)
         {
-            return Result::Error("This thread already has a FiberStackGrowthThread");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
 #if !SC_PLATFORM_WINDOWS
         if (signalStackStorage.sizeInBytes() < FiberStackGrowthSignalStackSize)
         {
-            return Result::Error("FiberStackGrowthThread signal stack storage is too small");
+            return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
         }
 #else
         (void)signalStackStorage;
@@ -582,7 +582,7 @@ struct FiberStackGrowthThreadInternal
         if (not newRuntime.open or fiberStackGrowthRuntimeLoad() != &newRuntime)
         {
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthRuntime is closing");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         newRuntime.registeredThreads += 1;
         fiberStackGrowthUnlock();
@@ -599,7 +599,7 @@ struct FiberStackGrowthThreadInternal
             SC_FIBERS_ASSERT_RELEASE(newRuntime.registeredThreads > 0);
             newRuntime.registeredThreads -= 1;
             fiberStackGrowthUnlock();
-            return Result::Error("FiberStackGrowthThread could not install its signal stack");
+            return Result::Error(FibersResultCategory, FibersError::SignalStackInstallFailed);
         }
         ownerThread       = pthread_self();
         signalStackMemory = signalStack.ss_sp;
@@ -620,18 +620,18 @@ struct FiberStackGrowthThreadInternal
 #if SC_PLATFORM_WINDOWS
         if (ownerThread != GetCurrentThreadId())
         {
-            return Result::Error("FiberStackGrowthThread must close on its owning thread");
+            return Result::Error(FibersResultCategory, FibersError::WrongOwner);
         }
 #else
         if (not pthread_equal(ownerThread, pthread_self()))
         {
-            return Result::Error("FiberStackGrowthThread must close on its owning thread");
+            return Result::Error(FibersResultCategory, FibersError::WrongOwner);
         }
         stack_t currentSignalStack = {};
         if (sigaltstack(nullptr, &currentSignalStack) != 0 or currentSignalStack.ss_sp != signalStackMemory or
             currentSignalStack.ss_size != signalStackSize)
         {
-            return Result::Error("FiberStackGrowthThread no longer owns this thread's signal stack");
+            return Result::Error(FibersResultCategory, FibersError::WrongOwner);
         }
         stack_t signalStackToRestore = previousSignalStack;
         if ((signalStackToRestore.ss_flags & SS_DISABLE) != 0)
@@ -640,7 +640,7 @@ struct FiberStackGrowthThreadInternal
         }
         if (sigaltstack(&signalStackToRestore, nullptr) != 0)
         {
-            return Result::Error("FiberStackGrowthThread could not restore its previous signal stack");
+            return Result::Error(FibersResultCategory, FibersError::SignalStackRestoreFailed);
         }
 #endif
         SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthThread == this);

@@ -7781,30 +7781,35 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not runtime.isOpen());
         if (not FiberStackGrowthRuntime::isSupported())
         {
-            SC_TEST_EXPECT(not runtime.create());
+            SC_TEST_EXPECT(runtime.create().isError(FibersResultCategory, FibersError::OperationUnsupported));
             return;
         }
         SC_TEST_EXPECT(runtime.create());
+        SC_TEST_EXPECT(runtime.create().isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(runtime.isOpen());
         SC_TEST_EXPECT(runtime.registeredThreadCount() == 0);
-        SC_TEST_EXPECT(not competingRuntime.create());
+        SC_TEST_EXPECT(competingRuntime.create().isError(FibersResultCategory, FibersError::InvalidState));
 
 #if SC_PLATFORM_WINDOWS
         SC_TEST_EXPECT(growthThread.create(runtime, {}));
 #else
         char signalStack[FiberStackGrowthSignalStackSize] = {};
         char insufficientSignalStack[4096]                = {};
-        SC_TEST_EXPECT(not growthThread.create(runtime, insufficientSignalStack));
+        SC_TEST_EXPECT(growthThread.create(runtime, insufficientSignalStack)
+                           .isError(FibersResultCategory, FibersError::StorageTooSmall));
         SC_TEST_EXPECT(growthThread.create(runtime, signalStack));
 #endif
         SC_TEST_EXPECT(growthThread.isOpen());
         SC_TEST_EXPECT(runtime.registeredThreadCount() == 1);
-        SC_TEST_EXPECT(not runtime.close());
+        SC_TEST_EXPECT(runtime.close().isError(FibersResultCategory, FibersError::InvalidState));
 
         Atomic<bool> foreignCloseRejected;
         Thread       foreignThread;
-        SC_TEST_EXPECT(foreignThread.start([&growthThread, &foreignCloseRejected](Thread&)
-                                           { foreignCloseRejected.store(not growthThread.close()); }));
+        SC_TEST_EXPECT(foreignThread.start(
+            [&growthThread, &foreignCloseRejected](Thread&)
+            {
+                foreignCloseRejected.store(growthThread.close().isError(FibersResultCategory, FibersError::WrongOwner));
+            }));
         SC_TEST_EXPECT(foreignThread.join());
         SC_TEST_EXPECT(foreignCloseRejected.load());
         SC_TEST_EXPECT(growthThread.isOpen());
