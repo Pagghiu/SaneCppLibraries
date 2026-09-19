@@ -84,7 +84,7 @@ SC::Result SC::AsyncRequest::executeOn(AsyncTaskSequence& task, ThreadPool& pool
 {
     if (flags & AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse)
     {
-        return Result::Error("AsyncTaskSequence is bound to a different async being started");
+        return Result::Error(AsyncResultCategory, AsyncError::RequestInUse);
     }
     task.threadPool = &pool;
     sequence        = &task;
@@ -118,7 +118,8 @@ SC::Result SC::AsyncRequest::checkState()
 {
     const bool asyncStateIsFree = state == AsyncRequest::State::Free;
     SC_LOG_MESSAGE("{} {} QUEUE\n", debugName, AsyncRequest::TypeToString(type));
-    SC_TRY_MSG(asyncStateIsFree, "Trying to stage AsyncRequest that is in use");
+    if (not asyncStateIsFree)
+        return Result::Error(AsyncResultCategory, AsyncError::RequestInUse);
     return SC::Result(true);
 }
 
@@ -936,7 +937,8 @@ SC::AsyncEventLoop::AsyncEventLoop() : internal(internalOpaque.get()) {}
 
 SC::Result SC::AsyncEventLoop::create(Options options)
 {
-    SC_TRY_MSG(not internal.initialized, "already created");
+    if (internal.initialized)
+        return Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized);
     SC_TRY(internal.kernelQueue.get().createEventLoop(options));
     SC_TRY(internal.kernelQueue.get().createSharedWatchers(*this));
     internal.initialized   = true;
@@ -946,7 +948,8 @@ SC::Result SC::AsyncEventLoop::create(Options options)
 
 SC::Result SC::AsyncEventLoop::close()
 {
-    SC_TRY_MSG(internal.initialized, "already closed");
+    if (not internal.initialized)
+        return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
     SC_TRY(internal.close(*this));
     internal.initialized = false;
     return SC::Result(true);
@@ -2313,7 +2316,7 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
     break;
     case AsyncRequest::State::Free:
         // TODO: Not sure if we should error out here
-        return SC::Result::Error("Trying to stop AsyncRequest that is not active");
+        return SC::Result::Error(AsyncResultCategory, AsyncError::RequestNotActive);
     case AsyncRequest::State::Cancelling:
         // Already Cancelling, but now we update the stop function
         break;
@@ -2323,7 +2326,8 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
 
 SC::Result SC::AsyncEventLoop::Internal::unscheduleLoopTimeout(AsyncLoopTimeout& timeout)
 {
-    SC_TRY_MSG(timeout.sequence == nullptr, "Cannot unschedule a sequenced AsyncLoopTimeout");
+    if (timeout.sequence != nullptr)
+        return Result::Error(AsyncResultCategory, AsyncError::SequencedTimeout);
     switch (timeout.state)
     {
     case AsyncRequest::State::Free: timeout.closeCallback = nullptr; return Result(true);
@@ -2340,9 +2344,9 @@ SC::Result SC::AsyncEventLoop::Internal::unscheduleLoopTimeout(AsyncLoopTimeout&
     case AsyncRequest::State::Submitting:
     case AsyncRequest::State::Reactivate:
     case AsyncRequest::State::Cancelling:
-        return Result::Error("Cannot unschedule AsyncLoopTimeout in transitional state");
+        return Result::Error(AsyncResultCategory, AsyncError::TimeoutTransitionInProgress);
     }
-    return Result::Error("Cannot unschedule AsyncLoopTimeout in unknown state");
+    return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
 }
 
 void SC::AsyncEventLoop::Internal::updateTime()

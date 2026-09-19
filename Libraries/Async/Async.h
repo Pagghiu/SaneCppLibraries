@@ -17,6 +17,7 @@
 #include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"
 #include "../Threading/ThreadPool.h"
+#include "AsyncError.h"
 
 namespace SC
 {

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Async/Async.h"
+#include "Libraries/Async/AsyncErrorFormatter.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
@@ -27,6 +28,10 @@ struct SC::AsyncContractTest : public SC::TestCase
 
         for (int idx = 0; idx < numRuns; ++idx)
         {
+            if (test_section("structured lifecycle errors"))
+            {
+                structuredLifecycleErrors();
+            }
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -188,6 +193,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     }
 
     void stopSuppressesNormalCallback();
+    void structuredLifecycleErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -252,6 +258,56 @@ struct SC::AsyncContractTest : public SC::TestCase
         return predicate();
     }
 };
+
+void SC::AsyncContractTest::structuredLifecycleErrors()
+{
+    static_assert(AsyncResultCategory.value == 13, "Async category is registry value 13");
+    static_assert(static_cast<uint32_t>(AsyncError::AlreadyInitialized) == 1, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidState) == 7, "Async errors are append-only");
+
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    SC_TEST_EXPECT(loop.create(options).isError(AsyncResultCategory, AsyncError::AlreadyInitialized));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [](AsyncLoopTimeout::Result&) {};
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{1000}));
+    const Result inUse = timeout.start(loop, TimeMs{1000});
+    SC_TEST_EXPECT(inUse.isError(AsyncResultCategory, AsyncError::RequestInUse));
+    SC_TEST_EXPECT(inUse.message == nullptr);
+    SC_TEST_EXPECT(timeout.unschedule(loop));
+
+    AsyncTaskSequence sequence;
+    AsyncLoopTimeout  sequenced;
+    sequenced.callback = [](AsyncLoopTimeout::Result&) {};
+    sequenced.executeOn(sequence);
+    SC_TEST_EXPECT(sequenced.start(loop, TimeMs{0}));
+    SC_TEST_EXPECT(sequenced.unschedule(loop).isError(AsyncResultCategory, AsyncError::SequencedTimeout));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(sequenced.isFree());
+    SC_TEST_EXPECT(timeout.stop(loop).isError(AsyncResultCategory, AsyncError::RequestNotActive));
+
+    char              message[64];
+    ResultErrorFormat formatted = formatAsyncError(inUse, message);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Request is already in use"));
+    SC_TEST_EXPECT(message[0] == 'R');
+    formatted = formatAsyncError(AsyncError::RequestInUse, {});
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Request is already in use"));
+    char tooSmall[2] = {'x', 'x'};
+    formatted        = formatAsyncError(AsyncError::RequestInUse, tooSmall);
+    SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
+    SC_TEST_EXPECT(tooSmall[0] == '\0');
+    SC_TEST_EXPECT(formatAsyncError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+    SC_TEST_EXPECT(formatAsyncError(Result::Error(ResultCategory(99), 1), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
+    SC_TEST_EXPECT(formatAsyncError(Result::Error(AsyncResultCategory, 999), message).status ==
+                   ResultErrorFormatStatus::UnknownError);
+
+    SC_TEST_EXPECT(loop.close());
+    SC_TEST_EXPECT(loop.close().isError(AsyncResultCategory, AsyncError::NotInitialized));
+}
 
 void SC::AsyncContractTest::stopSuppressesNormalCallback()
 {

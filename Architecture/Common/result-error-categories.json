@@ -82,6 +82,12 @@
       "owner": "Fibers",
       "declaration": "Libraries/Fibers/FibersError.h",
       "constant": "FibersResultCategory"
+    },
+    {
+      "value": 13,
+      "owner": "Async",
+      "declaration": "Libraries/Async/AsyncError.h",
+      "constant": "AsyncResultCategory"
     }
   ]
 }
