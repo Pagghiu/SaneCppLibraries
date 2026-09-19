@@ -21,6 +21,11 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::SequencedTimeout: formatter.append("Sequenced timeout cannot be unscheduled"); break;
     case AsyncError::TimeoutTransitionInProgress: formatter.append("Timeout is changing state"); break;
     case AsyncError::InvalidState: formatter.append("Operation is invalid in the current state"); break;
+    case AsyncError::InvalidCallback: formatter.append("Work callback is invalid"); break;
+    case AsyncError::MissingThreadPool: formatter.append("Thread pool has not been set"); break;
+    case AsyncError::InvalidHandle: formatter.append("Handle is invalid"); break;
+    case AsyncError::InvalidSignal: formatter.append("Signal number is invalid"); break;
+    case AsyncError::UnsupportedSignal: formatter.append("Signal cannot be watched"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

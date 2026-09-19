@@ -20,6 +20,11 @@ enum class AsyncError : uint32_t
     SequencedTimeout,
     TimeoutTransitionInProgress,
     InvalidState,
+    InvalidCallback,
+    MissingThreadPool,
+    InvalidHandle,
+    InvalidSignal,
+    UnsupportedSignal,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

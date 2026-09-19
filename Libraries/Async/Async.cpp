@@ -291,8 +291,10 @@ int32_t SC::AsyncLoopWakeUp::getPendingWakeUps() const { return pendingWakeUps.l
 
 SC::Result SC::AsyncLoopWork::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(work.isValid(), "AsyncLoopWork::start - Invalid work callback");
-    SC_TRY_MSG(sequence != nullptr, "AsyncLoopWork::start - setThreadPool not called");
+    if (not work.isValid())
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidCallback);
+    if (sequence == nullptr)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::MissingThreadPool);
     return SC::Result(true);
 }
 
@@ -309,7 +311,8 @@ SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, FileDescriptor::Han
 
 SC::Result SC::AsyncProcessExit::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncProcessExit - Invalid handle");
+    if (handle == FileDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidHandle);
     return SC::Result(true);
 }
 
@@ -322,18 +325,21 @@ SC::Result SC::AsyncSignal::start(AsyncEventLoop& loop, int num, AsyncSignalOpti
 
 SC::Result SC::AsyncSignal::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(signalNumber > 0, "AsyncSignal - Invalid signal number");
+    if (signalNumber <= 0)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSignal);
 #if SC_PLATFORM_WINDOWS
     // Only console control signals are supported on Windows:
     // SIGINT (2) -> CTRL_C_EVENT, 21 -> CTRL_BREAK_EVENT, SIGTERM (15) -> CTRL_CLOSE_EVENT
-    SC_TRY_MSG(signalNumber == 2 or signalNumber == 21 or signalNumber == 15,
-               "AsyncSignal - Unsupported signal on Windows (only SIGINT=2, SIGBREAK=21, SIGTERM=15)");
+    if (signalNumber != 2 and signalNumber != 21 and signalNumber != 15)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::UnsupportedSignal);
 #else
 #if defined(SIGKILL)
-    SC_TRY_MSG(signalNumber != SIGKILL, "AsyncSignal - SIGKILL cannot be handled");
+    if (signalNumber == SIGKILL)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::UnsupportedSignal);
 #endif
 #if defined(SIGSTOP)
-    SC_TRY_MSG(signalNumber != SIGSTOP, "AsyncSignal - SIGSTOP cannot be handled");
+    if (signalNumber == SIGSTOP)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::UnsupportedSignal);
 #endif
 #endif
     return SC::Result(true);

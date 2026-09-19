@@ -264,6 +264,7 @@ void SC::AsyncContractTest::structuredLifecycleErrors()
     static_assert(AsyncResultCategory.value == 13, "Async category is registry value 13");
     static_assert(static_cast<uint32_t>(AsyncError::AlreadyInitialized) == 1, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::InvalidState) == 7, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::UnsupportedSignal) == 12, "Async errors are append-only");
 
     AsyncEventLoop loop;
     SC_TEST_EXPECT(loop.create(options));
@@ -1189,14 +1190,30 @@ void SC::AsyncContractTest::validationFailureLeavesRequestFree()
     signal.callback = [&](AsyncSignal::Result&) { callbacks++; };
 
     Result startResult = signal.start(eventLoop, -1);
-    SC_TEST_EXPECT(not startResult);
+    SC_TEST_EXPECT(startResult.isError(AsyncResultCategory, AsyncError::InvalidSignal));
     SC_TEST_EXPECT(signal.isFree());
     SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 0);
 
+    // Signal 9 is uncatchable on POSIX and outside the supported console set on Windows.
+    SC_TEST_EXPECT(signal.start(eventLoop, 9).isError(AsyncResultCategory, AsyncError::UnsupportedSignal));
+    SC_TEST_EXPECT(signal.isFree());
+
     SC_TEST_EXPECT(eventLoop.runNoWait());
     SC_TEST_EXPECT(callbacks == 0);
     SC_TEST_EXPECT(signal.isFree());
+
+    AsyncProcessExit processExit;
+    SC_TEST_EXPECT(
+        processExit.start(eventLoop, FileDescriptor::Invalid).isError(AsyncResultCategory, AsyncError::InvalidHandle));
+    SC_TEST_EXPECT(processExit.isFree());
+
+    AsyncLoopWork work;
+    SC_TEST_EXPECT(work.start(eventLoop).isError(AsyncResultCategory, AsyncError::InvalidCallback));
+    SC_TEST_EXPECT(work.isFree());
+    work.work = [] { return Result(true); };
+    SC_TEST_EXPECT(work.start(eventLoop).isError(AsyncResultCategory, AsyncError::MissingThreadPool));
+    SC_TEST_EXPECT(work.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
 
