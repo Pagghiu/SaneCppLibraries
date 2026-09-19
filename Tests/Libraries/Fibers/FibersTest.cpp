@@ -8441,8 +8441,9 @@ struct SC::FibersTest : public SC::TestCase
         options.guardPage        = true;
 
         FiberStackClass stackClass;
-        SC_TEST_EXPECT(not stackClass.reserve({}));
+        SC_TEST_EXPECT(stackClass.reserve({}).isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(stackClass.reserve(options));
+        SC_TEST_EXPECT(stackClass.reserve(options).isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(stackClass.isReserved());
         SC_TEST_EXPECT(stackClass.capacity() == 2);
         SC_TEST_EXPECT(stackClass.activeCount() == 0);
@@ -8475,7 +8476,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(stackClass.owns(secondStack));
         SC_TEST_EXPECT(firstStack.memory().data() != secondStack.memory().data());
         SC_TEST_EXPECT(stackClass.activeCount() == 2);
-        SC_TEST_EXPECT(not stackClass.acquire(exhaustedStack));
+        SC_TEST_EXPECT(stackClass.acquire(exhaustedStack).isError(FibersResultCategory, FibersError::SlotUnavailable));
 
         FiberScheduler scheduler;
         FiberTask      task;
@@ -8527,10 +8528,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberStackClass        incrementalClass;
         FiberStackClassOptions invalidIncrementalOptions   = incrementalOptions;
         invalidIncrementalOptions.initialCommitSizeInBytes = 0;
-        SC_TEST_EXPECT(not incrementalClass.reserve(invalidIncrementalOptions));
+        SC_TEST_EXPECT(incrementalClass.reserve(invalidIncrementalOptions)
+                           .isError(FibersResultCategory, FibersError::InvalidConfiguration));
         invalidIncrementalOptions                         = incrementalOptions;
         invalidIncrementalOptions.growthCommitSizeInBytes = incrementalOptions.stackSizeInBytes * 2;
-        SC_TEST_EXPECT(not incrementalClass.reserve(invalidIncrementalOptions));
+        SC_TEST_EXPECT(incrementalClass.reserve(invalidIncrementalOptions)
+                           .isError(FibersResultCategory, FibersError::InvalidConfiguration));
         SC_TEST_EXPECT(incrementalClass.reserve(incrementalOptions));
 
         incrementalClass.diagnostics(diagnostics);

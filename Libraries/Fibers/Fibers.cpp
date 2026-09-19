@@ -1235,15 +1235,15 @@ struct FiberStackClassInternal
     {
         if (isReserved())
         {
-            return Result::Error("FiberStackClass is already reserved");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (options.stackSizeInBytes < FiberStackMinimumSize)
         {
-            return Result::Error("FiberStackClass stack size is too small");
+            return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
         }
         if (options.maxStacks == 0)
         {
-            return Result::Error("FiberStackClass max stacks is zero");
+            return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
         }
 
         stackBytes = FiberVirtualMemory::roundUpToPageSize(options.stackSizeInBytes);
@@ -1252,12 +1252,12 @@ struct FiberStackClassInternal
             if (not FiberStackGrowthRuntime::isSupported())
             {
                 resetMetadata();
-                return Result::Error("Incremental FiberStackClass is unavailable under the active tooling");
+                return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
             }
             if (options.initialCommitSizeInBytes == 0 or options.growthCommitSizeInBytes == 0)
             {
                 resetMetadata();
-                return Result::Error("Incremental FiberStackClass commit sizes must be non-zero");
+                return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
             }
             initialCommitBytes = FiberVirtualMemory::roundUpToPageSize(options.initialCommitSizeInBytes);
             growthCommitBytes  = FiberVirtualMemory::roundUpToPageSize(options.growthCommitSizeInBytes);
@@ -1271,7 +1271,7 @@ struct FiberStackClassInternal
             if (initialCommitBytes > stackBytes or growthCommitBytes > stackBytes)
             {
                 resetMetadata();
-                return Result::Error("Incremental FiberStackClass commit sizes exceed the stack size");
+                return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
             }
         }
         else if (options.commitMode == FiberStackCommitMode::Full)
@@ -1279,7 +1279,7 @@ struct FiberStackClassInternal
             if (options.initialCommitSizeInBytes != 0 or options.growthCommitSizeInBytes != 0)
             {
                 resetMetadata();
-                return Result::Error("Full FiberStackClass does not accept incremental commit sizes");
+                return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
             }
             initialCommitBytes = stackBytes;
             growthCommitBytes  = stackBytes;
@@ -1287,7 +1287,7 @@ struct FiberStackClassInternal
         else
         {
             resetMetadata();
-            return Result::Error("FiberStackClass commit mode is invalid");
+            return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
         }
         commitMode = options.commitMode;
 
@@ -1303,13 +1303,13 @@ struct FiberStackClassInternal
         if (not virtualMemory.reserve(totalBytes))
         {
             resetMetadata();
-            return Result::Error("Failed to reserve FiberStackClass memory");
+            return Result::Error(FibersResultCategory, FibersError::MemoryReservationFailed);
         }
         if (not virtualMemory.commit(metadataBytes))
         {
             virtualMemory.release();
             resetMetadata();
-            return Result::Error("Failed to commit FiberStackClass metadata");
+            return Result::Error(FibersResultCategory, FibersError::MemoryCommitFailed);
         }
         peakCommittedBytes = metadataBytes;
 
@@ -1333,12 +1333,12 @@ struct FiberStackClassInternal
         if (not isReserved())
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberStackClass is not reserved");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (nextFreeStack == maxStacks)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberStackClass has no available stack");
+            return Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
         }
 
         const size_t index     = nextFreeStack;
@@ -1378,12 +1378,12 @@ struct FiberStackClassInternal
         if (index >= maxStacks)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberStackClass does not own stack");
+            return Result::Error(FibersResultCategory, FibersError::WrongOwner);
         }
         if (stackStates[index] == StackState::Free)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberStackClass stack is not active");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         const StackState previousState = stackStates[index];
         stackStates[index]             = StackState::Free;
@@ -1416,7 +1416,7 @@ struct FiberStackClassInternal
     {
         if (not isReserved())
         {
-            return Result::Error("FiberStackClass is not reserved");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         return availabilityQueue.wait(scheduler, hasAvailableSlot, this);
     }
@@ -1427,7 +1427,7 @@ struct FiberStackClassInternal
         if (not isReserved() or activeStacks != 0 or boundPool != nullptr)
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberStackClass cannot be bound");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         boundPool = &pool;
         fiberSchedulerUnlock(availabilityQueue.lock);
@@ -1440,7 +1440,7 @@ struct FiberStackClassInternal
         if (boundPool != &pool or activeStacks != 0 or availabilityQueue.hasWaitersUnlocked())
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
-            return Result::Error("FiberStackClass cannot be unbound");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         boundPool = nullptr;
         fiberSchedulerUnlock(availabilityQueue.lock);
@@ -1523,7 +1523,7 @@ struct FiberStackClassInternal
 
         if (fiberStackGrowthThread == nullptr or fiberStackGrowthThread->runtime != fiberStackGrowthRuntimeLoad())
         {
-            return Result::Error("Incremental fiber stack execution requires a registered growth thread");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         SC_FIBERS_ASSERT_RELEASE(fiberStackGrowthActiveStack.stackBegin == nullptr);
         FiberStack   stack(memory);
@@ -1544,7 +1544,7 @@ struct FiberStackClassInternal
                 if (VirtualAlloc(nextCommittedBegin, growthBytes, MEM_COMMIT, PAGE_READWRITE) == nullptr)
                 {
                     fiberSchedulerUnlock(availabilityQueue.lock);
-                    return Result::Error("Failed to prepare incremental fiber stack growth pages");
+                    return Result::Error(FibersResultCategory, FibersError::StackGrowthPreparationFailed);
                 }
                 DWORD previousProtection = 0;
                 if (VirtualProtect(committedBegin - FiberVirtualMemory::getPageSize(),
@@ -1553,7 +1553,7 @@ struct FiberStackClassInternal
                 {
                     SC_FIBERS_ASSERT_RELEASE(VirtualFree(nextCommittedBegin, growthBytes, MEM_DECOMMIT) != FALSE);
                     fiberSchedulerUnlock(availabilityQueue.lock);
-                    return Result::Error("Failed to prepare incremental fiber stack guard page");
+                    return Result::Error(FibersResultCategory, FibersError::StackGuardPreparationFailed);
                 }
                 fiberStackCommitStore(stackCommittedSizes[index], nextCommittedBytes);
                 fiberStackCommitFetchAdd(committedStackBytes, growthBytes);
