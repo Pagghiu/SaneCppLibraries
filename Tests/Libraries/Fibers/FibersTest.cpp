@@ -8599,10 +8599,10 @@ struct SC::FibersTest : public SC::TestCase
 
         State state;
         state.event = &event;
-        SC_TEST_EXPECT(not event.wait(scheduler));
+        SC_TEST_EXPECT(event.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
 
         FiberEvent signaledEvent(true);
-        SC_TEST_EXPECT(not signaledEvent.wait(scheduler));
+        SC_TEST_EXPECT(signaledEvent.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
         SC_TEST_EXPECT(signaledEvent.isSignaled());
 
         SC_TEST_EXPECT(scheduler.spawn(task, stack,
@@ -8644,7 +8644,7 @@ struct SC::FibersTest : public SC::TestCase
         FiberStack          secondStack({secondStackMemory, sizeof(secondStackMemory)});
 
         SC_TEST_EXPECT(event.isSignaled());
-        SC_TEST_EXPECT(not event.wait(scheduler));
+        SC_TEST_EXPECT(event.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
         SC_TEST_EXPECT(event.isSignaled());
         State state;
         state.event = &event;
@@ -8700,10 +8700,11 @@ struct SC::FibersTest : public SC::TestCase
         FiberStack     secondStack({secondStackMemory, sizeof(secondStackMemory)});
         State          state;
         state.semaphore = &semaphore;
-        SC_TEST_EXPECT(not semaphore.wait(scheduler));
+        SC_TEST_EXPECT(semaphore.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
 
         FiberSemaphore availableSemaphore(1);
-        SC_TEST_EXPECT(not availableSemaphore.wait(scheduler));
+        SC_TEST_EXPECT(
+            availableSemaphore.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
         SC_TEST_EXPECT(availableSemaphore.available() == 1);
 
         FiberTask::Procedure procedure = FiberTask::Procedure(
@@ -8772,8 +8773,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(firstTask.result());
         SC_TEST_EXPECT(secondTask.result());
         SC_TEST_EXPECT(not mutex.isOwnedByCurrentTask(scheduler));
-        SC_TEST_EXPECT(not mutex.lock(scheduler));
-        SC_TEST_EXPECT(not mutex.unlock(scheduler));
+        SC_TEST_EXPECT(mutex.lock(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
+        SC_TEST_EXPECT(mutex.unlock(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
 
         struct HandoffState
         {

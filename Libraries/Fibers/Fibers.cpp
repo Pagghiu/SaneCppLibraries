@@ -6571,7 +6571,7 @@ Result FiberEvent::wait(FiberScheduler& scheduler)
 {
     if (scheduler.currentTask() == nullptr)
     {
-        return Result::Error("FiberEvent::wait must be called from a fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
     fiberSchedulerLock(primitiveLock);
     if (signaled)
@@ -6689,7 +6689,7 @@ Result FiberAutoResetEvent::wait(FiberScheduler& scheduler)
 {
     if (scheduler.currentTask() == nullptr)
     {
-        return Result::Error("FiberAutoResetEvent::wait must be called from a fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
     fiberSchedulerLock(primitiveLock);
     if (signaled)
@@ -6829,7 +6829,7 @@ Result FiberSemaphore::wait(FiberScheduler& scheduler)
 {
     if (scheduler.currentTask() == nullptr)
     {
-        return Result::Error("FiberSemaphore::wait must be called from a fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
     fiberSchedulerLock(primitiveLock);
     if (availableCount != 0)
@@ -6969,7 +6969,7 @@ Result FiberMutex::lock(FiberScheduler& scheduler)
     FiberTask* currentTask = scheduler.currentTask();
     if (currentTask == nullptr)
     {
-        return Result::Error("FiberMutex::lock must be called from a fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
     fiberSchedulerLock(primitiveLock);
     if (not locked)
@@ -6983,7 +6983,7 @@ Result FiberMutex::lock(FiberScheduler& scheduler)
     {
         fiberSchedulerUnlock(primitiveLock);
         SC_FIBERS_ASSERT_RELEASE(false);
-        return Result::Error("FiberMutex cannot be locked recursively");
+        return Result::Error(FibersResultCategory, FibersError::SynchronizationViolation);
     }
 
     WaitNode node;
@@ -7020,19 +7020,19 @@ Result FiberMutex::unlock(FiberScheduler& scheduler)
     FiberTask* currentTask = scheduler.currentTask();
     if (currentTask == nullptr)
     {
-        return Result::Error("FiberMutex::unlock must be called from a fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
     fiberSchedulerLock(primitiveLock);
     if (not locked)
     {
         fiberSchedulerUnlock(primitiveLock);
-        return Result::Error("FiberMutex is not locked");
+        return Result::Error(FibersResultCategory, FibersError::SynchronizationViolation);
     }
     if (owner != currentTask)
     {
         fiberSchedulerUnlock(primitiveLock);
         SC_FIBERS_ASSERT_RELEASE(false);
-        return Result::Error("FiberMutex cannot be unlocked by a different fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongOwner);
     }
 
     WaitNode* node = popWaiter();
