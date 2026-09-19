@@ -2360,18 +2360,18 @@ Result FiberWorkerThread::applyThreadPolicy()
         case FiberWorkerThreadPriority::Low: nativePriority = THREAD_PRIORITY_BELOW_NORMAL; break;
         case FiberWorkerThreadPriority::High: nativePriority = THREAD_PRIORITY_ABOVE_NORMAL; break;
         }
-        SC_TRY_MSG(::SetThreadPriority(::GetCurrentThread(), nativePriority) != 0,
-                   "FiberWorkerThread SetThreadPriority failed");
+        if (::SetThreadPriority(::GetCurrentThread(), nativePriority) == 0)
+            return Result::Error(FibersResultCategory, FibersError::ThreadPriorityApplyFailed);
     }
     if (affinityMask != 0)
     {
-        SC_TRY_MSG(::SetThreadAffinityMask(::GetCurrentThread(), static_cast<DWORD_PTR>(affinityMask)) != 0,
-                   "FiberWorkerThread SetThreadAffinityMask failed");
+        if (::SetThreadAffinityMask(::GetCurrentThread(), static_cast<DWORD_PTR>(affinityMask)) == 0)
+            return Result::Error(FibersResultCategory, FibersError::ThreadAffinityApplyFailed);
     }
 #elif SC_PLATFORM_LINUX
     if (threadPriority != FiberWorkerThreadPriority::Default and threadPriority != FiberWorkerThreadPriority::Normal)
     {
-        return Result::Error("FiberWorkerThread priority is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
     if (affinityMask != 0)
     {
@@ -2384,17 +2384,17 @@ Result FiberWorkerThread::applyThreadPolicy()
                 CPU_SET(bit, &cpuSet);
             }
         }
-        SC_TRY_MSG(::pthread_setaffinity_np(::pthread_self(), sizeof(cpuSet), &cpuSet) == 0,
-                   "FiberWorkerThread pthread_setaffinity_np failed");
+        if (::pthread_setaffinity_np(::pthread_self(), sizeof(cpuSet), &cpuSet) != 0)
+            return Result::Error(FibersResultCategory, FibersError::ThreadAffinityApplyFailed);
     }
 #else
     if (threadPriority != FiberWorkerThreadPriority::Default and threadPriority != FiberWorkerThreadPriority::Normal)
     {
-        return Result::Error("FiberWorkerThread priority is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
     if (affinityMask != 0)
     {
-        return Result::Error("FiberWorkerThread affinity is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
 #endif
     return Result(true);
@@ -2410,7 +2410,7 @@ Result FiberWorkerThread::startThread()
     threadHandle = ::CreateThread(0, 512 * 1024, FiberWorkerPoolThreadEntry::run, this, CREATE_SUSPENDED, &threadID);
     if (threadHandle == nullptr)
     {
-        return Result::Error("FiberWorkerThread CreateThread failed");
+        return Result::Error(FibersResultCategory, FibersError::ThreadStartFailed);
     }
     started = true;
     ::ResumeThread(threadHandle);
@@ -2420,7 +2420,7 @@ Result FiberWorkerThread::startThread()
     const int res = ::pthread_create(&threadHandle, nullptr, FiberWorkerPoolThreadEntry::run, this);
     if (res != 0)
     {
-        return Result::Error("FiberWorkerThread pthread_create failed");
+        return Result::Error(FibersResultCategory, FibersError::ThreadStartFailed);
     }
     started = true;
 #endif
@@ -2443,7 +2443,7 @@ Result FiberWorkerThread::joinThread()
     const int  res          = ::pthread_join(threadHandle, nullptr);
     if (res != 0)
     {
-        return Result::Error("FiberWorkerThread pthread_join failed");
+        return Result::Error(FibersResultCategory, FibersError::ThreadJoinFailed);
     }
 #endif
     started = false;
@@ -2454,7 +2454,7 @@ Result FiberWorkerThread::runThreadEntry()
 {
     if (pool == nullptr)
     {
-        return Result::Error("FiberWorkerThread has no pool");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     SC_TRY(applyThreadPolicy());
     if (stackGrowthRuntime == nullptr)
@@ -2508,18 +2508,18 @@ Result FiberJobWorkerThread::applyThreadPolicy()
         case FiberWorkerThreadPriority::Low: nativePriority = THREAD_PRIORITY_BELOW_NORMAL; break;
         case FiberWorkerThreadPriority::High: nativePriority = THREAD_PRIORITY_ABOVE_NORMAL; break;
         }
-        SC_TRY_MSG(::SetThreadPriority(::GetCurrentThread(), nativePriority) != 0,
-                   "FiberJobWorkerThread SetThreadPriority failed");
+        if (::SetThreadPriority(::GetCurrentThread(), nativePriority) == 0)
+            return Result::Error(FibersResultCategory, FibersError::ThreadPriorityApplyFailed);
     }
     if (affinityMask != 0)
     {
-        SC_TRY_MSG(::SetThreadAffinityMask(::GetCurrentThread(), static_cast<DWORD_PTR>(affinityMask)) != 0,
-                   "FiberJobWorkerThread SetThreadAffinityMask failed");
+        if (::SetThreadAffinityMask(::GetCurrentThread(), static_cast<DWORD_PTR>(affinityMask)) == 0)
+            return Result::Error(FibersResultCategory, FibersError::ThreadAffinityApplyFailed);
     }
 #elif SC_PLATFORM_LINUX
     if (threadPriority != FiberWorkerThreadPriority::Default and threadPriority != FiberWorkerThreadPriority::Normal)
     {
-        return Result::Error("FiberJobWorkerThread priority is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
     if (affinityMask != 0)
     {
@@ -2532,17 +2532,17 @@ Result FiberJobWorkerThread::applyThreadPolicy()
                 CPU_SET(bit, &cpuSet);
             }
         }
-        SC_TRY_MSG(::pthread_setaffinity_np(::pthread_self(), sizeof(cpuSet), &cpuSet) == 0,
-                   "FiberJobWorkerThread pthread_setaffinity_np failed");
+        if (::pthread_setaffinity_np(::pthread_self(), sizeof(cpuSet), &cpuSet) != 0)
+            return Result::Error(FibersResultCategory, FibersError::ThreadAffinityApplyFailed);
     }
 #else
     if (threadPriority != FiberWorkerThreadPriority::Default and threadPriority != FiberWorkerThreadPriority::Normal)
     {
-        return Result::Error("FiberJobWorkerThread priority is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
     if (affinityMask != 0)
     {
-        return Result::Error("FiberJobWorkerThread affinity is not supported on this platform");
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
     }
 #endif
     return Result(true);
@@ -2558,7 +2558,7 @@ Result FiberJobWorkerThread::startThread()
     threadHandle = ::CreateThread(0, 512 * 1024, FiberJobWorkerPoolThreadEntry::run, this, CREATE_SUSPENDED, &threadID);
     if (threadHandle == nullptr)
     {
-        return Result::Error("FiberJobWorkerThread CreateThread failed");
+        return Result::Error(FibersResultCategory, FibersError::ThreadStartFailed);
     }
     started = true;
     ::ResumeThread(threadHandle);
@@ -2568,7 +2568,7 @@ Result FiberJobWorkerThread::startThread()
     const int result = ::pthread_create(&threadHandle, nullptr, FiberJobWorkerPoolThreadEntry::run, this);
     if (result != 0)
     {
-        return Result::Error("FiberJobWorkerThread pthread_create failed");
+        return Result::Error(FibersResultCategory, FibersError::ThreadStartFailed);
     }
     started = true;
 #endif
@@ -2591,7 +2591,7 @@ Result FiberJobWorkerThread::joinThread()
     const int  result       = ::pthread_join(threadHandle, nullptr);
     if (result != 0)
     {
-        return Result::Error("FiberJobWorkerThread pthread_join failed");
+        return Result::Error(FibersResultCategory, FibersError::ThreadJoinFailed);
     }
 #endif
     started = false;
@@ -2602,7 +2602,7 @@ Result FiberJobWorkerThread::runThreadEntry()
 {
     if (pool == nullptr)
     {
-        return Result::Error("FiberJobWorkerThread has no pool");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     SC_TRY(applyThreadPolicy());
     return pool->workerMain(workerIndex);
