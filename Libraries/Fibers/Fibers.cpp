@@ -7222,20 +7222,20 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
 {
     if (task.originGroup != nullptr)
     {
-        return Result::Error("FiberTask is retained by a FiberTaskGroup");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (task.isActive())
     {
-        return Result::Error("FiberTask is already active");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (not procedure.isValid())
     {
-        return Result::Error("FiberTask procedure is not valid");
+        return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
     }
     FiberTaskStatus previousStatus = FiberTaskStatus::Invalid;
     if (not fiberTaskStatusReserveForSpawn(task.taskStatus, previousStatus))
     {
-        return Result::Error("FiberTask is already active or being published");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
 
     FiberWorker* ownerWorker = currentWorkerFor(*this);
@@ -7257,7 +7257,7 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
             if (not tryReserveInjection(injectionPosition))
             {
                 fiberTaskStatusStore(task.taskStatus, previousStatus);
-                return Result::Error("Fiber injection queue is full");
+                return Result::Error(FibersResultCategory, FibersError::QueueUnavailable);
             }
         }
         fiberAtomicFetchAddSize(injectionPublishing, 1);
@@ -7290,13 +7290,13 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     if (task.originGroup != nullptr)
     {
         fiberTaskStatusStore(task.taskStatus, previousStatus);
-        return Result::Error("FiberTask is retained by a FiberTaskGroup");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     size_t injectionPosition = 0;
     if (injectionQueue != nullptr and not tryReserveInjection(injectionPosition))
     {
         fiberTaskStatusStore(task.taskStatus, previousStatus);
-        return Result::Error("Fiber injection queue is full");
+        return Result::Error(FibersResultCategory, FibersError::QueueUnavailable);
     }
 
     Result initializeResult = initializeTaskForSpawn(task, stack, procedure, options);
@@ -7466,8 +7466,9 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
         if (task == nullptr)
         {
             fiberAtomicFetchAddSize(worker.idlePolls, 1);
-            return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
-                                                          : Result::Error("FiberScheduler cannot make progress");
+            return fiberAtomicLoadSize(activeFibers) == 0
+                       ? Result(true)
+                       : Result::Error(FibersResultCategory, FibersError::NoProgress);
         }
         SC_FIBERS_ASSERT_RELEASE(
             fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
@@ -7499,8 +7500,9 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
         if (task == nullptr)
         {
             fiberAtomicFetchAddSize(worker.idlePolls, 1);
-            return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
-                                                          : Result::Error("FiberScheduler cannot make progress");
+            return fiberAtomicLoadSize(activeFibers) == 0
+                       ? Result(true)
+                       : Result::Error(FibersResultCategory, FibersError::NoProgress);
         }
         SC_FIBERS_ASSERT_RELEASE(
             fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
@@ -7614,7 +7616,7 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
             fiberAtomicFetchAddSize(worker.idlePolls, 1);
             if (stealWorkers.sizeInElements() == 0 and fiberAtomicLoadSize(readyFibers) != 0)
             {
-                return Result::Error("FiberScheduler has ready fibers queued on another worker");
+                return Result::Error(FibersResultCategory, FibersError::UnexpectedWorkerState);
             }
             return Result(true);
         }
@@ -7678,11 +7680,11 @@ Result FiberScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberW
 {
     if (not allocator.isOpen())
     {
-        return Result::Error("FiberAllocator is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (capacityPerWorker == 0)
     {
-        return Result::Error("Fiber worker deque capacity is zero");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
 
     size_t allocatedWorkers = 0;
@@ -7691,12 +7693,12 @@ Result FiberScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberW
         if (worker.localDeque != nullptr)
         {
             releaseWorkerDeques({workers.data(), allocatedWorkers});
-            return Result::Error("FiberWorker already has a local deque");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
         if (worker.localReadyFibers != 0)
         {
             releaseWorkerDeques({workers.data(), allocatedWorkers});
-            return Result::Error("FiberWorker local queue is not empty");
+            return Result::Error(FibersResultCategory, FibersError::InvalidState);
         }
 
         const size_t dequeBytes = capacityPerWorker * sizeof(FiberTask*);
@@ -7704,7 +7706,7 @@ Result FiberScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberW
         if (memory == nullptr)
         {
             releaseWorkerDeques({workers.data(), allocatedWorkers});
-            return Result::Error("FiberWorker deque allocation failed");
+            return Result::Error(FibersResultCategory, FibersError::AllocationFailed);
         }
 
         worker.localDeque          = static_cast<FiberTask**>(memory);
@@ -7728,21 +7730,21 @@ Result FiberScheduler::createInjectionQueue(FiberAllocator& allocator, size_t ca
     static_assert(sizeof(InjectionSlot) == FiberInjectionSlotStorageSize, "Update FiberInjectionSlotStorageSize");
     if (not allocator.isOpen())
     {
-        return Result::Error("FiberAllocator is not open");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
     if (capacity == 0)
     {
-        return Result::Error("Fiber injection queue capacity is zero");
+        return Result::Error(FibersResultCategory, FibersError::InvalidConfiguration);
     }
     if (injectionQueue != nullptr)
     {
-        return Result::Error("Fiber injection queue already exists");
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
     }
 
     void* memory = allocator.allocate(this, capacity * sizeof(InjectionSlot), alignof(InjectionSlot));
     if (memory == nullptr)
     {
-        return Result::Error("Fiber injection queue allocation failed");
+        return Result::Error(FibersResultCategory, FibersError::AllocationFailed);
     }
 
     injectionQueue          = static_cast<InjectionSlot*>(memory);
@@ -7807,13 +7809,13 @@ Result FiberScheduler::yield()
     FiberWorker* worker = currentWorkerFor(*this);
     if (worker == nullptr or worker->workerTask == nullptr)
     {
-        return Result::Error("FiberScheduler::yield must be called from a fiber");
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
     }
 
     FiberTask& task = *worker->workerTask;
     if (task.isCancellationRequested())
     {
-        return Result::Error("FiberTask cancelled");
+        return Result::Error(FibersResultCategory, FibersError::Cancelled);
     }
 
     task.suspendAction        = FiberTaskSuspendAction::Ready;
@@ -7826,7 +7828,7 @@ Result FiberScheduler::yield()
 
     trace(FiberTraceEventType::TaskYielded, &task, worker);
     FiberContextOperations::switchTo(task.context(), worker->rootContext());
-    return task.isCancellationRequested() ? Result::Error("FiberTask cancelled") : Result(true);
+    return task.isCancellationRequested() ? Result::Error(FibersResultCategory, FibersError::Cancelled) : Result(true);
 }
 
 Result FiberScheduler::shutdown()
@@ -7857,7 +7859,7 @@ Result FiberScheduler::requestCancel(FiberTask& task)
     }
     if (task.scheduler != this)
     {
-        return Result::Error("FiberTask belongs to another scheduler");
+        return Result::Error(FibersResultCategory, FibersError::WrongScheduler);
     }
 
     return cancelTaskUnlocked(task);
@@ -7932,7 +7934,7 @@ Result FiberScheduler::done(FiberCounter& counter)
     }
     if (value == 0)
     {
-        return Result::Error("FiberCounter already reached zero");
+        return Result::Error(FibersResultCategory, FibersError::CounterUnderflow);
     }
 
     // Serialize the final transition with add() and waiter publication so generations cannot overlap.
@@ -7956,7 +7958,7 @@ Result FiberScheduler::doneUnlocked(FiberCounter& counter)
             return Result(true);
         }
     }
-    return Result::Error("FiberCounter already reached zero");
+    return Result::Error(FibersResultCategory, FibersError::CounterUnderflow);
 }
 
 Result FiberScheduler::wait(FiberCounter& counter) { return waitImpl(counter, true); }
@@ -8004,7 +8006,7 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
     FiberTask& task = *worker->workerTask;
     if (interruptible and task.isCancellationRequested())
     {
-        return Result::Error("FiberTask cancelled");
+        return Result::Error(FibersResultCategory, FibersError::Cancelled);
     }
 
     task.suspendAction        = FiberTaskSuspendAction::CounterWait;
@@ -8018,7 +8020,9 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
 
     trace(FiberTraceEventType::TaskWaiting, &task, worker);
     FiberContextOperations::switchTo(task.context(), worker->rootContext());
-    return interruptible and task.isCancellationRequested() ? Result::Error("FiberTask cancelled") : Result(true);
+    return interruptible and task.isCancellationRequested()
+               ? Result::Error(FibersResultCategory, FibersError::Cancelled)
+               : Result(true);
 }
 
 FiberTask* FiberScheduler::currentTask()
@@ -9502,12 +9506,12 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
 {
     if (entry == nullptr)
     {
-        return Result::Error("FiberContext entry is null");
+        return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
     }
     FiberStack fiberStack(stack);
     if (not fiberStack.isUsable())
     {
-        return Result::Error("FiberContext stack is too small");
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
     }
 
     const size_t usableStackSize = fiberStack.usableSizeInBytes();

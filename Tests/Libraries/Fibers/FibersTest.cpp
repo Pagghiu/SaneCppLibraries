@@ -409,6 +409,10 @@ struct SC::FibersTest : public SC::TestCase
         state.main  = &mainContext;
         state.fiber = &fiberContext;
 
+        SC_TEST_EXPECT(FiberContextOperations::create(fiberContext, stack.memory(), nullptr, &state)
+                           .isError(FibersResultCategory, FibersError::InvalidProcedure));
+        SC_TEST_EXPECT(FiberContextOperations::create(fiberContext, {}, contextEntry, &state)
+                           .isError(FibersResultCategory, FibersError::StorageTooSmall));
         SC_TEST_EXPECT(FiberContextOperations::captureCurrent(mainContext));
         SC_TEST_EXPECT(FiberContextOperations::create(fiberContext, stack.memory(), contextEntry, &state));
 
@@ -435,6 +439,7 @@ struct SC::FibersTest : public SC::TestCase
         FiberStack stack({stackMemory, sizeof(stackMemory)});
 
         State state;
+        SC_TEST_EXPECT(scheduler.yield().isError(FibersResultCategory, FibersError::WrongExecutionContext));
         SC_TEST_EXPECT(scheduler.spawn(task, stack,
                                        FiberTask::Procedure(
                                            [&state](FiberScheduler& scheduler)
@@ -7124,7 +7129,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(waiter.status() == FiberTaskStatus::Ready);
         SC_TEST_EXPECT(diagnostics.readyFibers == 1);
         SC_TEST_EXPECT(diagnostics.lockAcquisitions <= 3);
-        SC_TEST_EXPECT(not scheduler.done(counter));
+        SC_TEST_EXPECT(scheduler.done(counter).isError(FibersResultCategory, FibersError::CounterUnderflow));
 
         SC_TEST_EXPECT(scheduler.run());
         SC_TEST_EXPECT(state.resumed.load(memory_order_relaxed) == 1);
@@ -7437,7 +7442,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(state.spawnResults[0]);
             SC_TEST_EXPECT(state.spawnResults[1]);
             SC_TEST_EXPECT(state.spawnResults[2]);
-            SC_TEST_EXPECT(not state.spawnResults[3]);
+            SC_TEST_EXPECT(state.spawnResults[3].isError(FibersResultCategory, FibersError::QueueUnavailable));
             SC_TEST_EXPECT(tasks[3].status() == FiberTaskStatus::Invalid);
             SC_TEST_EXPECT(state.completed.load(memory_order_relaxed) == 3);
             SC_TEST_EXPECT(producer.result());
