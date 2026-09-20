@@ -64,6 +64,12 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::SignalSubscriberLimitReached: formatter.append("Signal subscriber limit was reached"); break;
     case AsyncError::InvalidEventIndex: formatter.append("Event index is invalid"); break;
     case AsyncError::CancellationFailed: formatter.append("Operation could not be cancelled"); break;
+    case AsyncError::SocketConnectFailed: formatter.append("Socket could not connect"); break;
+    case AsyncError::SocketSendFailed: formatter.append("Socket data could not be sent"); break;
+    case AsyncError::SocketReceiveFailed: formatter.append("Socket data could not be received"); break;
+    case AsyncError::SocketSendIncomplete: formatter.append("Socket data was only partially sent"); break;
+    case AsyncError::FileWriteFailed: formatter.append("File data could not be written"); break;
+    case AsyncError::FileWriteIncomplete: formatter.append("File data was only partially written"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

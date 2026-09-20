@@ -599,7 +599,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         if (errno != EAGAIN and errno != EINPROGRESS)
         {
-            return Result::Error("connect failed");
+            return res.toResult();
         }
 
         async.flags |= Internal::Flag_WatcherSet;
@@ -628,10 +628,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, async.handle, OUTPUT_EVENTS_MASK));
         if (socketRes == 0)
         {
-            SC_TRY_MSG(errorCode == 0, "connect SO_ERROR");
+            if (errorCode != 0)
+                return Result::Error(AsyncResultCategory, AsyncError::SocketConnectFailed);
             return Result(true);
         }
-        return Result::Error("connect getsockopt failed");
+        return Result::Error(AsyncResultCategory, AsyncError::SocketConnectFailed);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -873,7 +874,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 async.flags |= Internal::Flag_WatcherSet;
                 return Result(setEventWatcher(eventLoop, async, async.handle, OUTPUT_EVENTS_MASK));
             }
-            return Result::Error("Error in posixTryWrite");
+            return Result::Error(AsyncResultCategory, async.type == AsyncRequest::Type::FileWrite
+                                                          ? AsyncError::FileWriteFailed
+                                                          : AsyncError::SocketSendFailed);
         }
         // Write has finished synchronously so force a manual invocation of its completion
         async.flags |= Internal::Flag_ManualCompletion;
@@ -897,7 +900,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                     result.reactivateRequest(true);
                     return Result(true);
                 }
-                return Result::Error("Zero-length socket send failed");
+                return Result::Error(AsyncResultCategory, AsyncError::SocketSendFailed);
             }
             result.completionData.numBytes = 0;
             return Result(true);
@@ -916,7 +919,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             }
         }
         result.completionData.numBytes = async.totalBytesWritten;
-        SC_TRY_MSG(result.completionData.numBytes == totalBytesToSend, "send didn't send all data");
+        if (result.completionData.numBytes != totalBytesToSend)
+            return Result::Error(AsyncResultCategory, async.type == AsyncRequest::Type::FileWrite
+                                                          ? AsyncError::FileWriteIncomplete
+                                                          : AsyncError::SocketSendIncomplete);
         return Result(true);
     }
 
@@ -1027,7 +1033,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
             res = ::recv(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         }
-        SC_TRY_MSG(res >= 0, "error in recv");
+        if (res < 0)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
         result.completionData.numBytes = static_cast<size_t>(res);
 
         if (res == 0 and result.getAsync().getType() != AsyncRequest::Type::SocketReceiveFrom)

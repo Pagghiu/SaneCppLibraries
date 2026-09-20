@@ -44,6 +44,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 backendLifecycleErrors();
             }
+            if (test_section("posix socket connect preserves foreign errors"))
+            {
+                posixSocketConnectPreservesForeignErrors();
+            }
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -229,6 +233,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void descriptorAssociationErrors();
     void monitorLifecycleErrors();
     void backendLifecycleErrors();
+    void posixSocketConnectPreservesForeignErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -393,6 +398,7 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     static_assert(static_cast<uint32_t>(AsyncError::SubmissionFailed) == 39, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::InvalidEventIndex) == 47, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::CancellationFailed) == 48, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::FileWriteIncomplete) == 54, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -432,6 +438,16 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidEventIndex, message).status == ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::CancellationFailed, message).status ==
                    ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketConnectFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketSendFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketReceiveFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketSendIncomplete, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileWriteFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileWriteIncomplete, message).status ==
+                   ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;
@@ -439,6 +455,37 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     unsupported.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
     SC_TEST_EXPECT(eventLoop.create(unsupported).isError(AsyncResultCategory, AsyncError::OperationUnsupported));
     SC_TEST_EXPECT(not eventLoop.isInitialized());
+#endif
+}
+
+void SC::AsyncContractTest::posixSocketConnectPreservesForeignErrors()
+{
+#if !SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_LINUX
+    if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseIoUring)
+        return;
+#endif
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    SocketIPAddress address;
+    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", 1));
+
+    AsyncSocketConnect connect;
+    connect.handle   = 0; // Standard input is not a socket; Async does not own this descriptor.
+    connect.address  = SocketAddress(address);
+    Result observed  = Result(true);
+    int    callbacks = 0;
+    connect.callback = [&](AsyncSocketConnect::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(eventLoop.start(connect));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(observed.category() == SocketResultCategory);
+    SC_TEST_EXPECT(eventLoop.close());
 #endif
 }
 

@@ -61,6 +61,12 @@ enum class AsyncError : uint32_t
     SignalSubscriberLimitReached,
     InvalidEventIndex,
     CancellationFailed,
+    SocketConnectFailed,
+    SocketSendFailed,
+    SocketReceiveFailed,
+    SocketSendIncomplete,
+    FileWriteFailed,
+    FileWriteIncomplete,
 };
 
 /// @brief Stable category assigned to Async-owned errors.
