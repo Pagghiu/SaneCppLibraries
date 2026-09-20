@@ -80,6 +80,10 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::SocketExtensionUnavailable: formatter.append("Required socket operation is unavailable"); break;
     case AsyncError::SocketBindFailed: formatter.append("Socket could not be bound"); break;
     case AsyncError::SocketBufferCountExceeded: formatter.append("Too many buffers for one socket send"); break;
+    case AsyncError::FileReadFailed: formatter.append("File data could not be read"); break;
+    case AsyncError::FileSeekFailed: formatter.append("File position could not be set"); break;
+    case AsyncError::FileSendFailed: formatter.append("File data could not be sent"); break;
+    case AsyncError::FileSendCompletionFailed: formatter.append("File send could not be completed"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

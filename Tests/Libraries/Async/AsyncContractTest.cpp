@@ -49,6 +49,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 socketBufferCountError();
             }
+            if (test_section("file read operation error"))
+            {
+                fileReadOperationError();
+            }
 #endif
             if (test_section("posix socket connect preserves foreign errors"))
             {
@@ -240,6 +244,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void monitorLifecycleErrors();
     void backendLifecycleErrors();
     void socketBufferCountError();
+    void fileReadOperationError();
     void posixSocketConnectPreservesForeignErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
@@ -407,6 +412,7 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     static_assert(static_cast<uint32_t>(AsyncError::CancellationFailed) == 48, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::FileWriteIncomplete) == 54, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::SocketBufferCountExceeded) == 62, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::FileSendCompletionFailed) == 66, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -471,6 +477,11 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketBindFailed, message).status == ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketBufferCountExceeded, message).status ==
                    ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileReadFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSeekFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendCompletionFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;
@@ -509,6 +520,33 @@ void SC::AsyncContractTest::socketBufferCountError()
     SC_TEST_EXPECT(callbacks == 1);
     SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::SocketBufferCountExceeded));
     SC_TEST_EXPECT(send.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+#endif
+}
+
+void SC::AsyncContractTest::fileReadOperationError()
+{
+#if SC_PLATFORM_WINDOWS
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    char          byte = 0;
+    AsyncFileRead read;
+    read.handle = nullptr; // Distinct from the invalid sentinel, but not a readable handle.
+    read.buffer = Span<char>(&byte, 1);
+
+    Result observed  = Result(true);
+    int    callbacks = 0;
+    read.callback    = [&](AsyncFileRead::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(eventLoop.start(read));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::FileReadFailed));
+    SC_TEST_EXPECT(read.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 #endif
 }

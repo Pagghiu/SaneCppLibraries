@@ -75,6 +75,10 @@ enum class AsyncError : uint32_t
     SocketExtensionUnavailable,
     SocketBindFailed,
     SocketBufferCountExceeded,
+    FileReadFailed,
+    FileSeekFailed,
+    FileSendFailed,
+    FileSendCompletionFailed,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

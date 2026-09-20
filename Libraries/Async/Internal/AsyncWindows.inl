@@ -798,7 +798,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     template <typename Func, typename T>
     static Result executeFileOperation(Func func, T& async, AsyncEventLoop* eventLoop, decltype(T::buffer) buffer,
-                                       bool synchronous, size_t& readBytes, bool* endOfFile)
+                                       bool synchronous, size_t& readBytes, bool* endOfFile, AsyncError operationError)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
@@ -827,7 +827,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                         }
                         else
                         {
-                            return Result::Error("ReadFile/WriteFile (GetOverlappedResult) error");
+                            return Result::Error(AsyncResultCategory, operationError);
                         }
                     }
                 }
@@ -855,8 +855,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 {
                     // File must have File::OpenOptions::async == true +
                     // associateExternallyCreatedFileDescriptor
-                    return Result::Error("ReadFile/WriteFile failed (forgot setting File::OpenOptions::async = true or "
-                                         "AsyncEventLoop::associateExternallyCreatedFileDescriptor?)");
+                    return Result::Error(AsyncResultCategory, operationError);
                 }
             }
         }
@@ -875,7 +874,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     template <typename ResultType>
-    static Result completeFileOperation(ResultType& result, bool* endOfFile)
+    static Result completeFileOperation(ResultType& result, bool* endOfFile, AsyncError operationError)
     {
         auto& async = result.getAsync();
         if (async.endedSync)
@@ -899,7 +898,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
             else
             {
-                return Result::Error("GetOverlappedResult error");
+                return Result::Error(AsyncResultCategory, operationError);
             }
         }
         result.completionData.numBytes = transferred;
@@ -924,7 +923,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             async.offset = async.readCursor;
         }
         SC_TRY(executeFileOperation(&::ReadFile, async, eventLoop, async.buffer, synchronous, completionData.numBytes,
-                                    &completionData.endOfFile));
+                                    &completionData.endOfFile, AsyncError::FileReadFailed));
         if (not completionData.endOfFile)
         {
             async.readCursor = async.offset + async.buffer.sizeInBytes();
@@ -934,7 +933,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     static Result completeAsync(AsyncFileRead::Result& result)
     {
-        return completeFileOperation(result, &result.completionData.endOfFile);
+        return completeFileOperation(result, &result.completionData.endOfFile, AsyncError::FileReadFailed);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -957,7 +956,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         if (async.singleBuffer)
         {
             return executeFileOperation(&::WriteFile, async, eventLoop, async.buffer, synchronous,
-                                        completionData.numBytes, nullptr);
+                                        completionData.numBytes, nullptr, AsyncError::FileWriteFailed);
         }
         else
         {
@@ -974,8 +973,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             {
                 size_t writtenBytes;
                 auto   buffer = async.buffers[currentBufferIndex];
-                SC_TRY(
-                    executeFileOperation(&::WriteFile, async, eventLoop, buffer, synchronous, writtenBytes, nullptr));
+                SC_TRY(executeFileOperation(&::WriteFile, async, eventLoop, buffer, synchronous, writtenBytes, nullptr,
+                                            AsyncError::FileWriteFailed));
                 currentBufferIndex += 1;
                 async.totalBytesWritten += buffer.sizeInBytes(); // writtenBytes could be == 0 in async case
                 if (synchronous == false)
@@ -991,13 +990,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         AsyncFileWrite& async = result.getAsync();
         if (async.singleBuffer)
         {
-            return completeFileOperation(result, nullptr);
+            return completeFileOperation(result, nullptr, AsyncError::FileWriteFailed);
         }
         else
         {
             if (async.totalBytesWritten == Internal::getSummedSizeOfBuffers(async))
             {
-                SC_TRY(completeFileOperation(result, nullptr));
+                SC_TRY(completeFileOperation(result, nullptr, AsyncError::FileWriteFailed));
                 // Write correct numBytes, as completeFileOperation will consider only last write
                 result.completionData.numBytes = async.totalBytesWritten;
             }
@@ -1030,7 +1029,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         offset.QuadPart = async.offset;
         if (not ::SetFilePointerEx(async.fileHandle, offset, nullptr, FILE_BEGIN))
         {
-            return Result::Error("SetFilePointerEx failed");
+            return Result::Error(AsyncResultCategory, AsyncError::FileSeekFailed);
         }
 
         constexpr size_t BUFFER_SIZE = 64 * 1024; // 64KB buffer
@@ -1043,7 +1042,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             BOOL  readRes   = ::ReadFile(async.fileHandle, buffer, toRead, &bytesRead, nullptr);
             if (not readRes)
             {
-                return Result::Error("ReadFile failed");
+                return Result::Error(AsyncResultCategory, AsyncError::FileReadFailed);
             }
             if (bytesRead == 0)
             {
@@ -1061,7 +1060,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 int   sendRes = ::WSASend(async.socketHandle, &wsabuf, 1, &sent, 0, nullptr, nullptr);
                 if (sendRes == SOCKET_ERROR)
                 {
-                    return Result::Error("WSASend failed");
+                    return Result::Error(AsyncResultCategory, AsyncError::SocketSendFailed);
                 }
                 written += sent;
             }
@@ -1118,7 +1117,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             DWORD error = ::WSAGetLastError();
             if (error != WSA_IO_PENDING)
             {
-                return Result::Error("TransmitFile failed");
+                return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
             }
             // WSA_IO_PENDING is expected - completion will arrive via IOCP
         }
@@ -1149,7 +1148,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         if (not success)
         {
-            return Result::Error("TransmitFile completion failed");
+            return Result::Error(AsyncResultCategory, AsyncError::FileSendCompletionFailed);
         }
 
         result.completionData.bytesTransferred = transferred;
