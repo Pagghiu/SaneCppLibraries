@@ -36,6 +36,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 descriptorAssociationErrors();
             }
+            if (test_section("monitor lifecycle errors"))
+            {
+                monitorLifecycleErrors();
+            }
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -219,6 +223,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void stopSuppressesNormalCallback();
     void structuredLifecycleErrors();
     void descriptorAssociationErrors();
+    void monitorLifecycleErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -357,6 +362,23 @@ void SC::AsyncContractTest::descriptorAssociationErrors()
     SC_TEST_EXPECT(
         eventLoop.removeAllAssociationsFor(socket).isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
 
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::monitorLifecycleErrors()
+{
+    AsyncEventLoopMonitor monitor;
+    SC_TEST_EXPECT(monitor.close().isError(AsyncResultCategory, AsyncError::NotInitialized));
+    SC_TEST_EXPECT(
+        monitor.stopMonitoringAndDispatchCompletions().isError(AsyncResultCategory, AsyncError::NotInitialized));
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+    monitor.onNewEventsAvailable = [] {};
+    SC_TEST_EXPECT(monitor.create(eventLoop));
+    SC_TEST_EXPECT(monitor.create(eventLoop).isError(AsyncResultCategory, AsyncError::AlreadyInitialized));
+    SC_TEST_EXPECT(monitor.close());
+    SC_TEST_EXPECT(monitor.close().isError(AsyncResultCategory, AsyncError::NotInitialized));
     SC_TEST_EXPECT(eventLoop.close());
 }
 

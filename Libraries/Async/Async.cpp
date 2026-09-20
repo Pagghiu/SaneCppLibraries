@@ -1274,7 +1274,7 @@ SC::Result SC::AsyncEventLoopMonitor::create(AsyncEventLoop& loop)
 {
     if (eventLoop)
     {
-        return Result::Error("Already initialized");
+        return Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized);
     }
     eventLoop = &loop;
 
@@ -1319,8 +1319,10 @@ SC::Result SC::AsyncEventLoopMonitor::monitoringLoopThread(Thread& thread)
 
 SC::Result SC::AsyncEventLoopMonitor::stopMonitoringAndDispatchCompletions()
 {
-    SC_TRY_MSG(eventLoop != nullptr, "Not initialized");
-    SC_TRY_MSG(not finished.load(), "Finished == true");
+    if (eventLoop == nullptr)
+        return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
+    if (finished.load())
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
     // Unblock the blocking poll on the other thread, even if it could be already unblocked
     const bool wakeUpMustBeSent = needsWakeUp.load();
     if (wakeUpMustBeSent)
@@ -1345,7 +1347,7 @@ SC::Result SC::AsyncEventLoopMonitor::close()
 {
     if (eventLoop == nullptr)
     {
-        return Result::Error("Not initialized");
+        return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
     }
     finished.exchange(true);
     eventObjectEnterBlockingMode.signal();
