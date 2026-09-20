@@ -31,6 +31,10 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::NoPendingSubmission: formatter.append("No submission is pending"); break;
     case AsyncError::ManualCompletionRequired: formatter.append("Manual completion mode is required"); break;
     case AsyncError::CompletionAlreadyPosted: formatter.append("Completion has already been posted"); break;
+    case AsyncError::InvalidSocketHandle: formatter.append("Socket handle is invalid"); break;
+    case AsyncError::InvalidAddress: formatter.append("Socket address is invalid"); break;
+    case AsyncError::EmptyBuffer: formatter.append("Buffer is empty"); break;
+    case AsyncError::MissingAcceptData: formatter.append("Accept request data is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

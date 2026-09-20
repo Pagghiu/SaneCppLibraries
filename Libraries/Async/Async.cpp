@@ -350,7 +350,7 @@ SC::Result SC::detail::AsyncSocketAcceptBase::start(AsyncEventLoop& eventLoop, c
 {
     acceptData = &data;
     SC_TRY(checkState());
-    SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(socketDescriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
     return eventLoop.start(*this);
 }
@@ -362,8 +362,10 @@ SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& eventLoop, const SocketD
 
 SC::Result SC::detail::AsyncSocketAcceptBase::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketAccept - Invalid handle");
-    SC_TRY_MSG(acceptData != nullptr, "AsyncSocketAccept - Invalid acceptData");
+    if (handle == SocketDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle);
+    if (acceptData == nullptr)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::MissingAcceptData);
     return SC::Result(true);
 }
 
@@ -377,22 +379,24 @@ SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& eventLoop, const Socket
                                          SocketAddress socketAddress)
 {
     SC_TRY(checkState());
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     address = socketAddress;
     return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketConnect::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketConnect - Invalid handle");
-    SC_TRY_MSG(address.isValid(), "AsyncSocketConnect - Invalid address");
+    if (handle == SocketDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle);
+    if (not address.isValid())
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidAddress);
     return SC::Result(true);
 }
 
 SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                       Span<const char> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     buffer       = data;
     singleBuffer = true;
     return eventLoop.start(*this);
@@ -401,7 +405,7 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& eventLoop, const SocketDes
 SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                       Span<Span<const char>> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     buffers      = data;
     singleBuffer = false;
     return eventLoop.start(*this);
@@ -409,14 +413,17 @@ SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& eventLoop, const SocketDes
 
 SC::Result SC::AsyncSocketSend::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketSend - Invalid handle");
+    if (handle == SocketDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle);
     if (singleBuffer)
     {
-        SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncSocketSend - Zero sized write buffer");
+        if (buffer.empty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
     }
     else
     {
-        SC_TRY_MSG(buffers.sizeInBytes() > 0 and not buffers[0].empty(), "AsyncSocketSend - Zero sized write buffer");
+        if (buffers.empty() or buffers[0].empty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
     }
     totalBytesWritten = 0;
     return SC::Result(true);
@@ -431,7 +438,7 @@ SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketD
 SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                         SocketAddress socketAddress, Span<const char> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     buffer       = data;
     singleBuffer = true;
     address      = socketAddress;
@@ -447,7 +454,7 @@ SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketD
 SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                         SocketAddress socketAddress, Span<Span<const char>> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     buffers      = data;
     singleBuffer = false;
     address      = socketAddress;
@@ -458,20 +465,22 @@ SC::Result SC::AsyncSocketSendTo::validate(AsyncEventLoop& eventLoop)
 {
     if (singleBuffer and buffer.empty())
     {
-        SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketSendTo - Invalid handle");
+        if (handle == SocketDescriptor::Invalid)
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle);
         totalBytesWritten = 0;
     }
     else
     {
         SC_TRY(AsyncSocketSend::validate(eventLoop))
     }
-    SC_TRY_MSG(address.isValid(), "AsyncSocketSendTo - Invalid destination address");
+    if (not address.isValid())
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidAddress);
     return SC::Result(true);
 }
 
 SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, Span<char> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
     buffer = data;
     if (getType() == Type::SocketReceiveFrom)
     {
@@ -499,7 +508,8 @@ SC::SocketAddress SC::AsyncSocketReceive::Result::getSourceSocketAddress() const
 
 SC::Result SC::AsyncSocketReceive::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketReceive - Invalid handle");
+    if (handle == SocketDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle);
     return SC::Result(true);
 }
 

@@ -124,6 +124,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 validationFailureLeavesRequestFree();
             }
+            if (test_section("socket validation errors"))
+            {
+                socketValidationErrors();
+            }
             if (test_section("loop close frees submitted requests"))
             {
                 loopCloseFreesSubmittedRequests();
@@ -220,6 +224,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void loopCloseWaitsForActiveTaskSequence();
     void threadPoolModeCanForceSuppliedPool();
     void validationFailureLeavesRequestFree();
+    void socketValidationErrors();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
     void loopCloseDrainsPendingCloseCallback();
@@ -1219,6 +1224,48 @@ void SC::AsyncContractTest::validationFailureLeavesRequestFree()
     work.work = [] { return Result(true); };
     SC_TEST_EXPECT(work.start(eventLoop).isError(AsyncResultCategory, AsyncError::MissingThreadPool));
     SC_TEST_EXPECT(work.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::socketValidationErrors()
+{
+    static_assert(static_cast<uint32_t>(AsyncError::MissingAcceptData) == 21, "Async errors are append-only");
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    SocketDescriptor  invalidSocket;
+    AsyncSocketAccept invalidAccept;
+    SC_TEST_EXPECT(
+        invalidAccept.start(eventLoop, invalidSocket).isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+    SC_TEST_EXPECT(invalidAccept.isFree());
+
+    AsyncSocketReceive invalidReceive;
+    char               receiveBuffer[1];
+    SC_TEST_EXPECT(invalidReceive.start(eventLoop, invalidSocket, receiveBuffer)
+                       .isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+    SC_TEST_EXPECT(invalidReceive.isFree());
+
+    SocketDescriptor socket;
+    SC_TEST_EXPECT(socket.create(SocketFlags::AddressFamilyIPV4));
+
+    AsyncSocketConnect connect;
+    SC_TEST_EXPECT(
+        connect.start(eventLoop, socket, SocketAddress()).isError(AsyncResultCategory, AsyncError::InvalidAddress));
+    SC_TEST_EXPECT(connect.isFree());
+
+    AsyncSocketSend send;
+    SC_TEST_EXPECT(
+        send.start(eventLoop, socket, Span<const char>()).isError(AsyncResultCategory, AsyncError::EmptyBuffer));
+    SC_TEST_EXPECT(send.isFree());
+
+    AsyncSocketSendTo sendTo;
+    SC_TEST_EXPECT(sendTo.start(eventLoop, socket, SocketAddress(), Span<const char>())
+                       .isError(AsyncResultCategory, AsyncError::InvalidAddress));
+    SC_TEST_EXPECT(sendTo.isFree());
+
+    SC_TEST_EXPECT(socket.close());
+    SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     SC_TEST_EXPECT(eventLoop.close());
 }
 
