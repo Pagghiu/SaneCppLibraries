@@ -70,6 +70,16 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::SocketSendIncomplete: formatter.append("Socket data was only partially sent"); break;
     case AsyncError::FileWriteFailed: formatter.append("File data could not be written"); break;
     case AsyncError::FileWriteIncomplete: formatter.append("File data was only partially written"); break;
+    case AsyncError::DescriptorAssociationFailed:
+        formatter.append("Descriptor could not be associated with event loop");
+        break;
+    case AsyncError::SocketCompletionFailed: formatter.append("Socket operation could not be completed"); break;
+    case AsyncError::SocketCreationFailed: formatter.append("Socket could not be created"); break;
+    case AsyncError::SocketAcceptFailed: formatter.append("Socket connection could not be accepted"); break;
+    case AsyncError::SocketAcceptFinalizationFailed: formatter.append("Accepted socket could not be finalized"); break;
+    case AsyncError::SocketExtensionUnavailable: formatter.append("Required socket operation is unavailable"); break;
+    case AsyncError::SocketBindFailed: formatter.append("Socket could not be bound"); break;
+    case AsyncError::SocketBufferCountExceeded: formatter.append("Too many buffers for one socket send"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -44,6 +44,12 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 backendLifecycleErrors();
             }
+#if SC_PLATFORM_WINDOWS
+            if (test_section("socket buffer count error"))
+            {
+                socketBufferCountError();
+            }
+#endif
             if (test_section("posix socket connect preserves foreign errors"))
             {
                 posixSocketConnectPreservesForeignErrors();
@@ -233,6 +239,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void descriptorAssociationErrors();
     void monitorLifecycleErrors();
     void backendLifecycleErrors();
+    void socketBufferCountError();
     void posixSocketConnectPreservesForeignErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
@@ -399,6 +406,7 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     static_assert(static_cast<uint32_t>(AsyncError::InvalidEventIndex) == 47, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::CancellationFailed) == 48, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::FileWriteIncomplete) == 54, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::SocketBufferCountExceeded) == 62, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -448,6 +456,21 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     SC_TEST_EXPECT(formatAsyncError(AsyncError::FileWriteFailed, message).status == ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::FileWriteIncomplete, message).status ==
                    ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::DescriptorAssociationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketCompletionFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketCreationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketAcceptFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketAcceptFinalizationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketExtensionUnavailable, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketBindFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketBufferCountExceeded, message).status ==
+                   ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;
@@ -455,6 +478,38 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     unsupported.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
     SC_TEST_EXPECT(eventLoop.create(unsupported).isError(AsyncResultCategory, AsyncError::OperationUnsupported));
     SC_TEST_EXPECT(not eventLoop.isInitialized());
+#endif
+}
+
+void SC::AsyncContractTest::socketBufferCountError()
+{
+#if SC_PLATFORM_WINDOWS
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    char             byte = 'x';
+    Span<const char> buffers[513];
+    for (Span<const char>& buffer : buffers)
+        buffer = Span<const char>(&byte, 1);
+
+    AsyncSocketSend send;
+    send.handle       = 0; // The buffer limit is checked before the socket handle is used.
+    send.buffers      = buffers;
+    send.singleBuffer = false;
+
+    Result observed  = Result(true);
+    int    callbacks = 0;
+    send.callback    = [&](AsyncSocketSend::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(eventLoop.start(send));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::SocketBufferCountExceeded));
+    SC_TEST_EXPECT(send.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
 #endif
 }
 

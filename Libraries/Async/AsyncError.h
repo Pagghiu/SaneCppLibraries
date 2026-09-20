@@ -67,6 +67,14 @@ enum class AsyncError : uint32_t
     SocketSendIncomplete,
     FileWriteFailed,
     FileWriteIncomplete,
+    DescriptorAssociationFailed,
+    SocketCompletionFailed,
+    SocketCreationFailed,
+    SocketAcceptFailed,
+    SocketAcceptFinalizationFailed,
+    SocketExtensionUnavailable,
+    SocketBindFailed,
+    SocketBufferCountExceeded,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

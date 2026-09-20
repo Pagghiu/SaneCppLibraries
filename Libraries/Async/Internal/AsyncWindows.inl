@@ -121,9 +121,10 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     {
         (void)removeAllAssociationsForFileDescriptorHandle(handle);
         HANDLE loopHandle;
-        SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
+        SC_TRY(loopFd.get(loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
         HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed");
+        if (iocp != loopHandle)
+            return Result::Error(AsyncResultCategory, AsyncError::DescriptorAssociationFailed);
         return Result(true);
     }
 
@@ -131,9 +132,10 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     {
         (void)removeAllAssociationsForSocketHandle(handle);
         HANDLE loopHandle;
-        SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
+        SC_TRY(loopFd.get(loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(handle), loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedSocket CreateIoCompletionPort failed");
+        if (iocp != loopHandle)
+            return Result::Error(AsyncResultCategory, AsyncError::DescriptorAssociationFailed);
         return Result(true);
     }
 
@@ -223,7 +225,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         if (res == FALSE)
         {
             // TODO: report error
-            return Result::Error("WSAGetOverlappedResult error");
+            return Result::Error(AsyncResultCategory, AsyncError::SocketCompletionFailed);
         }
         if (size)
         {
@@ -403,7 +405,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
         SOCKET clientSocket = ::WSASocketW(af, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, flags);
-        SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed");
+        if (clientSocket == INVALID_SOCKET)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketCreationFailed);
         auto deferDeleteSocket = MakeDeferred([&] { closesocket(clientSocket); });
         static_assert(sizeof(detail::AsyncSocketAcceptData::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
                       "Check acceptBuffer size");
@@ -420,7 +423,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         if (res == FALSE and WSAGetLastError() != WSA_IO_PENDING)
         {
             // TODO: Check AcceptEx WSA error codes
-            return Result::Error("AcceptEx failed");
+            return Result::Error(AsyncResultCategory, AsyncError::SocketAcceptFailed);
         }
 
         // TODO: Handle synchronous success
@@ -433,14 +436,18 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         AsyncSocketAccept& operation = result.getAsync();
         SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.acceptData->overlapped.get().overlapped));
         SOCKET clientSocket;
-        SC_TRY(operation.acceptData->clientSocket.get(clientSocket, Result::Error("clientSocket error")));
+        SC_TRY(operation.acceptData->clientSocket.get(
+            clientSocket, Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
         const int socketOpRes = ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
                                              reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
-        SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed");
+        if (socketOpRes != 0)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketAcceptFinalizationFailed);
         HANDLE loopHandle;
-        SC_TRY(result.eventLoop.internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("completeAsync")));
+        SC_TRY(result.eventLoop.internal.kernelQueue.get().loopFd.get(
+            loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
+        if (iocp != loopHandle)
+            return Result::Error(AsyncResultCategory, AsyncError::DescriptorAssociationFailed);
 
         return Result(result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket)));
     }
@@ -457,7 +464,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 return Result(true);
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
-                return Result::Error("AsyncSocketAccept: CancelEx failed");
+                return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
             // The request may have just completed; poll once to drain a potential queued completion.
             eventLoop.internal.hasPendingKernelCancellations = true;
         }
@@ -480,7 +487,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             int rc = WSAIoctl(async.handle, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),
                               &async.acceptData->pAcceptEx, sizeof(LPFN_ACCEPTEX), &dwBytes, NULL, NULL);
             if (rc != 0)
-                return Result::Error("WSAIoctl failed");
+                return Result::Error(AsyncResultCategory, AsyncError::SocketExtensionUnavailable);
         }
         return Result(true);
     }
@@ -519,7 +526,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         }
         if (bindRes == SOCKET_ERROR)
         {
-            return Result::Error("bind failed");
+            return Result::Error(AsyncResultCategory, AsyncError::SocketBindFailed);
         }
         SC_TRY(ensureConnectFunction(asyncConnect));
 
@@ -532,7 +539,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             asyncConnect.handle, sockAddr, sockAddrLen, nullptr, 0, &dummyTransferred, &overlapped);
         if (connectRes == FALSE and WSAGetLastError() != WSA_IO_PENDING)
         {
-            return Result::Error("ConnectEx failed");
+            return Result::Error(AsyncResultCategory, AsyncError::SocketConnectFailed);
         }
         ::setsockopt(asyncConnect.handle, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0);
         return Result(true);
@@ -555,7 +562,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             int rc = WSAIoctl(async.handle, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &async.pConnectEx,
                               sizeof(LPFN_CONNECTEX), &dwBytes, NULL, NULL);
             if (rc != 0)
-                return Result::Error("WSAIoctl failed");
+                return Result::Error(AsyncResultCategory, AsyncError::SocketExtensionUnavailable);
         }
         return Result(true);
     }
@@ -583,7 +590,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             constexpr size_t MaxBuffers = 512;
             if (async.buffers.sizeInElements() > MaxBuffers)
             {
-                return Result::Error("Cannot write more than 512 buffers at once");
+                return Result::Error(AsyncResultCategory, AsyncError::SocketBufferCountExceeded);
             }
             DWORD  numBuffers = static_cast<DWORD>(async.buffers.sizeInElements());
             WSABUF buffers[MaxBuffers];
@@ -594,7 +601,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
             res = ::WSASend(async.handle, buffers, numBuffers, &transferred, 0, &overlapped, nullptr);
         }
-        SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSASend failed");
+        if (res == SOCKET_ERROR and WSAGetLastError() != WSA_IO_PENDING)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketSendFailed);
         // TODO: when res == 0 we could avoid the additional GetOverlappedResult syscall
         return Result(true);
     }
@@ -632,7 +640,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             constexpr size_t MaxBuffers = 512;
             if (async.buffers.sizeInElements() > MaxBuffers)
             {
-                return Result::Error("Cannot write more than 512 buffers at once");
+                return Result::Error(AsyncResultCategory, AsyncError::SocketBufferCountExceeded);
             }
             DWORD  numBuffers = static_cast<DWORD>(async.buffers.sizeInElements());
             WSABUF buffers[MaxBuffers];
@@ -648,7 +656,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             res = ::WSASendTo(async.handle, buffers, numBuffers, &transferred, 0, sockAddr, sockAddrLen, &overlapped,
                               nullptr);
         }
-        SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSASendTo failed");
+        if (res == SOCKET_ERROR and WSAGetLastError() != WSA_IO_PENDING)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketSendFailed);
         return Result(true);
     }
 
@@ -663,7 +672,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 return Result(true);
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
-                return Result::Error("AsyncSocketSendTo: CancelEx failed");
+                return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
             // The request may have just completed; poll once to drain a potential queued completion.
             eventLoop.internal.hasPendingKernelCancellations = true;
         }
@@ -693,7 +702,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         ::memset(sockAddr, 0, sizeof(async.address.handle));
         const int res = ::WSARecvFrom(async.handle, &buffer, 1, &transferred, &async.receiveFlags, sockAddr,
                                       &async.addressSize, &overlapped, nullptr);
-        SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSARecvFrom failed");
+        if (res == SOCKET_ERROR and WSAGetLastError() != WSA_IO_PENDING)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
         return Result(true);
     }
 
@@ -708,7 +718,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 return Result(true);
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
-                return Result::Error("AsyncSocketReceiveFrom: CancelEx failed");
+                return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
             // The request may have just completed; poll once to drain a potential queued completion.
             eventLoop.internal.hasPendingKernelCancellations = true;
         }
@@ -733,7 +743,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         DWORD     transferred;
         DWORD     flags = 0;
         const int res   = ::WSARecv(async.handle, &buffer, 1, &transferred, &flags, &overlapped, nullptr);
-        SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSARecv failed");
+        if (res == SOCKET_ERROR and WSAGetLastError() != WSA_IO_PENDING)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
         // TODO: when res == 0 we could avoid the additional GetOverlappedResult syscall
         return Result(true);
     }
@@ -749,7 +760,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 return Result(true);
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
-                return Result::Error("AsyncSocketReceive: CancelEx failed");
+                return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
             // The request may have just completed; poll once to drain a potential queued completion.
             eventLoop.internal.hasPendingKernelCancellations = true;
         }
