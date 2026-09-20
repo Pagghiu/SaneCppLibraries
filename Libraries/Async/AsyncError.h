@@ -25,6 +25,11 @@ enum class AsyncError : uint32_t
     InvalidHandle,
     InvalidSignal,
     UnsupportedSignal,
+    OperationUnsupported,
+    SubmissionAlreadyPending,
+    NoPendingSubmission,
+    ManualCompletionRequired,
+    CompletionAlreadyPosted,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

@@ -156,6 +156,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 runDispatchesPostedManualCompletion();
             }
+            if (test_section("external completion state errors"))
+            {
+                externalCompletionStateErrors();
+            }
             if (test_section("split phase dispatch controls callback thread"))
             {
                 splitPhaseDispatchControlsCallbackThread();
@@ -224,6 +228,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void listenersWrapBlockingPollOnly();
     void runNoWaitLeavesFutureWorkPending();
     void runDispatchesPostedManualCompletion();
+    void externalCompletionStateErrors();
     void splitPhaseDispatchControlsCallbackThread();
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
@@ -1412,6 +1417,50 @@ void SC::AsyncContractTest::runDispatchesPostedManualCompletion()
     SC_TEST_EXPECT(callbacks == 1);
     SC_TEST_EXPECT(bytesTransferred == 37);
     SC_TEST_EXPECT(completion.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::externalCompletionStateErrors()
+{
+    static_assert(static_cast<uint32_t>(AsyncError::CompletionAlreadyPosted) == 17, "Async errors are append-only");
+
+    AsyncEventLoop          eventLoop;
+    AsyncExternalCompletion completion;
+    int                     callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    completion.callback = [&](AsyncExternalCompletion::Result&) { callbacks++; };
+    SC_TEST_EXPECT(completion.clearSubmissionPending().isError(AsyncResultCategory, AsyncError::NoPendingSubmission));
+    SC_TEST_EXPECT(completion.start(eventLoop));
+    SC_TEST_EXPECT(
+        eventLoop.postExternalCompletion(completion, 1).isError(AsyncResultCategory, AsyncError::RequestNotActive));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(completion.isActive());
+    SC_TEST_EXPECT(
+        eventLoop.postExternalCompletion(completion, 1).isError(AsyncResultCategory, AsyncError::NoPendingSubmission));
+    SC_TEST_EXPECT(completion.markSubmissionPending());
+    SC_TEST_EXPECT(
+        completion.markSubmissionPending().isError(AsyncResultCategory, AsyncError::SubmissionAlreadyPending));
+    SC_TEST_EXPECT(completion.clearSubmissionPending());
+    SC_TEST_EXPECT(
+        eventLoop.postExternalCompletion(completion, 1).isError(AsyncResultCategory, AsyncError::NoPendingSubmission));
+    SC_TEST_EXPECT(completion.markSubmissionPending());
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 37));
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 37)
+                       .isError(AsyncResultCategory, AsyncError::CompletionAlreadyPosted));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(completion.isFree());
+
+    AsyncFileReadiness readiness;
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(readiness.start(eventLoop, FileDescriptor::Invalid)
+                       .isError(AsyncResultCategory, AsyncError::OperationUnsupported));
+#else
+    SC_TEST_EXPECT(
+        readiness.start(eventLoop, FileDescriptor::Invalid).isError(AsyncResultCategory, AsyncError::InvalidHandle));
+#endif
+    SC_TEST_EXPECT(readiness.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
 

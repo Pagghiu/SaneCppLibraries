@@ -26,6 +26,11 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::InvalidHandle: formatter.append("Handle is invalid"); break;
     case AsyncError::InvalidSignal: formatter.append("Signal number is invalid"); break;
     case AsyncError::UnsupportedSignal: formatter.append("Signal cannot be watched"); break;
+    case AsyncError::OperationUnsupported: formatter.append("Operation is unsupported"); break;
+    case AsyncError::SubmissionAlreadyPending: formatter.append("Submission is already pending"); break;
+    case AsyncError::NoPendingSubmission: formatter.append("No submission is pending"); break;
+    case AsyncError::ManualCompletionRequired: formatter.append("Manual completion mode is required"); break;
+    case AsyncError::CompletionAlreadyPosted: formatter.append("Completion has already been posted"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

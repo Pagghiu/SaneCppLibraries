@@ -579,7 +579,7 @@ SC::Result SC::AsyncFileReadiness::start(AsyncEventLoop& eventLoop, FileDescript
     // Windows IOCP is completion-based and does not provide generic file-handle readiness.
     // Do not emulate this with timer polling. If socket readiness is needed later, add a
     // dedicated AsyncSocketReadiness using AFD poll / socket-specific mechanisms.
-    return SC::Result::Error("AsyncFileReadiness is not supported on Windows");
+    return SC::Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
 #else
     SC_TRY(checkState());
     handle = fd;
@@ -589,7 +589,8 @@ SC::Result SC::AsyncFileReadiness::start(AsyncEventLoop& eventLoop, FileDescript
 
 SC::Result SC::AsyncFileReadiness::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileReadiness - Invalid file descriptor");
+    if (handle == FileDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidHandle);
     return SC::Result(true);
 }
 
@@ -613,7 +614,8 @@ SC::Result SC::AsyncExternalCompletion::start(AsyncEventLoop& eventLoop, FileDes
 
 SC::Result SC::AsyncExternalCompletion::markSubmissionPending()
 {
-    SC_TRY_MSG(not submissionPending, "AsyncExternalCompletion already has a pending submission");
+    if (submissionPending)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::SubmissionAlreadyPending);
     submissionPending = true;
     bytesTransferred  = 0;
     completionPosted  = false;
@@ -626,7 +628,8 @@ SC::Result SC::AsyncExternalCompletion::markSubmissionPending()
 
 SC::Result SC::AsyncExternalCompletion::clearSubmissionPending()
 {
-    SC_TRY_MSG(submissionPending, "AsyncExternalCompletion has no pending submission");
+    if (not submissionPending)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::NoPendingSubmission);
     submissionPending = false;
     bytesTransferred  = 0;
     completionPosted  = false;
@@ -635,7 +638,8 @@ SC::Result SC::AsyncExternalCompletion::clearSubmissionPending()
 
 SC::Result SC::AsyncExternalCompletion::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(manualMode or handle != FileDescriptor::Invalid, "AsyncExternalCompletion - Invalid file descriptor");
+    if (not manualMode and handle == FileDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidHandle);
     return SC::Result(true);
 }
 
@@ -1190,10 +1194,14 @@ SC::Result SC::AsyncEventLoop::start(AsyncRequest& async)
 
 SC::Result SC::AsyncEventLoop::postExternalCompletion(AsyncExternalCompletion& async, size_t bytesTransferred)
 {
-    SC_TRY_MSG(async.manualMode, "AsyncExternalCompletion is not in manual mode");
-    SC_TRY_MSG(async.state == AsyncRequest::State::Active, "AsyncExternalCompletion is not active");
-    SC_TRY_MSG(async.submissionPending, "AsyncExternalCompletion has no pending submission");
-    SC_TRY_MSG(not async.completionPosted, "AsyncExternalCompletion completion already posted");
+    if (not async.manualMode)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::ManualCompletionRequired);
+    if (async.state != AsyncRequest::State::Active)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::RequestNotActive);
+    if (not async.submissionPending)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::NoPendingSubmission);
+    if (async.completionPosted)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::CompletionAlreadyPosted);
     async.bytesTransferred = bytesTransferred;
     async.completionPosted = true;
     if ((async.flags & Internal::Flag_ManualCompletion) == 0)
