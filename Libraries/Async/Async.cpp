@@ -666,8 +666,8 @@ SC::Result SC::AsyncFileSend::start(AsyncEventLoop& eventLoop, const FileDescrip
                                     size_t pipeSize)
 {
     SC_TRY(checkState());
-    SC_TRY(file.get(fileHandle, SC::Result::Error("AsyncFileSend - Invalid file descriptor")));
-    SC_TRY(socket.get(socketHandle, SC::Result::Error("AsyncFileSend - Invalid socket descriptor")));
+    SC_TRY(file.get(fileHandle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
+    SC_TRY(socket.get(socketHandle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
 #if SC_PLATFORM_LINUX
     pipeBufferSize = pipeSize;
 #else
@@ -681,9 +681,12 @@ SC::Result SC::AsyncFileSend::start(AsyncEventLoop& eventLoop, const FileDescrip
 
 SC::Result SC::AsyncFileSend::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(fileHandle != FileDescriptor::Invalid, "AsyncFileSend - Invalid file descriptor");
-    SC_TRY_MSG(socketHandle != SocketDescriptor::Invalid, "AsyncFileSend - Invalid socket descriptor");
-    SC_TRY_MSG(length > 0, "AsyncFileSend - Zero length");
+    if (fileHandle == FileDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle);
+    if (socketHandle == SocketDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle);
+    if (length == 0)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyTransfer);
     return SC::Result(true);
 }
 

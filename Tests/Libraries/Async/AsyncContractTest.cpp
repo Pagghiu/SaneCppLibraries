@@ -132,6 +132,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 fileValidationErrors();
             }
+            if (test_section("file send validation errors"))
+            {
+                fileSendValidationErrors();
+            }
             if (test_section("loop close frees submitted requests"))
             {
                 loopCloseFreesSubmittedRequests();
@@ -230,6 +234,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void validationFailureLeavesRequestFree();
     void socketValidationErrors();
     void fileValidationErrors();
+    void fileSendValidationErrors();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
     void loopCloseDrainsPendingCloseCallback();
@@ -1300,6 +1305,36 @@ void SC::AsyncContractTest::fileValidationErrors()
         write.start(eventLoop, invalidFile, data).isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
     SC_TEST_EXPECT(write.isFree());
 
+    SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::fileSendValidationErrors()
+{
+    static_assert(static_cast<uint32_t>(AsyncError::EmptyTransfer) == 23, "Async errors are append-only");
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    FileDescriptor   invalidFile;
+    SocketDescriptor invalidSocket;
+    AsyncFileSend    send;
+    SC_TEST_EXPECT(send.start(eventLoop, invalidFile, invalidSocket, 0, 1)
+                       .isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(send.isFree());
+
+    // Non-sentinel placeholders exercise validation only; neither request reaches backend submission.
+#if SC_PLATFORM_WINDOWS
+    send.fileHandle = nullptr;
+#else
+    send.fileHandle = 0;
+#endif
+    SC_TEST_EXPECT(eventLoop.start(send).isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+    SC_TEST_EXPECT(send.isFree());
+
+    send.socketHandle = 0;
+    SC_TEST_EXPECT(eventLoop.start(send).isError(AsyncResultCategory, AsyncError::EmptyTransfer));
+    SC_TEST_EXPECT(send.isFree());
     SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     SC_TEST_EXPECT(eventLoop.close());
 }

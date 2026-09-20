@@ -36,6 +36,7 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::EmptyBuffer: formatter.append("Buffer is empty"); break;
     case AsyncError::MissingAcceptData: formatter.append("Accept request data is missing"); break;
     case AsyncError::InvalidFileHandle: formatter.append("File handle is invalid"); break;
+    case AsyncError::EmptyTransfer: formatter.append("Transfer length is zero"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
