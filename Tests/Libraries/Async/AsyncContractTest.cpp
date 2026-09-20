@@ -32,6 +32,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 structuredLifecycleErrors();
             }
+            if (test_section("descriptor association errors"))
+            {
+                descriptorAssociationErrors();
+            }
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -214,6 +218,7 @@ struct SC::AsyncContractTest : public SC::TestCase
 
     void stopSuppressesNormalCallback();
     void structuredLifecycleErrors();
+    void descriptorAssociationErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -333,6 +338,26 @@ void SC::AsyncContractTest::structuredLifecycleErrors()
 
     SC_TEST_EXPECT(loop.close());
     SC_TEST_EXPECT(loop.close().isError(AsyncResultCategory, AsyncError::NotInitialized));
+}
+
+void SC::AsyncContractTest::descriptorAssociationErrors()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    FileDescriptor file;
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file).isError(AsyncResultCategory,
+                                                                                    AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(
+        eventLoop.removeAllAssociationsFor(file).isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+
+    SocketDescriptor socket;
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(socket).isError(AsyncResultCategory,
+                                                                              AsyncError::InvalidSocketHandle));
+    SC_TEST_EXPECT(
+        eventLoop.removeAllAssociationsFor(socket).isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+
+    SC_TEST_EXPECT(eventLoop.close());
 }
 
 void SC::AsyncContractTest::stopSuppressesNormalCallback()
