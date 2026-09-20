@@ -515,8 +515,10 @@ SC::Result SC::AsyncSocketReceive::validate(AsyncEventLoop&)
 
 SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& eventLoop)
 {
-    SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead - Zero sized read buffer");
-    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileRead - Invalid file descriptor");
+    if (buffer.empty())
+        return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
+    if (handle == FileDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle);
     // Only use the async tasks for operations and backends that are not io_uring
     if (not eventLoop.needsThreadPoolForFileOperations() and not isThreadPoolForced())
     {
@@ -527,7 +529,7 @@ SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& eventLoop)
 
 SC::Result SC::AsyncFileRead::start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<char> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
     buffer = data;
     return eventLoop.start(*this);
 }
@@ -535,7 +537,7 @@ SC::Result SC::AsyncFileRead::start(AsyncEventLoop& eventLoop, const FileDescrip
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor,
                                      Span<Span<const char>> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
     return start(eventLoop, data);
 }
 
@@ -548,7 +550,7 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, Span<Span<const 
 
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<const char> data)
 {
-    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    SC_TRY(descriptor.get(handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
     return start(eventLoop, data);
 }
 
@@ -563,13 +565,16 @@ SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& eventLoop)
 {
     if (singleBuffer)
     {
-        SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileWrite - Zero sized write buffer");
+        if (buffer.empty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
     }
     else
     {
-        SC_TRY_MSG(not buffers.empty() and not buffers[0].empty(), "AsyncFileWrite - Zero sized write buffer");
+        if (buffers.empty() or buffers[0].empty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
     }
-    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileWrite - Invalid file descriptor");
+    if (handle == FileDescriptor::Invalid)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle);
     totalBytesWritten = 0;
 
     // Only use the async tasks for operations and backends that are not io_uring

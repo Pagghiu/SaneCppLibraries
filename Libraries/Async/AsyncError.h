@@ -34,6 +34,7 @@ enum class AsyncError : uint32_t
     InvalidAddress,
     EmptyBuffer,
     MissingAcceptData,
+    InvalidFileHandle,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

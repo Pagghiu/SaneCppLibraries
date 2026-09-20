@@ -128,6 +128,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 socketValidationErrors();
             }
+            if (test_section("file validation errors"))
+            {
+                fileValidationErrors();
+            }
             if (test_section("loop close frees submitted requests"))
             {
                 loopCloseFreesSubmittedRequests();
@@ -225,6 +229,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void threadPoolModeCanForceSuppliedPool();
     void validationFailureLeavesRequestFree();
     void socketValidationErrors();
+    void fileValidationErrors();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
     void loopCloseDrainsPendingCloseCallback();
@@ -1265,6 +1270,36 @@ void SC::AsyncContractTest::socketValidationErrors()
     SC_TEST_EXPECT(sendTo.isFree());
 
     SC_TEST_EXPECT(socket.close());
+    SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::fileValidationErrors()
+{
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidFileHandle) == 22, "Async errors are append-only");
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    FileDescriptor invalidFile;
+    char           readBuffer[1];
+    AsyncFileRead  read;
+    SC_TEST_EXPECT(
+        read.start(eventLoop, invalidFile, readBuffer).isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(read.isFree());
+    SC_TEST_EXPECT(eventLoop.start(read).isError(AsyncResultCategory, AsyncError::EmptyBuffer));
+    SC_TEST_EXPECT(read.isFree());
+
+    AsyncFileWrite write;
+    SC_TEST_EXPECT(write.start(eventLoop, Span<const char>()).isError(AsyncResultCategory, AsyncError::EmptyBuffer));
+    SC_TEST_EXPECT(write.isFree());
+    const Span<const char> data = {"x", 1};
+    SC_TEST_EXPECT(write.start(eventLoop, data).isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(write.isFree());
+    SC_TEST_EXPECT(
+        write.start(eventLoop, invalidFile, data).isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(write.isFree());
+
     SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     SC_TEST_EXPECT(eventLoop.close());
 }
