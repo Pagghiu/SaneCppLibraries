@@ -36,6 +36,10 @@ enum class AsyncError : uint32_t
     MissingAcceptData,
     InvalidFileHandle,
     EmptyTransfer,
+    OperationNotSet,
+    InvalidPath,
+    InvalidSourcePath,
+    InvalidDestinationPath,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

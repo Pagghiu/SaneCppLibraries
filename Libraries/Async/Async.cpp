@@ -695,39 +695,55 @@ SC::Result SC::AsyncFileSend::validate(AsyncEventLoop&)
 //-------------------------------------------------------------------------------------------------------
 SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(operation != Operation::None, "AsyncFileSystemOperation - No operation set");
+    if (operation == Operation::None)
+        return SC::Result::Error(AsyncResultCategory, AsyncError::OperationNotSet);
     switch (operation)
     {
-    case Operation::Open: SC_TRY_MSG(not openData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path"); break;
+    case Operation::Open:
+        if (openData.path.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidPath);
+        break;
     case Operation::Close:
-        SC_TRY_MSG(closeData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
+        if (closeData.handle == FileDescriptor::Invalid)
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle);
         break;
     case Operation::Read:
-        SC_TRY_MSG(readData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
-        SC_TRY_MSG(readData.buffer.sizeInBytes() > 0, "AsyncFileSystemOperation - Zero sized read buffer");
+        if (readData.handle == FileDescriptor::Invalid)
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle);
+        if (readData.buffer.empty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
         break;
     case Operation::Write:
-        SC_TRY_MSG(writeData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
-        SC_TRY_MSG(writeData.buffer.sizeInBytes() > 0, "AsyncFileSystemOperation - Zero sized write buffer");
+        if (writeData.handle == FileDescriptor::Invalid)
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle);
+        if (writeData.buffer.empty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
         break;
     case Operation::CopyFile:
-        SC_TRY_MSG(not copyFileData.path.isEmpty(), "AsyncFileSystemOperation - Invalid source path");
-        SC_TRY_MSG(not copyFileData.destinationPath.isEmpty(), "AsyncFileSystemOperation - Invalid destination path");
+        if (copyFileData.path.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSourcePath);
+        if (copyFileData.destinationPath.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidDestinationPath);
         break;
     case Operation::Rename:
-        SC_TRY_MSG(not renameData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
-        SC_TRY_MSG(not renameData.newPath.isEmpty(), "AsyncFileSystemOperation - Invalid new path");
+        if (renameData.path.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidPath);
+        if (renameData.newPath.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidDestinationPath);
         break;
     case Operation::RemoveDirectory:
-        SC_TRY_MSG(not removeData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
+        if (removeData.path.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidPath);
         break;
     case Operation::RemoveFile:
-        SC_TRY_MSG(not removeData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
+        if (removeData.path.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidPath);
         break;
     case Operation::CopyDirectory:
-        SC_TRY_MSG(not copyDirectoryData.path.isEmpty(), "AsyncFileSystemOperation - Invalid source path");
-        SC_TRY_MSG(not copyDirectoryData.destinationPath.isEmpty(),
-                   "AsyncFileSystemOperation - Invalid destination path");
+        if (copyDirectoryData.path.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSourcePath);
+        if (copyDirectoryData.destinationPath.isEmpty())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidDestinationPath);
         break;
     case Operation::None: break;
     }
@@ -804,6 +820,7 @@ SC::Result SC::AsyncFileSystemOperation::close(AsyncEventLoop& eventLoop, FileDe
     SC_TRY(checkState());
     operation = Operation::Close;
     new (&closeData, PlacementNew()) CloseData({handle});
+    SC_TRY(validate(eventLoop));
     if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
@@ -824,6 +841,7 @@ SC::Result SC::AsyncFileSystemOperation::read(AsyncEventLoop& eventLoop, FileDes
     SC_TRY(checkState());
     operation = Operation::Read;
     new (&readData, PlacementNew()) ReadData({handle, buffer, offset});
+    SC_TRY(validate(eventLoop));
     if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
@@ -849,6 +867,7 @@ SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDe
     SC_TRY(checkState());
     operation = Operation::Write;
     new (&writeData, PlacementNew()) WriteData({handle, buffer, offset});
+    SC_TRY(validate(eventLoop));
     if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
@@ -873,6 +892,7 @@ SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, Str
     SC_TRY(checkState());
     operation = Operation::CopyFile;
     new (&copyFileData, PlacementNew()) CopyFileData({path, destinationPath, copyFlags});
+    SC_TRY(validate(eventLoop));
     // TODO: Implement this on io_uring using two splice submissions with IOSQE_IO_LINK
     loopWork.work = [&]() -> SC::Result
     {
@@ -889,6 +909,7 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
     SC_TRY(checkState());
     operation = Operation::Rename;
     new (&renameData, PlacementNew()) RenameData({path, newPath});
+    SC_TRY(validate(eventLoop));
     if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
@@ -908,6 +929,7 @@ SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& ev
     SC_TRY(checkState());
     operation = Operation::RemoveDirectory;
     new (&removeData, PlacementNew()) RemoveData({path});
+    SC_TRY(validate(eventLoop));
     if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
@@ -927,6 +949,7 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
     SC_TRY(checkState());
     operation = Operation::RemoveFile;
     new (&removeData, PlacementNew()) RemoveData({path});
+    SC_TRY(validate(eventLoop));
     if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
@@ -947,6 +970,7 @@ SC::Result SC::AsyncFileSystemOperation::copyDirectory(AsyncEventLoop& eventLoop
     SC_TRY(checkState());
     operation = Operation::CopyDirectory;
     new (&copyDirectoryData, PlacementNew()) CopyDirectoryData({path, destinationPath, copyFlags});
+    SC_TRY(validate(eventLoop));
     loopWork.work = [&]() -> SC::Result
     {
         SC_TRY(FileSystem::Operations::copyDirectory(copyDirectoryData.path, copyDirectoryData.destinationPath,

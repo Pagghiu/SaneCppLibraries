@@ -136,6 +136,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 fileSendValidationErrors();
             }
+            if (test_section("file system preflight errors"))
+            {
+                fileSystemPreflightErrors();
+            }
             if (test_section("loop close frees submitted requests"))
             {
                 loopCloseFreesSubmittedRequests();
@@ -235,6 +239,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void socketValidationErrors();
     void fileValidationErrors();
     void fileSendValidationErrors();
+    void fileSystemPreflightErrors();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
     void loopCloseDrainsPendingCloseCallback();
@@ -1335,6 +1340,60 @@ void SC::AsyncContractTest::fileSendValidationErrors()
     send.socketHandle = 0;
     SC_TEST_EXPECT(eventLoop.start(send).isError(AsyncResultCategory, AsyncError::EmptyTransfer));
     SC_TEST_EXPECT(send.isFree());
+    SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::fileSystemPreflightErrors()
+{
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidDestinationPath) == 27, "Async errors are append-only");
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // This must fail before a thread pool or backend is selected.
+    AsyncFileSystemOperation copy;
+    SC_TEST_EXPECT(copy.copyFile(eventLoop, {}, {}).isError(AsyncResultCategory, AsyncError::InvalidSourcePath));
+    SC_TEST_EXPECT(copy.isFree());
+
+    AsyncFileSystemOperation copyDestination;
+    SC_TEST_EXPECT(copyDestination.copyFile(eventLoop, SC_NATIVE_STR("source"), {})
+                       .isError(AsyncResultCategory, AsyncError::InvalidDestinationPath));
+    SC_TEST_EXPECT(copyDestination.isFree());
+
+    AsyncFileSystemOperation copyDirectory;
+    SC_TEST_EXPECT(copyDirectory.copyDirectory(eventLoop, {}, SC_NATIVE_STR("destination"))
+                       .isError(AsyncResultCategory, AsyncError::InvalidSourcePath));
+    SC_TEST_EXPECT(copyDirectory.isFree());
+
+    AsyncFileSystemOperation unset;
+    SC_TEST_EXPECT(eventLoop.start(unset).isError(AsyncResultCategory, AsyncError::OperationNotSet));
+    SC_TEST_EXPECT(unset.isFree());
+
+    AsyncFileSystemOperation open;
+    SC_TEST_EXPECT(open.open(eventLoop, {}, FileOpen::Read).isError(AsyncResultCategory, AsyncError::InvalidPath));
+    SC_TEST_EXPECT(open.isFree());
+
+    AsyncFileSystemOperation close;
+    SC_TEST_EXPECT(
+        close.close(eventLoop, FileDescriptor::Invalid).isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(close.isFree());
+
+    char                     buffer[1];
+    AsyncFileSystemOperation read;
+    SC_TEST_EXPECT(read.read(eventLoop, FileDescriptor::Invalid, buffer, 0)
+                       .isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+    SC_TEST_EXPECT(read.isFree());
+
+    AsyncFileSystemOperation rename;
+    SC_TEST_EXPECT(rename.rename(eventLoop, SC_NATIVE_STR("source"), {})
+                       .isError(AsyncResultCategory, AsyncError::InvalidDestinationPath));
+    SC_TEST_EXPECT(rename.isFree());
+
+    AsyncFileSystemOperation remove;
+    SC_TEST_EXPECT(remove.removeFile(eventLoop, {}).isError(AsyncResultCategory, AsyncError::InvalidPath));
+    SC_TEST_EXPECT(remove.isFree());
+
     SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     SC_TEST_EXPECT(eventLoop.close());
 }

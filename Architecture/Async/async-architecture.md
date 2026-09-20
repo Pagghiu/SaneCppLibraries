@@ -86,3 +86,4 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - [ASYNC-0005 - Use request reactivation for recurring async work](async-0005-use-request-reactivation-for-recurring-async-work.md)
 - [ASYNC-0006 - Unschedule loop timeouts from the userspace schedule](async-0006-unschedule-loop-timeouts-from-the-userspace-schedule.md)
 - [ASYNC-0007 - Use portable structured Result errors](async-0007-use-portable-structured-result-errors.md)
+- [ASYNC-0008 - Validate file-system requests before backend routing](async-0008-validate-file-system-requests-before-backend-routing.md)

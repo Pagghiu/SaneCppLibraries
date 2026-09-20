@@ -37,6 +37,10 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::MissingAcceptData: formatter.append("Accept request data is missing"); break;
     case AsyncError::InvalidFileHandle: formatter.append("File handle is invalid"); break;
     case AsyncError::EmptyTransfer: formatter.append("Transfer length is zero"); break;
+    case AsyncError::OperationNotSet: formatter.append("File-system operation has not been set"); break;
+    case AsyncError::InvalidPath: formatter.append("Path is invalid"); break;
+    case AsyncError::InvalidSourcePath: formatter.append("Source path is invalid"); break;
+    case AsyncError::InvalidDestinationPath: formatter.append("Destination path is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
