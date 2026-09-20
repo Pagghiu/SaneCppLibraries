@@ -79,6 +79,8 @@ enum class AsyncError : uint32_t
     FileSeekFailed,
     FileSendFailed,
     FileSendCompletionFailed,
+    FileSendIncomplete,
+    InvalidTransferPipe,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

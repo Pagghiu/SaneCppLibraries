@@ -84,6 +84,8 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::FileSeekFailed: formatter.append("File position could not be set"); break;
     case AsyncError::FileSendFailed: formatter.append("File data could not be sent"); break;
     case AsyncError::FileSendCompletionFailed: formatter.append("File send could not be completed"); break;
+    case AsyncError::FileSendIncomplete: formatter.append("File data was only partially sent"); break;
+    case AsyncError::InvalidTransferPipe: formatter.append("File transfer pipe is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

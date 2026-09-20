@@ -1119,7 +1119,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             }
         } while ((res == -1) and (errno == EINTR));
 
-        SC_TRY_MSG(res >= 0, "::read failed");
+        if (res < 0)
+            return Result::Error(AsyncResultCategory, AsyncError::FileReadFailed);
         completionData.numBytes = static_cast<size_t>(res);
         if (not span.empty() and res == 0)
         {
@@ -1168,7 +1169,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         const off_t  offset           = {async.useOffset ? static_cast<off_t>(async.offset) : -1};
         SC_TRY(posixTryWrite(async, totalBytesToSend, WriteApiPosixWrite{offset}));
         completionData.numBytes = async.totalBytesWritten;
-        SC_TRY_MSG(completionData.numBytes == totalBytesToSend, "Partial write (disk full or RLIMIT_FSIZE reached)");
+        if (completionData.numBytes != totalBytesToSend)
+            return Result::Error(AsyncResultCategory, AsyncError::FileWriteIncomplete);
         return Result(true);
     }
 
@@ -1259,7 +1261,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             if (errno != EAGAIN && errno != EWOULDBLOCK)
             {
-                return Result::Error("sendfile failed");
+                return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
             }
         }
 
@@ -1293,7 +1295,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             {
                 if (errno != EAGAIN && errno != EWOULDBLOCK)
                 {
-                    return Result::Error("sendfile failed");
+                    return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
                 }
             }
         }
@@ -1338,7 +1340,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                     ::poll(&pfd, 1, -1); // Block indefinitely until writable
                     continue;
                 }
-                return Result::Error("sendfile failed");
+                return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
             }
         }
         completionData.bytesTransferred = async.bytesSent;

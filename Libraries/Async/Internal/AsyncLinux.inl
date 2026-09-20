@@ -497,7 +497,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                 totalBytes += buf.sizeInBytes();
             }
         }
-        SC_TRY_MSG(result.completionData.numBytes == totalBytes, "send didn't send all data");
+        if (result.completionData.numBytes != totalBytes)
+            return Result::Error(AsyncResultCategory, AsyncError::SocketSendIncomplete);
         return Result(true);
     }
 
@@ -571,7 +572,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     result.reactivateRequest(true);
                     return Result(true);
                 }
-                return Result::Error("io_uring file read readiness read failed");
+                return Result::Error(AsyncResultCategory, AsyncError::FileReadFailed);
             }
 
             result.completionData.numBytes = static_cast<size_t>(readBytes);
@@ -660,7 +661,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         // Splice from file to pipe
         const int fdIn = async.fileHandle;
         int       fdPipeW;
-        SC_TRY(async.splicePipe.writePipe.get(fdPipeW, Result::Error("Invalid write pipe")));
+        SC_TRY(async.splicePipe.writePipe.get(fdPipeW,
+                                              Result::Error(AsyncResultCategory, AsyncError::InvalidTransferPipe)));
         AsyncLinuxIOUring::prepSplice(submission1, fdIn, async.offset, fdPipeW, -1,
                                       static_cast<unsigned int>(async.length - async.bytesSent), 0);
         AsyncLinuxIOUring::setData(submission1, nullptr); // Ignore completion of the first part
@@ -669,7 +671,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
         // Splice from pipe to socket
         int fdPipeR;
-        SC_TRY(async.splicePipe.readPipe.get(fdPipeR, Result::Error("Invalid read pipe")));
+        SC_TRY(async.splicePipe.readPipe.get(fdPipeR,
+                                             Result::Error(AsyncResultCategory, AsyncError::InvalidTransferPipe)));
         const int fdOut = async.socketHandle;
         AsyncLinuxIOUring::prepSplice(submission2, fdPipeR, -1, fdOut, -1,
                                       static_cast<unsigned int>(async.length - async.bytesSent), 0);
@@ -686,7 +689,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         int32_t res = events[result.eventIndex].res;
         if (res < 0)
         {
-            return Result::Error("Splice failed");
+            return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
         }
 
         const size_t bytesTransferred = static_cast<size_t>(res);
@@ -700,7 +703,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         }
         else
         {
-            return Result::Error("Not all data sent in splice");
+            return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
         }
     }
 

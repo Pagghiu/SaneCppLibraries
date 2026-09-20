@@ -58,6 +58,12 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 posixSocketConnectPreservesForeignErrors();
             }
+#if !SC_PLATFORM_WINDOWS
+            if (test_section("file send operation error"))
+            {
+                fileSendOperationError();
+            }
+#endif
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -246,6 +252,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void socketBufferCountError();
     void fileReadOperationError();
     void posixSocketConnectPreservesForeignErrors();
+    void fileSendOperationError();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -413,6 +420,7 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     static_assert(static_cast<uint32_t>(AsyncError::FileWriteIncomplete) == 54, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::SocketBufferCountExceeded) == 62, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::FileSendCompletionFailed) == 66, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidTransferPipe) == 68, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -481,6 +489,10 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSeekFailed, message).status == ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendFailed, message).status == ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendCompletionFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendIncomplete, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidTransferPipe, message).status ==
                    ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX
@@ -578,6 +590,37 @@ void SC::AsyncContractTest::posixSocketConnectPreservesForeignErrors()
     SC_TEST_EXPECT(eventLoop.runNoWait());
     SC_TEST_EXPECT(callbacks == 1);
     SC_TEST_EXPECT(observed.category() == SocketResultCategory);
+    SC_TEST_EXPECT(eventLoop.close());
+#endif
+}
+
+void SC::AsyncContractTest::fileSendOperationError()
+{
+#if !SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_LINUX
+    // This regression exercises sendfile; io_uring uses linked splice submissions instead.
+    if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseIoUring)
+        return;
+#endif
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    AsyncFileSend send;
+    send.fileHandle   = 999999; // Valid sentinel-wise, but not open; Async does not own it.
+    send.socketHandle = 999999;
+    send.length       = 1;
+
+    Result observed  = Result(true);
+    int    callbacks = 0;
+    send.callback    = [&](AsyncFileSend::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(eventLoop.start(send));
+    SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return callbacks == 1; }));
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::FileSendFailed));
+    SC_TEST_EXPECT(send.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 #endif
 }
