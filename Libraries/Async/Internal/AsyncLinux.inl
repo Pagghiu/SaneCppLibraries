@@ -207,7 +207,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             if (kernelSubmission == nullptr)
             {
                 // Not much we can do at this point, we can't really submit
-                return Result::Error("io_uring get submission failed");
+                return Result::Error(AsyncResultCategory, AsyncError::SubmissionCapacityExhausted);
             }
         }
         newSubmission = kernelSubmission;
@@ -289,7 +289,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     if (sqe == nullptr)
                     {
                         // TODO: is it correct returning if failing to get a new sqe?
-                        return Result::Error("io_uring get timeout submission failed");
+                        return Result::Error(AsyncResultCategory, AsyncError::SubmissionCapacityExhausted);
                     }
                     auto timespec = KernelEventsPosix::timerToRelativeTimespec(eventLoop.internal.loopTime, nextTimer);
                     kts.tv_sec    = timespec.tv_sec;
@@ -315,7 +315,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     if (sqe == nullptr)
                     {
                         // TODO: is it correct returning if failing to get a new sqe?
-                        return Result::Error("io_uring get timeout submission failed");
+                        return Result::Error(AsyncResultCategory, AsyncError::SubmissionCapacityExhausted);
                     }
                     const __u64 userData = reinterpret_cast<__u64>(&kq.timerState);
                     AsyncLinuxIOUring::prepTimeoutRemove(sqe, userData, 0);
@@ -346,12 +346,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     }
                     else
                     {
-                        return Result::Error("io_uring_submit EAGAIN / EBUSY");
+                        return Result::Error(AsyncResultCategory, AsyncError::SubmissionCapacityExhausted);
                     }
                 }
                 else
                 {
-                    return Result::Error("io_uring_submit");
+                    return Result::Error(AsyncResultCategory, AsyncError::SubmissionFailed);
                 }
             }
 

@@ -46,6 +46,15 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::WakeUpFailed: formatter.append("Event loop could not be woken"); break;
     case AsyncError::InvalidEventLoopHandle: formatter.append("Event-loop handle is invalid"); break;
     case AsyncError::InvalidWakeUpHandle: formatter.append("Event-loop wake-up handle is invalid"); break;
+    case AsyncError::WatcherRegistrationFailed: formatter.append("Event watcher could not be registered"); break;
+    case AsyncError::WatcherRemovalFailed: formatter.append("Event watcher could not be removed"); break;
+    case AsyncError::EventLoopFlushFailed: formatter.append("Event-loop changes could not be submitted"); break;
+    case AsyncError::EventLoopPollFailed: formatter.append("Event loop could not poll for events"); break;
+    case AsyncError::EventCompletionFailed: formatter.append("Event could not be completed"); break;
+    case AsyncError::SubmissionCapacityExhausted:
+        formatter.append("Event-loop submission capacity is exhausted");
+        break;
+    case AsyncError::SubmissionFailed: formatter.append("Event-loop submission failed"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

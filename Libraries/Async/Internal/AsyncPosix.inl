@@ -234,23 +234,25 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         event.events             = filter;
         event.data.ptr           = &async; // data.ptr is a user data pointer
         FileDescriptor::Handle loopFd;
-        SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(loopFd, Result::Error("loop")));
+        SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(
+            loopFd, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
 
         int res = ::epoll_ctl(loopFd, EPOLL_CTL_ADD, fileDescriptor, &event);
         if (res == -1)
         {
-            return Result::Error("epoll_ctl");
+            return Result::Error(AsyncResultCategory, AsyncError::WatcherRegistrationFailed);
         }
         return Result(true);
     }
 
 #endif
     template <int VALUE>
-    static Result setSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle, int32_t filter)
+    static Result setSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle, int32_t filter,
+                                            AsyncError failure)
     {
         FileDescriptor::Handle loopFd;
         SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(
-            loopFd, Result::Error("AsyncEventLoop::KernelQueuePosix::syncWithKernel() - Invalid Handle")));
+            loopFd, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
 #if SC_ASYNC_USE_EPOLL
         struct epoll_event event;
         event.events   = filter;
@@ -265,7 +267,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         {
             return Result(true);
         }
-        return Result::Error("stopSingleWatcherImmediate failed");
+        return Result::Error(AsyncResultCategory, failure);
     }
 
     static Result stopSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle, int32_t filter)
@@ -275,7 +277,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #else
         constexpr auto VALUE = EV_DELETE;
 #endif
-        return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter);
+        return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter, AsyncError::WatcherRemovalFailed);
     }
 
     static Result startSingleWatcherImmediate(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle,
@@ -286,7 +288,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #else
         constexpr auto VALUE = EV_ADD;
 #endif
-        return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter);
+        return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter, AsyncError::WatcherRegistrationFailed);
     }
 
     static Result associateExternallyCreatedSocketHandle(SocketDescriptor::Handle) { return Result(true); }
@@ -373,7 +375,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 return Result(true);
             }
             continueProcessing = false;
-            return Result::Error("Error in processing event (epoll EPOLLERR or EPOLLHUP)");
+            return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
         }
         return Result(true);
     }
@@ -400,7 +402,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     Result flushQueue(AsyncEventLoop& eventLoop)
     {
         FileDescriptor::Handle loopFd;
-        SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopFd, Result::Error("flushQueue() - Invalid Handle")));
+        SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(
+            loopFd, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
 
         int res;
         do
@@ -409,7 +412,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         } while (res == -1 && errno == EINTR);
         if (res != 0)
         {
-            return Result::Error("AsyncEventLoop::KernelQueuePosix::flushQueue() - kevent failed");
+            return Result::Error(AsyncResultCategory, AsyncError::EventLoopFlushFailed);
         }
         newEvents = 0;
         return Result(true);
@@ -431,7 +434,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             // Processes that exit too fast error out with ESRCH errno, but we do not consider it an error...
             if (request->type != AsyncRequest::Type::ProcessExit or event.data != ESRCH)
             {
-                return Result::Error("Error in processing event (kqueue EV_ERROR)");
+                return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
             }
         }
         return Result(true);
@@ -482,7 +485,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 nextTimer = &loopTimeout->expirationTime;
             }
         }
-        static constexpr Result errorResult = Result::Error("syncWithKernel() - Invalid Handle");
+        static constexpr Result errorResult = Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle);
         FileDescriptor::Handle  loopFd;
         SC_TRY(eventLoop.internal.kernelQueue.get().getPosix().loopFd.get(loopFd, errorResult));
 
@@ -524,7 +527,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         } while (true);
         if (res == -1)
         {
-            return Result::Error("AsyncEventLoop::KernelQueuePosix::poll() - failed");
+            return Result::Error(AsyncResultCategory, AsyncError::EventLoopPollFailed);
         }
         newEvents = static_cast<int>(res);
         if (loopTimeout)

@@ -287,7 +287,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 nextTimer = &loopTimeout->expirationTime;
             }
         }
-        static constexpr Result errorResult = Result::Error("syncWithKernel() - Invalid Handle");
+        static constexpr Result errorResult = Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle);
         FileDescriptor::Handle  loopFd;
         SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopFd, errorResult));
 
@@ -316,8 +316,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
             else
             {
-                // TODO: GetQueuedCompletionStatusEx error handling
-                return Result::Error("KernelEvents::poll() - GetQueuedCompletionStatusEx error");
+                return Result::Error(AsyncResultCategory, AsyncError::EventLoopPollFailed);
             }
         }
         if (loopTimeout)

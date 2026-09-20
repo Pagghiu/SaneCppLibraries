@@ -390,6 +390,7 @@ void SC::AsyncContractTest::monitorLifecycleErrors()
 void SC::AsyncContractTest::backendLifecycleErrors()
 {
     static_assert(static_cast<uint32_t>(AsyncError::InvalidWakeUpHandle) == 32, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::SubmissionFailed) == 39, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -401,6 +402,19 @@ void SC::AsyncContractTest::backendLifecycleErrors()
                    ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidWakeUpHandle, message).status ==
                    ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::WatcherRegistrationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::WatcherRemovalFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopFlushFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopPollFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventCompletionFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SubmissionCapacityExhausted, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SubmissionFailed, message).status == ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;

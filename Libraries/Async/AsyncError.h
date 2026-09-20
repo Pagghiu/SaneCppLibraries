@@ -45,6 +45,13 @@ enum class AsyncError : uint32_t
     WakeUpFailed,
     InvalidEventLoopHandle,
     InvalidWakeUpHandle,
+    WatcherRegistrationFailed,
+    WatcherRemovalFailed,
+    EventLoopFlushFailed,
+    EventLoopPollFailed,
+    EventCompletionFailed,
+    SubmissionCapacityExhausted,
+    SubmissionFailed,
 };
 
 /// @brief Stable category assigned to Async-owned errors.
