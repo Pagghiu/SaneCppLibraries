@@ -909,11 +909,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         break;
         case AsyncFileSystemOperation::Operation::CopyFile: {
             // TODO: Implement this using two splice submissions with IOSQE_IO_LINK
-            return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
         break;
         case AsyncFileSystemOperation::Operation::CopyDirectory: {
-            return Result::Error("AsyncFileSystemOperation::CopyDirectory - Not implemented");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
         break;
         case AsyncFileSystemOperation::Operation::Rename: {
@@ -959,9 +959,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             result.completionData.numBytes = static_cast<size_t>(completion.res);
             break;
         case AsyncFileSystemOperation::Operation::CopyFile:
-            return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         case AsyncFileSystemOperation::Operation::CopyDirectory:
-            return Result::Error("AsyncFileSystemOperation::CopyDirectory - Not implemented");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         case AsyncFileSystemOperation::Operation::Rename: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::RemoveDirectory: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::RemoveFile: result.completionData.code = completion.res; break;
@@ -982,7 +982,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         AsyncExternalCompletion& async = result.getAsync();
         if (not async.submissionPending)
         {
-            return Result::Error("AsyncExternalCompletion completed without pending submission");
+            return Result::Error(AsyncResultCategory, AsyncError::NoPendingSubmission);
         }
         result.completionData.bytesTransferred = async.bytesTransferred;
         async.submissionPending                = false;

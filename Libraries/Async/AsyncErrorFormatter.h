@@ -63,6 +63,7 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::SignalReadFailed: formatter.append("Signal event could not be read"); break;
     case AsyncError::SignalSubscriberLimitReached: formatter.append("Signal subscriber limit was reached"); break;
     case AsyncError::InvalidEventIndex: formatter.append("Event index is invalid"); break;
+    case AsyncError::CancellationFailed: formatter.append("Operation could not be cancelled"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

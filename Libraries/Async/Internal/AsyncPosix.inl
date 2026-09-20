@@ -1233,7 +1233,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         if (notImplemented)
 
         {
-            return Result::Error("sendfile not implemented on this platform");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
 
         if (res >= 0)
@@ -1389,7 +1389,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         AsyncExternalCompletion& async = result.getAsync();
         if (not async.submissionPending)
         {
-            return Result::Error("AsyncExternalCompletion completed without pending submission");
+            return Result::Error(AsyncResultCategory, AsyncError::NoPendingSubmission);
         }
         result.completionData.bytesTransferred = async.bytesTransferred;
         async.submissionPending                = false;
@@ -1589,6 +1589,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return true;
     }
     
-    template <typename T, typename P> static Result executeOperation(T&, P&) { return Result::Error("Implement executeOperation"); }
+    template <typename T, typename P> static Result executeOperation(T&, P&)
+    {
+        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
+    }
     // clang-format on
 };

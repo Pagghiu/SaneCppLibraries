@@ -400,7 +400,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         case SocketFlags::AddressFamilyIPV4: af = AF_INET; break;
         case SocketFlags::AddressFamilyIPV6: af = AF_INET6; break;
         case SocketFlags::AddressFamilyUnix:
-            return Result::Error("Async Unix-domain accept is unsupported on this platform");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
         SOCKET clientSocket = ::WSASocketW(af, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, flags);
         SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed");
@@ -496,7 +496,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         int bindRes;
         if (asyncConnect.address.getAddressFamily() == SocketFlags::AddressFamilyUnix)
         {
-            return Result::Error("Async Unix-domain connect is unsupported on this platform");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
         if (asyncConnect.address.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
         {
@@ -1153,10 +1153,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     static Result activateAsync(AsyncEventLoop&, AsyncFileReadiness&)
     {
-        return Result::Error("AsyncFileReadiness is not supported on Windows");
+        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
     }
 
-    static Result completeAsync(AsyncFileReadiness::Result&) { return Result::Error("AsyncFileReadiness completion"); }
+    static Result completeAsync(AsyncFileReadiness::Result&)
+    {
+        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
+    }
 
     static Result cancelAsync(AsyncEventLoop&, AsyncFileReadiness&) { return Result(true); }
 
@@ -1189,7 +1192,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         AsyncExternalCompletion& async = result.getAsync();
         if (not async.submissionPending)
         {
-            return Result::Error("AsyncExternalCompletion completed without pending submission");
+            return Result::Error(AsyncResultCategory, AsyncError::NoPendingSubmission);
         }
         if (async.manualMode)
         {
@@ -1236,7 +1239,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             async.completionPosted  = false;
             return Result(true);
         }
-        return Result::Error("AsyncExternalCompletion CancelIoEx failed");
+        return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
     }
 
     [[nodiscard]] static bool teardownAsync(AsyncExternalCompletion*, AsyncTeardown&) { return true; }
@@ -1640,7 +1643,10 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.
     template<typename T> static bool needsSubmissionWhenReactivating(T&) { return true; }
         
-    template <typename T, typename P> static Result executeOperation(T&, P&) { return Result::Error("Implement executeOperation"); }
+    template <typename T, typename P> static Result executeOperation(T&, P&)
+    {
+        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
+    }
     // clang-format on
 };
 
