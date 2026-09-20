@@ -40,6 +40,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 monitorLifecycleErrors();
             }
+            if (test_section("backend lifecycle errors"))
+            {
+                backendLifecycleErrors();
+            }
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -224,6 +228,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void structuredLifecycleErrors();
     void descriptorAssociationErrors();
     void monitorLifecycleErrors();
+    void backendLifecycleErrors();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -380,6 +385,30 @@ void SC::AsyncContractTest::monitorLifecycleErrors()
     SC_TEST_EXPECT(monitor.close());
     SC_TEST_EXPECT(monitor.close().isError(AsyncResultCategory, AsyncError::NotInitialized));
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::backendLifecycleErrors()
+{
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidWakeUpHandle) == 32, "Async errors are append-only");
+
+    char message[64];
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::WakeUpInitializationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::WakeUpFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidEventLoopHandle, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidWakeUpHandle, message).status ==
+                   ResultErrorFormatStatus::Success);
+
+#if !SC_PLATFORM_LINUX
+    AsyncEventLoop          eventLoop;
+    AsyncEventLoop::Options unsupported;
+    unsupported.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
+    SC_TEST_EXPECT(eventLoop.create(unsupported).isError(AsyncResultCategory, AsyncError::OperationUnsupported));
+    SC_TEST_EXPECT(not eventLoop.isInitialized());
+#endif
 }
 
 void SC::AsyncContractTest::stopSuppressesNormalCallback()

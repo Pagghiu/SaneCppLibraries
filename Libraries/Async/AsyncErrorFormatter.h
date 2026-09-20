@@ -41,6 +41,11 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::InvalidPath: formatter.append("Path is invalid"); break;
     case AsyncError::InvalidSourcePath: formatter.append("Source path is invalid"); break;
     case AsyncError::InvalidDestinationPath: formatter.append("Destination path is invalid"); break;
+    case AsyncError::EventLoopCreationFailed: formatter.append("Event loop could not be created"); break;
+    case AsyncError::WakeUpInitializationFailed: formatter.append("Event-loop wake-up could not be initialized"); break;
+    case AsyncError::WakeUpFailed: formatter.append("Event loop could not be woken"); break;
+    case AsyncError::InvalidEventLoopHandle: formatter.append("Event-loop handle is invalid"); break;
+    case AsyncError::InvalidWakeUpHandle: formatter.append("Event-loop wake-up handle is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

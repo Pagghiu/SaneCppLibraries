@@ -60,7 +60,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     {
         if (ringInited)
         {
-            return Result::Error("ring already inited");
+            return Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized);
         }
         const int uringResult = ring.create(QueueDepth);
         if (uringResult < 0)
@@ -94,7 +94,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         FileDescriptor::Handle newEventFd = ::eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
         if (newEventFd < 0)
         {
-            return Result::Error("eventfd");
+            return Result::Error(AsyncResultCategory, AsyncError::WakeUpInitializationFailed);
         }
         SC_TRY(wakeUpEventFd.assign(newEventFd));
 
@@ -107,7 +107,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     Result wakeUpFromExternalThread()
     {
         int eventFd;
-        SC_TRY(wakeUpEventFd.get(eventFd, Result::Error("writePipe handle")));
+        SC_TRY(wakeUpEventFd.get(eventFd, Result::Error(AsyncResultCategory, AsyncError::InvalidWakeUpHandle)));
         ssize_t eventValue;
         do
         {
@@ -116,7 +116,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 
         if (eventValue < 0)
         {
-            return Result::Error("AsyncEventLoop::wakeUpFromExternalThread - Error in write");
+            return Result::Error(AsyncResultCategory, AsyncError::WakeUpFailed);
         }
         return Result(true);
     }

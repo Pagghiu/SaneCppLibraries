@@ -40,6 +40,11 @@ enum class AsyncError : uint32_t
     InvalidPath,
     InvalidSourcePath,
     InvalidDestinationPath,
+    EventLoopCreationFailed,
+    WakeUpInitializationFailed,
+    WakeUpFailed,
+    InvalidEventLoopHandle,
+    InvalidWakeUpHandle,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

@@ -176,13 +176,12 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     {
         if (options.apiType != AsyncEventLoop::Options::ApiType::Automatic)
         {
-            return Result::Error("createEventLoop only accepts ApiType::Automatic");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
         HANDLE newQueue = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
         if (newQueue == INVALID_HANDLE_VALUE)
         {
-            // TODO: Better CreateIoCompletionPort error handling
-            return Result::Error("AsyncEventLoop::KernelQueue::createEventLoop() - CreateIoCompletionPort");
+            return Result::Error(AsyncResultCategory, AsyncError::EventLoopCreationFailed);
         }
         SC_TRY(loopFd.assign(newQueue));
         return Result(true);
@@ -237,12 +236,12 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     Result wakeUpFromExternalThread()
     {
         FileDescriptor::Handle loopHandle;
-        SC_TRY(loopFd.get(loopHandle, Result::Error("watchInputs - Invalid Handle")));
+        SC_TRY(loopFd.get(loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
 
         OVERLAPPED* overlapped = static_cast<OVERLAPPED*>(asyncWakeUp.getWindowsOverlapped());
         if (::PostQueuedCompletionStatus(loopHandle, 0, 0, overlapped) == FALSE)
         {
-            return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
+            return Result::Error(AsyncResultCategory, AsyncError::WakeUpFailed);
         }
         return Result(true);
     }

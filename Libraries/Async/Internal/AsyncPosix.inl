@@ -133,7 +133,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     {
         if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseIoUring)
         {
-            return Result::Error("createEventLoop: Cannot use io_uring");
+            return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
 #if SC_ASYNC_USE_EPOLL
         const int newQueue = ::epoll_create1(O_CLOEXEC);
@@ -142,8 +142,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #endif
         if (newQueue == -1)
         {
-            // TODO: Better error handling
-            return Result::Error("AsyncEventLoop::KernelQueuePosix::createEventLoop() failed");
+            return Result::Error(AsyncResultCategory, AsyncError::EventLoopCreationFailed);
         }
         SC_TRY(loopFd.assign(newQueue));
         return Result(true);
@@ -169,7 +168,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         const int eventFd = ::eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
         if (eventFd == -1)
         {
-            return Result::Error("eventfd");
+            return Result::Error(AsyncResultCategory, AsyncError::WakeUpInitializationFailed);
         }
         SC_TRY(wakeUpEventFd.assign(eventFd));
         SC_TRY(wakeUpPoll.start(eventLoop, eventFd));
@@ -200,7 +199,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         // TODO: We need an atomic bool swap to wait until next run
 #if SC_ASYNC_USE_EPOLL
         int eventFd;
-        SC_TRY(wakeUpEventFd.get(eventFd, Result::Error("eventfd handle")));
+        SC_TRY(wakeUpEventFd.get(eventFd, Result::Error(AsyncResultCategory, AsyncError::InvalidWakeUpHandle)));
         int writeResult;
         do
         {
@@ -208,11 +207,11 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         } while (writeResult == -1 and errno == EINTR);
         if (writeResult == -1)
         {
-            return Result::Error("AsyncEventLoop::wakeUpFromExternalThread - Error in write");
+            return Result::Error(AsyncResultCategory, AsyncError::WakeUpFailed);
         }
 #else
         FileDescriptor::Handle handle;
-        SC_TRY(loopFd.get(handle, Result::Error("Invalid loop handle")));
+        SC_TRY(loopFd.get(handle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
         struct kevent event;
         EV_SET(&event, static_cast<uintptr_t>(wakeUpUserEventIdent), EVFILT_USER, 0, NOTE_TRIGGER, 0, &wakeUpPoll);
         int triggerResult;
@@ -222,7 +221,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         } while (triggerResult == -1 and errno == EINTR);
         if (triggerResult == -1)
         {
-            return Result::Error("AsyncEventLoop::wakeUpFromExternalThread - Error in kevent NOTE_TRIGGER");
+            return Result::Error(AsyncResultCategory, AsyncError::WakeUpFailed);
         }
 #endif
         return Result(true);
