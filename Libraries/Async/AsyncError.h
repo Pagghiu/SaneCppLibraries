@@ -52,6 +52,14 @@ enum class AsyncError : uint32_t
     EventCompletionFailed,
     SubmissionCapacityExhausted,
     SubmissionFailed,
+    ProcessWatcherCreationFailed,
+    ProcessWatcherRemovalFailed,
+    ProcessWaitFailed,
+    SignalWatcherCreationFailed,
+    SignalWatcherRemovalFailed,
+    SignalReadFailed,
+    SignalSubscriberLimitReached,
+    InvalidEventIndex,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

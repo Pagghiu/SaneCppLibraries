@@ -102,7 +102,7 @@ SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
         waitHandle = INVALID_HANDLE_VALUE;
         if (res == FALSE)
         {
-            return Result::Error("UnregisterWaitEx failed");
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherRemovalFailed);
         }
     }
     return Result(true);
@@ -1284,7 +1284,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                                                     &async, INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
         if (result == FALSE)
         {
-            return Result::Error("RegisterWaitForSingleObject failed");
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherCreationFailed);
         }
         return Result(async.waitHandle.assign(waitHandle));
     }
@@ -1296,7 +1296,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         DWORD processStatus;
         if (GetExitCodeProcess(processExit.handle, &processStatus) == FALSE)
         {
-            return Result::Error("GetExitCodeProcess failed");
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWaitFailed);
         }
         result.completionData.exitStatus = static_cast<int32_t>(processStatus);
         return Result(true);
@@ -1428,7 +1428,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         Result add(AsyncSignal& async, HANDLE iocpHandle)
         {
             const int index = signalToIndex(async.signalNumber);
-            SC_TRY_MSG(index >= 0, "AsyncSignal - Invalid signal index");
+            if (index < 0)
+                return Result::Error(AsyncResultCategory, AsyncError::InvalidSignal);
 
             ::EnterCriticalSection(&cs);
 
@@ -1436,7 +1437,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             if (sub == nullptr)
             {
                 ::LeaveCriticalSection(&cs);
-                return Result::Error("AsyncSignal - Too many signal subscribers");
+                return Result::Error(AsyncResultCategory, AsyncError::SignalSubscriberLimitReached);
             }
             sub->signal     = &async;
             sub->iocpHandle = iocpHandle;

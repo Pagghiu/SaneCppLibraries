@@ -55,6 +55,14 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
         formatter.append("Event-loop submission capacity is exhausted");
         break;
     case AsyncError::SubmissionFailed: formatter.append("Event-loop submission failed"); break;
+    case AsyncError::ProcessWatcherCreationFailed: formatter.append("Process watcher could not be created"); break;
+    case AsyncError::ProcessWatcherRemovalFailed: formatter.append("Process watcher could not be removed"); break;
+    case AsyncError::ProcessWaitFailed: formatter.append("Process exit could not be observed"); break;
+    case AsyncError::SignalWatcherCreationFailed: formatter.append("Signal watcher could not be created"); break;
+    case AsyncError::SignalWatcherRemovalFailed: formatter.append("Signal watcher could not be removed"); break;
+    case AsyncError::SignalReadFailed: formatter.append("Signal event could not be read"); break;
+    case AsyncError::SignalSubscriberLimitReached: formatter.append("Signal subscriber limit was reached"); break;
+    case AsyncError::InvalidEventIndex: formatter.append("Event index is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

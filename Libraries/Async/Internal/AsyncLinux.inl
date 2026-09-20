@@ -737,12 +737,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 #if SC_COMPILER_FILC
         (void)eventLoop;
         (void)async;
-        return Result::Error("AsyncProcessExit unsupported under Fil-C on Linux: pidfd_open is unavailable");
+        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
 #else
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
         if (pidFd < 0)
         {
-            return Result::Error("pidfd_open failed");
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherCreationFailed);
         }
         SC_ASYNC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         io_uring_sqe* submission;
@@ -778,7 +778,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         ::sigprocmask(SIG_BLOCK, &mask, nullptr);
 
         const int sigFd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
-        SC_TRY_MSG(sigFd >= 0, "signalfd failed");
+        if (sigFd < 0)
+            return Result::Error(AsyncResultCategory, AsyncError::SignalWatcherCreationFailed);
         SC_ASYNC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
         async.signalFdHandle = sigFd;
 
@@ -793,7 +794,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         struct signalfd_siginfo fdsi;
         ssize_t                 s = ::read(result.getAsync().signalFdHandle, &fdsi, sizeof(struct signalfd_siginfo));
-        SC_TRY_MSG(s == sizeof(struct signalfd_siginfo), "signalfd read failed");
+        if (s != sizeof(struct signalfd_siginfo))
+            return Result::Error(AsyncResultCategory, AsyncError::SignalReadFailed);
         result.completionData.signalNumber  = static_cast<int>(fdsi.ssi_signo);
         result.completionData.deliveryCount = 1;
         return Result(true);

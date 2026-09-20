@@ -65,12 +65,14 @@ struct AsyncSignalDispositionRegistry
 
     Result add(int signalNumber)
     {
-        SC_TRY_MSG(signalNumber > 0 and signalNumber < NSIG, "AsyncSignal - Invalid signal number");
+        if (signalNumber <= 0 or signalNumber >= NSIG)
+            return Result::Error(AsyncResultCategory, AsyncError::InvalidSignal);
         Entry& entry = entries[signalNumber];
         if (entry.refCount == 0)
         {
             void (*oldHandler)(int) = ::signal(signalNumber, SIG_IGN);
-            SC_TRY_MSG(oldHandler != SIG_ERR, "AsyncSignal - signal(SIG_IGN) failed");
+            if (oldHandler == SIG_ERR)
+                return Result::Error(AsyncResultCategory, AsyncError::SignalWatcherCreationFailed);
             entry.oldHandler      = oldHandler;
             entry.hasSavedHandler = true;
         }
@@ -93,7 +95,8 @@ struct AsyncSignalDispositionRegistry
         if (entry.refCount == 0 and entry.hasSavedHandler)
         {
             void (*oldHandler)(int) = ::signal(signalNumber, entry.oldHandler);
-            SC_TRY_MSG(oldHandler != SIG_ERR, "AsyncSignal - restoring signal handler failed");
+            if (oldHandler == SIG_ERR)
+                return Result::Error(AsyncResultCategory, AsyncError::SignalWatcherRemovalFailed);
             entry.oldHandler      = SIG_DFL;
             entry.hasSavedHandler = false;
         }
@@ -1426,7 +1429,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         } while (waitPid == -1 and errno == EINTR);
         if (waitPid == -1)
         {
-            return Result::Error("waitPid");
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWaitFailed);
         }
         if (WIFEXITED(status) != 0)
         {
@@ -1442,12 +1445,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 #if SC_COMPILER_FILC
         (void)eventLoop;
         (void)async;
-        return Result::Error("AsyncProcessExit unsupported under Fil-C on Linux: pidfd_open is unavailable");
+        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
 #else
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
         if (pidFd < 0)
         {
-            return Result::Error("pidfd_open failed");
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherCreationFailed);
         }
         SC_ASYNC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         return setEventWatcher(eventLoop, async, pidFd, INPUT_EVENTS_MASK);
@@ -1480,7 +1483,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result completeAsync(AsyncProcessExit::Result& result)
     {
-        SC_TRY_MSG(result.eventIndex >= 0, "Invalid event Index");
+        if (result.eventIndex < 0)
+            return Result::Error(AsyncResultCategory, AsyncError::InvalidEventIndex);
         const struct kevent event = events[result.eventIndex];
         // If process exits too early it can happen that we get EV_ERROR with ESRCH
         if ((event.flags & EV_ERROR) != 0 and (event.data == ESRCH))
@@ -1511,7 +1515,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         ::sigprocmask(SIG_BLOCK, &mask, nullptr);
 
         const int sigFd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
-        SC_TRY_MSG(sigFd >= 0, "signalfd failed");
+        if (sigFd < 0)
+            return Result::Error(AsyncResultCategory, AsyncError::SignalWatcherCreationFailed);
         SC_ASYNC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
         async.signalFdHandle = sigFd;
         return setEventWatcher(eventLoop, async, sigFd, INPUT_EVENTS_MASK);
@@ -1532,7 +1537,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         struct signalfd_siginfo fdsi;
         ssize_t                 s = ::read(result.getAsync().signalFdHandle, &fdsi, sizeof(struct signalfd_siginfo));
-        SC_TRY_MSG(s == sizeof(struct signalfd_siginfo), "signalfd read failed");
+        if (s != sizeof(struct signalfd_siginfo))
+            return Result::Error(AsyncResultCategory, AsyncError::SignalReadFailed);
         result.completionData.signalNumber  = static_cast<int>(fdsi.ssi_signo);
         result.completionData.deliveryCount = 1;
         return Result(true);
@@ -1553,7 +1559,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result completeAsync(AsyncSignal::Result& result)
     {
-        SC_TRY_MSG(result.eventIndex >= 0, "Invalid event Index");
+        if (result.eventIndex < 0)
+            return Result::Error(AsyncResultCategory, AsyncError::InvalidEventIndex);
         const struct kevent event = events[result.eventIndex];
         // ident contains the signal number
         result.completionData.signalNumber = static_cast<int>(event.ident);

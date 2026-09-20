@@ -391,6 +391,7 @@ void SC::AsyncContractTest::backendLifecycleErrors()
 {
     static_assert(static_cast<uint32_t>(AsyncError::InvalidWakeUpHandle) == 32, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::SubmissionFailed) == 39, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidEventIndex) == 47, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -415,6 +416,19 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     SC_TEST_EXPECT(formatAsyncError(AsyncError::SubmissionCapacityExhausted, message).status ==
                    ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::SubmissionFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::ProcessWatcherCreationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::ProcessWatcherRemovalFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::ProcessWaitFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalWatcherCreationFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalWatcherRemovalFailed, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalReadFailed, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalSubscriberLimitReached, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidEventIndex, message).status == ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;
