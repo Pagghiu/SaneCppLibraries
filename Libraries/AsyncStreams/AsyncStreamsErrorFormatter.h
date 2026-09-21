@@ -23,6 +23,20 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
     case AsyncStreamsError::InvalidSliceCount: formatter.append("Slice count must be greater than zero"); break;
     case AsyncStreamsError::ChildViewOutOfBounds: formatter.append("Child view exceeds its parent buffer"); break;
     case AsyncStreamsError::InvalidRootBufferType: formatter.append("Root buffer type is invalid"); break;
+    case AsyncStreamsError::ReadableNotReady: formatter.append("Readable stream is not ready to start"); break;
+    case AsyncStreamsError::ReadQueueMissing: formatter.append("Readable stream has no read queue"); break;
+    case AsyncStreamsError::EmptyReadBuffer: formatter.append("Readable stream cannot push an empty buffer"); break;
+    case AsyncStreamsError::ReadQueueFull: formatter.append("Readable stream queue is full"); break;
+    case AsyncStreamsError::InvalidReadableState:
+        formatter.append("Readable stream operation is invalid in this state");
+        break;
+    case AsyncStreamsError::ReadReactivationMissing:
+        formatter.append("Readable stream did not reactivate after pushing data");
+        break;
+    case AsyncStreamsError::ReadableDestroying: formatter.append("Readable stream is being destroyed"); break;
+    case AsyncStreamsError::ReadableEnded: formatter.append("Readable stream has ended"); break;
+    case AsyncStreamsError::ReadableNotInitialized: formatter.append("Readable stream is not initialized"); break;
+    case AsyncStreamsError::ReadableErrored: formatter.append("Readable stream is in an error state"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

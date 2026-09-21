@@ -22,6 +22,16 @@ enum class AsyncStreamsError : uint32_t
     InvalidSliceCount,
     ChildViewOutOfBounds,
     InvalidRootBufferType,
+    ReadableNotReady,
+    ReadQueueMissing,
+    EmptyReadBuffer,
+    ReadQueueFull,
+    InvalidReadableState,
+    ReadReactivationMissing,
+    ReadableDestroying,
+    ReadableEnded,
+    ReadableNotInitialized,
+    ReadableErrored,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.

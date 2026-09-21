@@ -59,6 +59,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             bufferPoolErrors();
         }
+        if (test_section("readable errors"))
+        {
+            readableErrors();
+        }
         if (test_section("unshift"))
         {
             unshift();
@@ -80,6 +84,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void writableStream();
     void createChildView();
     void bufferPoolErrors();
+    void readableErrors();
     void unshift();
     void pipelineBackpressureSyncSource();
     void pipelineBackpressureAsyncSource();
@@ -576,6 +581,93 @@ void SC::AsyncStreamsTest::bufferPoolErrors()
     SC_TEST_EXPECT(formatAsyncStreamsError(outOfBounds, message).status == ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncStreamsError(Result::Error(ResultCategory(0x7ffffffdu), 17), message).status ==
                    ResultErrorFormatStatus::ForeignCategory);
+}
+
+void SC::AsyncStreamsTest::readableErrors()
+{
+    struct IdleReadable : AsyncReadableStream
+    {
+        Result asyncRead() override { return Result(true); }
+    };
+
+    char            bytes[8] = {};
+    AsyncBufferView storage[1];
+    storage[0] = Span<char>(bytes);
+    storage[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(storage);
+
+    IdleReadable readable;
+    Result       beforeInit = readable.start();
+    SC_TEST_EXPECT(not beforeInit);
+    SC_TEST_EXPECT(beforeInit.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(beforeInit.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ReadableNotReady));
+
+    Result missingQueue = readable.init(pool);
+    SC_TEST_EXPECT(not missingQueue);
+    SC_TEST_EXPECT(missingQueue.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ReadQueueMissing));
+
+    AsyncReadableStream::Request requests[2];
+    readable.setReadQueue(requests);
+    SC_TEST_EXPECT(readable.init(pool));
+    Result repeatedInit = readable.init(pool);
+    SC_TEST_EXPECT(not repeatedInit);
+    SC_TEST_EXPECT(repeatedInit.errorValue() == static_cast<uint32_t>(AsyncStreamsError::InvalidReadableState));
+
+    Result observed(true);
+    SC_TEST_EXPECT(readable.eventError.addListener([&observed](Result error) { observed = error; }));
+    SC_TEST_EXPECT(not readable.push(AsyncBufferView::ID(0), 0));
+    SC_TEST_EXPECT(observed.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(observed.errorValue() == static_cast<uint32_t>(AsyncStreamsError::EmptyReadBuffer));
+
+    readable.pushEnd();
+    readable.pushEnd();
+    SC_TEST_EXPECT(observed.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ReadableEnded));
+
+    IdleReadable uninitialized;
+    Result       uninitializedSignal(true);
+    SC_TEST_EXPECT(
+        uninitialized.eventError.addListener([&uninitializedSignal](Result error) { uninitializedSignal = error; }));
+    uninitialized.pushEnd();
+    SC_TEST_EXPECT(uninitializedSignal.errorValue() ==
+                   static_cast<uint32_t>(AsyncStreamsError::ReadableNotInitialized));
+
+    IdleReadable                 fullQueue;
+    AsyncReadableStream::Request fullRequests[2];
+    fullQueue.setReadQueue(fullRequests);
+    SC_TEST_EXPECT(fullQueue.init(pool));
+    AsyncBufferView::ID queueBufferID;
+    Span<char>          queueData;
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, queueBufferID, queueData));
+    SC_TEST_EXPECT(fullQueue.unshift(queueBufferID));
+    Result queueFull = fullQueue.unshift(queueBufferID);
+    SC_TEST_EXPECT(not queueFull);
+    SC_TEST_EXPECT(queueFull.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ReadQueueFull));
+    fullQueue.destroy();
+    pool.unrefBuffer(queueBufferID);
+
+    struct MissingReactivationReadable : AsyncReadableStream
+    {
+        Result asyncRead() override
+        {
+            AsyncBufferView::ID bufferID;
+            Span<char>          data;
+            SC_TRY(getBuffersPool().requestNewBuffer(1, bufferID, data));
+            (void)push(bufferID, 1);
+            getBuffersPool().unrefBuffer(bufferID);
+            return Result(true);
+        }
+    } missingReactivation;
+
+    AsyncReadableStream::Request otherRequests[2];
+    missingReactivation.setReadQueue(otherRequests);
+    SC_TEST_EXPECT(missingReactivation.init(pool));
+    Result missingSignal(true);
+    SC_TEST_EXPECT(
+        missingReactivation.eventError.addListener([&missingSignal](Result error) { missingSignal = error; }));
+    SC_TEST_EXPECT(missingReactivation.start());
+    SC_TEST_EXPECT(missingSignal.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(missingSignal.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ReadReactivationMissing));
 }
 
 void SC::AsyncStreamsTest::unshift()

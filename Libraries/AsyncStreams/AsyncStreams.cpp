@@ -343,9 +343,10 @@ Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, siz
 //-------------------------------------------------------------------------------------------------------
 Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool)
 {
-    SC_TRY_MSG(state == State::Stopped or state == State::Ended,
-               "AsyncReadableStream::init - Can be called only in Stopped / Destroyed / Ended state")
-    SC_TRY_MSG(readQueue.size() > 0, "AsyncReadableStream::init - setReadQueue not called")
+    if (state != State::Stopped and state != State::Ended)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidReadableState);
+    if (readQueue.size() == 0)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadQueueMissing);
     buffers   = &buffersPool;
     state     = State::CanRead;
     destroyed = false;
@@ -360,7 +361,8 @@ Result AsyncReadableStream::asyncDestroyReadable() { return finishedDestroyingRe
 
 Result AsyncReadableStream::start()
 {
-    SC_TRY_MSG(state == State::CanRead, "Can start only in CanRead state")
+    if (state != State::CanRead)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadableNotReady);
     executeRead();
     return Result(true);
 }
@@ -384,7 +386,7 @@ bool AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
 {
     if (newSize == 0)
     {
-        emitError(Result::Error("AsyncReadableStream::push zero sized buffer is not allowed"));
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::EmptyReadBuffer));
         return false;
     }
     // Push buffer to the queue
@@ -394,7 +396,7 @@ bool AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     if (not readQueue.pushBack(request))
     {
         state = State::Errored;
-        emitError(Result::Error("AsyncReadableStream::push dropping buffer"));
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadQueueFull));
         return false;
     }
     buffers->refBuffer(bufferID); // 1a. unrefBuffer in emitOnData()
@@ -422,7 +424,7 @@ bool AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     }
     break;
     default: {
-        emitError(Result::Error("AsyncReadableStream::push - called in wrong state"));
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidReadableState));
     }
     break;
     }
@@ -433,7 +435,8 @@ Result AsyncReadableStream::unshift(AsyncBufferView::ID bufferID)
 {
     Request request;
     request.bufferID = bufferID;
-    SC_TRY_MSG(readQueue.pushFront(request), "readable unshift failed");
+    if (not readQueue.pushFront(request))
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadQueueFull);
     buffers->refBuffer(bufferID); // 1. refBuffer
     return Result(true);
 }
@@ -465,7 +468,7 @@ void AsyncReadableStream::reactivate(bool doReactivate)
     }
     break;
     default: {
-        emitError(Result::Error("AsyncReadableStream::reactivate - called in wrong state"));
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidReadableState));
     }
     }
 }
@@ -485,7 +488,7 @@ void AsyncReadableStream::pause()
     case State::Ended:
     case State::Paused: break;
     default: {
-        emitError(Result::Error("AsyncReadableStream::pause - called in wrong state"));
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidReadableState));
     }
     }
 }
@@ -524,7 +527,7 @@ void AsyncReadableStream::resumeReading()
     break;
     case State::Stopped:
     case State::Errored: {
-        emitError(Result::Error("AsyncReadableStream::resume - called in wrong state"));
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidReadableState));
     }
     break;
     default: break; // Ignore resume requests while reading
@@ -567,7 +570,8 @@ void AsyncReadableStream::destroy()
 
 Result AsyncReadableStream::finishedDestroyingReadable()
 {
-    SC_TRY_MSG(state == State::Destroying, "finishedDestroying only callable in State::Destroying");
+    if (state != State::Destroying)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidReadableState);
     state     = State::Ended;
     destroyed = true;
     eventClose.emit();
@@ -598,7 +602,7 @@ void AsyncReadableStream::executeRead()
                 break;
             case State::SyncPushing:
                 state = State::Errored;
-                emitError(Result::Error("Forgot to call reactivate({true || false}) from asyncRead"));
+                emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadReactivationMissing));
                 break;
             default: break;
             }
@@ -629,10 +633,16 @@ void AsyncReadableStream::pushEnd()
         eventEnd.emit();
         maybeDestroyEndedReadable();
         break;
-    case State::Destroying: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is destroying")); break;
-    case State::Ended: emitError(Result::Error("AsyncReadableStream::pushEnd - stream already ended")); break;
-    case State::Stopped: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is not even inited")); break;
-    case State::Errored: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is in error state")); break;
+    case State::Destroying:
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadableDestroying));
+        break;
+    case State::Ended: emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadableEnded)); break;
+    case State::Stopped:
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadableNotInitialized));
+        break;
+    case State::Errored:
+        emitError(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ReadableErrored));
+        break;
     }
 }
 
