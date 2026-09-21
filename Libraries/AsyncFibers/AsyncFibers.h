@@ -12,6 +12,7 @@
 #include "../Common/Assert.h"
 #include "../Fibers/Fibers.h"
 #include "../Threading/Atomic.h"
+#include "AsyncFibersError.h"
 
 //! @defgroup group_async_fibers AsyncFibers
 //! Experimental stackful fiber bridge over AsyncEventLoop.

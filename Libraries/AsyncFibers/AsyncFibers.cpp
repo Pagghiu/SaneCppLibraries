@@ -11,7 +11,10 @@ namespace SC
 {
 namespace
 {
-static constexpr Result AsyncFiberTaskCancelled() { return Result::Error("FiberTask cancelled"); }
+static constexpr Result AsyncFiberTaskCancelled()
+{
+    return Result::Error(AsyncFibersResultCategory, AsyncFibersError::Cancelled);
+}
 
 struct AsyncFiberOperationState
 {
@@ -370,7 +373,7 @@ Result AsyncFiberIO::sendAll(const SocketDescriptor& socket, Span<const char> da
             const size_t bytesSent = result.completionData.numBytes;
             if (bytesSent == 0)
             {
-                state.result = Result::Error("AsyncFiberIO::sendAll made no progress");
+                state.result = Result::Error(AsyncFibersResultCategory, AsyncFibersError::SocketSendNoProgress);
             }
             else
             {
@@ -434,7 +437,7 @@ Result AsyncFiberIO::fileReadExactAt(const FileDescriptor& file, uint64_t offset
 Result AsyncFiberIO::filePoll(const FileDescriptor& file)
 {
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TRY(file.get(handle, Result::Error("AsyncFiberIO::filePoll invalid file")));
+    SC_TRY(file.get(handle, Result::Error(AsyncFibersResultCategory, AsyncFibersError::InvalidFileHandle)));
 
     FiberCounter             counter;
     AsyncFiberOperationState state;
@@ -742,7 +745,7 @@ Result AsyncFiberIO::fileReadExactImpl(const FileDescriptor& file, Span<char> bu
         if (currentBytesRead == 0)
         {
             SC_TRY(buffer.sliceStartLength(0, numBytesRead, outResult.data));
-            return Result::Error("AsyncFiberIO::fileReadExact reached end of file");
+            return Result::Error(AsyncFibersResultCategory, AsyncFibersError::UnexpectedEndOfFile);
         }
 
         numBytesRead += currentBytesRead;
@@ -807,14 +810,16 @@ Result AsyncFiberIO::fileWriteImpl(const FileDescriptor& file, Span<const char> 
 Result AsyncFiberIO::checkOwnerThread() const
 {
     SC_ASYNC_FIBERS_ASSERT_RELEASE(isOwnerThread());
-    SC_TRY_MSG(isOwnerThread(), "AsyncFiberIO used from a thread different than its owner thread");
+    if (not isOwnerThread())
+        return Result::Error(AsyncFibersResultCategory, AsyncFibersError::WrongOwnerThread);
     return Result(true);
 }
 
 Result AsyncFiberIO::checkFiberContext() const
 {
-    return scheduler.currentTask() != nullptr ? Result(true)
-                                              : Result::Error("AsyncFiberIO operation must be called from a fiber");
+    return scheduler.currentTask() != nullptr
+               ? Result(true)
+               : Result::Error(AsyncFibersResultCategory, AsyncFibersError::FiberContextRequired);
 }
 
 void AsyncFiberIO::operationStarted() { pendingOperations.fetch_add(1); }
@@ -840,18 +845,18 @@ Result AsyncFiberIO::enqueueCommand(AsyncFiberCommand& command)
 {
     if (commands.empty())
     {
-        return Result::Error("AsyncFiberIO command queue storage is empty");
+        return Result::Error(AsyncFibersResultCategory, AsyncFibersError::CommandStorageEmpty);
     }
     if (not command.execute.isValid())
     {
-        return Result::Error("AsyncFiberIO command is invalid");
+        return Result::Error(AsyncFibersResultCategory, AsyncFibersError::InvalidCommand);
     }
 
     lockCommands();
     if (commandCount == commands.sizeInElements())
     {
         unlockCommands();
-        return Result::Error("AsyncFiberIO command queue is full");
+        return Result::Error(AsyncFibersResultCategory, AsyncFibersError::CommandQueueFull);
     }
 
     const size_t index = (commandHead + commandCount) % commands.sizeInElements();

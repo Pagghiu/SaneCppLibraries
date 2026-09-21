@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/AsyncFibers/AsyncFibers.h"
+#include "Libraries/AsyncFibers/AsyncFibersErrorFormatter.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
@@ -63,6 +64,10 @@ struct SC::AsyncFibersTest : public SC::TestCase
         if (test_section("sleep"))
         {
             sleep();
+        }
+        if (test_section("structured result identities"))
+        {
+            structuredResultIdentities();
         }
         if (test_section("run aliases"))
         {
@@ -277,6 +282,54 @@ struct SC::AsyncFibersTest : public SC::TestCase
         }
 #endif
         return false;
+    }
+
+    void structuredResultIdentities()
+    {
+        static_assert(AsyncFibersResultCategory.value == 14, "AsyncFibers owns category 14");
+        static_assert(static_cast<uint32_t>(AsyncFibersError::CommandQueueFull) == 9,
+                      "AsyncFibers errors are append-only");
+
+        char message[64];
+        SC_TEST_EXPECT(formatAsyncFibersError(AsyncFibersError::Cancelled, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAsyncFibersError(AsyncFibersError::UnexpectedEndOfFile, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAsyncFibersError(AsyncFibersError::CommandQueueFull, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(
+            formatAsyncFibersError(Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer), message).status ==
+            ResultErrorFormatStatus::ForeignCategory);
+
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+        FiberScheduler scheduler;
+        AsyncFiberIO   io(scheduler, eventLoop);
+
+        SC_TEST_EXPECT(io.sleep(TimeMs{1}).isError(AsyncFibersResultCategory, AsyncFibersError::FiberContextRequired));
+        FileDescriptor invalidFile;
+        SC_TEST_EXPECT(
+            io.filePoll(invalidFile).isError(AsyncFibersResultCategory, AsyncFibersError::InvalidFileHandle));
+
+        SocketDescriptor invalidSocket;
+        char             payload[1] = {'x'};
+        struct Context
+        {
+            AsyncFiberIO*     io;
+            SocketDescriptor* socket;
+            char*             payload;
+        } context{&io, &invalidSocket, payload};
+        FiberTask  task;
+        char       stackMemory[64 * 1024] = {};
+        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        SC_TEST_EXPECT(
+            scheduler.spawn(task, stack,
+                            FiberTask::Procedure([&context](FiberScheduler&)
+                                                 { return context.io->send(*context.socket, {context.payload, 1}); })));
+        SC_TEST_EXPECT(io.run());
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(task.result().isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+        SC_TEST_EXPECT(eventLoop.close());
     }
 
     void sleep()
@@ -494,6 +547,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(state.canceled);
         SC_TEST_EXPECT(task.isCompleted());
         SC_TEST_EXPECT(not task.result());
+        SC_TEST_EXPECT(task.result().isError(AsyncFibersResultCategory, AsyncFibersError::Cancelled));
         SC_TEST_EXPECT(eventLoop.close());
     }
 
@@ -1311,6 +1365,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(not secondTask.result());
         SC_TEST_EXPECT(state.firstResult);
         SC_TEST_EXPECT(not state.secondResult);
+        SC_TEST_EXPECT(state.secondResult.isError(AsyncFibersResultCategory, AsyncFibersError::CommandQueueFull));
 
         state.workerRuns.store(0);
         SC_TEST_EXPECT(scheduler.spawn(firstTask, firstStack,
@@ -2918,6 +2973,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
                                            })));
         SC_TEST_EXPECT(io.run());
         SC_TEST_EXPECT(not eofTask.result());
+        SC_TEST_EXPECT(eofTask.result().isError(AsyncFibersResultCategory, AsyncFibersError::UnexpectedEndOfFile));
         SC_TEST_EXPECT(state.eofResult.endOfFile);
         SC_TEST_EXPECT(state.eofResult.data.sizeInBytes() == sizeof(state.writeBuffer));
         for (size_t idx = 0; idx < sizeof(state.writeBuffer); ++idx)

@@ -92,3 +92,4 @@ one.
 - [ASYNCFIBERS-0004 - Keep AsyncFiberIO concrete until a second backend exists](asyncfibers-0004-keep-asyncfiberio-concrete-until-a-second-backend-exists.md)
 - [ASYNCFIBERS-0005 - Defer AwaitTask fiber adapters until both runtimes stabilize](asyncfibers-0005-defer-awaittask-fiber-adapters-until-both-runtimes-stabilize.md)
 - [ASYNCFIBERS-0006 - Keep cancellation completion-aware across async stop races](asyncfibers-0006-keep-cancellation-completion-aware-across-async-stop-races.md)
+- [ASYNCFIBERS-0007 - Use portable structured Result errors](asyncfibers-0007-use-portable-structured-result-errors.md)

@@ -88,6 +88,12 @@
       "owner": "Async",
       "declaration": "Libraries/Async/AsyncError.h",
       "constant": "AsyncResultCategory"
+    },
+    {
+      "value": 14,
+      "owner": "AsyncFibers",
+      "declaration": "Libraries/AsyncFibers/AsyncFibersError.h",
+      "constant": "AsyncFibersResultCategory"
     }
   ]
 }
