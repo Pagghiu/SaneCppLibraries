@@ -16,6 +16,7 @@
 #include "../Common/PlatformMacrosInstructionSet.h"
 #include "../Common/Result.h"
 #include "../Common/Span.h"
+#include "AsyncStreamsError.h"
 #include "Internal/CircularQueue.h"
 #include "Internal/Event.h"
 

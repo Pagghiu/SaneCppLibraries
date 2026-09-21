@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/AsyncStreams/AsyncStreams.h"
 #include "Libraries/Async/Async.h"
+#include "Libraries/AsyncStreams/AsyncStreamsErrorFormatter.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/Buffer.h"
@@ -54,6 +55,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             createChildView();
         }
+        if (test_section("buffer pool errors"))
+        {
+            bufferPoolErrors();
+        }
         if (test_section("unshift"))
         {
             unshift();
@@ -74,6 +79,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void readableAsyncStream();
     void writableStream();
     void createChildView();
+    void bufferPoolErrors();
     void unshift();
     void pipelineBackpressureSyncSource();
     void pipelineBackpressureAsyncSource();
@@ -507,6 +513,69 @@ void SC::AsyncStreamsTest::createChildView()
     pool.unrefBuffer(parentID); // Now unref parent, parent refs = 0
     // parentID is NOT nullptr because it was marked as reusable!
     SC_TEST_EXPECT(pool.getBuffer(parentID) != nullptr);
+}
+
+void SC::AsyncStreamsTest::bufferPoolErrors()
+{
+    char            bytes[8] = {};
+    AsyncBufferView storage[3];
+    storage[0] = Span<char>(bytes);
+    storage[0].setReusable(true);
+    storage[1] = Span<const char>(bytes);
+
+    AsyncBuffersPool pool;
+    pool.setBuffers(storage);
+
+    Span<const char> readable;
+    Span<char>       writable;
+    Result           invalid = pool.getReadableData(AsyncBufferView::ID(99), readable);
+    SC_TEST_EXPECT(not invalid);
+    SC_TEST_EXPECT(invalid.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(invalid.errorValue() == static_cast<uint32_t>(AsyncStreamsError::InvalidBufferID));
+
+    Result readonly = pool.getWritableData(AsyncBufferView::ID(1), writable);
+    SC_TEST_EXPECT(not readonly);
+    SC_TEST_EXPECT(readonly.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(readonly.errorValue() == static_cast<uint32_t>(AsyncStreamsError::BufferNotWritable));
+
+    AsyncBufferView::ID bufferID;
+    Result              noBuffer = pool.requestNewBuffer(9, bufferID, writable);
+    SC_TEST_EXPECT(not noBuffer);
+    SC_TEST_EXPECT(noBuffer.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(noBuffer.errorValue() == static_cast<uint32_t>(AsyncStreamsError::NoReusableBuffer));
+
+    AsyncBufferView fullStorage[1];
+    fullStorage[0] = Span<char>(bytes);
+    AsyncBuffersPool fullPool;
+    fullPool.setBuffers(fullStorage);
+    AsyncBufferView extra{Span<char>(bytes)};
+    Result          full = fullPool.pushBuffer(move(extra), bufferID);
+    SC_TEST_EXPECT(not full);
+    SC_TEST_EXPECT(full.errorValue() == static_cast<uint32_t>(AsyncStreamsError::BufferPoolFull));
+
+    AsyncBufferView slices[1];
+    Result          zeroSlices = AsyncBuffersPool::sliceInEqualParts(slices, Span<char>(bytes), 0);
+    SC_TEST_EXPECT(not zeroSlices);
+    SC_TEST_EXPECT(zeroSlices.errorValue() == static_cast<uint32_t>(AsyncStreamsError::InvalidSliceCount));
+    Result insufficientSlices = AsyncBuffersPool::sliceInEqualParts(slices, Span<char>(bytes), 2);
+    SC_TEST_EXPECT(not insufficientSlices);
+    SC_TEST_EXPECT(insufficientSlices.errorValue() ==
+                   static_cast<uint32_t>(AsyncStreamsError::InsufficientSliceStorage));
+
+    Result invalidParent = pool.createChildView(AsyncBufferView::ID(99), 0, 1, bufferID);
+    SC_TEST_EXPECT(not invalidParent);
+    SC_TEST_EXPECT(invalidParent.errorValue() == static_cast<uint32_t>(AsyncStreamsError::InvalidParentBufferID));
+    Result outOfBounds = pool.createChildView(AsyncBufferView::ID(0), 7, 2, bufferID);
+    SC_TEST_EXPECT(not outOfBounds);
+    SC_TEST_EXPECT(outOfBounds.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ChildViewOutOfBounds));
+    Result overflow = pool.createChildView(AsyncBufferView::ID(0), static_cast<size_t>(-1), 2, bufferID);
+    SC_TEST_EXPECT(not overflow);
+    SC_TEST_EXPECT(overflow.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ChildViewOutOfBounds));
+
+    char message[80];
+    SC_TEST_EXPECT(formatAsyncStreamsError(outOfBounds, message).status == ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncStreamsError(Result::Error(ResultCategory(0x7ffffffdu), 17), message).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
 }
 
 void SC::AsyncStreamsTest::unshift()

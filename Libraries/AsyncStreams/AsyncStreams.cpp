@@ -56,7 +56,8 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
 Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<const char>& data)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getReadableData - Invalid bufferID");
+    if (buffer == nullptr)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidBufferID);
     switch (buffer->type)
     {
     case AsyncBufferView::Type::Writable: {
@@ -78,7 +79,8 @@ Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<cons
     }
     case AsyncBufferView::Type::Child: {
         AsyncBufferView* parent = getBuffer(buffer->parentID);
-        SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::getReadableData - Invalid parentID");
+        if (parent == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidParentBufferID);
         if (parent->type == AsyncBufferView::Type::Growable)
         {
             AsyncBufferView::GrowableStorage storage;
@@ -103,7 +105,8 @@ Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<cons
 Result AsyncBuffersPool::getWritableData(AsyncBufferView::ID bufferID, Span<char>& data)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getWritableData - Invalid bufferID");
+    if (buffer == nullptr)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidBufferID);
     switch (buffer->type)
     {
     case AsyncBufferView::Type::Writable:
@@ -111,7 +114,8 @@ Result AsyncBuffersPool::getWritableData(AsyncBufferView::ID bufferID, Span<char
         break;
     case AsyncBufferView::Type::Child: {
         AsyncBufferView* parent = getBuffer(buffer->parentID);
-        SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::getWritableData - Invalid parentID");
+        if (parent == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidParentBufferID);
         if (parent->type == AsyncBufferView::Type::Growable)
         {
             AsyncBufferView::GrowableStorage storage;
@@ -128,7 +132,7 @@ Result AsyncBuffersPool::getWritableData(AsyncBufferView::ID bufferID, Span<char
         }
         break;
     }
-    default: return Result::Error("AsyncBuffersPool::getWritableData - Readonly or Growable buffer");
+    default: return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::BufferNotWritable);
     }
     return Result(true);
 }
@@ -171,7 +175,7 @@ Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBuffer
             }
         }
     }
-    return Result::Error("AsyncBuffersPool::requestNewBuffer failed");
+    return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::NoReusableBuffer);
 }
 
 void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes)
@@ -243,12 +247,15 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
             return Result(true);
         }
     }
-    return Result::Error("pushBuffer failed");
+    return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::BufferPoolFull);
 }
 
 Result AsyncBuffersPool::sliceInEqualParts(Span<AsyncBufferView> buffers, Span<char> memory, size_t numSlices)
 {
-    SC_TRY_MSG(buffers.sizeInElements() >= numSlices, "AsyncBuffersPool::sliceInEqualParts - insufficient buffers")
+    if (numSlices == 0)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidSliceCount);
+    if (buffers.sizeInElements() < numSlices)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InsufficientSliceStorage);
     const size_t sliceSize = memory.sizeInBytes() / numSlices;
     for (size_t sliceIdx = 0; sliceIdx < numSlices; ++sliceIdx)
     {
@@ -264,7 +271,11 @@ Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, siz
                                          AsyncBufferView::ID& outChildBufferID)
 {
     AsyncBufferView* parent = getBuffer(parentBufferID);
-    SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::createChildView - Invalid parent bufferID");
+    if (parent == nullptr)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidParentBufferID);
+
+    if (offset > static_cast<size_t>(-1) - parent->offset)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ChildViewOutOfBounds);
 
     AsyncBufferView::ID rootParentID = parentBufferID;
     size_t              rootOffset   = parent->offset + offset;
@@ -274,7 +285,8 @@ Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, siz
     {
         rootParentID = parent->parentID;
         parent       = getBuffer(rootParentID);
-        SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::createChildView - Internal Error (Invalid parent ID)");
+        if (parent == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidParentBufferID);
     }
 
     Span<const char> rootFullData;
@@ -291,11 +303,11 @@ Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, siz
         (void)parent->getGrowableBuffer(storage, false); // destruct
         break;
     }
-    default: return Result::Error("AsyncBuffersPool::createChildView - Invalid root parent type");
+    default: return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidRootBufferType);
     }
 
-    SC_TRY_MSG(rootOffset + length <= rootFullData.sizeInBytes(),
-               "AsyncBuffersPool::createChildView - Offset and length out of bounds");
+    if (rootOffset > rootFullData.sizeInBytes() or length > rootFullData.sizeInBytes() - rootOffset)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::ChildViewOutOfBounds);
 
     for (size_t idx = 0; idx < buffers.sizeInElements(); ++idx)
     {
@@ -323,7 +335,7 @@ Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, siz
             return Result(true);
         }
     }
-    return Result::Error("AsyncBuffersPool::createChildView - No space in buffer pool");
+    return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::BufferPoolFull);
 }
 
 //-------------------------------------------------------------------------------------------------------
