@@ -81,6 +81,9 @@ enum class AsyncError : uint32_t
     FileSendCompletionFailed,
     FileSendIncomplete,
     InvalidTransferPipe,
+    ThreadPoolAlreadyStopped,
+    ActiveRequestsRemain,
+    InvalidSubmissionState,
 };
 
 /// @brief Stable category assigned to Async-owned errors.

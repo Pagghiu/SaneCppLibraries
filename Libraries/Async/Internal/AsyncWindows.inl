@@ -1275,13 +1275,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         (void)(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
         FileDescriptor::Handle loopHandle;
-        SC_ASYNC_TRUST_RESULT(
-            async.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loopFd")));
+        SC_ASYNC_TRUST_RESULT(async.eventLoop->internal.kernelQueue.get().loopFd.get(
+            loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
 
         if (PostQueuedCompletionStatus(loopHandle, 0, 0, &async.overlapped.get().overlapped) == FALSE)
         {
             // TODO: Report error?
-            // return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
+            // TODO: The callback has no Result return path; surface posting failure through the request lifecycle.
         }
     }
 
@@ -1551,7 +1551,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         // Get the IOCP handle for this loop
         FileDescriptor::Handle loopHandle;
-        SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loop handle")));
+        SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(
+            loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle)));
 
         // Register in the global signal registry
         return AsyncSignalRegistryWindows::get().add(async, loopHandle);
@@ -1593,7 +1594,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         FileDescriptor::Handle loopHandle = FileDescriptor::Invalid;
         if (teardown.eventLoop)
         {
-            (void)teardown.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error(""));
+            (void)teardown.eventLoop->internal.kernelQueue.get().loopFd.get(
+                loopHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidEventLoopHandle));
         }
 
         Subscriber** pp = &reg.slots[index].head;

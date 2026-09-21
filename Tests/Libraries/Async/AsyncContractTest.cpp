@@ -421,6 +421,7 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     static_assert(static_cast<uint32_t>(AsyncError::SocketBufferCountExceeded) == 62, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::FileSendCompletionFailed) == 66, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::InvalidTransferPipe) == 68, "Async errors are append-only");
+    static_assert(static_cast<uint32_t>(AsyncError::InvalidSubmissionState) == 71, "Async errors are append-only");
 
     char message[64];
     SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
@@ -493,6 +494,12 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendIncomplete, message).status ==
                    ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidTransferPipe, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::ThreadPoolAlreadyStopped, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::ActiveRequestsRemain, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidSubmissionState, message).status ==
                    ResultErrorFormatStatus::Success);
 
 #if !SC_PLATFORM_LINUX

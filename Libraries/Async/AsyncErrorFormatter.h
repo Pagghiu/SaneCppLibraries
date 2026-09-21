@@ -86,6 +86,11 @@ inline ResultErrorFormat formatAsyncError(AsyncError error, Span<char> output)
     case AsyncError::FileSendCompletionFailed: formatter.append("File send could not be completed"); break;
     case AsyncError::FileSendIncomplete: formatter.append("File data was only partially sent"); break;
     case AsyncError::InvalidTransferPipe: formatter.append("File transfer pipe is invalid"); break;
+    case AsyncError::ThreadPoolAlreadyStopped: formatter.append("Thread pool stopped before requests completed"); break;
+    case AsyncError::ActiveRequestsRemain: formatter.append("Event loop still has active requests after close"); break;
+    case AsyncError::InvalidSubmissionState:
+        formatter.append("Request cannot be submitted in its current state");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

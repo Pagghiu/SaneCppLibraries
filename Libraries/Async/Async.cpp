@@ -807,7 +807,7 @@ SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringS
     {
         FileDescriptor fd;
         SC_TRY(fd.open(openData.path, openData.mode));
-        auto res = fd.get(completionData.handle, SC::Result::Error("Open returned invalid handle"));
+        auto res = fd.get(completionData.handle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle));
         fd.detach(); // Detach the file descriptor from the loop work so that it is not closed when the callback ends
         return res;
     };
@@ -1563,7 +1563,7 @@ SC::Result SC::AsyncEventLoop::Internal::waitForThreadPoolTasks(IntrusiveDoubleL
         {
             if (not asyncTask->threadPool->waitForTask(asyncTask->task))
             {
-                res = Result::Error("Threadpool was already stopped");
+                res = Result::Error(AsyncResultCategory, AsyncError::ThreadPoolAlreadyStopped);
             }
             it->flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
         }
@@ -1614,7 +1614,7 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     SC_TRY(eventLoop.internal.kernelQueue.get().close());
     if (numberOfExternals != 0 or numberOfActiveHandles != 0 or numberOfManualCompletions != 0)
     {
-        return Result::Error("Non-Zero active count after close");
+        return Result::Error(AsyncResultCategory, AsyncError::ActiveRequestsRemain);
     }
     return res;
 }
@@ -1654,7 +1654,7 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(AsyncEventLoop& eventLo
     break;
     case AsyncRequest::State::Active: {
         SC_ASYNC_ASSERT_DEBUG(false);
-        return SC::Result::Error("AsyncEventLoop::processSubmissions() got Active handle");
+        return SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSubmissionState);
     }
     break;
     }
@@ -2140,7 +2140,8 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     // Process
     case AsyncRequest::Type::ProcessExit:
 #if SC_PLATFORM_LINUX
-        (void)static_cast<AsyncProcessExit&>(async).pidFd.get(teardown.fileHandle, Result::Error("missing pidfd"));
+        (void)static_cast<AsyncProcessExit&>(async).pidFd.get(
+            teardown.fileHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidHandle));
         static_cast<AsyncProcessExit&>(async).pidFd.detach();
 #endif
         teardown.processHandle = static_cast<AsyncProcessExit&>(async).handle;
@@ -2150,7 +2151,8 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
 #if SC_PLATFORM_WINDOWS
         teardown.signalNumber = static_cast<AsyncSignal&>(async).signalNumber;
 #elif SC_PLATFORM_LINUX
-        (void)static_cast<AsyncSignal&>(async).signalFd.get(teardown.fileHandle, Result::Error("missing signalfd"));
+        (void)static_cast<AsyncSignal&>(async).signalFd.get(
+            teardown.fileHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidHandle));
         static_cast<AsyncSignal&>(async).signalFd.detach();
 #elif SC_PLATFORM_APPLE
         teardown.signalNumber = static_cast<AsyncSignal&>(async).signalNumber;
