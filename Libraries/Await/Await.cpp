@@ -2418,7 +2418,7 @@ Result AwaitTaskGroup::spawn(AwaitTask& task)
 {
     if (numTasks >= tasks.sizeInElements())
     {
-        return Result::Error("AwaitTaskGroup storage is full");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskGroupStorageFull);
     }
     SC_TRY(await.spawn(task));
     tasks[numTasks] = &task;
@@ -2430,14 +2430,14 @@ Result AwaitTaskGroup::spawnAll(Span<AwaitTask*> taskList)
 {
     if (taskList.sizeInElements() > remainingCapacity())
     {
-        return Result::Error("AwaitTaskGroup storage is full");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskGroupStorageFull);
     }
 
     for (size_t idx = 0; idx < taskList.sizeInElements(); ++idx)
     {
         if (taskList[idx] == nullptr)
         {
-            return Result::Error("AwaitTaskGroup contains invalid task");
+            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
         }
     }
 
@@ -2460,7 +2460,7 @@ Result AwaitTaskGroup::collectResults(Span<Result> outResults, AwaitTaskGroupRes
 {
     if (outResults.sizeInElements() < numTasks)
     {
-        return Result::Error("AwaitTaskGroup result storage is too small");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskGroupResultStorageTooSmall);
     }
 
     AwaitTaskGroupResultSummary summary;
@@ -2472,7 +2472,7 @@ Result AwaitTaskGroup::collectResults(Span<Result> outResults, AwaitTaskGroupRes
         AwaitTask* task = tasks[idx];
         if (task == nullptr)
         {
-            return Result::Error("AwaitTaskGroup contains invalid task");
+            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
         }
 
         Result taskResult = task->result();
@@ -2516,7 +2516,7 @@ Result AwaitTaskGroup::summarizeResults(AwaitTaskGroupResultSummary& outSummary)
         AwaitTask* task = tasks[idx];
         if (task == nullptr)
         {
-            return Result::Error("AwaitTaskGroup contains invalid task");
+            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
         }
 
         Result taskResult = task->result();
@@ -3096,7 +3096,7 @@ bool AwaitTaskGroupWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuati
         AwaitTask* task = group.tasks[idx];
         if (task == nullptr or not task->isValid())
         {
-            operationResult = Result::Error("AwaitTaskGroup contains invalid task");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
             clearChildCallbacks();
             return false;
         }
@@ -3107,7 +3107,7 @@ bool AwaitTaskGroupWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuati
         }
         if (not task->isActive())
         {
-            operationResult = Result::Error("AwaitTaskGroup contains inactive task");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInactiveTask);
             clearChildCallbacks();
             return false;
         }
@@ -3115,7 +3115,7 @@ bool AwaitTaskGroupWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuati
         AwaitTask::Promise& promise = task->handle.promise();
         if (promise.completionCallback != nullptr or promise.continuation != nullptr)
         {
-            operationResult = Result::Error("AwaitTask is already being awaited");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyAwaited);
             clearChildCallbacks();
             return false;
         }
@@ -3226,7 +3226,7 @@ Result AwaitTaskGroupWaitAllAwaiter::collectResult() const
         AwaitTask* task = group.tasks[idx];
         if (task == nullptr)
         {
-            return Result::Error("AwaitTaskGroup contains invalid task");
+            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
         }
         SC_TRY(task->result());
     }
@@ -3248,7 +3248,7 @@ bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuati
 
     if (group.numTasks == 0)
     {
-        operationResult = Result::Error("AwaitTaskGroup is empty");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupEmpty);
         return false;
     }
 
@@ -3257,7 +3257,7 @@ bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuati
         AwaitTask* task = group.tasks[idx];
         if (task == nullptr or not task->isValid())
         {
-            operationResult = Result::Error("AwaitTaskGroup contains invalid task");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
             clearChildCallbacks();
             return false;
         }
@@ -3272,7 +3272,7 @@ bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuati
         }
         if (not task->isActive())
         {
-            operationResult = Result::Error("AwaitTaskGroup contains inactive task");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInactiveTask);
             clearChildCallbacks();
             return false;
         }
@@ -3280,7 +3280,7 @@ bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuati
         AwaitTask::Promise& promise = task->handle.promise();
         if (promise.completionCallback != nullptr or promise.continuation != nullptr)
         {
-            operationResult = Result::Error("AwaitTask is already being awaited");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyAwaited);
             clearChildCallbacks();
             return false;
         }
@@ -3423,7 +3423,7 @@ Result AwaitTaskGroupWaitAnyAwaiter::setWinner(size_t index)
     AwaitTask* task = group.tasks[index];
     if (task == nullptr)
     {
-        return Result::Error("AwaitTaskGroup contains invalid task");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
     }
 
     winnerIndex     = index;

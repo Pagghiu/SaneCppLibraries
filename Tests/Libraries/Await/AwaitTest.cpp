@@ -349,7 +349,7 @@ struct SC::AwaitTest : public SC::TestCase
     static AwaitTask failSoon(AwaitEventLoop& await)
     {
         SC_CO_TRY(co_await await.sleep(1_ms));
-        co_return Result::Error("AwaitTest failSoon");
+        co_return Result::Error(ResultCategory(0x7ffffffdu), 43);
     }
 
     static AwaitTask wakeUpOnce(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& result)
@@ -1287,7 +1287,8 @@ struct SC::AwaitTest : public SC::TestCase
         }
 
         Result shortResults[1] = {Result(true)};
-        if (group.collectResults(shortResults))
+        if (not group.collectResults(shortResults)
+                    .isError(AwaitResultCategory, AwaitError::TaskGroupResultStorageTooSmall))
         {
             co_return Result::Error("Await task group short collect unexpectedly succeeded");
         }
@@ -1295,18 +1296,21 @@ struct SC::AwaitTest : public SC::TestCase
         Result                      results[2] = {Result(true), Result(true)};
         AwaitTaskGroupResultSummary summary;
         Result                      aggregate = group.collectResults(results, &summary);
-        if (aggregate or not results[0] or results[1] or summary.numTasks != 2 or summary.numCompleted != 2 or
-            summary.numSucceeded != 1 or summary.numFailed != 1 or summary.firstFailureIndex != 1 or
-            summary.firstFailureTask != &childB or summary.firstFailure)
+        if (not aggregate.isError(ResultCategory(0x7ffffffdu), 43) or not results[0] or
+            not results[1].isError(ResultCategory(0x7ffffffdu), 43) or summary.numTasks != 2 or
+            summary.numCompleted != 2 or summary.numSucceeded != 1 or summary.numFailed != 1 or
+            summary.firstFailureIndex != 1 or summary.firstFailureTask != &childB or
+            not summary.firstFailure.isError(ResultCategory(0x7ffffffdu), 43))
         {
             co_return Result::Error("Await task group collected result mismatch");
         }
 
         AwaitTaskGroupResultSummary summaryOnly;
         Result                      summaryAggregate = group.summarizeResults(summaryOnly);
-        if (summaryAggregate or summaryOnly.numTasks != 2 or summaryOnly.numCompleted != 2 or
-            summaryOnly.numSucceeded != 1 or summaryOnly.numFailed != 1 or summaryOnly.firstFailureIndex != 1 or
-            summaryOnly.firstFailureTask != &childB or summaryOnly.firstFailure)
+        if (not summaryAggregate.isError(ResultCategory(0x7ffffffdu), 43) or summaryOnly.numTasks != 2 or
+            summaryOnly.numCompleted != 2 or summaryOnly.numSucceeded != 1 or summaryOnly.numFailed != 1 or
+            summaryOnly.firstFailureIndex != 1 or summaryOnly.firstFailureTask != &childB or
+            not summaryOnly.firstFailure.isError(ResultCategory(0x7ffffffdu), 43))
         {
             co_return Result::Error("Await task group summary result mismatch");
         }
@@ -1322,7 +1326,7 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTaskGroup group(await, groupStorage);
 
         AwaitTask* tooManyChildren[3] = {&child, &child, &child};
-        if (group.spawnAll(tooManyChildren))
+        if (not group.spawnAll(tooManyChildren).isError(AwaitResultCategory, AwaitError::TaskGroupStorageFull))
         {
             co_return Result::Error("Await task group spawnAll unexpectedly ignored capacity");
         }
@@ -1332,7 +1336,7 @@ struct SC::AwaitTest : public SC::TestCase
         }
 
         AwaitTask* invalidChildren[1] = {};
-        if (group.spawnAll(invalidChildren))
+        if (not group.spawnAll(invalidChildren).isError(AwaitResultCategory, AwaitError::TaskGroupInvalidTask))
         {
             co_return Result::Error("Await task group spawnAll unexpectedly ignored invalid task");
         }
@@ -1390,7 +1394,7 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTaskGroup              group(await, emptyStorage);
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         Result                      waitResult = co_await group.waitAny(waitAnyResult);
-        if (waitResult or waitAnyResult.task != nullptr)
+        if (not waitResult.isError(AwaitResultCategory, AwaitError::TaskGroupEmpty) or waitAnyResult.task != nullptr)
         {
             co_return Result::Error("Await empty task group waitAny result mismatch");
         }
@@ -1630,6 +1634,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         static_assert(AwaitResultCategory.value == 15, "Await owns category 15");
         static_assert(static_cast<uint32_t>(AwaitError::UnhandledException) == 14, "Await errors are append-only");
+        static_assert(static_cast<uint32_t>(AwaitError::TaskAlreadyAwaited) == 32, "Await errors are append-only");
 
         Result cancelled = AwaitCancelledResult();
         Result wrongLoop = AwaitWrongEventLoopResult();
@@ -1644,6 +1649,18 @@ struct SC::AwaitTest : public SC::TestCase
         char message[64];
         SC_TEST_EXPECT(formatAwaitError(cancelled, message).status == ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(formatAwaitError(wrongLoop, message).status == ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupStorageFull, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupInvalidTask, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupResultStorageTooSmall, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupInactiveTask, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupEmpty, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskAlreadyAwaited, message).status ==
+                       ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(
             formatAwaitError(Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized), message).status ==
             ResultErrorFormatStatus::ForeignCategory);

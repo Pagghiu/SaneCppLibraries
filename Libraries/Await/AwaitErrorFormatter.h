@@ -44,6 +44,12 @@ inline ResultErrorFormat formatAwaitError(AwaitError error, Span<char> output)
     case AwaitError::MissingFile: formatter.append("File is missing"); break;
     case AwaitError::MissingReadResult: formatter.append("File read result is missing"); break;
     case AwaitError::InvalidFileSystemOperation: formatter.append("File-system operation is invalid"); break;
+    case AwaitError::TaskGroupStorageFull: formatter.append("Task group storage is full"); break;
+    case AwaitError::TaskGroupInvalidTask: formatter.append("Task group contains an invalid task"); break;
+    case AwaitError::TaskGroupResultStorageTooSmall: formatter.append("Task group result storage is too small"); break;
+    case AwaitError::TaskGroupInactiveTask: formatter.append("Task group contains an inactive task"); break;
+    case AwaitError::TaskGroupEmpty: formatter.append("Task group is empty"); break;
+    case AwaitError::TaskAlreadyAwaited: formatter.append("Task is already being awaited"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

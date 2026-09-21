@@ -39,6 +39,12 @@ enum class AwaitError : uint32_t
     MissingFile,
     MissingReadResult,
     InvalidFileSystemOperation,
+    TaskGroupStorageFull,
+    TaskGroupInvalidTask,
+    TaskGroupResultStorageTooSmall,
+    TaskGroupInactiveTask,
+    TaskGroupEmpty,
+    TaskAlreadyAwaited,
 };
 
 /// @brief Stable category assigned to Await-owned errors.
