@@ -55,6 +55,8 @@ inline ResultErrorFormat formatAwaitError(AwaitError error, Span<char> output)
     case AwaitError::RegistryInactiveTask: formatter.append("Task registry contains an inactive task"); break;
     case AwaitError::RegistryEmpty: formatter.append("Task registry is empty"); break;
     case AwaitError::RegistryInvalidTask: formatter.append("Task registry contains an invalid task"); break;
+    case AwaitError::TaskTimedOut: formatter.append("Task timed out"); break;
+    case AwaitError::InvalidWorkCallback: formatter.append("Work callback is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

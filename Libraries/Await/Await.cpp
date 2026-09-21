@@ -3539,7 +3539,7 @@ bool AwaitTaskSpawnAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
     if (not task.isValid())
     {
-        operationResult = Result::Error("AwaitTask is invalid");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
         return false;
     }
 
@@ -3568,7 +3568,7 @@ bool AwaitTaskSpawnAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     AwaitTask::Promise& child = task.handle.promise();
     if (child.completionCallback != nullptr or child.continuation != nullptr)
     {
-        operationResult = Result::Error("AwaitTask is already being awaited");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyAwaited);
         return false;
     }
 
@@ -3623,7 +3623,7 @@ bool AwaitTaskTimeoutAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     }
     if (promise.completionCallback != nullptr or promise.continuation != nullptr)
     {
-        operationResult = Result::Error("AwaitTask is already being awaited");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyAwaited);
         return false;
     }
 
@@ -3644,7 +3644,7 @@ bool AwaitTaskTimeoutAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         {
             outResult->timedOut = true;
         }
-        operationResult     = Result::Error("AwaitTask timed out");
+        operationResult     = Result::Error(AwaitResultCategory, AwaitError::TaskTimedOut);
         Result cancelResult = task.cancel(await);
         if (not cancelResult)
         {
@@ -3778,7 +3778,7 @@ bool AwaitLoopWorkAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
     if (not work.isValid())
     {
-        operationResult = Result::Error("AwaitLoopWork callback is invalid");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::InvalidWorkCallback);
         return false;
     }
 

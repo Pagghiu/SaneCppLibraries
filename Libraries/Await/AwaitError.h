@@ -50,6 +50,8 @@ enum class AwaitError : uint32_t
     RegistryInactiveTask,
     RegistryEmpty,
     RegistryInvalidTask,
+    TaskTimedOut,
+    InvalidWorkCallback,
 };
 
 /// @brief Stable category assigned to Await-owned errors.

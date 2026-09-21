@@ -1059,6 +1059,12 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    static AwaitTask loopWorkInvalidCallback(AwaitEventLoop& await, ThreadPool& threadPool)
+    {
+        Function<Result()> work;
+        co_return co_await await.loopWork(threadPool, work);
+    }
+
     static AwaitTask loopWorkCancellable(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
     {
         Function<Result()> work = [&workCount]
@@ -1565,7 +1571,8 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTimeoutResult timeoutResult;
         Result             waitResult = co_await await.waitFor(child, 1_ms, &timeoutResult);
-        if (waitResult or not timeoutResult.timedOut or not child.isCompleted() or child.result())
+        if (not waitResult.isError(AwaitResultCategory, AwaitError::TaskTimedOut) or not timeoutResult.timedOut or
+            not child.isCompleted() or not AwaitIsCancelled(child.result()))
         {
             co_return Result::Error("Await waitFor timed-out child result mismatch");
         }
@@ -1637,6 +1644,7 @@ struct SC::AwaitTest : public SC::TestCase
         static_assert(static_cast<uint32_t>(AwaitError::UnhandledException) == 14, "Await errors are append-only");
         static_assert(static_cast<uint32_t>(AwaitError::TaskAlreadyAwaited) == 32, "Await errors are append-only");
         static_assert(static_cast<uint32_t>(AwaitError::RegistryInvalidTask) == 37, "Await errors are append-only");
+        static_assert(static_cast<uint32_t>(AwaitError::InvalidWorkCallback) == 39, "Await errors are append-only");
 
         Result cancelled = AwaitCancelledResult();
         Result wrongLoop = AwaitWrongEventLoopResult();
@@ -1671,6 +1679,9 @@ struct SC::AwaitTest : public SC::TestCase
                        ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryEmpty, message).status == ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryInvalidTask, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskTimedOut, message).status == ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::InvalidWorkCallback, message).status ==
                        ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(
             formatAwaitError(Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized), message).status ==
@@ -3391,6 +3402,10 @@ struct SC::AwaitTest : public SC::TestCase
 
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(workCount.load() == 1);
+        AwaitTask invalid = loopWorkInvalidCallback(await, threadPool);
+        SC_TEST_EXPECT(await.spawn(invalid));
+        SC_TEST_EXPECT(invalid.isCompleted());
+        SC_TEST_EXPECT(invalid.result().isError(AwaitResultCategory, AwaitError::InvalidWorkCallback));
         SC_TEST_EXPECT(async.close());
         SC_TEST_EXPECT(threadPool.destroy());
     }
