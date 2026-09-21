@@ -28,6 +28,18 @@ inline ResultErrorFormat formatAwaitError(AwaitError error, Span<char> output)
     case AwaitError::TaskAlreadyStarted: formatter.append("Task has already started"); break;
     case AwaitError::TaskCancellationUnavailable: formatter.append("Task cannot be cancelled now"); break;
     case AwaitError::UnhandledException: formatter.append("Task encountered an unhandled exception"); break;
+    case AwaitError::SocketSendNoProgress: formatter.append("Socket send made no progress"); break;
+    case AwaitError::SocketReceiveIncomplete:
+        formatter.append("Socket disconnected before the requested data arrived");
+        break;
+    case AwaitError::SocketReceiveNoProgress: formatter.append("Socket receive made no progress"); break;
+    case AwaitError::EmptyReceiveBuffer: formatter.append("Receive buffer is empty"); break;
+    case AwaitError::ReceiveLineBufferExhausted:
+        formatter.append("Receive buffer filled before a newline arrived");
+        break;
+    case AwaitError::FileReadNoProgress: formatter.append("File read made no progress"); break;
+    case AwaitError::OperationUnsupported: formatter.append("Operation is unsupported"); break;
+    case AwaitError::InvalidFileHandle: formatter.append("File handle is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

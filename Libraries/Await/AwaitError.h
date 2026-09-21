@@ -27,6 +27,14 @@ enum class AwaitError : uint32_t
     TaskAlreadyStarted,
     TaskCancellationUnavailable,
     UnhandledException,
+    SocketSendNoProgress,
+    SocketReceiveIncomplete,
+    SocketReceiveNoProgress,
+    EmptyReceiveBuffer,
+    ReceiveLineBufferExhausted,
+    FileReadNoProgress,
+    OperationUnsupported,
+    InvalidFileHandle,
 };
 
 /// @brief Stable category assigned to Await-owned errors.

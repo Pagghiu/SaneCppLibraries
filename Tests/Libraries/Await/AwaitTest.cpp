@@ -66,6 +66,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             structuredAwaitIdentities();
         }
+        if (test_section("awaiter error identities"))
+        {
+            awaiterErrorIdentities();
+        }
         if (test_section("move task"))
         {
             moveTask();
@@ -275,6 +279,17 @@ struct SC::AwaitTest : public SC::TestCase
         (void)await;
         SC_CO_TRY(Result::Error(ResultCategory(0x7fffffffu), 42));
         co_return Result(true);
+    }
+
+    static AwaitTask receiveLineEmptyBuffer(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                            AwaitSocketReceiveLineResult& outResult)
+    {
+        co_return co_await await.receiveLine(socket, Span<char>(), outResult);
+    }
+
+    static AwaitTask filePollInvalid(AwaitEventLoop& await, const FileDescriptor& file)
+    {
+        co_return co_await await.filePoll(file);
     }
 
     struct FrameAddressProbe
@@ -1627,6 +1642,51 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(allocator.createFixed(storage).isError(AwaitResultCategory, AwaitError::AllocatorAlreadyOpen));
         SC_TEST_EXPECT(allocator.close());
         SC_TEST_EXPECT(allocator.createVirtual({}).isError(AwaitResultCategory, AwaitError::AllocatorReservationEmpty));
+    }
+
+    void awaiterErrorIdentities()
+    {
+        static_assert(static_cast<uint32_t>(AwaitError::InvalidFileHandle) == 22, "Await errors are append-only");
+
+        char message[80];
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::SocketSendNoProgress, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::SocketReceiveIncomplete, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::SocketReceiveNoProgress, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::EmptyReceiveBuffer, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::ReceiveLineBufferExhausted, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::FileReadNoProgress, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::OperationUnsupported, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::InvalidFileHandle, message).status ==
+                       ResultErrorFormatStatus::Success);
+
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+        SocketDescriptor             invalidSocket;
+        AwaitSocketReceiveLineResult lineResult;
+        AwaitTask                    lineTask = receiveLineEmptyBuffer(await, invalidSocket, lineResult);
+        SC_TEST_EXPECT(await.spawn(lineTask));
+        SC_TEST_EXPECT(lineTask.isCompleted());
+        SC_TEST_EXPECT(lineTask.result().isError(AwaitResultCategory, AwaitError::EmptyReceiveBuffer));
+
+        FileDescriptor invalidFile;
+        AwaitTask      pollTask = filePollInvalid(await, invalidFile);
+        SC_TEST_EXPECT(await.spawn(pollTask));
+        SC_TEST_EXPECT(pollTask.isCompleted());
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(pollTask.result().isError(AwaitResultCategory, AwaitError::OperationUnsupported));
+#else
+        SC_TEST_EXPECT(pollTask.result().isError(AwaitResultCategory, AwaitError::InvalidFileHandle));
+#endif
+        SC_TEST_EXPECT(async.close());
     }
 
     void immediateTask()

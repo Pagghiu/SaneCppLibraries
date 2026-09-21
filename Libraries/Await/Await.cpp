@@ -1431,7 +1431,7 @@ bool AwaitSocketSendAllAwaiter::await_suspend(AwaitTask::Handle newContinuation)
             const size_t bytesSent = result.completionData.numBytes;
             if (bytesSent == 0)
             {
-                operationResult = Result::Error("AwaitSocketSendAll made no progress");
+                operationResult = Result::Error(AwaitResultCategory, AwaitError::SocketSendNoProgress);
                 continuation.resume();
                 return;
             }
@@ -1525,7 +1525,7 @@ bool AwaitSocketSendAllBuffersAwaiter::await_suspend(AwaitTask::Handle newContin
             const size_t bytesSent = result.completionData.numBytes;
             if (bytesSent == 0)
             {
-                operationResult = Result::Error("AwaitSocketSendAllBuffers made no progress");
+                operationResult = Result::Error(AwaitResultCategory, AwaitError::SocketSendNoProgress);
                 continuation.resume();
                 return;
             }
@@ -1693,13 +1693,13 @@ bool AwaitSocketReceiveExactAwaiter::await_suspend(AwaitTask::Handle newContinua
             {
                 if (result.completionData.disconnected)
                 {
-                    operationResult = Result::Error("AwaitSocketReceiveExact disconnected before buffer was full");
+                    operationResult = Result::Error(AwaitResultCategory, AwaitError::SocketReceiveIncomplete);
                     continuation.resume();
                     return;
                 }
                 if (bytesReceived == 0)
                 {
-                    operationResult = Result::Error("AwaitSocketReceiveExact made no progress");
+                    operationResult = Result::Error(AwaitResultCategory, AwaitError::SocketReceiveNoProgress);
                     continuation.resume();
                     return;
                 }
@@ -1773,7 +1773,7 @@ bool AwaitSocketReceiveLineAwaiter::await_suspend(AwaitTask::Handle newContinuat
     outResult = {};
     if (buffer.empty())
     {
-        operationResult = Result::Error("AwaitSocketReceiveLine buffer is empty");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::EmptyReceiveBuffer);
         return false;
     }
 
@@ -1791,7 +1791,7 @@ bool AwaitSocketReceiveLineAwaiter::await_suspend(AwaitTask::Handle newContinuat
             }
             if (received.empty())
             {
-                operationResult = Result::Error("AwaitSocketReceiveLine made no progress");
+                operationResult = Result::Error(AwaitResultCategory, AwaitError::SocketReceiveNoProgress);
                 continuation.resume();
                 return;
             }
@@ -1805,7 +1805,7 @@ bool AwaitSocketReceiveLineAwaiter::await_suspend(AwaitTask::Handle newContinuat
             }
             if (numBytesReceived >= buffer.sizeInBytes())
             {
-                operationResult = Result::Error("AwaitSocketReceiveLine buffer exhausted before newline");
+                operationResult = Result::Error(AwaitResultCategory, AwaitError::ReceiveLineBufferExhausted);
                 (void)updateOutResult(false);
                 continuation.resume();
                 return;
@@ -2004,7 +2004,7 @@ bool AwaitFileReadUntilFullOrEOFAwaiter::await_suspend(AwaitTask::Handle newCont
                 }
                 if (bytesRead == 0)
                 {
-                    operationResult = Result::Error("AwaitFileReadUntilFullOrEOF made no progress");
+                    operationResult = Result::Error(AwaitResultCategory, AwaitError::FileReadNoProgress);
                     continuation.resume();
                     return;
                 }
@@ -2204,7 +2204,7 @@ bool AwaitFilePollAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFilePollAwaiter::cancel);
 
 #if SC_PLATFORM_WINDOWS
-    operationResult = Result::Error("Await filePoll is not supported on Windows");
+    operationResult = Result::Error(AwaitResultCategory, AwaitError::OperationUnsupported);
     return false;
 #else
     request.callback = [this](AsyncFileReadiness::Result& result)
@@ -2214,7 +2214,7 @@ bool AwaitFilePollAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     };
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    operationResult               = file.get(handle, Result::Error("Await filePoll invalid file"));
+    operationResult               = file.get(handle, Result::Error(AwaitResultCategory, AwaitError::InvalidFileHandle));
     if (not operationResult)
     {
         return false;
