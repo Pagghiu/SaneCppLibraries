@@ -30,6 +30,7 @@
 
 #include "../Async/Async.h"
 #include "../Common/Result.h"
+#include "AwaitError.h"
 #include "Internal/AwaitCoroutine.h"
 
 //! @defgroup group_await Await

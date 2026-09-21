@@ -75,3 +75,4 @@ Inferred negative target: avoid promise/future APIs where task start, allocation
 - [AWAIT-0003 - Keep Await helpers thin and keep long-lived streams out of AwaitEventLoop](await-0003-keep-await-helpers-thin-and-keep-long-lived-streams-out-of-awaiteventloop.md)
 - [AWAIT-0004 - Use caller-owned TaskGroup and TaskRegistry storage](await-0004-use-caller-owned-taskgroup-and-taskregistry-storage.md)
 - [AWAIT-0005 - Keep cancellation cooperative and Result-based](await-0005-keep-cancellation-cooperative-and-result-based.md)
+- [AWAIT-0006 - Use portable structured Result errors](await-0006-use-portable-structured-result-errors.md)

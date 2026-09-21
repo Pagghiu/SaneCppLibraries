@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "Libraries/Await/Await.h"
+#include "Libraries/Await/AwaitErrorFormatter.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
@@ -60,6 +61,10 @@ struct SC::AwaitTest : public SC::TestCase
         if (test_section("SC_CO_TRY structured propagation"))
         {
             coTryStructuredPropagation();
+        }
+        if (test_section("structured Await identities"))
+        {
+            structuredAwaitIdentities();
         }
         if (test_section("move task"))
         {
@@ -1592,6 +1597,38 @@ struct SC::AwaitTest : public SC::TestCase
         }
     }
 
+    void structuredAwaitIdentities()
+    {
+        static_assert(AwaitResultCategory.value == 15, "Await owns category 15");
+        static_assert(static_cast<uint32_t>(AwaitError::UnhandledException) == 14, "Await errors are append-only");
+
+        Result cancelled = AwaitCancelledResult();
+        Result wrongLoop = AwaitWrongEventLoopResult();
+        SC_TEST_EXPECT(cancelled.isError(AwaitResultCategory, AwaitError::Cancelled));
+        SC_TEST_EXPECT(wrongLoop.isError(AwaitResultCategory, AwaitError::WrongEventLoop));
+        SC_TEST_EXPECT(AwaitIsCancelled(cancelled));
+        SC_TEST_EXPECT(not AwaitIsWrongEventLoop(cancelled));
+        SC_TEST_EXPECT(AwaitIsWrongEventLoop(wrongLoop));
+        SC_TEST_EXPECT(not AwaitIsCancelled(wrongLoop));
+        SC_TEST_EXPECT(not AwaitIsCancelled(Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized)));
+
+        char message[64];
+        SC_TEST_EXPECT(formatAwaitError(cancelled, message).status == ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(wrongLoop, message).status == ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(
+            formatAwaitError(Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized), message).status ==
+            ResultErrorFormatStatus::ForeignCategory);
+
+        AwaitAllocator allocator;
+        SC_TEST_EXPECT(
+            allocator.createFixed(Span<char>()).isError(AwaitResultCategory, AwaitError::AllocatorStorageEmpty));
+        char storage[1024] = {};
+        SC_TEST_EXPECT(allocator.createFixed(storage));
+        SC_TEST_EXPECT(allocator.createFixed(storage).isError(AwaitResultCategory, AwaitError::AllocatorAlreadyOpen));
+        SC_TEST_EXPECT(allocator.close());
+        SC_TEST_EXPECT(allocator.createVirtual({}).isError(AwaitResultCategory, AwaitError::AllocatorReservationEmpty));
+    }
+
     void immediateTask()
     {
         AsyncEventLoop async;
@@ -1656,7 +1693,9 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTask invalid;
         SC_TEST_EXPECT(not invalid.isValid());
         SC_TEST_EXPECT(not invalid.result());
+        SC_TEST_EXPECT(invalid.result().isError(AwaitResultCategory, AwaitError::InvalidTask));
         SC_TEST_EXPECT(not invalid.cancel(await));
+        SC_TEST_EXPECT(invalid.cancel(await).isError(AwaitResultCategory, AwaitError::InvalidTask));
         SC_TEST_EXPECT(not await.spawn(invalid));
 
         AwaitTask task  = waitTwice(await);
@@ -1728,6 +1767,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result    wrongSpawnResult = awaitB.spawn(task);
         SC_TEST_EXPECT(not wrongSpawnResult);
         SC_TEST_EXPECT(AwaitIsWrongEventLoop(wrongSpawnResult));
+        SC_TEST_EXPECT(wrongSpawnResult.isError(AwaitResultCategory, AwaitError::WrongEventLoop));
         SC_TEST_EXPECT(not task.isStarted());
 
         AwaitTask active = waitTwice(awaitA);
@@ -1844,6 +1884,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result taskResult = task.result();
         SC_TEST_EXPECT(not taskResult);
         SC_TEST_EXPECT(AwaitIsCancelled(taskResult));
+        SC_TEST_EXPECT(taskResult.isError(AwaitResultCategory, AwaitError::Cancelled));
         SC_TEST_EXPECT(async.close());
     }
 

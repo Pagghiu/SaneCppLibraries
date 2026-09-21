@@ -118,15 +118,15 @@ static Result cancelCancellableAwait(AsyncRequestType& request, Result& operatio
 
 const char* AwaitCancellationMessage() { return AwaitCancellationMessageStorage; }
 
-Result AwaitCancelledResult() { return Result::FromStableCharPointer(AwaitCancellationMessageStorage); }
+Result AwaitCancelledResult() { return Result::Error(AwaitResultCategory, AwaitError::Cancelled); }
 
-bool AwaitIsCancelled(Result result) { return result.message == AwaitCancellationMessageStorage; }
+bool AwaitIsCancelled(Result result) { return result.isError(AwaitResultCategory, AwaitError::Cancelled); }
 
 const char* AwaitWrongEventLoopMessage() { return AwaitWrongEventLoopMessageStorage; }
 
-Result AwaitWrongEventLoopResult() { return Result::FromStableCharPointer(AwaitWrongEventLoopMessageStorage); }
+Result AwaitWrongEventLoopResult() { return Result::Error(AwaitResultCategory, AwaitError::WrongEventLoop); }
 
-bool AwaitIsWrongEventLoop(Result result) { return result.message == AwaitWrongEventLoopMessageStorage; }
+bool AwaitIsWrongEventLoop(Result result) { return result.isError(AwaitResultCategory, AwaitError::WrongEventLoop); }
 
 struct AwaitAllocator::BlockHeader
 {
@@ -147,11 +147,11 @@ Result AwaitAllocator::createFixed(Span<char> storage)
 {
     if (isOpen())
     {
-        return Result::Error("AwaitAllocator is already open");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorAlreadyOpen);
     }
     if (storage.empty())
     {
-        return Result::Error("AwaitAllocator fixed storage is empty");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorStorageEmpty);
     }
 
     resetState();
@@ -164,11 +164,11 @@ Result AwaitAllocator::createVirtual(AwaitAllocatorVirtualOptions options)
 {
     if (isOpen())
     {
-        return Result::Error("AwaitAllocator is already open");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorAlreadyOpen);
     }
     if (options.reserveBytes == 0)
     {
-        return Result::Error("AwaitAllocator virtual reservation is empty");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorReservationEmpty);
     }
 
     resetState();
@@ -186,7 +186,7 @@ Result AwaitAllocator::createVirtual(AwaitAllocatorVirtualOptions options)
     if (virtualMemory == nullptr)
     {
         resetState();
-        return Result::Error("AwaitAllocator virtual reservation failed");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorReservationFailed);
     }
 
     currentMode = AwaitAllocatorMode::Virtual;
@@ -194,7 +194,7 @@ Result AwaitAllocator::createVirtual(AwaitAllocatorVirtualOptions options)
     {
         releaseVirtualMemory();
         resetState();
-        return Result::Error("AwaitAllocator virtual initial commit failed");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorCommitFailed);
     }
     return Result(true);
 }
@@ -203,7 +203,7 @@ Result AwaitAllocator::createMalloc()
 {
     if (isOpen())
     {
-        return Result::Error("AwaitAllocator is already open");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorAlreadyOpen);
     }
     resetState();
     currentMode = AwaitAllocatorMode::Malloc;
@@ -214,7 +214,7 @@ Result AwaitAllocator::createPolymorphic(AwaitAllocatorInterface& customAllocato
 {
     if (isOpen())
     {
-        return Result::Error("AwaitAllocator is already open");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorAlreadyOpen);
     }
     resetState();
     allocatorInterface = &customAllocatorInterface;
@@ -231,7 +231,7 @@ Result AwaitAllocator::close()
     if (currentStatistics.bytesInUse != 0 or currentStatistics.numAllocations != currentStatistics.numReleases)
     {
         SC_AWAIT_ASSERT_RELEASE(false);
-        return Result::Error("AwaitAllocator closed with live allocations");
+        return Result::Error(AwaitResultCategory, AwaitError::AllocatorHasLiveAllocations);
     }
 
     releaseVirtualMemory();
@@ -660,11 +660,11 @@ Result AwaitTask::result() const
 {
     if (not handle)
     {
-        return Result::Error("AwaitTask is invalid");
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
     if (not isCompleted())
     {
-        return Result::Error("AwaitTask is not completed");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskNotCompleted);
     }
     return handle.promise().taskResult;
 }
@@ -673,7 +673,7 @@ Result AwaitTask::cancel(AwaitEventLoop& await)
 {
     if (not handle)
     {
-        return Result::Error("AwaitTask is invalid");
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
     Promise& promise = handle.promise();
     if (promise.completed)
@@ -686,7 +686,7 @@ Result AwaitTask::cancel(AwaitEventLoop& await)
     }
     if (not promise.started)
     {
-        return Result::Error("AwaitTask is not started");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskNotStarted);
     }
     if (promise.cancellationRequested)
     {
@@ -694,7 +694,7 @@ Result AwaitTask::cancel(AwaitEventLoop& await)
     }
     if (promise.cancellation.cancel == nullptr)
     {
-        return Result::Error("AwaitTask cannot be cancelled right now");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskCancellationUnavailable);
     }
     promise.cancellationRequested = true;
     return promise.cancellation.cancel(promise.cancellation.object, await);
@@ -731,11 +731,11 @@ Result AwaitTask::start()
 {
     if (not handle)
     {
-        return Result::Error("AwaitTask is invalid");
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
     if (handle.promise().started)
     {
-        return Result::Error("AwaitTask already started");
+        return Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyStarted);
     }
     handle.promise().started = true;
     return Result(true);
@@ -764,7 +764,8 @@ void AwaitTask::destroy()
 }
 
 AwaitTask::Promise::Promise()
-    : taskResult(Result::Error("AwaitTask not completed")), eventLoop(nullptr), started(false), completed(false)
+    : taskResult(Result::Error(AwaitResultCategory, AwaitError::TaskNotCompleted)), eventLoop(nullptr), started(false),
+      completed(false)
 {
     deferredDestroyNext   = {};
     completionObject      = nullptr;
@@ -842,7 +843,10 @@ AwaitTask::Promise::FinalSuspend AwaitTask::Promise::final_suspend() noexcept { 
 
 void AwaitTask::Promise::return_value(Result newResult) noexcept { taskResult = newResult; }
 
-void AwaitTask::Promise::unhandled_exception() noexcept { taskResult = Result::Error("AwaitTask unhandled exception"); }
+void AwaitTask::Promise::unhandled_exception() noexcept
+{
+    taskResult = Result::Error(AwaitResultCategory, AwaitError::UnhandledException);
+}
 
 AwaitEventLoop::AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitAllocator& allocator)
     : eventLoop(asyncEventLoop), frameAllocator(&allocator), deferredDestroyList({})
@@ -860,7 +864,7 @@ Result AwaitEventLoop::spawn(AwaitTask& task)
 {
     if (not task.isValid())
     {
-        return Result::Error("AwaitTask is invalid");
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
     AwaitEventLoop* taskEventLoop = task.handle.promise().eventLoop;
     if (taskEventLoop != nullptr and taskEventLoop != this)
