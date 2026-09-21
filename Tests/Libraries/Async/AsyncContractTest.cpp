@@ -64,6 +64,12 @@ struct SC::AsyncContractTest : public SC::TestCase
                 fileSendOperationError();
             }
 #endif
+#if SC_PLATFORM_LINUX
+            if (test_section("io_uring completion error"))
+            {
+                ioUringCompletionError();
+            }
+#endif
             if (test_section("stop suppresses normal callback"))
             {
                 stopSuppressesNormalCallback();
@@ -253,6 +259,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void fileReadOperationError();
     void posixSocketConnectPreservesForeignErrors();
     void fileSendOperationError();
+    void ioUringCompletionError();
     void closeCallbackRunsAfterRequestIsFree();
     void closeCallbackCanRestartRequest();
     void stopFreeRequestFails();
@@ -628,6 +635,35 @@ void SC::AsyncContractTest::fileSendOperationError()
     SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return callbacks == 1; }));
     SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::FileSendFailed));
     SC_TEST_EXPECT(send.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+#endif
+}
+
+void SC::AsyncContractTest::ioUringCompletionError()
+{
+#if SC_PLATFORM_LINUX
+    if (options.apiType != AsyncEventLoop::Options::ApiType::ForceUseIoUring)
+        return;
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    char          byte = 0;
+    AsyncFileRead read;
+    read.handle = 999999; // Not an open descriptor, but distinct from the invalid sentinel.
+    read.buffer = Span<char>(&byte, 1);
+
+    Result observed  = Result(true);
+    int    callbacks = 0;
+    read.callback    = [&](AsyncFileRead::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(eventLoop.start(read));
+    SC_TEST_EXPECT(runNoWaitUntil(eventLoop, [&] { return callbacks == 1; }, 100));
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::EventCompletionFailed));
+    SC_TEST_EXPECT(read.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 #endif
 }

@@ -35,7 +35,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     TimerState timerState = TimerState::Idle;
 
     AsyncLinuxIOUring ring;
-    char              createErrorMessage[64] = {};
 
     AsyncFileReadiness wakeUpPoll;
     FileDescriptor     wakeUpEventFd;
@@ -65,13 +64,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         const int uringResult = ring.create(QueueDepth);
         if (uringResult < 0)
         {
-            const int written = ::snprintf(createErrorMessage, sizeof(createErrorMessage),
-                                           "io_uring setup failed (errno=%d)", -uringResult);
-            if (written <= 0 or static_cast<size_t>(written) >= sizeof(createErrorMessage))
-            {
-                return Result::Error("io_uring setup failed");
-            }
-            return Result::FromStableCharPointer(createErrorMessage);
+            return Result::Error(AsyncResultCategory, AsyncError::EventLoopCreationFailed);
         }
         ringInited = true;
         return Result(true);
@@ -133,8 +126,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     io_uring_cqe*  events;
     io_uring_cqe** eventPointers;
 
-    char lastErrorMessage[96] = {};
-
     int&      newEvents;
     const int totalNumEvents;
 
@@ -154,17 +145,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_cqe& completion = events[idx];
         return reinterpret_cast<AsyncRequest*>(AsyncLinuxIOUring::getData(&completion));
-    }
-
-    Result makeIoUringCompletionError(int completionResult)
-    {
-        const int written = ::snprintf(lastErrorMessage, sizeof(lastErrorMessage),
-                                       "Error in processing event (io_uring, errno=%d)", -completionResult);
-        if (written <= 0 or static_cast<size_t>(written) >= sizeof(lastErrorMessage))
-        {
-            return Result::Error("Error in processing event (io_uring)");
-        }
-        return Result::FromStableCharPointer(lastErrorMessage);
     }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
@@ -383,7 +363,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     continueProcessing = false; // Don't process cancellations
                     if (completion.res != -ECANCELED)
                     {
-                        return makeIoUringCompletionError(completion.res);
+                        return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
                     }
                 }
             }
