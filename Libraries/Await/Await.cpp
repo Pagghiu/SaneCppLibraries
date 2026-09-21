@@ -2563,11 +2563,11 @@ Result AwaitTaskRegistry::spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* 
 {
     if (not task.isValid())
     {
-        return Result::Error("AwaitTask is invalid");
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
     if (task.isStarted())
     {
-        return Result::Error("AwaitTaskRegistry can only spawn unstarted tasks");
+        return Result::Error(AwaitResultCategory, AwaitError::RegistryTaskAlreadyStarted);
     }
 
     for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
@@ -2593,7 +2593,7 @@ Result AwaitTaskRegistry::spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* 
         }
         return Result(true);
     }
-    return Result::Error("AwaitTaskRegistry storage is full");
+    return Result::Error(AwaitResultCategory, AwaitError::RegistryStorageFull);
 }
 
 Result AwaitTaskRegistry::cancelAll()
@@ -2751,7 +2751,7 @@ bool AwaitTaskRegistryWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinu
         }
         if (not task.isActive())
         {
-            operationResult = Result::Error("AwaitTaskRegistry contains inactive task");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::RegistryInactiveTask);
             clearTaskCallbacks();
             return false;
         }
@@ -2759,7 +2759,7 @@ bool AwaitTaskRegistryWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinu
         AwaitTask::Promise& promise = task.handle.promise();
         if (promise.completionCallback != nullptr or promise.continuation != nullptr)
         {
-            operationResult = Result::Error("AwaitTask is already being awaited");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyAwaited);
             clearTaskCallbacks();
             return false;
         }
@@ -2899,7 +2899,7 @@ bool AwaitTaskRegistryWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinu
         }
         if (not task.isActive())
         {
-            operationResult = Result::Error("AwaitTaskRegistry contains inactive task");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::RegistryInactiveTask);
             clearTaskCallbacks();
             return false;
         }
@@ -2907,7 +2907,7 @@ bool AwaitTaskRegistryWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinu
         AwaitTask::Promise& promise = task.handle.promise();
         if (promise.completionCallback != nullptr or promise.continuation != nullptr)
         {
-            operationResult = Result::Error("AwaitTask is already being awaited");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyAwaited);
             clearTaskCallbacks();
             return false;
         }
@@ -2918,7 +2918,7 @@ bool AwaitTaskRegistryWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinu
 
     if (totalTasks == 0)
     {
-        operationResult = Result::Error("AwaitTaskRegistry is empty");
+        operationResult = Result::Error(AwaitResultCategory, AwaitError::RegistryEmpty);
         return false;
     }
 
@@ -3056,7 +3056,7 @@ Result AwaitTaskRegistryWaitAnyAwaiter::setWinner(size_t index)
     AwaitTask& task = registry.tasks[index];
     if (not task.isValid())
     {
-        return Result::Error("AwaitTaskRegistry contains invalid task");
+        return Result::Error(AwaitResultCategory, AwaitError::RegistryInvalidTask);
     }
 
     winnerIndex     = index;

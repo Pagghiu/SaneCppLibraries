@@ -45,6 +45,11 @@ enum class AwaitError : uint32_t
     TaskGroupInactiveTask,
     TaskGroupEmpty,
     TaskAlreadyAwaited,
+    RegistryTaskAlreadyStarted,
+    RegistryStorageFull,
+    RegistryInactiveTask,
+    RegistryEmpty,
+    RegistryInvalidTask,
 };
 
 /// @brief Stable category assigned to Await-owned errors.

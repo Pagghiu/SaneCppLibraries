@@ -1189,9 +1189,10 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTaskRegistryWaitAnyResult waitAnyResult;
         Result                         waitResult = co_await registry.waitAny(waitAnyResult);
-        if (waitResult or waitAnyResult.index != 0 or waitAnyResult.task != registry.taskAt(0) or
-            waitAnyResult.task->result() or not registry.taskAt(1)->isCompleted() or
-            not AwaitIsCancelled(registry.taskAt(1)->result()))
+        if (not waitResult.isError(ResultCategory(0x7ffffffdu), 43) or waitAnyResult.index != 0 or
+            waitAnyResult.task != registry.taskAt(0) or
+            not waitAnyResult.task->result().isError(ResultCategory(0x7ffffffdu), 43) or
+            not registry.taskAt(1)->isCompleted() or not AwaitIsCancelled(registry.taskAt(1)->result()))
         {
             co_return Result::Error("Await registry failing waitAny result mismatch");
         }
@@ -1220,7 +1221,7 @@ struct SC::AwaitTest : public SC::TestCase
         (void)await;
         AwaitTaskRegistryWaitAnyResult waitAnyResult;
         Result                         waitResult = co_await registry.waitAny(waitAnyResult);
-        if (waitResult or waitAnyResult.task != nullptr)
+        if (not waitResult.isError(AwaitResultCategory, AwaitError::RegistryEmpty) or waitAnyResult.task != nullptr)
         {
             co_return Result::Error("Await registry empty waitAny result mismatch");
         }
@@ -1635,6 +1636,7 @@ struct SC::AwaitTest : public SC::TestCase
         static_assert(AwaitResultCategory.value == 15, "Await owns category 15");
         static_assert(static_cast<uint32_t>(AwaitError::UnhandledException) == 14, "Await errors are append-only");
         static_assert(static_cast<uint32_t>(AwaitError::TaskAlreadyAwaited) == 32, "Await errors are append-only");
+        static_assert(static_cast<uint32_t>(AwaitError::RegistryInvalidTask) == 37, "Await errors are append-only");
 
         Result cancelled = AwaitCancelledResult();
         Result wrongLoop = AwaitWrongEventLoopResult();
@@ -1660,6 +1662,15 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupEmpty, message).status ==
                        ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskAlreadyAwaited, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryTaskAlreadyStarted, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryStorageFull, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryInactiveTask, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryEmpty, message).status == ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryInvalidTask, message).status ==
                        ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(
             formatAwaitError(Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized), message).status ==
@@ -3752,7 +3763,8 @@ struct SC::AwaitTest : public SC::TestCase
 
             SC_TEST_EXPECT(registry.spawn(waitLong(await)));
             SC_TEST_EXPECT(registry.activeCount() == 1);
-            SC_TEST_EXPECT(not registry.spawn(waitTwice(await)));
+            SC_TEST_EXPECT(
+                registry.spawn(waitTwice(await)).isError(AwaitResultCategory, AwaitError::RegistryStorageFull));
             SC_TEST_EXPECT(registry.size() == 1);
             SC_TEST_EXPECT(registry.taskAt(0) == &storage[0]);
             SC_TEST_EXPECT(registry.taskAt(1) == nullptr);

@@ -50,6 +50,11 @@ inline ResultErrorFormat formatAwaitError(AwaitError error, Span<char> output)
     case AwaitError::TaskGroupInactiveTask: formatter.append("Task group contains an inactive task"); break;
     case AwaitError::TaskGroupEmpty: formatter.append("Task group is empty"); break;
     case AwaitError::TaskAlreadyAwaited: formatter.append("Task is already being awaited"); break;
+    case AwaitError::RegistryTaskAlreadyStarted: formatter.append("Registry task has already started"); break;
+    case AwaitError::RegistryStorageFull: formatter.append("Task registry storage is full"); break;
+    case AwaitError::RegistryInactiveTask: formatter.append("Task registry contains an inactive task"); break;
+    case AwaitError::RegistryEmpty: formatter.append("Task registry is empty"); break;
+    case AwaitError::RegistryInvalidTask: formatter.append("Task registry contains an invalid task"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
