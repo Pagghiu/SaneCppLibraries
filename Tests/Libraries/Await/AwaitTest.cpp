@@ -70,6 +70,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             awaiterErrorIdentities();
         }
+        if (test_section("file system error identities"))
+        {
+            fileSystemErrorIdentities();
+        }
         if (test_section("move task"))
         {
             moveTask();
@@ -290,6 +294,16 @@ struct SC::AwaitTest : public SC::TestCase
     static AwaitTask filePollInvalid(AwaitEventLoop& await, const FileDescriptor& file)
     {
         co_return co_await await.filePoll(file);
+    }
+
+    static AwaitTask fsCloseInvalid(AwaitEventLoop& await, ThreadPool& threadPool, FileDescriptor& file)
+    {
+        co_return co_await await.fsClose(threadPool, file);
+    }
+
+    static AwaitTask fsOpenInvalidPath(AwaitEventLoop& await, ThreadPool& threadPool, FileDescriptor& output)
+    {
+        co_return co_await await.fsOpen(threadPool, StringSpan(), FileOpen::Read, output);
     }
 
     struct FrameAddressProbe
@@ -1687,6 +1701,41 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(pollTask.result().isError(AwaitResultCategory, AwaitError::InvalidFileHandle));
 #endif
         SC_TEST_EXPECT(async.close());
+    }
+
+    void fileSystemErrorIdentities()
+    {
+        static_assert(static_cast<uint32_t>(AwaitError::InvalidFileSystemOperation) == 26,
+                      "Await errors are append-only");
+
+        char message[64];
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::MissingOutputFile, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::MissingFile, message).status == ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::MissingReadResult, message).status ==
+                       ResultErrorFormatStatus::Success);
+        SC_TEST_EXPECT(formatAwaitError(AwaitError::InvalidFileSystemOperation, message).status ==
+                       ResultErrorFormatStatus::Success);
+
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
+        ThreadPool threadPool;
+        SC_TEST_EXPECT(threadPool.create(1));
+
+        FileDescriptor invalidFile;
+        AwaitTask      closeTask = fsCloseInvalid(await, threadPool, invalidFile);
+        SC_TEST_EXPECT(await.spawn(closeTask));
+        SC_TEST_EXPECT(closeTask.isCompleted());
+        SC_TEST_EXPECT(closeTask.result().isError(AwaitResultCategory, AwaitError::InvalidFileHandle));
+
+        AwaitTask openTask = fsOpenInvalidPath(await, threadPool, invalidFile);
+        SC_TEST_EXPECT(await.spawn(openTask));
+        SC_TEST_EXPECT(openTask.isCompleted());
+        SC_TEST_EXPECT(openTask.result().isError(AsyncResultCategory, AsyncError::InvalidPath));
+
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(threadPool.destroy());
     }
 
     void immediateTask()

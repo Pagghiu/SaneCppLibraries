@@ -40,6 +40,10 @@ inline ResultErrorFormat formatAwaitError(AwaitError error, Span<char> output)
     case AwaitError::FileReadNoProgress: formatter.append("File read made no progress"); break;
     case AwaitError::OperationUnsupported: formatter.append("Operation is unsupported"); break;
     case AwaitError::InvalidFileHandle: formatter.append("File handle is invalid"); break;
+    case AwaitError::MissingOutputFile: formatter.append("Output file is missing"); break;
+    case AwaitError::MissingFile: formatter.append("File is missing"); break;
+    case AwaitError::MissingReadResult: formatter.append("File read result is missing"); break;
+    case AwaitError::InvalidFileSystemOperation: formatter.append("File-system operation is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

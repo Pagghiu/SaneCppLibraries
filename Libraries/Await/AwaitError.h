@@ -35,6 +35,10 @@ enum class AwaitError : uint32_t
     FileReadNoProgress,
     OperationUnsupported,
     InvalidFileHandle,
+    MissingOutputFile,
+    MissingFile,
+    MissingReadResult,
+    InvalidFileSystemOperation,
 };
 
 /// @brief Stable category assigned to Await-owned errors.

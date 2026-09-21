@@ -2308,7 +2308,7 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
     case AwaitFileSystemOperationType::Open:
         if (outFile == nullptr)
         {
-            operationResult = Result::Error("Await fsOpen missing output file");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::MissingOutputFile);
             return false;
         }
         operationResult = request.open(await.asyncEventLoop(), path, mode);
@@ -2316,11 +2316,11 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
     case AwaitFileSystemOperationType::Close: {
         if (fileToClose == nullptr)
         {
-            operationResult = Result::Error("Await fsClose missing file");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::MissingFile);
             return false;
         }
         FileDescriptor::Handle handle = FileDescriptor::Invalid;
-        operationResult               = fileToClose->get(handle, Result::Error("Await fsClose invalid file"));
+        operationResult = fileToClose->get(handle, Result::Error(AwaitResultCategory, AwaitError::InvalidFileHandle));
         if (not operationResult)
         {
             return false;
@@ -2333,13 +2333,18 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
         return operationResult;
     }
     case AwaitFileSystemOperationType::Read: {
-        if (fileToUse == nullptr or outReadResult == nullptr)
+        if (fileToUse == nullptr)
         {
-            operationResult = Result::Error("Await fsRead missing file or result");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::MissingFile);
+            return false;
+        }
+        if (outReadResult == nullptr)
+        {
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::MissingReadResult);
             return false;
         }
         FileDescriptor::Handle handle = FileDescriptor::Invalid;
-        operationResult               = fileToUse->get(handle, Result::Error("Await fsRead invalid file"));
+        operationResult = fileToUse->get(handle, Result::Error(AwaitResultCategory, AwaitError::InvalidFileHandle));
         if (not operationResult)
         {
             return false;
@@ -2351,11 +2356,11 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
     case AwaitFileSystemOperationType::Write: {
         if (fileToUse == nullptr)
         {
-            operationResult = Result::Error("Await fsWrite missing file");
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::MissingFile);
             return false;
         }
         FileDescriptor::Handle handle = FileDescriptor::Invalid;
-        operationResult               = fileToUse->get(handle, Result::Error("Await fsWrite invalid file"));
+        operationResult = fileToUse->get(handle, Result::Error(AwaitResultCategory, AwaitError::InvalidFileHandle));
         if (not operationResult)
         {
             return false;
@@ -2384,7 +2389,7 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
         return operationResult;
     }
 
-    operationResult = Result::Error("Await file system operation is invalid");
+    operationResult = Result::Error(AwaitResultCategory, AwaitError::InvalidFileSystemOperation);
     return false;
 }
 
