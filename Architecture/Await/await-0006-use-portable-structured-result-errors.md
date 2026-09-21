@@ -19,7 +19,8 @@ The mandatory header contains numeric identity only. Optional `AwaitErrorFormatt
 into caller-provided storage.
 
 The old message getter functions remain temporarily during the compatibility bridge but are not used for identity.
-The bridge-removal audit must remove or isolate them so unused English strings are linker-evictable. A separate typed
+They live in a separate optional source object so unused English strings can be omitted from linked binaries. The
+bridge-removal audit must decide whether to retain or remove this legacy text API. A separate typed
 coroutine result or native-detail API would require an explicit promise-size and lifetime review.
 
 ## Consequences

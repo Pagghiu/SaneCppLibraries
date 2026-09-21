@@ -26,9 +26,6 @@ namespace SC
 {
 namespace
 {
-static const char AwaitCancellationMessageStorage[]   = "AwaitTask cancelled";
-static const char AwaitWrongEventLoopMessageStorage[] = "AwaitTask belongs to another AwaitEventLoop";
-
 static constexpr size_t AwaitFrameAlignment =
 #if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
     __STDCPP_DEFAULT_NEW_ALIGNMENT__;
@@ -116,13 +113,9 @@ static Result cancelCancellableAwait(AsyncRequestType& request, Result& operatio
 }
 } // namespace
 
-const char* AwaitCancellationMessage() { return AwaitCancellationMessageStorage; }
-
 Result AwaitCancelledResult() { return Result::Error(AwaitResultCategory, AwaitError::Cancelled); }
 
 bool AwaitIsCancelled(Result result) { return result.isError(AwaitResultCategory, AwaitError::Cancelled); }
-
-const char* AwaitWrongEventLoopMessage() { return AwaitWrongEventLoopMessageStorage; }
 
 Result AwaitWrongEventLoopResult() { return Result::Error(AwaitResultCategory, AwaitError::WrongEventLoop); }
 
