@@ -11,6 +11,29 @@ static SC::ZLibAPI zlib;
 
 struct SC::ZLibStream::Internal
 {
+    static Result error(ZLibAPI::Error status)
+    {
+        switch (status)
+        {
+        case ZLibAPI::BUF_ERROR:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionNoProgress);
+        case ZLibAPI::STREAM_END:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionUnexpectedEnd);
+        case ZLibAPI::NEED_DICT:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionDictionaryRequired);
+        case ZLibAPI::ERRNO: return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionIOFailure);
+        case ZLibAPI::STREAM_ERROR:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionStreamInvalid);
+        case ZLibAPI::DATA_ERROR:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionDataInvalid);
+        case ZLibAPI::MEM_ERROR:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionMemoryUnavailable);
+        case ZLibAPI::VERSION_ERROR:
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionVersionMismatch);
+        default: return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionFailed);
+        }
+    }
+
     static Result compress(ZLibAPI::Stream& stream, Span<const char>& input, Span<char>& output)
     {
         stream.next_in   = reinterpret_cast<const uint8_t*>(input.data());
@@ -23,21 +46,14 @@ struct SC::ZLibStream::Internal
         const auto offsetIn   = input.sizeInBytes() - stream.avail_in;
         const bool outSliceOk = output.sliceStart(offsetOut, output);
         const bool inSliceOk  = input.sliceStart(offsetIn, input);
-        SC_TRY_MSG(inSliceOk and outSliceOk, "compress sliceStart");
+        if (not inSliceOk or not outSliceOk)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionSpanInvalid);
         switch (result)
         {
         case ZLibAPI::OK: // All good
             return Result(true);
-        case ZLibAPI::BUF_ERROR: return Result::Error("BUF_ERROR");
-        case ZLibAPI::STREAM_END: return Result::Error("STREAM_END");
-        case ZLibAPI::NEED_DICT: return Result::Error("NEED_DICT");
-        case ZLibAPI::ERRNO: return Result::Error("ERRNO");
-        case ZLibAPI::STREAM_ERROR: return Result::Error("STREAM_ERROR");
-        case ZLibAPI::DATA_ERROR: return Result::Error("DATA_ERROR");
-        case ZLibAPI::MEM_ERROR: return Result::Error("MEM_ERROR");
-        case ZLibAPI::VERSION_ERROR: return Result::Error("VERSION_ERROR");
+        default: return error(result);
         }
-        return Result::Error("UNKNOWN");
     }
 
     static Result compressFinalize(ZLibAPI::Stream& stream, Span<char>& output, bool& streamEnded)
@@ -50,7 +66,8 @@ struct SC::ZLibStream::Internal
         const auto result    = zlib.deflate(stream, ZLibAPI::Flush::FINISH);
         const auto offsetOut = output.sizeInBytes() - stream.avail_out;
         const bool slicesOk  = output.sliceStart(offsetOut, output);
-        SC_TRY_MSG(slicesOk, "compressFinalize sliceStart");
+        if (not slicesOk)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionSpanInvalid);
         streamEnded = result == ZLibAPI::Error::STREAM_END;
         switch (result)
         {
@@ -58,14 +75,8 @@ struct SC::ZLibStream::Internal
         case ZLibAPI::BUF_ERROR:  // Returned when output space is insufficient
         case ZLibAPI::STREAM_END: // Stream Ended
             return Result(true);
-        case ZLibAPI::NEED_DICT: return Result::Error("NEED_DICT");
-        case ZLibAPI::ERRNO: return Result::Error("ERRNO");
-        case ZLibAPI::STREAM_ERROR: return Result::Error("STREAM_ERROR");
-        case ZLibAPI::DATA_ERROR: return Result::Error("DATA_ERROR");
-        case ZLibAPI::MEM_ERROR: return Result::Error("MEM_ERROR");
-        case ZLibAPI::VERSION_ERROR: return Result::Error("VERSION_ERROR");
+        default: return error(result);
         }
-        return Result::Error("UNKNOWN");
     }
 
     static Result decompress(ZLibAPI::Stream& stream, Span<const char>& input, Span<char>& output)
@@ -81,21 +92,15 @@ struct SC::ZLibStream::Internal
         const bool outSliceOk = output.sliceStart(offsetOut, output);
         const bool inSliceOk  = input.sliceStart(offsetIn, input);
 
-        SC_TRY_MSG(inSliceOk and outSliceOk, "decompress sliceStart");
+        if (not inSliceOk or not outSliceOk)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionSpanInvalid);
         switch (result)
         {
         case ZLibAPI::OK:         // All good
         case ZLibAPI::STREAM_END: // Stream ended
             return Result(true);
-        case ZLibAPI::BUF_ERROR: return Result::Error("BUF_ERROR");
-        case ZLibAPI::NEED_DICT: return Result::Error("NEED_DICT");
-        case ZLibAPI::ERRNO: return Result::Error("ERRNO");
-        case ZLibAPI::STREAM_ERROR: return Result::Error("STREAM_ERROR");
-        case ZLibAPI::DATA_ERROR: return Result::Error("DATA_ERROR");
-        case ZLibAPI::MEM_ERROR: return Result::Error("MEM_ERROR");
-        case ZLibAPI::VERSION_ERROR: return Result::Error("VERSION_ERROR");
+        default: return error(result);
         }
-        return Result::Error("UNKNOWN");
     }
 
     static Result decompressFinalize(ZLibAPI::Stream& stream, Span<char>& output, bool& streamEnded)
@@ -107,7 +112,8 @@ struct SC::ZLibStream::Internal
         const auto result    = zlib.inflate(stream, ZLibAPI::Flush::FINISH);
         const auto offsetOut = output.sizeInBytes() - stream.avail_out;
         const bool slicesOk  = output.sliceStart(offsetOut, output);
-        SC_TRY_MSG(slicesOk, "decompressFinalize sliceStart");
+        if (not slicesOk)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionSpanInvalid);
         streamEnded = result == ZLibAPI::Error::STREAM_END;
         switch (result)
         {
@@ -115,14 +121,8 @@ struct SC::ZLibStream::Internal
         case ZLibAPI::BUF_ERROR:  // Returned when output space is insufficient
         case ZLibAPI::STREAM_END: // Stream Ended
             return Result(true);
-        case ZLibAPI::NEED_DICT: return Result::Error("NEED_DICT");
-        case ZLibAPI::ERRNO: return Result::Error("ERRNO");
-        case ZLibAPI::STREAM_ERROR: return Result::Error("STREAM_ERROR");
-        case ZLibAPI::DATA_ERROR: return Result::Error("DATA_ERROR");
-        case ZLibAPI::MEM_ERROR: return Result::Error("MEM_ERROR");
-        case ZLibAPI::VERSION_ERROR: return Result::Error("VERSION_ERROR");
+        default: return error(result);
         }
-        return Result::Error("UNKNOWN");
     }
 };
 
@@ -152,7 +152,8 @@ SC::ZLibStream::~ZLibStream()
 SC::Result SC::ZLibStream::init(Algorithm wantedAlgorithm)
 {
     ZLibAPI::Stream& stream = buffer.reinterpret_as<ZLibAPI::Stream>();
-    SC_TRY_MSG(state == State::Constructed, "Init can be called only in State::Constructed");
+    if (state != State::Constructed)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionAlreadyInitialized);
 
     SC_TRY(zlib.load());
 
@@ -199,12 +200,13 @@ SC::Result SC::ZLibStream::init(Algorithm wantedAlgorithm)
         state = State::Inited;
         return Result(true);
     }
-    return Result::Error("ZLibStream::Init failed");
+    return Internal::error(ret);
 }
 
 SC::Result SC::ZLibStream::process(Span<const char>& input, Span<char>& output)
 {
-    SC_TRY_MSG(not output.empty(), "ZLibStream::process empty output is not allowed");
+    if (output.empty())
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionOutputBufferEmpty);
     ZLibAPI::Stream& stream = buffer.reinterpret_as<ZLibAPI::Stream>();
     switch (algorithm)
     {

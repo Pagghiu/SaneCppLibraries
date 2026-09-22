@@ -47,6 +47,11 @@ struct SC::ZLibStreamTest : public SC::TestCase
         }
         zlib.unload();
 
+        if (test_section("status errors"))
+        {
+            statusErrors();
+        }
+
         if (test_section("gzip"))
         {
             // "test" compressed with gzip
@@ -79,6 +84,7 @@ struct SC::ZLibStreamTest : public SC::TestCase
     void syncDecompression(ZLibStream::Algorithm compressionAlgorithm, const StringView referenceString,
                            const Span<const uint8_t> compressedReference);
     void runtimeError();
+    void statusErrors();
 
     /// @brief Compares this span with another one byte by byte
     template <typename T, typename U>
@@ -106,6 +112,39 @@ void SC::ZLibStreamTest::runtimeError()
                    ResultErrorFormatStatus::Success);
     SC_TEST_EXPECT(formatAsyncStreamsError(AsyncStreamsError::CompressionSymbolMissing, message).status ==
                    ResultErrorFormatStatus::Success);
+}
+
+void SC::ZLibStreamTest::statusErrors()
+{
+    ZLibStream compressor;
+    SC_TEST_EXPECT(compressor.init(ZLibStream::CompressZLib));
+
+    Result repeatedInit = compressor.init(ZLibStream::CompressZLib);
+    SC_TEST_EXPECT(not repeatedInit);
+    SC_TEST_EXPECT(repeatedInit.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(repeatedInit.errorValue() ==
+                   static_cast<uint32_t>(AsyncStreamsError::CompressionAlreadyInitialized));
+
+    char             sourceByte[1] = {'x'};
+    Span<const char> source(sourceByte);
+    Span<char>       emptyOutput;
+    Result           empty = compressor.process(source, emptyOutput);
+    SC_TEST_EXPECT(not empty);
+    SC_TEST_EXPECT(empty.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionOutputBufferEmpty));
+
+    ZLibStream inflater;
+    SC_TEST_EXPECT(inflater.init(ZLibStream::DecompressZLib));
+    const char       invalidData[4] = {0, 0, 0, 0};
+    Span<const char> invalidInput(invalidData);
+    char             outputBytes[32];
+    Span<char>       output(outputBytes);
+    Result           invalid = inflater.process(invalidInput, output);
+    SC_TEST_EXPECT(not invalid);
+    SC_TEST_EXPECT(invalid.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(invalid.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionDataInvalid));
+
+    char message[80];
+    SC_TEST_EXPECT(formatAsyncStreamsError(invalid, message).status == ResultErrorFormatStatus::Success);
 }
 
 void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgorithm, const StringView inputString,

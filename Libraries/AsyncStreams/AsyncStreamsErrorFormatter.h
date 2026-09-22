@@ -65,6 +65,24 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
     case AsyncStreamsError::CompressionSymbolMissing:
         formatter.append("Compression runtime is missing a required function");
         break;
+    case AsyncStreamsError::CompressionSpanInvalid: formatter.append("Compression buffer span is invalid"); break;
+    case AsyncStreamsError::CompressionNoProgress: formatter.append("Compression made no progress"); break;
+    case AsyncStreamsError::CompressionUnexpectedEnd: formatter.append("Compression stream ended unexpectedly"); break;
+    case AsyncStreamsError::CompressionDictionaryRequired:
+        formatter.append("Compression dictionary is required");
+        break;
+    case AsyncStreamsError::CompressionIOFailure: formatter.append("Compression input or output failed"); break;
+    case AsyncStreamsError::CompressionStreamInvalid: formatter.append("Compression stream state is invalid"); break;
+    case AsyncStreamsError::CompressionDataInvalid: formatter.append("Compressed data is invalid"); break;
+    case AsyncStreamsError::CompressionMemoryUnavailable: formatter.append("Compression memory is unavailable"); break;
+    case AsyncStreamsError::CompressionVersionMismatch:
+        formatter.append("Compression runtime version is incompatible");
+        break;
+    case AsyncStreamsError::CompressionFailed: formatter.append("Compression failed"); break;
+    case AsyncStreamsError::CompressionAlreadyInitialized:
+        formatter.append("Compression stream is already initialized");
+        break;
+    case AsyncStreamsError::CompressionOutputBufferEmpty: formatter.append("Compression output buffer is empty"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

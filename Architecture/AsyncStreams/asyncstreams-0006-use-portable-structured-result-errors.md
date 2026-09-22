@@ -40,6 +40,9 @@ Compression runtime discovery uses the same `CompressionRuntimeUnavailable` prim
 and the Windows registry fallback. A loaded runtime missing a required function uses `CompressionSymbolMissing`.
 Registry stage and native-loader details are intentionally not promoted into OS-specific primary codes; if callers
 need them, they require a separately designed bounded extension rather than borrowed text in plain `Result`.
+Native zlib statuses become portable operation outcomes such as invalid compressed data, missing dictionary, runtime
+version mismatch, or no progress. A normal `STREAM_END` from decompression or finalization remains success with the
+existing `streamEnded` output; only an unexpected end during compression processing is an error.
 
 ## Consequences
 

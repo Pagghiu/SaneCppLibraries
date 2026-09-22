@@ -48,6 +48,18 @@ enum class AsyncStreamsError : uint32_t
     TransformAlreadyFinalizing,
     CompressionRuntimeUnavailable,
     CompressionSymbolMissing,
+    CompressionSpanInvalid,
+    CompressionNoProgress,
+    CompressionUnexpectedEnd,
+    CompressionDictionaryRequired,
+    CompressionIOFailure,
+    CompressionStreamInvalid,
+    CompressionDataInvalid,
+    CompressionMemoryUnavailable,
+    CompressionVersionMismatch,
+    CompressionFailed,
+    CompressionAlreadyInitialized,
+    CompressionOutputBufferEmpty,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.
