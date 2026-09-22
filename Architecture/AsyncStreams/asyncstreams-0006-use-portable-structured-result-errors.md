@@ -36,6 +36,11 @@ may be carried later in a bounded library-specific enriched result, but must not
 code without an explicit ADR justification. The formatter remains optional so unused English messages can be removed
 by the linker.
 
+Compression runtime discovery uses the same `CompressionRuntimeUnavailable` primary code for `dlopen`, `LoadLibrary`,
+and the Windows registry fallback. A loaded runtime missing a required function uses `CompressionSymbolMissing`.
+Registry stage and native-loader details are intentionally not promoted into OS-specific primary codes; if callers
+need them, they require a separately designed bounded extension rather than borrowed text in plain `Result`.
+
 ## Consequences
 
 Callers of the existing `Result` APIs can continue using `SC_TRY` unchanged. Callers that need to distinguish

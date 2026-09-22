@@ -46,6 +46,8 @@ enum class AsyncStreamsError : uint32_t
     TransformAlreadyFinalized,
     TransformAlreadyProcessing,
     TransformAlreadyFinalizing,
+    CompressionRuntimeUnavailable,
+    CompressionSymbolMissing,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.

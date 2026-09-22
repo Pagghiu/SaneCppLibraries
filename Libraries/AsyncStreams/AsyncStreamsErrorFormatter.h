@@ -59,6 +59,12 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
         formatter.append("Transform is already processing input");
         break;
     case AsyncStreamsError::TransformAlreadyFinalizing: formatter.append("Transform is already finalizing"); break;
+    case AsyncStreamsError::CompressionRuntimeUnavailable:
+        formatter.append("Compression runtime is unavailable");
+        break;
+    case AsyncStreamsError::CompressionSymbolMissing:
+        formatter.append("Compression runtime is missing a required function");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

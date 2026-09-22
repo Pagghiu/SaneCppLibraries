@@ -27,7 +27,7 @@ struct SC::ZLibAPI::Internal
 #endif
         if (!sym)
         {
-            return Result::Error("Failed to load zlib symbol");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionSymbolMissing);
         }
         return Result(true);
     }
@@ -73,14 +73,14 @@ struct SC::ZLibAPI::Internal
         // Open the registry key
         if (::RegOpenKeyExA(HKEY_LOCAL_MACHINE, subKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
         {
-            return Result::Error("GetClrCompressionPath: Failed to open registry key.");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionRuntimeUnavailable);
         }
 
         // Query the InstallPath value
         if (::RegQueryValueExA(hKey, valueName, NULL, &valueType, (LPBYTE)pathBuffer, &valueSize) != ERROR_SUCCESS)
         {
             ::RegCloseKey(hKey);
-            return Result::Error("GetClrCompressionPath: Failed to read registry value");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionRuntimeUnavailable);
         }
 
         ::RegCloseKey(hKey);
@@ -88,13 +88,13 @@ struct SC::ZLibAPI::Internal
         // Check the type of the registry value
         if (valueType != REG_SZ)
         {
-            return Result::Error("GetClrCompressionPath: Unexpected registry value type.");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionRuntimeUnavailable);
         }
 
         // Construct the path to clrcompression.dll
         if (::strcat_s(pathBuffer, bufferSize, "clrcompression.dll") != 0)
         {
-            return Result::Error("GetClrCompressionPath: Not enough space");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionRuntimeUnavailable);
         }
         return Result(true);
     }
@@ -135,7 +135,7 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
 
     if (!library)
     {
-        return Result::Error("Failed to load zlib library");
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionRuntimeUnavailable);
     }
     // Load functions
     SC_TRY(Internal::requireSymbol(*this, pDeflate, "deflate"));

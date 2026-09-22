@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/AsyncStreams/Internal/ZLibStream.h"
+#include "Libraries/AsyncStreams/AsyncStreamsErrorFormatter.h"
 #include "Libraries/AsyncStreams/Internal/ZLibAPI.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
@@ -35,6 +36,10 @@ struct SC::ZLibStreamTest : public SC::TestCase
 {
     ZLibStreamTest(SC::TestReport& report) : TestCase(report, "ZLibStreamTest")
     {
+        if (test_section("runtime error"))
+        {
+            runtimeError();
+        }
         ZLibAPI zlib;
         if (not zlib.load())
         {
@@ -73,6 +78,7 @@ struct SC::ZLibStreamTest : public SC::TestCase
                          const Span<const uint8_t> compressedReference);
     void syncDecompression(ZLibStream::Algorithm compressionAlgorithm, const StringView referenceString,
                            const Span<const uint8_t> compressedReference);
+    void runtimeError();
 
     /// @brief Compares this span with another one byte by byte
     template <typename T, typename U>
@@ -85,6 +91,22 @@ struct SC::ZLibStreamTest : public SC::TestCase
         return ::memcmp(first.data(), other.data(), first.sizeInBytes()) == 0;
     }
 };
+
+void SC::ZLibStreamTest::runtimeError()
+{
+#if not SC_PLATFORM_WINDOWS
+    ZLibAPI missing;
+    Result  result = missing.load("SC-result-runtime-that-does-not-exist");
+    SC_TEST_EXPECT(not result);
+    SC_TEST_EXPECT(result.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(result.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionRuntimeUnavailable));
+#endif
+    char message[80];
+    SC_TEST_EXPECT(formatAsyncStreamsError(AsyncStreamsError::CompressionRuntimeUnavailable, message).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatAsyncStreamsError(AsyncStreamsError::CompressionSymbolMissing, message).status ==
+                   ResultErrorFormatStatus::Success);
+}
 
 void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgorithm, const StringView inputString,
                                          const Span<const uint8_t> compressedReference)
