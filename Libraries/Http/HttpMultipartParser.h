@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Result.h"
 #include "../Common/Span.h"
 #include "../Common/StringSpan.h"
+#include "HttpError.h"
 #include "HttpExport.h"
 
 namespace SC
@@ -85,7 +85,7 @@ struct SC_HTTP_EXPORT HttpMultipartParser
     /// @param data Incoming chunk of bytes to be parsed
     /// @param readBytes Number of bytes actually read
     /// @param parsedData A sub-span of `data` pointing at the actually parsed data
-    /// @return Valid result if parse didn't encounter any error
+    /// @return Success after completion too; inspect `state` or `token` for the Finished outcome.
     Result parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
 
   private:

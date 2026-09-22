@@ -119,7 +119,8 @@ Result HttpMultipartContentDispositionView::parse(StringSpan headerValue)
     StringSpan   header = HttpMultipartInternal::trim(headerValue);
     const char*  data   = header.bytesWithoutTerminator();
     const size_t length = header.sizeInBytes();
-    SC_TRY_MSG(not header.isEmpty(), "Multipart Content-Disposition is empty");
+    if (header.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartDispositionEmpty);
 
     size_t cursor = 0;
     while (cursor < length and data[cursor] != ';')
@@ -127,7 +128,8 @@ Result HttpMultipartContentDispositionView::parse(StringSpan headerValue)
         cursor++;
     }
     disposition = HttpMultipartInternal::trim({{data, cursor}, false, header.getEncoding()});
-    SC_TRY_MSG(not disposition.isEmpty(), "Multipart Content-Disposition disposition is empty");
+    if (disposition.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartDispositionTypeEmpty);
 
     while (cursor < length)
     {
@@ -215,6 +217,10 @@ bool HttpMultipartPartHeadersView::hasSafeFileName() const
 Result HttpMultipartParser::initWithBoundary(StringSpan boundaryValue)
 {
     reset();
+    if (boundaryValue.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartBoundaryInvalid);
+    if (boundaryValue.sizeInBytes() >= sizeof(boundaryStorage))
+        return Result::Error(HttpResultCategory, HttpError::MultipartBoundaryTooLong);
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     ::strncpy_s(boundaryStorage, sizeof(boundaryStorage), boundaryValue.bytesWithoutTerminator(),
                 min(sizeof(boundaryStorage) - 1, boundaryValue.sizeInBytes()));
@@ -223,7 +229,7 @@ Result HttpMultipartParser::initWithBoundary(StringSpan boundaryValue)
               min(sizeof(boundaryStorage) - 1, boundaryValue.sizeInBytes()));
 #endif
     boundary = StringSpan::fromNullTerminated(boundaryStorage, StringEncoding::Ascii);
-    return Result(boundary.StringSpan::sizeInBytes() == boundaryValue.sizeInBytes());
+    return Result(true);
 }
 
 void HttpMultipartParser::reset()
@@ -248,7 +254,9 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
     readBytes = 0;
     if (state == State::Finished)
     {
-        return Result(false);
+        token      = Token::Finished;
+        parsedData = {};
+        return Result(true);
     }
 
     if (emitBoundaryCandidate)
@@ -295,8 +303,8 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
 
         while (consumed < data.sizeInBytes())
         {
-            SC_TRY_MSG(boundaryCandidateLength < sizeof(boundaryBuffer),
-                       "HttpMultipartParser boundary candidate too large");
+            if (boundaryCandidateLength >= sizeof(boundaryBuffer))
+                return Result::Error(HttpResultCategory, HttpError::MultipartBoundaryCandidateTooLong);
             boundaryBuffer[boundaryCandidateLength++] = data[consumed++];
 
             const bool newPartPrefix = isPrefix("\r\n");
@@ -398,7 +406,8 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
         // Emit PartHeaderEnd
         token = Token::PartHeaderEnd;
         state = State::Result;
-        SC_TRY(data.sliceStartLength(0, 0, parsedData));
+        if (not data.sliceStartLength(0, 0, parsedData))
+            return Result::Error(HttpResultCategory, HttpError::MultipartSpanInvalid);
         SC_CO_RETURN(topLevelCoroutine, Result(true));
 
         //------------------------
@@ -444,7 +453,9 @@ Result HttpMultipartParser::process(Span<const char>& data, size_t& readBytes, S
     for (auto c : data)
     {
         tokenLength++;
-        SC_TRY((this->*Func)(c));
+        const bool parsed = (this->*Func)(c);
+        if (not parsed)
+            return Result::Error(HttpResultCategory, HttpError::MultipartMalformedSyntax);
 
         if (boundaryMatchIndex == 1)
         {
@@ -468,13 +479,14 @@ Result HttpMultipartParser::process(Span<const char>& data, size_t& readBytes, S
     const auto lengthDelta = (tokenLength >= initialLength) ? (tokenLength - initialLength) : 0;
     if (state == State::Result)
     {
-        SC_TRY(data.sliceStartLength(startDelta, lengthDelta, parsedData));
-        SC_TRY(data.sliceStart(readBytes, data));
+        if (not data.sliceStartLength(startDelta, lengthDelta, parsedData) or not data.sliceStart(readBytes, data))
+            return Result::Error(HttpResultCategory, HttpError::MultipartSpanInvalid);
         nestedParserCoroutine = 0;
     }
     else
     {
-        SC_TRY(data.sliceStartLength(startDelta, lengthDelta, parsedData));
+        if (not data.sliceStartLength(startDelta, lengthDelta, parsedData))
+            return Result::Error(HttpResultCategory, HttpError::MultipartSpanInvalid);
     }
     return Result(true);
 }

@@ -24,6 +24,10 @@ value remains a non-error `bool` outcome.
 The route matcher retains its non-error `Matched`, `MethodNotAllowed`, `NotFound`, and `TooManyParams` statuses;
 `formatAllowHeader` reports only insufficient caller storage as an Http error and forwards request-target parse failures
 without replacing their identity.
+Multipart parsing now reports invalid/oversized boundaries, empty disposition fields, malformed syntax, and internal
+span/candidate-bound violations with Http codes. Once its final boundary has been consumed, repeated `parse` calls
+return success with `state` and `token` equal to `Finished`, zero bytes consumed, and empty parsed data. Completion is
+not a failure; callers can continue to use the existing state/token outputs without a new allocation or result type.
 
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.

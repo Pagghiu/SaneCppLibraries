@@ -26,6 +26,13 @@ enum class HttpError : uint32_t
     InvalidIPv6Host,
     InvalidURLPort,
     AllowHeaderOutputTooSmall,
+    MultipartDispositionEmpty,
+    MultipartDispositionTypeEmpty,
+    MultipartBoundaryInvalid,
+    MultipartBoundaryTooLong,
+    MultipartBoundaryCandidateTooLong,
+    MultipartMalformedSyntax,
+    MultipartSpanInvalid,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

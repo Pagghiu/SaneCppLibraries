@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpMultipartParser.h"
+#include "Libraries/Http/HttpErrorFormatter.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
@@ -12,13 +13,10 @@ struct HttpMultipartParserTest;
 
 namespace
 {
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
-    if (result or result.message == nullptr)
-    {
-        return false;
-    }
-    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
 }
 } // namespace
 
@@ -130,6 +128,13 @@ struct SC::HttpMultipartParserTest : public SC::TestCase
         }
 
         SC_TEST_EXPECT(parser.state == HttpMultipartParser::State::Finished);
+        Span<const char> afterFinish;
+        size_t           afterFinishRead = static_cast<size_t>(-1);
+        SC_TEST_EXPECT(parser.parse("ignored", afterFinishRead, afterFinish));
+        SC_TEST_EXPECT(parser.state == HttpMultipartParser::State::Finished);
+        SC_TEST_EXPECT(parser.token == HttpMultipartParser::Token::Finished);
+        SC_TEST_EXPECT(afterFinishRead == 0);
+        SC_TEST_EXPECT(afterFinish.empty());
     }
 
     HttpMultipartParserTest(SC::TestReport& report) : TestCase(report, "HttpMultipartParserTest")
@@ -261,9 +266,23 @@ struct SC::HttpMultipartParserTest : public SC::TestCase
             SC_TEST_EXPECT(not HttpMultipartIsSafeFileName(StringSpan({"\x01.txt", 5}, false, StringEncoding::Ascii)));
             SC_TEST_EXPECT(HttpMultipartIsSafeFileName("raw-utf8-\xC3\xA8.txt"));
 
-            SC_TEST_EXPECT(resultMessageEquals(disposition.parse(""), "Multipart Content-Disposition is empty"));
-            SC_TEST_EXPECT(resultMessageEquals(disposition.parse(" ; name=\"field\""),
-                                               "Multipart Content-Disposition disposition is empty"));
+            SC_TEST_EXPECT(resultHasHttpError(disposition.parse(""), HttpError::MultipartDispositionEmpty));
+            SC_TEST_EXPECT(
+                resultHasHttpError(disposition.parse(" ; name=\"field\""), HttpError::MultipartDispositionTypeEmpty));
+
+            HttpMultipartParser invalidBoundary;
+            SC_TEST_EXPECT(
+                resultHasHttpError(invalidBoundary.initWithBoundary(""), HttpError::MultipartBoundaryInvalid));
+            char oversizedBoundary[71];
+            for (char& value : oversizedBoundary)
+                value = 'x';
+            SC_TEST_EXPECT(resultHasHttpError(
+                invalidBoundary.initWithBoundary(StringSpan({oversizedBoundary, 71}, false, StringEncoding::Ascii)),
+                HttpError::MultipartBoundaryTooLong));
+
+            char formatted[96];
+            SC_TEST_EXPECT(formatHttpError(HttpError::MultipartDispositionEmpty, formatted).status ==
+                           ResultErrorFormatStatus::Success);
         }
 
         if (test_section("large data streaming"))

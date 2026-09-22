@@ -27,6 +27,15 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::InvalidIPv6Host: formatter.append("URL IPv6 host is invalid"); break;
     case HttpError::InvalidURLPort: formatter.append("URL port is invalid"); break;
     case HttpError::AllowHeaderOutputTooSmall: formatter.append("Allow header output buffer is too small"); break;
+    case HttpError::MultipartDispositionEmpty: formatter.append("Multipart Content-Disposition is empty"); break;
+    case HttpError::MultipartDispositionTypeEmpty: formatter.append("Multipart disposition type is empty"); break;
+    case HttpError::MultipartBoundaryInvalid: formatter.append("Multipart boundary is empty"); break;
+    case HttpError::MultipartBoundaryTooLong: formatter.append("Multipart boundary is too long"); break;
+    case HttpError::MultipartBoundaryCandidateTooLong:
+        formatter.append("Multipart boundary candidate is too long");
+        break;
+    case HttpError::MultipartMalformedSyntax: formatter.append("Multipart syntax is malformed"); break;
+    case HttpError::MultipartSpanInvalid: formatter.append("Multipart parser span is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
