@@ -40,6 +40,10 @@ struct SC::ZLibStreamTest : public SC::TestCase
         {
             runtimeError();
         }
+        if (test_section("uninitialized stream"))
+        {
+            uninitializedStream();
+        }
         ZLibAPI zlib;
         if (not zlib.load())
         {
@@ -85,6 +89,7 @@ struct SC::ZLibStreamTest : public SC::TestCase
                            const Span<const uint8_t> compressedReference);
     void runtimeError();
     void statusErrors();
+    void uninitializedStream();
 
     /// @brief Compares this span with another one byte by byte
     template <typename T, typename U>
@@ -145,6 +150,30 @@ void SC::ZLibStreamTest::statusErrors()
 
     char message[80];
     SC_TEST_EXPECT(formatAsyncStreamsError(invalid, message).status == ResultErrorFormatStatus::Success);
+
+    ZLibStream invalidAlgorithm;
+    Result     unsupported = invalidAlgorithm.init(static_cast<ZLibStream::Algorithm>(-1));
+    SC_TEST_EXPECT(not unsupported);
+    SC_TEST_EXPECT(unsupported.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionStreamInvalid));
+}
+
+void SC::ZLibStreamTest::uninitializedStream()
+{
+    ZLibStream       stream;
+    char             inputByte[1] = {'x'};
+    char             outputBytes[16];
+    Span<const char> input(inputByte);
+    Span<char>       output(outputBytes);
+    Result           process = stream.process(input, output);
+    SC_TEST_EXPECT(not process);
+    SC_TEST_EXPECT(process.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(process.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionNotInitialized));
+
+    bool   ended    = false;
+    Result finalize = stream.finalize(output, ended);
+    SC_TEST_EXPECT(not finalize);
+    SC_TEST_EXPECT(finalize.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(finalize.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionNotInitialized));
 }
 
 void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgorithm, const StringView inputString,

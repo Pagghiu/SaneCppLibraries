@@ -42,6 +42,10 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
         {
             adapterPreconditions();
         }
+        if (test_section("zlib adapter preconditions"))
+        {
+            zlibAdapterPreconditions();
+        }
 
         int numTestsToRun = 1;
         if (AsyncEventLoop::tryProbingIOUring())
@@ -159,6 +163,7 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
     void fileToFile();
     void failedReadWithoutAssignedBuffer();
     void adapterPreconditions();
+    void zlibAdapterPreconditions();
 
     template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename ZLIB_STREAM_TYPE, typename DESCRIPTOR_TYPE>
     void fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide, DESCRIPTOR_TYPE& readSide,
@@ -278,6 +283,44 @@ void SC::AsyncRequestStreamsTest::adapterPreconditions()
     SC_TEST_EXPECT(writeError.category() == AsyncStreamsResultCategory);
     SC_TEST_EXPECT(writeError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::AsyncEventLoopMissing));
     pool.unrefBuffer(recoveredID);
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, recoveredID, recoveredData));
+    pool.unrefBuffer(recoveredID);
+}
+
+void SC::AsyncRequestStreamsTest::zlibAdapterPreconditions()
+{
+    char            bytes[16] = {};
+    AsyncBufferView storage[1];
+    storage[0] = Span<char>(bytes);
+    storage[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(storage);
+
+    SyncZLibTransformStream      sync;
+    AsyncReadableStream::Request syncReadRequests[2];
+    AsyncWritableStream::Request syncWriteRequests[2];
+    SC_TEST_EXPECT(sync.init(pool, syncReadRequests, syncWriteRequests));
+    sync.AsyncWritableStream::setAutoDestroy(false);
+    Result syncError(true);
+    SC_TEST_EXPECT(sync.AsyncWritableStream::eventError.addListener([&syncError](Result error) { syncError = error; }));
+    sync.AsyncWritableStream::end();
+    SC_TEST_EXPECT(syncError.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(syncError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CompressionNotInitialized));
+
+    AsyncZLibTransformStream     async;
+    AsyncReadableStream::Request asyncReadRequests[2];
+    AsyncWritableStream::Request asyncWriteRequests[2];
+    SC_TEST_EXPECT(async.init(pool, asyncReadRequests, asyncWriteRequests));
+    async.AsyncWritableStream::setAutoDestroy(false);
+    Result asyncError(true);
+    SC_TEST_EXPECT(
+        async.AsyncWritableStream::eventError.addListener([&asyncError](Result error) { asyncError = error; }));
+    async.AsyncWritableStream::end();
+    SC_TEST_EXPECT(asyncError.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(asyncError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::AsyncEventLoopMissing));
+
+    AsyncBufferView::ID recoveredID;
+    Span<char>          recoveredData;
     SC_TEST_EXPECT(pool.requestNewBuffer(1, recoveredID, recoveredData));
     pool.unrefBuffer(recoveredID);
 }

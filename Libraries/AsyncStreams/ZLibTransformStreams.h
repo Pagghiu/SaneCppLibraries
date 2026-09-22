@@ -42,7 +42,8 @@ struct AsyncZLibTransformStreamT : public AsyncTransformStream
         savedInput  = input;
         savedOutput = output;
         finalizing  = false;
-        SC_TRY_MSG(eventLoop != nullptr, "AsyncZLibTransformStreamT::setEventLoop not called");
+        if (eventLoop == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncEventLoopMissing);
         return asyncWork.start(*eventLoop);
     }
 
@@ -51,7 +52,8 @@ struct AsyncZLibTransformStreamT : public AsyncTransformStream
         // Intentionally not resetting savedInput, that can contain leftover data to process
         savedOutput = output;
         finalizing  = true;
-        SC_TRY_MSG(eventLoop != nullptr, "AsyncZLibTransformStreamT::setEventLoop not called");
+        if (eventLoop == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncEventLoopMissing);
         return asyncWork.start(*eventLoop);
     }
 

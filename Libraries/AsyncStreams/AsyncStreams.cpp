@@ -1654,11 +1654,12 @@ bool SyncZLibTransformStream::canEndWritable()
     {
         Span<char> outputData = outputBefore;
 
-        bool streamEnded = false;
-        if (not stream.finalize(outputData, streamEnded))
+        bool         streamEnded = false;
+        const Result result      = stream.finalize(outputData, streamEnded);
+        if (not result)
         {
             AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
-            AsyncWritableStream::emitError(Result::Error("SyncZLibTransformStream::canEndTransform error"));
+            AsyncWritableStream::emitError(result);
             return true; // --> Transition to ENDED (unrecoverable error)
         }
         const size_t outputBytes = outputBefore.sizeInBytes() - outputData.sizeInBytes();

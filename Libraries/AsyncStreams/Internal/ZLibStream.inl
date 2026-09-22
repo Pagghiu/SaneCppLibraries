@@ -130,6 +130,8 @@ SC::ZLibStream::ZLibStream() {}
 
 SC::ZLibStream::~ZLibStream()
 {
+    if (state != State::Inited)
+        return;
     ZLibAPI::Stream& stream = buffer.reinterpret_as<ZLibAPI::Stream>();
     switch (algorithm)
     {
@@ -200,11 +202,14 @@ SC::Result SC::ZLibStream::init(Algorithm wantedAlgorithm)
         state = State::Inited;
         return Result(true);
     }
+    zlib.unload();
     return Internal::error(ret);
 }
 
 SC::Result SC::ZLibStream::process(Span<const char>& input, Span<char>& output)
 {
+    if (state != State::Inited)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionNotInitialized);
     if (output.empty())
         return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionOutputBufferEmpty);
     ZLibAPI::Stream& stream = buffer.reinterpret_as<ZLibAPI::Stream>();
@@ -226,6 +231,8 @@ SC::Result SC::ZLibStream::process(Span<const char>& input, Span<char>& output)
 
 SC::Result SC::ZLibStream::finalize(Span<char>& output, bool& streamEnded)
 {
+    if (state != State::Inited)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CompressionNotInitialized);
     ZLibAPI::Stream& stream = buffer.reinterpret_as<ZLibAPI::Stream>();
     switch (algorithm)
     {

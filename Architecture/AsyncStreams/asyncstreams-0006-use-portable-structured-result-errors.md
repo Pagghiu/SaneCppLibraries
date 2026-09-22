@@ -43,6 +43,10 @@ need them, they require a separately designed bounded extension rather than borr
 Native zlib statuses become portable operation outcomes such as invalid compressed data, missing dictionary, runtime
 version mismatch, or no progress. A normal `STREAM_END` from decompression or finalization remains success with the
 existing `streamEnded` output; only an unexpected end during compression processing is an error.
+Uninitialized zlib stream operations report `CompressionNotInitialized` before using runtime function pointers.
+Failed initialization releases its runtime reference immediately, and destruction calls native cleanup only for a
+successfully initialized stream. Both synchronous and asynchronous zlib adapters forward these structured failures
+without replacing them with generic text.
 
 The header-only Async request adapters classify their own missing event-loop and descriptor preconditions, while
 forwarding errors from Async requests unchanged. Event-loop absence is checked before acquiring a pool buffer or

@@ -83,6 +83,7 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
         formatter.append("Compression stream is already initialized");
         break;
     case AsyncStreamsError::CompressionOutputBufferEmpty: formatter.append("Compression output buffer is empty"); break;
+    case AsyncStreamsError::CompressionNotInitialized: formatter.append("Compression stream is not initialized"); break;
     case AsyncStreamsError::AsyncEventLoopMissing: formatter.append("Async stream has no event loop"); break;
     case AsyncStreamsError::AsyncRequestDestroying: formatter.append("Async request is being destroyed"); break;
     case AsyncStreamsError::AsyncDescriptorMissing: formatter.append("Async stream descriptor is missing"); break;
