@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpRouter.h"
+#include "Libraries/Http/HttpError.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -99,9 +100,10 @@ void HttpRouterTest::diagnosticMessages()
 
     HttpRouteParam params[1];
     HttpRouteMatch match;
-    SC_TEST_EXPECT(
-        resultMessageEquals(router.match(HttpParser::Method::HttpGET, "http://example.com/users/42", params, match),
-                            "HttpRequestTargetView only supports origin-form request targets"));
+    const Result unsupported = router.match(HttpParser::Method::HttpGET, "http://example.com/users/42", params, match);
+    SC_TEST_EXPECT(not unsupported);
+    SC_TEST_EXPECT(unsupported.category() == HttpResultCategory);
+    SC_TEST_EXPECT(unsupported.errorValue() == static_cast<uint32_t>(HttpError::UnsupportedRequestTargetForm));
 }
 
 void runHttpRouterTest(SC::TestReport& report) { HttpRouterTest test(report); }

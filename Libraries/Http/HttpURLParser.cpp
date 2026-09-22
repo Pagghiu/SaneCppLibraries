@@ -144,10 +144,12 @@ static SC::Result scHttpDecodeComponent(SC::StringSpan input, SC::Span<char> sto
         char decoded = data[read];
         if (decoded == '%')
         {
-            SC_TRY_MSG(read + 2 < size, "Malformed percent escape");
+            if (size - read < 3)
+                return SC::Result::Error(SC::HttpResultCategory, SC::HttpError::MalformedPercentEscape);
             const int high = scHttpHexValue(data[read + 1]);
             const int low  = scHttpHexValue(data[read + 2]);
-            SC_TRY_MSG(high >= 0 and low >= 0, "Malformed percent escape");
+            if (high < 0 or low < 0)
+                return SC::Result::Error(SC::HttpResultCategory, SC::HttpError::MalformedPercentEscape);
             decoded = static_cast<char>((high << 4) | low);
             read += 2;
         }
@@ -155,7 +157,8 @@ static SC::Result scHttpDecodeComponent(SC::StringSpan input, SC::Span<char> sto
         {
             decoded = ' ';
         }
-        SC_TRY_MSG(write < storage.sizeInBytes(), "Decoded output buffer is too small");
+        if (write >= storage.sizeInBytes())
+            return SC::Result::Error(SC::HttpResultCategory, SC::HttpError::DecodedOutputTooSmall);
         storage.data()[write++] = decoded;
     }
     output = {{storage.data(), write}, false, input.getEncoding()};
@@ -188,9 +191,10 @@ SC::Result SC::HttpFormUrlDecode(StringSpan input, Span<char> storage, StringSpa
 SC::Result SC::HttpRequestTargetView::parse(StringSpan requestTarget)
 {
     *this = {};
-    SC_TRY_MSG(not requestTarget.isEmpty(), "HttpRequestTargetView empty request target");
-    SC_TRY_MSG(not scHttpUrlContainsInvalidWhitespace(requestTarget),
-               "HttpRequestTargetView request target contains invalid whitespace");
+    if (requestTarget.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::RequestTargetEmpty);
+    if (scHttpUrlContainsInvalidWhitespace(requestTarget))
+        return Result::Error(HttpResultCategory, HttpError::RequestTargetWhitespace);
 
     raw = requestTarget;
 
@@ -202,7 +206,8 @@ SC::Result SC::HttpRequestTargetView::parse(StringSpan requestTarget)
         return Result(true);
     }
 
-    SC_TRY_MSG(data[0] == '/', "HttpRequestTargetView only supports origin-form request targets");
+    if (data[0] != '/')
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedRequestTargetForm);
 
     size_t queryStart = length;
     size_t hashStart  = length;
@@ -255,12 +260,12 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
     HttpStringIterator start = it;
 
     // Protocol
-    SC_TRY(it.advanceUntilMatches(':'));
+    if (not it.advanceUntilMatches(':'))
+        return Result::Error(HttpResultCategory, HttpError::MalformedURL);
     protocol = HttpStringIterator::fromIterators(start, it, encoding);
     SC_TRY(validateProtocol());
-    SC_TRY(it.advanceIfMatches(':'));
-    SC_TRY(it.advanceIfMatches('/'));
-    SC_TRY(it.advanceIfMatches('/'));
+    if (not it.advanceIfMatches(':') or not it.advanceIfMatches('/') or not it.advanceIfMatches('/'))
+        return Result::Error(HttpResultCategory, HttpError::MalformedURL);
     // hostname
     start = it;
 
@@ -399,7 +404,7 @@ SC::Result SC::HttpURLParser::parseHost()
     {
         // IPv6
         if (not it2.advanceUntilMatches(']'))
-            return Result(false);
+            return Result::Error(HttpResultCategory, HttpError::InvalidIPv6Host);
         (void)it2.stepForward(); // include ]
         hostname = HttpStringIterator::fromIterators(start2, it2, encoding);
         // check if next char is ':' (port separator) without consuming it twice
@@ -408,18 +413,19 @@ SC::Result SC::HttpURLParser::parseHost()
             (void)it2.stepForward();
             StringSpan portString = HttpStringIterator::fromIteratorUntilEnd(it2, encoding);
             if (portString.isEmpty())
-                return Result(false);
+                return Result::Error(HttpResultCategory, HttpError::InvalidURLPort);
             int32_t value;
-            SC_TRY(HttpStringIterator::parseInt32(portString, value));
+            if (not HttpStringIterator::parseInt32(portString, value))
+                return Result::Error(HttpResultCategory, HttpError::InvalidURLPort);
             if (value < 0 || value > 65535)
-                return Result(false);
+                return Result::Error(HttpResultCategory, HttpError::InvalidURLPort);
             port = static_cast<uint16_t>(value);
             // Update host to include hostname and port
             host = HttpStringIterator::fromIterators(start, it2, encoding);
         }
         else if (not it2.isAtEnd())
         {
-            return Result(false);
+            return Result::Error(HttpResultCategory, HttpError::InvalidIPv6Host);
         }
         else
         {
@@ -438,11 +444,12 @@ SC::Result SC::HttpURLParser::parseHost()
             (void)it2.stepForward();
             StringSpan portString = HttpStringIterator::fromIteratorUntilEnd(it2, encoding);
             if (portString.isEmpty())
-                return Result(false);
+                return Result::Error(HttpResultCategory, HttpError::InvalidURLPort);
             int32_t value;
-            SC_TRY(HttpStringIterator::parseInt32(portString, value));
+            if (not HttpStringIterator::parseInt32(portString, value))
+                return Result::Error(HttpResultCategory, HttpError::InvalidURLPort);
             if (value < 0 || value > 65535)
-                return Result(false);
+                return Result::Error(HttpResultCategory, HttpError::InvalidURLPort);
             port = static_cast<uint16_t>(value);
             // Advance it2 to end of port string for host calculation
             while (not it2.isAtEnd())
@@ -475,27 +482,32 @@ SC::Result SC::HttpURLParser::validateProtocol()
         return Result(true);
     }
 
-    return Result(false);
+    return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
 }
 
 SC::Result SC::HttpURLParser::validatePath()
 {
     // TODO: Improve validatePath
-    return Result(not scHttpUrlContainsInvalidWhitespace(pathname) and
-                  not scHttpUrlContainsInvalidWhitespace(search) and not scHttpUrlContainsInvalidWhitespace(hash));
+    if (scHttpUrlContainsInvalidWhitespace(pathname) or scHttpUrlContainsInvalidWhitespace(search) or
+        scHttpUrlContainsInvalidWhitespace(hash))
+        return Result::Error(HttpResultCategory, HttpError::InvalidURLPath);
+    return Result(true);
 }
 
 SC::Result SC::HttpURLParser::validateHost()
 {
     // TODO: Improve validateHost
-    return Result(not host.isEmpty() and not scHttpUrlContainsInvalidWhitespace(host) and
-                  ((HttpStringIterator::startsWith(hostname, "[") and HttpStringIterator::endsWith(hostname, "]")) or
-                   HttpStringIterator::containsCodePoint(host, '.') or hostname == "localhost"));
+    if (host.isEmpty() or scHttpUrlContainsInvalidWhitespace(host) or
+        not((HttpStringIterator::startsWith(hostname, "[") and HttpStringIterator::endsWith(hostname, "]")) or
+            HttpStringIterator::containsCodePoint(host, '.') or hostname == "localhost"))
+        return Result::Error(HttpResultCategory, HttpError::InvalidURLHost);
+    return Result(true);
 }
 
 SC::Result SC::HttpURLParser::parseUserPassword(StringSpan userPassword)
 {
-    SC_TRY_MSG(not scHttpUrlContainsInvalidWhitespace(userPassword), "HttpURLParser invalid userinfo");
+    if (scHttpUrlContainsInvalidWhitespace(userPassword))
+        return Result::Error(HttpResultCategory, HttpError::InvalidURLUserInfo);
 
     HttpStringIterator it    = userPassword;
     auto               start = it;

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpURLParser.h"
+#include "Libraries/Http/HttpErrorFormatter.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC
@@ -10,13 +11,10 @@ struct HttpURLParserTest;
 
 namespace
 {
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
-    if (result or result.message == nullptr)
-    {
-        return false;
-    }
-    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
 }
 } // namespace
 
@@ -392,10 +390,11 @@ void SC::HttpURLParserTest::testFormUrlEncoded()
 
     SC_TEST_EXPECT(iterator.next(item));
     SC_TEST_EXPECT(item.name == "bad");
-    SC_TEST_EXPECT(resultMessageEquals(HttpPercentDecode(item.value, storage, decoded), "Malformed percent escape"));
-    SC_TEST_EXPECT(resultMessageEquals(HttpFormUrlDecode("%2", storage, decoded), "Malformed percent escape"));
     SC_TEST_EXPECT(
-        resultMessageEquals(HttpFormUrlDecode("abc", {storage, 2}, decoded), "Decoded output buffer is too small"));
+        resultHasHttpError(HttpPercentDecode(item.value, storage, decoded), HttpError::MalformedPercentEscape));
+    SC_TEST_EXPECT(resultHasHttpError(HttpFormUrlDecode("%2", storage, decoded), HttpError::MalformedPercentEscape));
+    SC_TEST_EXPECT(
+        resultHasHttpError(HttpFormUrlDecode("abc", {storage, 2}, decoded), HttpError::DecodedOutputTooSmall));
 
     SC_TEST_EXPECT(not iterator.next(item));
 
@@ -461,17 +460,30 @@ void SC::HttpURLParserTest::testDiagnosticMessages()
 {
     HttpRequestTargetView target;
 
-    SC_TEST_EXPECT(resultMessageEquals(target.parse(""), "HttpRequestTargetView empty request target"));
-    SC_TEST_EXPECT(resultMessageEquals(target.parse("/bad path"),
-                                       "HttpRequestTargetView request target contains invalid whitespace"));
-    SC_TEST_EXPECT(resultMessageEquals(target.parse("relative/path"),
-                                       "HttpRequestTargetView only supports origin-form request targets"));
+    SC_TEST_EXPECT(resultHasHttpError(target.parse(""), HttpError::RequestTargetEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(target.parse("/bad path"), HttpError::RequestTargetWhitespace));
+    SC_TEST_EXPECT(resultHasHttpError(target.parse("relative/path"), HttpError::UnsupportedRequestTargetForm));
 
     char       storage[4];
     StringSpan decoded;
-    SC_TEST_EXPECT(resultMessageEquals(HttpPercentDecode("%2", storage, decoded), "Malformed percent escape"));
+    SC_TEST_EXPECT(resultHasHttpError(HttpPercentDecode("%2", storage, decoded), HttpError::MalformedPercentEscape));
     SC_TEST_EXPECT(
-        resultMessageEquals(HttpPercentDecode("abcdef", {storage, 2}, decoded), "Decoded output buffer is too small"));
+        resultHasHttpError(HttpPercentDecode("abcdef", {storage, 2}, decoded), HttpError::DecodedOutputTooSmall));
+
+    HttpURLParser url;
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("http:/site.com"), HttpError::MalformedURL));
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("ftp://site.com"), HttpError::UnsupportedProtocol));
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("http://site.com:99999"), HttpError::InvalidURLPort));
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("http://[::1"), HttpError::InvalidIPv6Host));
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("http://a"), HttpError::InvalidURLHost));
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("http://site.com/bad path"), HttpError::InvalidURLPath));
+    SC_TEST_EXPECT(resultHasHttpError(url.parse("http://bad user@site.com"), HttpError::InvalidURLUserInfo));
+
+    char formatted[96];
+    SC_TEST_EXPECT(formatHttpError(HttpError::MalformedPercentEscape, formatted).status ==
+                   ResultErrorFormatStatus::Success);
+    SC_TEST_EXPECT(formatHttpError(Result::Error(ResultCategory(0x7ffffffdu), 7), formatted).status ==
+                   ResultErrorFormatStatus::ForeignCategory);
 }
 
 void SC::HttpURLParserTest::testSpecialChars()

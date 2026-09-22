@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Result.h"
 #include "../Common/StringSpan.h"
+#include "HttpError.h"
 #include "HttpExport.h"
 
 namespace SC

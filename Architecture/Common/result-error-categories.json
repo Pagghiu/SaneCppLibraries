@@ -106,6 +106,12 @@
       "owner": "AsyncStreams",
       "declaration": "Libraries/AsyncStreams/AsyncStreamsError.h",
       "constant": "AsyncStreamsResultCategory"
+    },
+    {
+      "value": 17,
+      "owner": "Http",
+      "declaration": "Libraries/Http/HttpError.h",
+      "constant": "HttpResultCategory"
     }
   ]
 }
