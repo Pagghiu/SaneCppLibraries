@@ -26,6 +26,7 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::InvalidURLUserInfo: formatter.append("URL user information is invalid"); break;
     case HttpError::InvalidIPv6Host: formatter.append("URL IPv6 host is invalid"); break;
     case HttpError::InvalidURLPort: formatter.append("URL port is invalid"); break;
+    case HttpError::AllowHeaderOutputTooSmall: formatter.append("Allow header output buffer is too small"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

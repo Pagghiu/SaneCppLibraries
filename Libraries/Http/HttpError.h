@@ -25,6 +25,7 @@ enum class HttpError : uint32_t
     InvalidURLUserInfo,
     InvalidIPv6Host,
     InvalidURLPort,
+    AllowHeaderOutputTooSmall,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

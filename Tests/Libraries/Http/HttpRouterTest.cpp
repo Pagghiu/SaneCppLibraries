@@ -6,14 +6,6 @@
 
 namespace SC
 {
-namespace
-{
-static bool resultMessageEquals(Result result, StringSpan expected)
-{
-    return not result and StringSpan::fromNullTerminated(result.message, StringEncoding::Ascii) == expected;
-}
-} // namespace
-
 struct HttpRouterTest : public TestCase
 {
     HttpRouterTest(SC::TestReport& report) : TestCase(report, "HttpRouterTest")
@@ -93,10 +85,12 @@ void HttpRouterTest::diagnosticMessages()
     HttpRouter router;
     SC_TEST_EXPECT(router.init(routes));
 
-    char       allowStorage[3];
-    StringSpan allow;
-    SC_TEST_EXPECT(resultMessageEquals(router.formatAllowHeader("/users/42", allowStorage, allow),
-                                       "HttpRouter Allow output buffer is too small"));
+    char         allowStorage[3];
+    StringSpan   allow;
+    const Result tooSmall = router.formatAllowHeader("/users/42", allowStorage, allow);
+    SC_TEST_EXPECT(not tooSmall);
+    SC_TEST_EXPECT(tooSmall.category() == HttpResultCategory);
+    SC_TEST_EXPECT(tooSmall.errorValue() == static_cast<uint32_t>(HttpError::AllowHeaderOutputTooSmall));
 
     HttpRouteParam params[1];
     HttpRouteMatch match;

@@ -21,6 +21,9 @@ The first migration slice distinguishes malformed percent escapes, insufficient 
 validation, URL syntax/protocol, path, host, IPv6 host, user information, and port errors. Boolean preflight failures
 that previously became uncategorized `Result(false)` receive an Http code. A normal iterator exhaustion or absent query
 value remains a non-error `bool` outcome.
+The route matcher retains its non-error `Matched`, `MethodNotAllowed`, `NotFound`, and `TooManyParams` statuses;
+`formatAllowHeader` reports only insufficient caller storage as an Http error and forwards request-target parse failures
+without replacing their identity.
 
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
