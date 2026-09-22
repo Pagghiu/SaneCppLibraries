@@ -51,6 +51,14 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
         formatter.append("Pipeline streams must share the same buffer pool");
         break;
     case AsyncStreamsError::PipelineListenerStorageFull: formatter.append("Pipeline listener storage is full"); break;
+    case AsyncStreamsError::TransformInputChanged:
+        formatter.append("Paused transform received a different input buffer");
+        break;
+    case AsyncStreamsError::TransformAlreadyFinalized: formatter.append("Transform has already finalized"); break;
+    case AsyncStreamsError::TransformAlreadyProcessing:
+        formatter.append("Transform is already processing input");
+        break;
+    case AsyncStreamsError::TransformAlreadyFinalizing: formatter.append("Transform is already finalizing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

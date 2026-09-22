@@ -42,6 +42,10 @@ enum class AsyncStreamsError : uint32_t
     PipelineSinkMissing,
     PipelineBufferPoolMismatch,
     PipelineListenerStorageFull,
+    TransformInputChanged,
+    TransformAlreadyFinalized,
+    TransformAlreadyProcessing,
+    TransformAlreadyFinalizing,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.

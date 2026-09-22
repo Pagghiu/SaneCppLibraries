@@ -944,17 +944,18 @@ Result AsyncTransformStream::asyncWrite(AsyncBufferView::ID bufferID, Function<v
         return prepare(bufferID, cb);
     }
     case State::Paused: {
-        SC_TRY_MSG(bufferID == inputBufferID, "Logical Error")
+        if (not(bufferID == inputBufferID))
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::TransformInputChanged);
         return prepare(bufferID, cb);
     }
     case State::Finalized: {
-        return Result::Error("Transform cannot be called during Finalized State");
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::TransformAlreadyFinalized);
     }
     case State::Processing: {
-        return Result::Error("Transform cannot be called during Processing State");
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::TransformAlreadyProcessing);
     }
     case State::Finalizing: {
-        return Result::Error("Transform cannot be called during Finalizing State");
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::TransformAlreadyFinalizing);
     }
     }
     return Result(true);
@@ -1037,7 +1038,10 @@ void AsyncTransformStream::tryFinalize()
         Result res = onFinalize(outputData);
         if (not res)
         {
-            AsyncWritableStream::emitError(Result::Error("AsyncTransformStream::onFinalize error"));
+            AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
+            outputBufferID = {};
+            outputData     = {};
+            AsyncWritableStream::emitError(res);
             state = State::None; // --> Transition to ENDED (unrecoverable error)
         }
     }

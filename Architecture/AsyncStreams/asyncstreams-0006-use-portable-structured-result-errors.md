@@ -27,6 +27,10 @@ listener capacity, and a buffer-pool mismatch. Both sides of a duplex transform 
 previous check accepted a transform when only one side matched. Subsequent ports add compression,
 and adapter codes to this single library-owned category.
 
+Transform state errors are local AsyncStreams identities. A failure returned by a transform's `onFinalize` callback
+remains the original `Result`, even if owned by another category, rather than being replaced with generic text. The
+failed finalize path releases its acquired output buffer so the caller-owned pool remains reusable.
+
 Primary codes describe portable operations and failure conditions. A zlib status or operating-system-specific detail
 may be carried later in a bounded library-specific enriched result, but must not become a platform-specific primary
 code without an explicit ADR justification. The formatter remains optional so unused English messages can be removed

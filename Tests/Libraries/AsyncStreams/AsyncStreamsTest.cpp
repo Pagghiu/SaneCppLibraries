@@ -71,6 +71,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             pipelineErrors();
         }
+        if (test_section("transform finalize error"))
+        {
+            transformFinalizeError();
+        }
         if (test_section("unshift"))
         {
             unshift();
@@ -95,6 +99,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void readableErrors();
     void writableErrors();
     void pipelineErrors();
+    void transformFinalizeError();
     void unshift();
     void pipelineBackpressureSyncSource();
     void pipelineBackpressureAsyncSource();
@@ -808,6 +813,40 @@ void SC::AsyncStreamsTest::pipelineErrors()
     mismatchedTransform.source        = nullptr;
     mismatchedTransform.transforms[0] = nullptr;
     mismatchedTransform.sinks[0]      = nullptr;
+}
+
+void SC::AsyncStreamsTest::transformFinalizeError()
+{
+    static constexpr ResultCategory ForeignCategory = ResultCategory(0x7ffffffdu);
+    struct FailingTransform : AsyncTransformStream
+    {
+        Result onProcess(Span<const char>, Span<char>) override { return Result(true); }
+        Result onFinalize(Span<char>) override { return Result::Error(ForeignCategory, 44); }
+    } transform;
+
+    char            bytes[16] = {};
+    AsyncBufferView storage[1];
+    storage[0] = Span<char>(bytes);
+    storage[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(storage);
+
+    AsyncReadableStream::Request readableRequests[2];
+    AsyncWritableStream::Request writableRequests[2];
+    SC_TEST_EXPECT(transform.init(pool, readableRequests, writableRequests));
+    transform.AsyncWritableStream::setAutoDestroy(false);
+
+    Result observed(true);
+    SC_TEST_EXPECT(
+        transform.AsyncWritableStream::eventError.addListener([&observed](Result error) { observed = error; }));
+    transform.AsyncWritableStream::end();
+    SC_TEST_EXPECT(not observed);
+    SC_TEST_EXPECT(observed.category() == ForeignCategory);
+    SC_TEST_EXPECT(observed.errorValue() == 44);
+    AsyncBufferView::ID recoveredID;
+    Span<char>          recoveredData;
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, recoveredID, recoveredData));
+    pool.unrefBuffer(recoveredID);
 }
 
 void SC::AsyncStreamsTest::unshift()
