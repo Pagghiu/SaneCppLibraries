@@ -45,6 +45,12 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
     case AsyncStreamsError::WriteQueueFull: formatter.append("Writable stream queue is full"); break;
     case AsyncStreamsError::WritableDestroying: formatter.append("Writable stream is being destroyed"); break;
     case AsyncStreamsError::WritableEndAlreadyCalled: formatter.append("Writable stream end was already called"); break;
+    case AsyncStreamsError::PipelineSourceMissing: formatter.append("Pipeline source is missing"); break;
+    case AsyncStreamsError::PipelineSinkMissing: formatter.append("Pipeline has no sink"); break;
+    case AsyncStreamsError::PipelineBufferPoolMismatch:
+        formatter.append("Pipeline streams must share the same buffer pool");
+        break;
+    case AsyncStreamsError::PipelineListenerStorageFull: formatter.append("Pipeline listener storage is full"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

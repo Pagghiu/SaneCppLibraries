@@ -67,6 +67,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             writableErrors();
         }
+        if (test_section("pipeline errors"))
+        {
+            pipelineErrors();
+        }
         if (test_section("unshift"))
         {
             unshift();
@@ -90,6 +94,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void bufferPoolErrors();
     void readableErrors();
     void writableErrors();
+    void pipelineErrors();
     void unshift();
     void pipelineBackpressureSyncSource();
     void pipelineBackpressureAsyncSource();
@@ -724,6 +729,85 @@ void SC::AsyncStreamsTest::writableErrors()
     pool.unrefBuffer(bufferID);
     char message[80];
     SC_TEST_EXPECT(formatAsyncStreamsError(afterEnd, message).status == ResultErrorFormatStatus::Success);
+}
+
+void SC::AsyncStreamsTest::pipelineErrors()
+{
+    struct IdleReadable : AsyncReadableStream
+    {
+        Result asyncRead() override { return Result(true); }
+    } source;
+    struct IdleWritable : AsyncWritableStream
+    {
+        Result asyncWrite(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>) override { return Result(true); }
+    } sink;
+    struct IdleDuplex : AsyncDuplexStream
+    {
+        Result asyncWrite(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>) override { return Result(true); }
+    } transform;
+
+    AsyncPipeline empty;
+    Result        noSource = empty.pipe();
+    SC_TEST_EXPECT(not noSource);
+    SC_TEST_EXPECT(noSource.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(noSource.errorValue() == static_cast<uint32_t>(AsyncStreamsError::PipelineSourceMissing));
+
+    char            firstBytes[8] = {};
+    char            otherBytes[8] = {};
+    AsyncBufferView firstStorage[1];
+    AsyncBufferView otherStorage[1];
+    firstStorage[0] = Span<char>(firstBytes);
+    otherStorage[0] = Span<char>(otherBytes);
+    AsyncBuffersPool firstPool;
+    AsyncBuffersPool otherPool;
+    firstPool.setBuffers(firstStorage);
+    otherPool.setBuffers(otherStorage);
+
+    AsyncReadableStream::Request sourceRequests[2];
+    AsyncWritableStream::Request sinkRequests[2];
+    AsyncReadableStream::Request transformReadRequests[2];
+    AsyncWritableStream::Request transformWriteRequests[2];
+    source.setReadQueue(sourceRequests);
+    sink.setWriteQueue(sinkRequests);
+    transform.setReadQueue(transformReadRequests);
+    transform.setWriteQueue(transformWriteRequests);
+    SC_TEST_EXPECT(source.init(firstPool));
+    SC_TEST_EXPECT(sink.init(otherPool));
+    SC_TEST_EXPECT(transform.AsyncReadableStream::init(firstPool));
+    SC_TEST_EXPECT(transform.AsyncWritableStream::init(otherPool));
+
+    AsyncPipeline noSink;
+    noSink.source      = &source;
+    Result missingSink = noSink.pipe();
+    SC_TEST_EXPECT(not missingSink);
+    SC_TEST_EXPECT(missingSink.errorValue() == static_cast<uint32_t>(AsyncStreamsError::PipelineSinkMissing));
+    noSink.source = nullptr;
+
+    AsyncPipeline mismatchedSink;
+    mismatchedSink.source   = &source;
+    mismatchedSink.sinks[0] = &sink;
+    Result sinkMismatch     = mismatchedSink.pipe();
+    SC_TEST_EXPECT(not sinkMismatch);
+    SC_TEST_EXPECT(sinkMismatch.errorValue() == static_cast<uint32_t>(AsyncStreamsError::PipelineBufferPoolMismatch));
+    mismatchedSink.source   = nullptr;
+    mismatchedSink.sinks[0] = nullptr;
+
+    AsyncWritableStream::Request compatibleSinkRequests[2];
+    IdleWritable                 compatibleSink;
+    compatibleSink.setWriteQueue(compatibleSinkRequests);
+    SC_TEST_EXPECT(compatibleSink.init(firstPool));
+
+    AsyncPipeline mismatchedTransform;
+    mismatchedTransform.source        = &source;
+    mismatchedTransform.transforms[0] = &transform;
+    mismatchedTransform.sinks[0]      = &compatibleSink;
+    Result transformMismatch          = mismatchedTransform.pipe();
+    SC_TEST_EXPECT(not transformMismatch);
+    SC_TEST_EXPECT(transformMismatch.errorValue() ==
+                   static_cast<uint32_t>(AsyncStreamsError::PipelineBufferPoolMismatch));
+    mismatchedTransform.source        = nullptr;
+    mismatchedTransform.transforms[0] = nullptr;
+    mismatchedTransform.sinks[0]      = nullptr;
 }
 
 void SC::AsyncStreamsTest::unshift()

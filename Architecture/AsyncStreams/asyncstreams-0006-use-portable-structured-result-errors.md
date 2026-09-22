@@ -22,7 +22,9 @@ codes apply regardless of the operation that observes them. `NoReusableBuffer` d
 satisfy a request from a full pool with no free slot. An invalid zero slice count is reported before division, and
 child-view bounds are checked without unsigned addition overflow. Readable failures distinguish missing queue storage,
 an invalid stream state, queue saturation, and missing reactivation after synchronous data delivery. Writable failures
-distinguish queue saturation from a write attempted after end. Subsequent ports add pipeline, compression,
+distinguish queue saturation from a write attempted after end. Pipeline setup distinguishes missing source/sink,
+listener capacity, and a buffer-pool mismatch. Both sides of a duplex transform must use the pipeline pool; the
+previous check accepted a transform when only one side matched. Subsequent ports add compression,
 and adapter codes to this single library-owned category.
 
 Primary codes describe portable operations and failure conditions. A zlib status or operating-system-specific detail
@@ -40,7 +42,8 @@ and consumer audit.
 ## Confirmation
 
 Buffer-pool tests assert stable category/value, zero-slice and overflowing child-view rejection, and optional formatter
-behavior. The category-registry validator, single-file compilation, and platform Debug/Release suites are promotion
+behavior. Pipeline tests distinguish missing components and reject a duplex transform with only one matching pool.
+The category-registry validator, single-file compilation, and platform Debug/Release suites are promotion
 gates for the completed library port.
 
 ## Related

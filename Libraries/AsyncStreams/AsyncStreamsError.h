@@ -38,6 +38,10 @@ enum class AsyncStreamsError : uint32_t
     WriteQueueFull,
     WritableDestroying,
     WritableEndAlreadyCalled,
+    PipelineSourceMissing,
+    PipelineSinkMissing,
+    PipelineBufferPoolMismatch,
+    PipelineListenerStorageFull,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.

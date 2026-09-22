@@ -1081,8 +1081,10 @@ Result AsyncPipeline::validate()
         if (sinks[idx] != nullptr)
             validSinks++;
     }
-    SC_TRY_MSG(source != nullptr, "AsyncPipeline::validate() invalid source");
-    SC_TRY_MSG(validSinks > 0, "AsyncPipeline::validate() invalid 0 sized list of sinks");
+    if (source == nullptr)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineSourceMissing);
+    if (validSinks == 0)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineSinkMissing);
     return Result(true);
 }
 
@@ -1097,19 +1099,24 @@ Result AsyncPipeline::pipe()
 
     bool res;
     res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::dispatchToPipes>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventData");
+    if (not res)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
     res = readable->eventEnd.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventEnd");
+    if (not res)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
     res = readable->eventClose.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventClose");
+    if (not res)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
     res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventError");
+    if (not res)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
     for (AsyncWritableStream* sink : sinks)
     {
         if (sink == nullptr)
             break;
         res = sink->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
-        SC_TRY_MSG(res, "AsyncPipeline::pipe() pipe run out of eventError");
+        if (not res)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
     }
     return Result(true);
 }
@@ -1297,17 +1304,17 @@ Result AsyncPipeline::checkBuffersPool()
             break;
         if (&sink->getBuffersPool() != &buffers)
         {
-            return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineBufferPoolMismatch);
         }
     }
     for (AsyncDuplexStream* transform : transforms)
     {
         if (transform == nullptr)
             break;
-        if ((&transform->AsyncReadableStream::getBuffersPool() != &buffers) and
+        if ((&transform->AsyncReadableStream::getBuffersPool() != &buffers) or
             (&transform->AsyncWritableStream::getBuffersPool() != &buffers))
         {
-            return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineBufferPoolMismatch);
         }
     }
     return Result(true);
@@ -1372,20 +1379,25 @@ Result AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
         transformInputs[idx] = readable;
         bool res;
         res = listenToEventData(*readable, *transform, true);
-        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventData");
+        if (not res)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
         AsyncWritableStream& writable = *transform;
         res = readable->eventClose.addListener<AsyncWritableStream, &AsyncWritableStream::end>(writable);
-        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventClose");
+        if (not res)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
         res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
-        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
+        if (not res)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
 
         readable = transform;
 
         res = transform->AsyncReadableStream::eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
-        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
+        if (not res)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
 
         res = transform->AsyncWritableStream::eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
-        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
+        if (not res)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::PipelineListenerStorageFull);
     }
     return Result(true);
 }
@@ -1496,8 +1508,7 @@ void AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
     if (dispatchReadable != nullptr and hasPendingWritesForReadable(*dispatchReadable))
     {
         dispatchReadable->pause();
-        const Result res = dispatchReadable != nullptr ? dispatchReadable->unshift(bufferID)
-                                                       : Result::Error("AsyncPipeline dispatchReadable == nullptr");
+        const Result res = dispatchReadable->unshift(bufferID);
         if (not res)
         {
             eventError.emit(res);
