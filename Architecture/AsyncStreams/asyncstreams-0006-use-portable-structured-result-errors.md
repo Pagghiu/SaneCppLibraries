@@ -44,6 +44,11 @@ Native zlib statuses become portable operation outcomes such as invalid compress
 version mismatch, or no progress. A normal `STREAM_END` from decompression or finalization remains success with the
 existing `streamEnded` output; only an unexpected end during compression processing is an error.
 
+The header-only Async request adapters classify their own missing event-loop and descriptor preconditions, while
+forwarding errors from Async requests unchanged. Event-loop absence is checked before acquiring a pool buffer or
+changing callback state, so it cannot strand pool capacity. A simulated Async request failure is tested with a foreign
+numeric category/value rather than a legacy message-pointer identity.
+
 ## Consequences
 
 Callers of the existing `Result` APIs can continue using `SC_TRY` unchanged. Callers that need to distinguish

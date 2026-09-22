@@ -38,6 +38,10 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
         {
             failedReadWithoutAssignedBuffer();
         }
+        if (test_section("adapter preconditions"))
+        {
+            adapterPreconditions();
+        }
 
         int numTestsToRun = 1;
         if (AsyncEventLoop::tryProbingIOUring())
@@ -154,6 +158,7 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
     void fileToFile();
     void failedReadWithoutAssignedBuffer();
+    void adapterPreconditions();
 
     template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename ZLIB_STREAM_TYPE, typename DESCRIPTOR_TYPE>
     void fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide, DESCRIPTOR_TYPE& readSide,
@@ -196,27 +201,85 @@ void SC::AsyncRequestStreamsTest::failedReadWithoutAssignedBuffer()
     readable.setReadQueue(readRequests);
     SC_TEST_EXPECT(readable.initForTest(pool));
 
-    static constexpr char ErrorMessage[] = "simulated read failure";
     struct ErrorContext
     {
-        const char* expectedMessage = ErrorMessage;
-        int         errors          = 0;
-        bool        messageMatches  = false;
+        int  errors          = 0;
+        bool identityMatches = false;
     };
     static ErrorContext context;
     SC_TEST_EXPECT(readable.eventError.addListener(
         [](Result error)
         {
             context.errors++;
-            context.messageMatches = error.message == context.expectedMessage;
+            context.identityMatches = error.category() == ResultCategory(0x7ffffffdu) and error.errorValue() == 91;
         }));
 
     static AsyncEventLoop eventLoop;
-    readable.completeFailedRead(eventLoop, Result::Error(ErrorMessage));
+    readable.completeFailedRead(eventLoop, Result::Error(ResultCategory(0x7ffffffdu), 91));
 
     SC_TEST_EXPECT(context.errors == 1);
-    SC_TEST_EXPECT(context.messageMatches);
+    SC_TEST_EXPECT(context.identityMatches);
     SC_TEST_EXPECT(pool.getBuffer(AsyncBufferView::ID(0)) != nullptr);
+}
+
+void SC::AsyncRequestStreamsTest::adapterPreconditions()
+{
+    char            bytes[16] = {};
+    AsyncBufferView storage[1];
+    storage[0] = Span<char>(bytes);
+    storage[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(storage);
+
+    AsyncEventLoop     loop;
+    FileDescriptor     invalidDescriptor;
+    ReadableFileStream readable;
+    Result             missingReadDescriptor = readable.init(pool, loop, invalidDescriptor);
+    SC_TEST_EXPECT(not missingReadDescriptor);
+    SC_TEST_EXPECT(missingReadDescriptor.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(missingReadDescriptor.errorValue() ==
+                   static_cast<uint32_t>(AsyncStreamsError::AsyncDescriptorMissing));
+
+    WritableFileStream writable;
+    Result             missingWriteDescriptor = writable.init(pool, loop, invalidDescriptor);
+    SC_TEST_EXPECT(not missingWriteDescriptor);
+    SC_TEST_EXPECT(missingWriteDescriptor.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(missingWriteDescriptor.errorValue() ==
+                   static_cast<uint32_t>(AsyncStreamsError::AsyncDescriptorMissing));
+
+    struct ReadableWithoutLoop : ReadableFileStream
+    {
+        Result initForTest(AsyncBuffersPool& buffersPool) { return AsyncReadableStream::init(buffersPool); }
+    } noLoopReadable;
+    AsyncReadableStream::Request readRequests[2];
+    noLoopReadable.setReadQueue(readRequests);
+    SC_TEST_EXPECT(noLoopReadable.initForTest(pool));
+    Result readError(true);
+    SC_TEST_EXPECT(noLoopReadable.eventError.addListener([&readError](Result error) { readError = error; }));
+    SC_TEST_EXPECT(noLoopReadable.start());
+    SC_TEST_EXPECT(readError.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(readError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::AsyncEventLoopMissing));
+    AsyncBufferView::ID recoveredID;
+    Span<char>          recoveredData;
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, recoveredID, recoveredData));
+    pool.unrefBuffer(recoveredID);
+
+    struct WritableWithoutLoop : WritableFileStream
+    {
+        Result initForTest(AsyncBuffersPool& buffersPool) { return AsyncWritableStream::init(buffersPool); }
+    } noLoopWritable;
+    AsyncWritableStream::Request writeRequests[2];
+    noLoopWritable.setWriteQueue(writeRequests);
+    SC_TEST_EXPECT(noLoopWritable.initForTest(pool));
+    Result writeError(true);
+    SC_TEST_EXPECT(noLoopWritable.eventError.addListener([&writeError](Result error) { writeError = error; }));
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, recoveredID, recoveredData));
+    SC_TEST_EXPECT(noLoopWritable.write(recoveredID));
+    SC_TEST_EXPECT(writeError.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(writeError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::AsyncEventLoopMissing));
+    pool.unrefBuffer(recoveredID);
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, recoveredID, recoveredData));
+    pool.unrefBuffer(recoveredID);
 }
 
 void SC::AsyncRequestStreamsTest::createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& writeSide,

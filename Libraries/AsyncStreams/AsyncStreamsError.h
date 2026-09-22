@@ -60,6 +60,9 @@ enum class AsyncStreamsError : uint32_t
     CompressionFailed,
     CompressionAlreadyInitialized,
     CompressionOutputBufferEmpty,
+    AsyncEventLoopMissing,
+    AsyncRequestDestroying,
+    AsyncDescriptorMissing,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.

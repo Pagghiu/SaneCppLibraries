@@ -30,10 +30,11 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
     virtual Result asyncRead() override
     {
         SC_ASYNC_STREAMS_ASSERT_RELEASE(request.isFree());
+        if (eventLoop == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncEventLoopMissing);
         if (this->getBufferOrPause(0, bufferID, request.buffer))
         {
             request.callback.template bind<Self, &Self::afterRead>(*this);
-            SC_TRY_MSG(eventLoop != nullptr, "AsyncRequestReadableStream eventLoop == nullptr");
             const Result startResult = request.start(*eventLoop);
             if (not startResult)
             {
@@ -135,9 +136,11 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
     template <typename DescriptorType>
     Result init(AsyncBuffersPool& buffersPool, AsyncEventLoopType& loop, const DescriptorType& descriptor)
     {
-        SC_TRY_MSG(not request.isCancelling(), "AsyncRequestReadableStream - Destroy in progress");
+        if (request.isCancelling())
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncRequestDestroying);
         this->eventLoop = &loop;
-        SC_TRY(descriptor.get(this->request.handle, Result::Error("Missing descriptor")));
+        SC_TRY(descriptor.get(this->request.handle,
+                              Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncDescriptorMissing)));
         return AsyncReadableStream::init(buffersPool);
     }
 };
@@ -164,12 +167,13 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
 
     virtual Result asyncWrite(BufferViewID newBufferID, Function<void(BufferViewID)> cb) override
     {
+        if (eventLoop == nullptr)
+            return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncEventLoopMissing);
         bufferID = newBufferID;
         SC_ASYNC_STREAMS_ASSERT_RELEASE(not callback.isValid());
         callback = move(cb);
         SC_TRY(this->getBuffersPool().getReadableData(bufferID, request.buffer));
         request.callback.template bind<Self, &Self::afterWrite>(*this);
-        SC_TRY_MSG(eventLoop != nullptr, "AsyncRequestWritableStream eventLoop == nullptr");
         const Result res = request.start(*eventLoop);
         if (res)
         {
@@ -231,7 +235,8 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     Result init(AsyncBuffersPool& buffersPool, AsyncEventLoopType& loop, const DescriptorType& descriptor)
     {
         this->eventLoop = &loop;
-        SC_TRY(descriptor.get(this->request.handle, Result::Error("Missing descriptor")));
+        SC_TRY(descriptor.get(this->request.handle,
+                              Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::AsyncDescriptorMissing)));
         return AsyncWritableStream::init(buffersPool);
     }
 };
