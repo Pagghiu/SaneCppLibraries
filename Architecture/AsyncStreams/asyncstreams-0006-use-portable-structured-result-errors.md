@@ -17,11 +17,12 @@ that category and a code. Errors returned by another library or caller code pass
 `AsyncStreamsError.h` contains no English error text; the optional `AsyncStreamsErrorFormatter.h` formats only when a
 caller asks. Plain `Result` remains the stored callback/result type and does not own text or allocate memory.
 
-The first ports cover buffer-pool and readable-stream failures. The same `InvalidBufferID`, `InvalidParentBufferID`, and `BufferPoolFull`
+The first ports cover buffer-pool, readable-stream, and writable-stream failures. The same `InvalidBufferID`, `InvalidParentBufferID`, and `BufferPoolFull`
 codes apply regardless of the operation that observes them. `NoReusableBuffer` distinguishes temporary inability to
 satisfy a request from a full pool with no free slot. An invalid zero slice count is reported before division, and
 child-view bounds are checked without unsigned addition overflow. Readable failures distinguish missing queue storage,
-an invalid stream state, queue saturation, and missing reactivation after synchronous data delivery. Subsequent ports add writable, pipeline, compression,
+an invalid stream state, queue saturation, and missing reactivation after synchronous data delivery. Writable failures
+distinguish queue saturation from a write attempted after end. Subsequent ports add pipeline, compression,
 and adapter codes to this single library-owned category.
 
 Primary codes describe portable operations and failure conditions. A zlib status or operating-system-specific detail

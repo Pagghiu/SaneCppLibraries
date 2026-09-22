@@ -63,6 +63,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             readableErrors();
         }
+        if (test_section("writable errors"))
+        {
+            writableErrors();
+        }
         if (test_section("unshift"))
         {
             unshift();
@@ -85,6 +89,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void createChildView();
     void bufferPoolErrors();
     void readableErrors();
+    void writableErrors();
     void unshift();
     void pipelineBackpressureSyncSource();
     void pipelineBackpressureAsyncSource();
@@ -668,6 +673,57 @@ void SC::AsyncStreamsTest::readableErrors()
     SC_TEST_EXPECT(missingReactivation.start());
     SC_TEST_EXPECT(missingSignal.category() == AsyncStreamsResultCategory);
     SC_TEST_EXPECT(missingSignal.errorValue() == static_cast<uint32_t>(AsyncStreamsError::ReadReactivationMissing));
+}
+
+void SC::AsyncStreamsTest::writableErrors()
+{
+    struct PendingWritable : AsyncWritableStream
+    {
+        Result asyncWrite(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>) override { return Result(true); }
+    };
+
+    char            bytes[8] = {};
+    AsyncBufferView storage[1];
+    storage[0] = Span<char>(bytes);
+    storage[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(storage);
+
+    PendingWritable writable;
+    Result          missingQueue = writable.init(pool);
+    SC_TEST_EXPECT(not missingQueue);
+    SC_TEST_EXPECT(missingQueue.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(missingQueue.errorValue() == static_cast<uint32_t>(AsyncStreamsError::WriteQueueMissing));
+
+    AsyncWritableStream::Request requests[2];
+    writable.setWriteQueue(requests);
+    writable.setAutoDestroy(false);
+    SC_TEST_EXPECT(writable.init(pool));
+
+    AsyncBufferView::ID bufferID;
+    Span<char>          data;
+    SC_TEST_EXPECT(pool.requestNewBuffer(1, bufferID, data));
+    SC_TEST_EXPECT(writable.write(bufferID));
+    SC_TEST_EXPECT(writable.write(bufferID));
+    Result full = writable.write(bufferID);
+    SC_TEST_EXPECT(not full);
+    SC_TEST_EXPECT(full.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(full.errorValue() == static_cast<uint32_t>(AsyncStreamsError::WriteQueueFull));
+
+    writable.end();
+    Result afterEnd = writable.write(bufferID);
+    SC_TEST_EXPECT(not afterEnd);
+    SC_TEST_EXPECT(afterEnd.errorValue() == static_cast<uint32_t>(AsyncStreamsError::WriteAfterEnd));
+
+    Result observed(true);
+    SC_TEST_EXPECT(writable.eventError.addListener([&observed](Result error) { observed = error; }));
+    writable.end();
+    SC_TEST_EXPECT(observed.errorValue() == static_cast<uint32_t>(AsyncStreamsError::WritableEndAlreadyCalled));
+
+    writable.destroy();
+    pool.unrefBuffer(bufferID);
+    char message[80];
+    SC_TEST_EXPECT(formatAsyncStreamsError(afterEnd, message).status == ResultErrorFormatStatus::Success);
 }
 
 void SC::AsyncStreamsTest::unshift()

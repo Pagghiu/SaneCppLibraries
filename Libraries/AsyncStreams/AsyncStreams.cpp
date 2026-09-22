@@ -677,9 +677,10 @@ bool AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncBuffe
 
 Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool)
 {
-    SC_TRY_MSG(state == State::Stopped or state == State::Ended,
-               "AsyncWritableStream::init - Can be called only in Stopped or Ended states");
-    SC_TRY_MSG(writeQueue.size() > 0, "AsyncWritableStream::init - setWriteQueue not called")
+    if (state != State::Stopped and state != State::Ended)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::InvalidWritableState);
+    if (writeQueue.size() == 0)
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WriteQueueMissing);
     buffers = &buffersPool;
     if (state == State::Ended)
     {
@@ -710,14 +711,14 @@ Result AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function<void(As
 {
     if (state == State::Ended or state == State::Ending)
     {
-        return Result::Error("AsyncWritableStream::write - failed (ending or ended state)");
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WriteAfterEnd);
     }
     Request request;
     request.bufferID = bufferID;
     request.cb       = move(cb);
     if (not writeQueue.pushBack(request))
     {
-        return Result::Error("AsyncWritableStream::write - queue is full");
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WriteQueueFull);
     }
     buffers->refBuffer(bufferID); // 2a. unrefBuffer below or in finishedWriting
     resumeWriting();
@@ -762,7 +763,7 @@ void AsyncWritableStream::resumeWriting()
         break;
     case State::Destroying: {
         // Invalid state, already destroyed or already destroying
-        eventError.emit(Result::Error("AsyncWritableStream::resumeWriting - destroy already called"));
+        eventError.emit(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WritableDestroying));
     }
     break;
     case State::Errored:
@@ -777,7 +778,8 @@ Result AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Function<void(
     request.bufferID = bufferID;
     buffers->refBuffer(bufferID);
     // Let's push this request in front instead of to the back
-    SC_TRY_MSG(writeQueue.pushFront(request), "writable unshift failed");
+    if (not writeQueue.pushFront(request))
+        return Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WriteQueueFull);
     return Result(true);
 }
 
@@ -866,13 +868,13 @@ void AsyncWritableStream::end()
         break;
     case State::Destroying: {
         // Invalid state, already destroyed or already destroying
-        eventError.emit(Result::Error("AsyncWritableStream::end - destroy already called"));
+        eventError.emit(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WritableDestroying));
     }
     break;
     case State::Ending:
     case State::Ended: {
         // Invalid state, already ended or already ending
-        eventError.emit(Result::Error("AsyncWritableStream::end - already called"));
+        eventError.emit(Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::WritableEndAlreadyCalled));
     }
     break;
     case State::Errored: break;

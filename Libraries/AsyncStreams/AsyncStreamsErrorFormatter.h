@@ -37,6 +37,14 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
     case AsyncStreamsError::ReadableEnded: formatter.append("Readable stream has ended"); break;
     case AsyncStreamsError::ReadableNotInitialized: formatter.append("Readable stream is not initialized"); break;
     case AsyncStreamsError::ReadableErrored: formatter.append("Readable stream is in an error state"); break;
+    case AsyncStreamsError::InvalidWritableState:
+        formatter.append("Writable stream operation is invalid in this state");
+        break;
+    case AsyncStreamsError::WriteQueueMissing: formatter.append("Writable stream has no write queue"); break;
+    case AsyncStreamsError::WriteAfterEnd: formatter.append("Writable stream cannot accept writes after end"); break;
+    case AsyncStreamsError::WriteQueueFull: formatter.append("Writable stream queue is full"); break;
+    case AsyncStreamsError::WritableDestroying: formatter.append("Writable stream is being destroyed"); break;
+    case AsyncStreamsError::WritableEndAlreadyCalled: formatter.append("Writable stream end was already called"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -32,6 +32,12 @@ enum class AsyncStreamsError : uint32_t
     ReadableEnded,
     ReadableNotInitialized,
     ReadableErrored,
+    InvalidWritableState,
+    WriteQueueMissing,
+    WriteAfterEnd,
+    WriteQueueFull,
+    WritableDestroying,
+    WritableEndAlreadyCalled,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.
