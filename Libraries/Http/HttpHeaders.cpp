@@ -96,7 +96,7 @@ struct HttpHeaderInternal
             {
                 if (index >= size)
                 {
-                    return Result::Error("Basic authorization has incomplete base64");
+                    return Result::Error(HttpResultCategory, HttpError::BasicBase64Incomplete);
                 }
                 const char current = data[index++];
                 if (current == '=')
@@ -109,7 +109,7 @@ struct HttpHeaderInternal
                     const int value = base64Value(current);
                     if (value < 0)
                     {
-                        return Result::Error("Basic authorization has invalid base64");
+                        return Result::Error(HttpResultCategory, HttpError::BasicBase64Invalid);
                     }
                     values[idx] = value;
                 }
@@ -117,11 +117,11 @@ struct HttpHeaderInternal
 
             if (padded[0] or padded[1] or (padded[2] and not padded[3]))
             {
-                return Result::Error("Basic authorization has invalid base64 padding");
+                return Result::Error(HttpResultCategory, HttpError::BasicBase64PaddingInvalid);
             }
             if ((padded[2] or padded[3]) and index != size)
             {
-                return Result::Error("Basic authorization has trailing base64 data");
+                return Result::Error(HttpResultCategory, HttpError::BasicBase64TrailingData);
             }
 
             const uint32_t decoded = (static_cast<uint32_t>(values[0]) << 18) |
@@ -130,7 +130,7 @@ struct HttpHeaderInternal
             const size_t bytesToWrite = padded[2] ? 1 : (padded[3] ? 2 : 3);
             if (outputSize + bytesToWrite > output.sizeInBytes())
             {
-                return Result::Error("Basic authorization output buffer is too small");
+                return Result::Error(HttpResultCategory, HttpError::BasicDecodeOutputTooSmall);
             }
             output.data()[outputSize++] = static_cast<char>((decoded >> 16) & 0xFF);
             if (bytesToWrite >= 2)
@@ -178,12 +178,14 @@ struct HttpHeaderInternal
     {
         for (char current : username.toCharSpan())
         {
-            SC_TRY_MSG(current != ':', "Basic authorization username must not contain colon");
+            if (current == ':')
+                return Result::Error(HttpResultCategory, HttpError::BasicUsernameContainsColon);
         }
 
         const size_t credentialLength = username.sizeInBytes() + 1 + password.sizeInBytes();
         const size_t encodedLength    = ((credentialLength + 2) / 3) * 4;
-        SC_TRY_MSG(offset + encodedLength <= storage.sizeInBytes(), "Authorization output buffer is too small");
+        if (offset > storage.sizeInBytes() or encodedLength > storage.sizeInBytes() - offset)
+            return Result::Error(HttpResultCategory, HttpError::AuthorizationOutputTooSmall);
 
         size_t credentialOffset = 0;
         while (credentialOffset < credentialLength)
@@ -544,7 +546,8 @@ Result HttpAuthorizationView::parse(StringSpan authorizationHeader)
             break;
         }
     }
-    SC_TRY_MSG(split != static_cast<size_t>(-1), "Authorization header missing credentials");
+    if (split == static_cast<size_t>(-1))
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationCredentialsMissing);
 
     scheme                 = {{data, split}, false, header.getEncoding()};
     size_t credentialStart = split;
@@ -552,7 +555,8 @@ Result HttpAuthorizationView::parse(StringSpan authorizationHeader)
     {
         credentialStart++;
     }
-    SC_TRY_MSG(credentialStart < header.sizeInBytes(), "Authorization header missing credentials");
+    if (credentialStart >= header.sizeInBytes())
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationCredentialsMissing);
     credentials = {{data + credentialStart, header.sizeInBytes() - credentialStart}, false, header.getEncoding()};
     credentials = HttpHeaderInternal::trimOptionalWhitespace(credentials);
     return Result(true);
@@ -568,7 +572,8 @@ Result HttpParseBearerToken(StringSpan authorizationHeader, StringSpan& token)
 
     HttpAuthorizationView authorization;
     SC_TRY(authorization.parse(authorizationHeader));
-    SC_TRY_MSG(authorization.isBearer(), "Authorization scheme is not Bearer");
+    if (not authorization.isBearer())
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationNotBearer);
     token = authorization.credentials;
     return Result(true);
 }
@@ -581,7 +586,8 @@ Result HttpParseBasicCredentials(StringSpan authorizationHeader, Span<char> stor
 
     HttpAuthorizationView authorization;
     SC_TRY(authorization.parse(authorizationHeader));
-    SC_TRY_MSG(authorization.isBasic(), "Authorization scheme is not Basic");
+    if (not authorization.isBasic())
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationNotBasic);
 
     size_t decodedSize = 0;
     SC_TRY(HttpHeaderInternal::decodeBase64(authorization.credentials, storage, decodedSize));
@@ -594,7 +600,8 @@ Result HttpParseBasicCredentials(StringSpan authorizationHeader, Span<char> stor
             break;
         }
     }
-    SC_TRY_MSG(colonIndex != static_cast<size_t>(-1), "Basic authorization missing password separator");
+    if (colonIndex == static_cast<size_t>(-1))
+        return Result::Error(HttpResultCategory, HttpError::BasicPasswordSeparatorMissing);
 
     username = {{storage.data(), colonIndex}, false, StringEncoding::Ascii};
     password = {{storage.data() + colonIndex + 1, decodedSize - colonIndex - 1}, false, StringEncoding::Ascii};
@@ -605,9 +612,11 @@ Result HttpWriteBearerAuthorization(StringSpan token, Span<char> storage, String
 {
     output        = {};
     size_t offset = 0;
-    SC_TRY_MSG(not token.isEmpty(), "Bearer authorization token is empty");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Bearer "), "Authorization output buffer is too small");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, token), "Authorization output buffer is too small");
+    if (token.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::BearerTokenEmpty);
+    if (not HttpHeaderInternal::appendTo(storage, offset, "Bearer ") or
+        not HttpHeaderInternal::appendTo(storage, offset, token))
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationOutputTooSmall);
     output = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);
 }
@@ -616,10 +625,11 @@ Result HttpWriteBasicAuthorization(StringSpan base64Credentials, Span<char> stor
 {
     output        = {};
     size_t offset = 0;
-    SC_TRY_MSG(not base64Credentials.isEmpty(), "Basic authorization credentials are empty");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Basic "), "Authorization output buffer is too small");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, base64Credentials),
-               "Authorization output buffer is too small");
+    if (base64Credentials.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::BasicCredentialsEmpty);
+    if (not HttpHeaderInternal::appendTo(storage, offset, "Basic ") or
+        not HttpHeaderInternal::appendTo(storage, offset, base64Credentials))
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationOutputTooSmall);
     output = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);
 }
@@ -629,7 +639,8 @@ Result HttpWriteBasicAuthorizationCredentials(StringSpan username, StringSpan pa
 {
     output        = {};
     size_t offset = 0;
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Basic "), "Authorization output buffer is too small");
+    if (not HttpHeaderInternal::appendTo(storage, offset, "Basic "))
+        return Result::Error(HttpResultCategory, HttpError::AuthorizationOutputTooSmall);
     SC_TRY(HttpHeaderInternal::appendBasicCredentialsBase64(username, password, storage, offset));
     output = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);

@@ -36,6 +36,21 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         break;
     case HttpError::MultipartMalformedSyntax: formatter.append("Multipart syntax is malformed"); break;
     case HttpError::MultipartSpanInvalid: formatter.append("Multipart parser span is invalid"); break;
+    case HttpError::AuthorizationCredentialsMissing: formatter.append("Authorization credentials are missing"); break;
+    case HttpError::AuthorizationNotBearer: formatter.append("Authorization scheme is not Bearer"); break;
+    case HttpError::AuthorizationNotBasic: formatter.append("Authorization scheme is not Basic"); break;
+    case HttpError::BasicBase64Incomplete: formatter.append("Basic credentials have incomplete base64"); break;
+    case HttpError::BasicBase64Invalid: formatter.append("Basic credentials have invalid base64"); break;
+    case HttpError::BasicBase64PaddingInvalid: formatter.append("Basic credentials have invalid base64 padding"); break;
+    case HttpError::BasicBase64TrailingData: formatter.append("Basic credentials have trailing base64 data"); break;
+    case HttpError::BasicDecodeOutputTooSmall: formatter.append("Basic credential output buffer is too small"); break;
+    case HttpError::BasicPasswordSeparatorMissing:
+        formatter.append("Basic credentials lack a password separator");
+        break;
+    case HttpError::BasicUsernameContainsColon: formatter.append("Basic username contains a colon"); break;
+    case HttpError::AuthorizationOutputTooSmall: formatter.append("Authorization output buffer is too small"); break;
+    case HttpError::BearerTokenEmpty: formatter.append("Bearer token is empty"); break;
+    case HttpError::BasicCredentialsEmpty: formatter.append("Basic credentials are empty"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

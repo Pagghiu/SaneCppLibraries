@@ -33,6 +33,19 @@ enum class HttpError : uint32_t
     MultipartBoundaryCandidateTooLong,
     MultipartMalformedSyntax,
     MultipartSpanInvalid,
+    AuthorizationCredentialsMissing,
+    AuthorizationNotBearer,
+    AuthorizationNotBasic,
+    BasicBase64Incomplete,
+    BasicBase64Invalid,
+    BasicBase64PaddingInvalid,
+    BasicBase64TrailingData,
+    BasicDecodeOutputTooSmall,
+    BasicPasswordSeparatorMissing,
+    BasicUsernameContainsColon,
+    AuthorizationOutputTooSmall,
+    BearerTokenEmpty,
+    BasicCredentialsEmpty,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

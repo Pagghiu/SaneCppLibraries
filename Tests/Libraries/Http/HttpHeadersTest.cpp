@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpHeaders.h"
+#include "Libraries/Http/HttpErrorFormatter.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -8,6 +9,12 @@ namespace SC
 static bool resultMessageEquals(const Result& result, StringSpan expected)
 {
     return not result and StringSpan::fromNullTerminated(result.message, StringEncoding::Ascii) == expected;
+}
+
+static bool resultHasHttpError(Result result, HttpError expected)
+{
+    return not result and result.category() == HttpResultCategory and
+           result.errorValue() == static_cast<uint32_t>(expected);
 }
 
 struct HttpHeadersTest : public TestCase
@@ -111,16 +118,26 @@ void HttpHeadersTest::authorizationHelpers()
     SC_TEST_EXPECT(password.isEmpty());
 
     SC_TEST_EXPECT(
-        resultMessageEquals(HttpParseBearerToken("Basic dXNlcjpwYXNz", token), "Authorization scheme is not Bearer"));
-    SC_TEST_EXPECT(
-        resultMessageEquals(HttpParseBasicCredentials("Basic !!!=", {storage, sizeof(storage)}, username, password),
-                            "Basic authorization has invalid base64"));
-    SC_TEST_EXPECT(resultMessageEquals(
-        HttpParseBasicCredentials("Basic bm9jb2xvbg==", {storage, sizeof(storage)}, username, password),
-        "Basic authorization missing password separator"));
-    SC_TEST_EXPECT(
-        resultMessageEquals(HttpParseBasicCredentials("Basic dXNlcjpwYXNz", {storage, 3}, username, password),
-                            "Basic authorization output buffer is too small"));
+        resultHasHttpError(HttpParseBearerToken("Basic dXNlcjpwYXNz", token), HttpError::AuthorizationNotBearer));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Bearer token", storage, username, password),
+                                      HttpError::AuthorizationNotBasic));
+    SC_TEST_EXPECT(resultHasHttpError(authorization.parse("Bearer"), HttpError::AuthorizationCredentialsMissing));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Basic Zg", storage, username, password),
+                                      HttpError::BasicBase64Incomplete));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Basic !!!=", storage, username, password),
+                                      HttpError::BasicBase64Invalid));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Basic ====", storage, username, password),
+                                      HttpError::BasicBase64PaddingInvalid));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Basic dXNlcjo=AAAA", storage, username, password),
+                                      HttpError::BasicBase64TrailingData));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Basic bm9jb2xvbg==", storage, username, password),
+                                      HttpError::BasicPasswordSeparatorMissing));
+    SC_TEST_EXPECT(resultHasHttpError(HttpParseBasicCredentials("Basic dXNlcjpwYXNz", {storage, 3}, username, password),
+                                      HttpError::BasicDecodeOutputTooSmall));
+
+    char formatted[96];
+    SC_TEST_EXPECT(formatHttpError(HttpError::BasicBase64Invalid, formatted).status ==
+                   ResultErrorFormatStatus::Success);
 }
 
 void HttpHeadersTest::setCookieHelpers()
@@ -232,18 +249,18 @@ void HttpHeadersTest::headerBuilders()
     SC_TEST_EXPECT(HttpWriteBasicAuthorizationCredentials("", "pass", {storage, sizeof(storage)}, output));
     SC_TEST_EXPECT(output == "Basic OnBhc3M=");
 
-    SC_TEST_EXPECT(resultMessageEquals(HttpWriteBearerAuthorization("", {storage, sizeof(storage)}, output),
-                                       "Bearer authorization token is empty"));
+    SC_TEST_EXPECT(resultHasHttpError(HttpWriteBearerAuthorization("", storage, output), HttpError::BearerTokenEmpty));
     SC_TEST_EXPECT(output.isEmpty());
-    SC_TEST_EXPECT(resultMessageEquals(HttpWriteBasicAuthorization("dXNlcjpwYXNz", {storage, 8}, output),
-                                       "Authorization output buffer is too small"));
+    SC_TEST_EXPECT(
+        resultHasHttpError(HttpWriteBasicAuthorization("", storage, output), HttpError::BasicCredentialsEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(HttpWriteBasicAuthorization("dXNlcjpwYXNz", {storage, 8}, output),
+                                      HttpError::AuthorizationOutputTooSmall));
     SC_TEST_EXPECT(output.isEmpty());
-    SC_TEST_EXPECT(resultMessageEquals(
-        HttpWriteBasicAuthorizationCredentials("bad:name", "pass", {storage, sizeof(storage)}, output),
-        "Basic authorization username must not contain colon"));
+    SC_TEST_EXPECT(resultHasHttpError(HttpWriteBasicAuthorizationCredentials("bad:name", "pass", storage, output),
+                                      HttpError::BasicUsernameContainsColon));
     SC_TEST_EXPECT(output.isEmpty());
-    SC_TEST_EXPECT(resultMessageEquals(HttpWriteBasicAuthorizationCredentials("user", "pass", {storage, 10}, output),
-                                       "Authorization output buffer is too small"));
+    SC_TEST_EXPECT(resultHasHttpError(HttpWriteBasicAuthorizationCredentials("user", "pass", {storage, 10}, output),
+                                      HttpError::AuthorizationOutputTooSmall));
     SC_TEST_EXPECT(output.isEmpty());
 }
 
