@@ -64,6 +64,8 @@ enum class AsyncStreamsError : uint32_t
     AsyncEventLoopMissing,
     AsyncRequestDestroying,
     AsyncDescriptorMissing,
+    CipherOutputBufferTooSmall,
+    CipherInvalidOutputSize,
 };
 
 /// @brief Stable category assigned to AsyncStreams-owned errors.

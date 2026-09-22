@@ -87,6 +87,12 @@ inline ResultErrorFormat formatAsyncStreamsError(AsyncStreamsError error, Span<c
     case AsyncStreamsError::AsyncEventLoopMissing: formatter.append("Async stream has no event loop"); break;
     case AsyncStreamsError::AsyncRequestDestroying: formatter.append("Async request is being destroyed"); break;
     case AsyncStreamsError::AsyncDescriptorMissing: formatter.append("Async stream descriptor is missing"); break;
+    case AsyncStreamsError::CipherOutputBufferTooSmall:
+        formatter.append("Cipher output buffer is smaller than one block");
+        break;
+    case AsyncStreamsError::CipherInvalidOutputSize:
+        formatter.append("Cipher reported an output size beyond its buffer");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

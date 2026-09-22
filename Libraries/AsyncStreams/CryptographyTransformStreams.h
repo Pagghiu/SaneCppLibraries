@@ -37,7 +37,7 @@ struct AsyncCipherTransformStreamT : public AsyncTransformStream
         {
             cipher.reset();
             AsyncWritableStream::emitError(
-                Result::Error("AsyncCipherTransformStreamT - output buffers must be at least 16 bytes"));
+                Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CipherOutputBufferTooSmall));
             AsyncTransformStream::afterProcess({}, output);
             return Result(true);
         }
@@ -55,7 +55,8 @@ struct AsyncCipherTransformStreamT : public AsyncTransformStream
         {
             cipher.reset();
             if (result)
-                AsyncWritableStream::emitError(Result::Error("AsyncCipherTransformStreamT - invalid output size"));
+                AsyncWritableStream::emitError(
+                    Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CipherInvalidOutputSize));
             else
                 AsyncWritableStream::emitError(result);
             AsyncTransformStream::afterProcess({}, output);
@@ -76,7 +77,7 @@ struct AsyncCipherTransformStreamT : public AsyncTransformStream
         {
             cipher.reset();
             AsyncWritableStream::emitError(
-                Result::Error("AsyncCipherTransformStreamT - output buffers must be at least 16 bytes"));
+                Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CipherOutputBufferTooSmall));
             AsyncTransformStream::afterFinalize(output, true);
             return Result(true);
         }
@@ -87,7 +88,8 @@ struct AsyncCipherTransformStreamT : public AsyncTransformStream
         {
             cipher.reset();
             if (result)
-                AsyncWritableStream::emitError(Result::Error("AsyncCipherTransformStreamT - invalid output size"));
+                AsyncWritableStream::emitError(
+                    Result::Error(AsyncStreamsResultCategory, AsyncStreamsError::CipherInvalidOutputSize));
             else
                 AsyncWritableStream::emitError(result);
             AsyncTransformStream::afterFinalize(output, true);

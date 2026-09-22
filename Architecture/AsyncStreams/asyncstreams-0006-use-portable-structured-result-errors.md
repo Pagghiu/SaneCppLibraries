@@ -52,6 +52,9 @@ The header-only Async request adapters classify their own missing event-loop and
 forwarding errors from Async requests unchanged. Event-loop absence is checked before acquiring a pool buffer or
 changing callback state, so it cannot strand pool capacity. A simulated Async request failure is tested with a foreign
 numeric category/value rather than a legacy message-pointer identity.
+The template-only cipher adapter uses local codes for an output buffer smaller than one block and for a session that
+reports more bytes than the supplied output span can hold. Errors returned by the cipher session itself retain their
+foreign identity, and the adapter still has no Cryptography library dependency.
 
 ## Consequences
 

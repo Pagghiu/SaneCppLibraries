@@ -26,7 +26,8 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
         {
             updateCalls += 1;
             bytesWritten = 0;
-            SC_TRY_MSG(output.sizeInBytes() >= input.sizeInBytes(), "TestCipher - insufficient output");
+            if (output.sizeInBytes() < input.sizeInBytes())
+                return Result::Error(ResultCategory(0x7ffffffdu), 51);
             for (size_t idx = 0; idx < input.sizeInBytes(); ++idx)
                 output[idx] = static_cast<uint8_t>(input[idx] ^ 0x5a);
             bytesWritten = input.sizeInBytes();
@@ -37,7 +38,8 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
         {
             finishCalls += 1;
             bytesWritten = 0;
-            SC_TRY_MSG(not output.empty(), "TestCipher - insufficient final output");
+            if (output.empty())
+                return Result::Error(ResultCategory(0x7ffffffdu), 52);
             output[0]    = 0xee;
             bytesWritten = 1;
             return Result(true);
@@ -58,7 +60,8 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
 
         Result add(Span<const uint8_t> data)
         {
-            SC_TRY_MSG(size + data.sizeInBytes() <= sizeof(bytes), "TestHmac - input too large");
+            if (size + data.sizeInBytes() > sizeof(bytes))
+                return Result::Error(ResultCategory(0x7ffffffdu), 53);
             memcpy(bytes + size, data.data(), data.sizeInBytes());
             size += data.sizeInBytes();
             return Result(true);
@@ -80,6 +83,8 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
             hmacTemplateAdapter();
         if (test_section("cipher rejects undersized buffers"))
             cipherRejectsUndersizedBuffers();
+        if (test_section("cipher rejects invalid output sizes"))
+            cipherRejectsInvalidOutputSizes();
         if (test_section("explicit destruction resets sessions"))
             explicitDestructionResetsSessions();
     }
@@ -87,6 +92,7 @@ struct SC::CryptographyTransformStreamsTest : public SC::TestCase
     void cipherTemplateAdapter();
     void hmacTemplateAdapter();
     void cipherRejectsUndersizedBuffers();
+    void cipherRejectsInvalidOutputSizes();
     void explicitDestructionResetsSessions();
 };
 
@@ -195,14 +201,66 @@ void SC::CryptographyTransformStreamsTest::cipherRejectsUndersizedBuffers()
     AsyncWritableStream::Request            writeRequests[2];
     SC_TEST_EXPECT(stream.init(pool, readRequests, writeRequests));
 
-    bool emittedError = false;
-    (void)stream.AsyncWritableStream::eventError.addListener([emittedError = &emittedError](Result)
-                                                             { *emittedError = true; });
+    Result observed(true);
+    (void)stream.AsyncWritableStream::eventError.addListener([&observed](Result error) { observed = error; });
     SC_TEST_EXPECT(stream.AsyncReadableStream::start());
     SC_TEST_EXPECT(stream.AsyncWritableStream::write(AsyncBufferView("x")));
-    SC_TEST_EXPECT(emittedError);
+    SC_TEST_EXPECT(not observed);
+    SC_TEST_EXPECT(observed.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(observed.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CipherOutputBufferTooSmall));
     SC_TEST_EXPECT(stream.cipher.updateCalls == 0);
     SC_TEST_EXPECT(stream.cipher.resetCalls == 1);
+}
+
+void SC::CryptographyTransformStreamsTest::cipherRejectsInvalidOutputSizes()
+{
+    struct OversizedUpdateCipher : TestCipher
+    {
+        Result update(Span<const uint8_t>, Span<uint8_t> output, size_t& bytesWritten)
+        {
+            bytesWritten = output.sizeInBytes() + 1;
+            return Result(true);
+        }
+    };
+    struct OversizedFinishCipher : TestCipher
+    {
+        Result finish(Span<uint8_t> output, size_t& bytesWritten)
+        {
+            bytesWritten = output.sizeInBytes() + 1;
+            return Result(true);
+        }
+    };
+
+    char            outputStorage[16];
+    AsyncBufferView bufferViews[2];
+    bufferViews[0] = Span<char>(outputStorage);
+    bufferViews[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(bufferViews);
+
+    AsyncCipherTransformStreamT<OversizedUpdateCipher> updateStream;
+    AsyncReadableStream::Request                       updateReadRequests[2];
+    AsyncWritableStream::Request                       updateWriteRequests[2];
+    SC_TEST_EXPECT(updateStream.init(pool, updateReadRequests, updateWriteRequests));
+    Result updateError(true);
+    SC_TEST_EXPECT(updateStream.AsyncWritableStream::eventError.addListener([&updateError](Result error)
+                                                                            { updateError = error; }));
+    SC_TEST_EXPECT(updateStream.AsyncReadableStream::start());
+    SC_TEST_EXPECT(updateStream.AsyncWritableStream::write(AsyncBufferView("x")));
+    SC_TEST_EXPECT(updateError.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(updateError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CipherInvalidOutputSize));
+
+    AsyncCipherTransformStreamT<OversizedFinishCipher> finishStream;
+    AsyncReadableStream::Request                       finishReadRequests[2];
+    AsyncWritableStream::Request                       finishWriteRequests[2];
+    SC_TEST_EXPECT(finishStream.init(pool, finishReadRequests, finishWriteRequests));
+    finishStream.AsyncWritableStream::setAutoDestroy(false);
+    Result finishError(true);
+    SC_TEST_EXPECT(finishStream.AsyncWritableStream::eventError.addListener([&finishError](Result error)
+                                                                            { finishError = error; }));
+    finishStream.AsyncWritableStream::end();
+    SC_TEST_EXPECT(finishError.category() == AsyncStreamsResultCategory);
+    SC_TEST_EXPECT(finishError.errorValue() == static_cast<uint32_t>(AsyncStreamsError::CipherInvalidOutputSize));
 }
 
 void SC::CryptographyTransformStreamsTest::explicitDestructionResetsSessions()
