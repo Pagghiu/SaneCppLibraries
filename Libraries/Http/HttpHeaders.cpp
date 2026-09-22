@@ -234,10 +234,19 @@ struct HttpHeaderInternal
     {
         if (not first)
         {
-            SC_TRY_MSG(appendTo(storage, offset, ", "), "Cache-Control output buffer is too small");
+            if (not appendTo(storage, offset, ", "))
+                return Result::Error(HttpResultCategory, HttpError::CacheControlOutputTooSmall);
         }
-        SC_TRY_MSG(appendTo(storage, offset, directive), "Cache-Control output buffer is too small");
+        if (not appendTo(storage, offset, directive))
+            return Result::Error(HttpResultCategory, HttpError::CacheControlOutputTooSmall);
         first = false;
+        return Result(true);
+    }
+
+    static Result appendCookiePiece(Span<char> storage, size_t& offset, StringSpan piece)
+    {
+        if (not appendTo(storage, offset, piece))
+            return Result::Error(HttpResultCategory, HttpError::SetCookieOutputTooSmall);
         return Result(true);
     }
 };
@@ -361,7 +370,8 @@ Result HttpSetCookieView::parse(StringSpan setCookieHeader)
     *this = {};
 
     StringSpan header = HttpHeaderInternal::trimOptionalWhitespace(setCookieHeader);
-    SC_TRY_MSG(not header.isEmpty(), "Set-Cookie header is empty");
+    if (header.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::SetCookieHeaderEmpty);
 
     const char*  data           = header.bytesWithoutTerminator();
     const size_t length         = header.sizeInBytes();
@@ -379,13 +389,15 @@ Result HttpSetCookieView::parse(StringSpan setCookieHeader)
             equals = idx;
         }
     }
-    SC_TRY_MSG(equals != static_cast<size_t>(-1) and equals < firstSemicolon, "Set-Cookie missing name/value");
+    if (equals == static_cast<size_t>(-1) or equals >= firstSemicolon)
+        return Result::Error(HttpResultCategory, HttpError::SetCookieNameValueMissing);
 
     name  = {{data, equals}, false, header.getEncoding()};
     value = {{data + equals + 1, firstSemicolon - equals - 1}, false, header.getEncoding()};
     name  = HttpHeaderInternal::trimOptionalWhitespace(name);
     value = HttpHeaderInternal::trimOptionalWhitespace(value);
-    SC_TRY_MSG(not name.isEmpty(), "Set-Cookie cookie name is empty");
+    if (name.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::SetCookieNameEmpty);
 
     if (firstSemicolon < length)
     {
@@ -434,46 +446,43 @@ Result HttpSetCookieBuilder::writeTo(Span<char> storage, StringSpan& output) con
 {
     output        = {};
     size_t offset = 0;
-    SC_TRY_MSG(not name.isEmpty(), "Set-Cookie cookie name is empty");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, name), "Set-Cookie output buffer is too small");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "="), "Set-Cookie output buffer is too small");
-    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, value), "Set-Cookie output buffer is too small");
+    if (name.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::SetCookieNameEmpty);
+    SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, name));
+    SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "="));
+    SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, value));
     if (not path.isEmpty())
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Path="), "Set-Cookie output buffer is too small");
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, path), "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; Path="));
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, path));
     }
     if (not domain.isEmpty())
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Domain="), "Set-Cookie output buffer is too small");
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, domain), "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; Domain="));
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, domain));
     }
     if (not expires.isEmpty())
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Expires="),
-                   "Set-Cookie output buffer is too small");
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, expires), "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; Expires="));
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, expires));
     }
     if (not maxAge.isEmpty())
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Max-Age="),
-                   "Set-Cookie output buffer is too small");
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, maxAge), "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; Max-Age="));
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, maxAge));
     }
     if (secure)
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Secure"), "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; Secure"));
     }
     if (httpOnly)
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; HttpOnly"),
-                   "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; HttpOnly"));
     }
     if (not sameSite.isEmpty())
     {
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; SameSite="),
-                   "Set-Cookie output buffer is too small");
-        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, sameSite), "Set-Cookie output buffer is too small");
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, "; SameSite="));
+        SC_TRY(HttpHeaderInternal::appendCookiePiece(storage, offset, sameSite));
     }
 
     output = {{storage.data(), offset}, false, StringEncoding::Ascii};
@@ -491,7 +500,8 @@ StringSpan HttpContentTypeApplicationOctetStream() { return "application/octet-s
 Result HttpCacheControlBuilder::writeTo(Span<char> storage, StringSpan& output) const
 {
     output = {};
-    SC_TRY_MSG(not(publicCache and privateCache), "Cache-Control cannot be both public and private");
+    if (publicCache and privateCache)
+        return Result::Error(HttpResultCategory, HttpError::CacheControlConflictingVisibility);
 
     size_t offset = 0;
     bool   first  = true;
@@ -514,8 +524,8 @@ Result HttpCacheControlBuilder::writeTo(Span<char> storage, StringSpan& output) 
     if (hasMaxAge)
     {
         SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "max-age="));
-        SC_TRY_MSG(HttpHeaderInternal::appendUnsigned(storage, offset, maxAgeSeconds),
-                   "Cache-Control output buffer is too small");
+        if (not HttpHeaderInternal::appendUnsigned(storage, offset, maxAgeSeconds))
+            return Result::Error(HttpResultCategory, HttpError::CacheControlOutputTooSmall);
     }
     if (mustRevalidate)
     {
@@ -526,7 +536,8 @@ Result HttpCacheControlBuilder::writeTo(Span<char> storage, StringSpan& output) 
         SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "immutable"));
     }
 
-    SC_TRY_MSG(not first, "Cache-Control builder has no directives");
+    if (first)
+        return Result::Error(HttpResultCategory, HttpError::CacheControlNoDirectives);
     output = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);
 }

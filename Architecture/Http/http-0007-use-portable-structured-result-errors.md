@@ -35,6 +35,10 @@ Authorization helpers distinguish missing credentials, wrong Bearer/Basic scheme
 username/password separator, invalid username, empty tokens/credentials, and caller output capacity. Each condition
 keeps a portable Http identity; no credentials or other borrowed text are retained in plain `Result`.
 
+Set-Cookie and Cache-Control builders and parsers use the same category while distinguishing empty or missing
+cookie fields, conflicting cache visibility, absent directives, and insufficient caller storage. Optional English
+formatting remains outside mandatory headers.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

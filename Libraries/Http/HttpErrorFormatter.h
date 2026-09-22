@@ -51,6 +51,15 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::AuthorizationOutputTooSmall: formatter.append("Authorization output buffer is too small"); break;
     case HttpError::BearerTokenEmpty: formatter.append("Bearer token is empty"); break;
     case HttpError::BasicCredentialsEmpty: formatter.append("Basic credentials are empty"); break;
+    case HttpError::SetCookieHeaderEmpty: formatter.append("Set-Cookie header is empty"); break;
+    case HttpError::SetCookieNameValueMissing: formatter.append("Set-Cookie name/value pair is missing"); break;
+    case HttpError::SetCookieNameEmpty: formatter.append("Set-Cookie name is empty"); break;
+    case HttpError::SetCookieOutputTooSmall: formatter.append("Set-Cookie output buffer is too small"); break;
+    case HttpError::CacheControlConflictingVisibility:
+        formatter.append("Cache-Control cannot be both public and private");
+        break;
+    case HttpError::CacheControlOutputTooSmall: formatter.append("Cache-Control output buffer is too small"); break;
+    case HttpError::CacheControlNoDirectives: formatter.append("Cache-Control has no directives"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

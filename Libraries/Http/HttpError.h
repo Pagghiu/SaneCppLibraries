@@ -46,6 +46,13 @@ enum class HttpError : uint32_t
     AuthorizationOutputTooSmall,
     BearerTokenEmpty,
     BasicCredentialsEmpty,
+    SetCookieHeaderEmpty,
+    SetCookieNameValueMissing,
+    SetCookieNameEmpty,
+    SetCookieOutputTooSmall,
+    CacheControlConflictingVisibility,
+    CacheControlOutputTooSmall,
+    CacheControlNoDirectives,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

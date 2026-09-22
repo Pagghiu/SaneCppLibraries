@@ -6,11 +6,6 @@
 
 namespace SC
 {
-static bool resultMessageEquals(const Result& result, StringSpan expected)
-{
-    return not result and StringSpan::fromNullTerminated(result.message, StringEncoding::Ascii) == expected;
-}
-
 static bool resultHasHttpError(Result result, HttpError expected)
 {
     return not result and result.category() == HttpResultCategory and
@@ -195,9 +190,13 @@ void HttpHeadersTest::setCookieHelpers()
     SC_TEST_EXPECT(roundTrip.httpOnly);
     SC_TEST_EXPECT(roundTrip.sameSite == "Strict");
 
-    SC_TEST_EXPECT(resultMessageEquals(builder.writeTo({storage, 4}, output), "Set-Cookie output buffer is too small"));
-    SC_TEST_EXPECT(resultMessageEquals(cookie.parse("=missing-name"), "Set-Cookie cookie name is empty"));
-    SC_TEST_EXPECT(resultMessageEquals(cookie.parse("missing-value"), "Set-Cookie missing name/value"));
+    SC_TEST_EXPECT(resultHasHttpError(builder.writeTo({storage, 4}, output), HttpError::SetCookieOutputTooSmall));
+    SC_TEST_EXPECT(output.isEmpty());
+    SC_TEST_EXPECT(resultHasHttpError(cookie.parse(""), HttpError::SetCookieHeaderEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(cookie.parse("=missing-name"), HttpError::SetCookieNameEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(cookie.parse("missing-value"), HttpError::SetCookieNameValueMissing));
+    builder.name = {};
+    SC_TEST_EXPECT(resultHasHttpError(builder.writeTo(storage, output), HttpError::SetCookieNameEmpty));
 }
 
 void HttpHeadersTest::headerBuilders()
@@ -227,15 +226,16 @@ void HttpHeadersTest::headerBuilders()
     cache              = {};
     cache.publicCache  = true;
     cache.privateCache = true;
-    SC_TEST_EXPECT(resultMessageEquals(cache.writeTo({storage, sizeof(storage)}, output),
-                                       "Cache-Control cannot be both public and private"));
+    SC_TEST_EXPECT(resultHasHttpError(cache.writeTo(storage, output), HttpError::CacheControlConflictingVisibility));
     SC_TEST_EXPECT(output.isEmpty());
 
     cache               = {};
     cache.hasMaxAge     = true;
     cache.maxAgeSeconds = 42;
-    SC_TEST_EXPECT(
-        resultMessageEquals(cache.writeTo({storage, 8}, output), "Cache-Control output buffer is too small"));
+    SC_TEST_EXPECT(resultHasHttpError(cache.writeTo({storage, 8}, output), HttpError::CacheControlOutputTooSmall));
+    SC_TEST_EXPECT(output.isEmpty());
+    cache = {};
+    SC_TEST_EXPECT(resultHasHttpError(cache.writeTo(storage, output), HttpError::CacheControlNoDirectives));
     SC_TEST_EXPECT(output.isEmpty());
 
     SC_TEST_EXPECT(HttpWriteBearerAuthorization("token", {storage, sizeof(storage)}, output));
