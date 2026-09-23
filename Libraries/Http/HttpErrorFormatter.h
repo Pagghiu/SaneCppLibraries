@@ -78,6 +78,24 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::MultipartWriterPartLimitExceeded:
         formatter.append("Multipart output part limit is exceeded");
         break;
+    case HttpError::BodyExceedsContentLength: formatter.append("HTTP body exceeds Content-Length"); break;
+    case HttpError::BodyFramingHeadersConflict:
+        formatter.append("Content-Length conflicts with Transfer-Encoding");
+        break;
+    case HttpError::TransferEncodingUnsupported: formatter.append("HTTP Transfer-Encoding is unsupported"); break;
+    case HttpError::UnexpectedBodyData: formatter.append("Unexpected HTTP body data"); break;
+    case HttpError::BodyStreamConsumptionMismatch:
+        formatter.append("HTTP body stream consumed an unexpected byte count");
+        break;
+    case HttpError::ChunkSizeOverflow: formatter.append("HTTP chunk size overflows"); break;
+    case HttpError::ChunkSizeInvalid: formatter.append("HTTP chunk size is invalid"); break;
+    case HttpError::ChunkHeaderMalformed: formatter.append("HTTP chunk header is malformed"); break;
+    case HttpError::ChunkTerminatorMalformed: formatter.append("HTTP chunk terminator is malformed"); break;
+    case HttpError::ChunkTrailersUnsupported: formatter.append("HTTP chunk trailers are unsupported"); break;
+    case HttpError::ChunkTrailerTerminatorMalformed:
+        formatter.append("HTTP chunk trailer terminator is malformed");
+        break;
+    case HttpError::PipelinedBodyUnsupported: formatter.append("Pipelined HTTP body data is unsupported"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

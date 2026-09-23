@@ -2113,7 +2113,7 @@ void SC::HttpAsyncClientTest::chunkedResponseRejectsTrailers()
     client.onError    = [this, &ctx](Result result)
     {
         ctx.sawError = true;
-        SC_TEST_EXPECT(resultMessageEquals(result, "HttpIncomingMessage non-empty trailers are not supported"));
+        SC_TEST_EXPECT(resultHasHttpError(result, HttpError::ChunkTrailersUnsupported));
         SC_TEST_EXPECT(ctx.httpServer.stop());
     };
 

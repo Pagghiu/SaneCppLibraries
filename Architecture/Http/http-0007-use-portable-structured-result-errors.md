@@ -49,6 +49,10 @@ separate code; its English text stays in the optional formatter.
 The multipart writer distinguishes absent, empty, unsafe, and oversized boundaries; malformed field/file names;
 unsafe content types; and part-count limits. Field and file paths share identities for the same portable condition.
 
+Incoming message framing reports Content-Length violations, conflicting or unsupported framing headers, invalid
+chunk syntax/terminators, trailers, and unsupported pipelined body bytes with portable codes. The same chunk-trailer
+identity propagates through server requests and client responses; no chunk text or OS status is retained in Result.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

@@ -445,7 +445,8 @@ Result HttpIncomingMessage::consumeBodyBytes(size_t bytes)
     {
         return Result(true);
     }
-    SC_TRY_MSG(bytes <= bodyBytesRemaining, "HttpIncomingMessage body exceeds Content-Length");
+    if (bytes > bodyBytesRemaining)
+        return Result::Error(HttpResultCategory, HttpError::BodyExceedsContentLength);
     bodyBytesRemaining -= bytes;
     if (bodyBytesRemaining == 0)
     {
@@ -503,14 +504,14 @@ Result HttpIncomingMessage::prepareBodyStream(AsyncBuffersPool& buffersPool, Fun
     const bool hasTransferEncoding = getHeader("Transfer-Encoding", transferEncoding);
     if (hasTransferEncoding and getHeader("Content-Length", contentLengthValue))
     {
-        return Result::Error("HttpIncomingMessage conflicting Content-Length and Transfer-Encoding");
+        return Result::Error(HttpResultCategory, HttpError::BodyFramingHeadersConflict);
     }
 
     if (hasTransferEncoding)
     {
         if (not scHttpTransferEncodingIsChunked(transferEncoding))
         {
-            return Result::Error("HttpIncomingMessage unsupported Transfer-Encoding");
+            return Result::Error(HttpResultCategory, HttpError::TransferEncodingUnsupported);
         }
         bodyFramingKind       = HttpBodyFramingKind::Chunked;
         bodyBytesRemaining    = 0;
@@ -549,7 +550,7 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
     {
         if (readData.sizeInBytes() > 0)
         {
-            return Result::Error("HttpIncomingMessage unexpected body data");
+            return Result::Error(HttpResultCategory, HttpError::UnexpectedBodyData);
         }
         return Result(true);
     }
@@ -558,7 +559,7 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
     {
         if (bodyFramingKind == HttpBodyFramingKind::ContentLength and readData.sizeInBytes() > bodyBytesRemaining)
         {
-            return Result::Error("HttpIncomingMessage received body beyond Content-Length");
+            return Result::Error(HttpResultCategory, HttpError::BodyExceedsContentLength);
         }
 
         const uint64_t remainingBeforePush = bodyBytesRemaining;
@@ -575,8 +576,8 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             }
             else
             {
-                SC_TRY_MSG(bodyBytesRemaining + readData.sizeInBytes() == remainingBeforePush,
-                           "HttpIncomingMessage body stream consumed an unexpected byte count");
+                if (bodyBytesRemaining + readData.sizeInBytes() != remainingBeforePush)
+                    return Result::Error(HttpResultCategory, HttpError::BodyStreamConsumptionMismatch);
             }
         }
         if (bodyFramingKind == HttpBodyFramingKind::ContentLength and bodyBytesRemaining == 0)
@@ -600,7 +601,8 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             uint8_t hexValue = 0;
             if (scHttpHexValue(current, hexValue))
             {
-                SC_TRY_MSG(chunkedChunkSize <= (UINT64_MAX - hexValue) / 16, "HttpIncomingMessage chunk size overflow");
+                if (chunkedChunkSize > (UINT64_MAX - hexValue) / 16)
+                    return Result::Error(HttpResultCategory, HttpError::ChunkSizeOverflow);
                 chunkedChunkSize     = chunkedChunkSize * 16 + hexValue;
                 chunkedSizeHasDigits = true;
                 rawOffset++;
@@ -608,19 +610,21 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             }
             if (current == ';')
             {
-                SC_TRY_MSG(chunkedSizeHasDigits, "HttpIncomingMessage invalid chunk size");
+                if (not chunkedSizeHasDigits)
+                    return Result::Error(HttpResultCategory, HttpError::ChunkSizeInvalid);
                 chunkedState = ChunkedState::SizeExtension;
                 rawOffset++;
                 break;
             }
             if (current == '\r')
             {
-                SC_TRY_MSG(chunkedSizeHasDigits, "HttpIncomingMessage invalid chunk size");
+                if (not chunkedSizeHasDigits)
+                    return Result::Error(HttpResultCategory, HttpError::ChunkSizeInvalid);
                 chunkedState = ChunkedState::SizeLF;
                 rawOffset++;
                 break;
             }
-            return Result::Error("HttpIncomingMessage invalid chunk size");
+            return Result::Error(HttpResultCategory, HttpError::ChunkSizeInvalid);
         }
         case ChunkedState::SizeExtension:
             if (current == '\r')
@@ -630,7 +634,8 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             rawOffset++;
             break;
         case ChunkedState::SizeLF:
-            SC_TRY_MSG(current == '\n', "HttpIncomingMessage malformed chunk header");
+            if (current != '\n')
+                return Result::Error(HttpResultCategory, HttpError::ChunkHeaderMalformed);
             rawOffset++;
             if (chunkedChunkSize == 0)
             {
@@ -683,12 +688,14 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             break;
         }
         case ChunkedState::DataCR:
-            SC_TRY_MSG(current == '\r', "HttpIncomingMessage malformed chunk terminator");
+            if (current != '\r')
+                return Result::Error(HttpResultCategory, HttpError::ChunkTerminatorMalformed);
             chunkedState = ChunkedState::DataLF;
             rawOffset++;
             break;
         case ChunkedState::DataLF:
-            SC_TRY_MSG(current == '\n', "HttpIncomingMessage malformed chunk terminator");
+            if (current != '\n')
+                return Result::Error(HttpResultCategory, HttpError::ChunkTerminatorMalformed);
             chunkedChunkSize     = 0;
             chunkedSizeHasDigits = false;
             chunkedState         = ChunkedState::Size;
@@ -701,9 +708,10 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
                 rawOffset++;
                 break;
             }
-            return Result::Error("HttpIncomingMessage non-empty trailers are not supported");
+            return Result::Error(HttpResultCategory, HttpError::ChunkTrailersUnsupported);
         case ChunkedState::TrailerEndLF:
-            SC_TRY_MSG(current == '\n', "HttpIncomingMessage malformed trailer terminator");
+            if (current != '\n')
+                return Result::Error(HttpResultCategory, HttpError::ChunkTrailerTerminatorMalformed);
             chunkedState = ChunkedState::Finished;
             bodyComplete = true;
             rawOffset++;
@@ -719,7 +727,7 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
                 }
                 else
                 {
-                    return Result::Error("HttpIncomingMessage does not support pipelined body data");
+                    return Result::Error(HttpResultCategory, HttpError::PipelinedBodyUnsupported);
                 }
             }
             finishBodyStream();
@@ -734,7 +742,7 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
                 sourceStream.getBuffersPool().unrefBuffer(pendingID);
                 return Result(true);
             }
-            return Result::Error("HttpIncomingMessage does not support pipelined body data");
+            return Result::Error(HttpResultCategory, HttpError::PipelinedBodyUnsupported);
         }
     }
     return Result(true);

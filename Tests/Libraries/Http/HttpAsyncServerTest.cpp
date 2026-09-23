@@ -206,6 +206,26 @@ struct ProbeHttpResponse : SC::HttpResponse
     }
 };
 
+struct ProbeHttpIncomingMessage : SC::HttpIncomingMessage
+{
+    void setContentLength(SC::uint64_t bytes)
+    {
+        setBodyFramingKind(SC::HttpBodyFramingKind::ContentLength);
+        setBodyBytesRemaining(bytes);
+    }
+
+    void setChunked()
+    {
+        setBodyFramingKind(SC::HttpBodyFramingKind::Chunked);
+        chunkedState          = ChunkedState::Size;
+        chunkedChunkSize      = 0;
+        chunkedBytesRemaining = 0;
+        chunkedSizeHasDigits  = false;
+    }
+
+    SC::Result processPrefix(SC::StringSpan data) { return processBodyData(bodyStream, {}, data.toCharSpan(), false); }
+};
+
 struct TimeoutGuard
 {
     SC::AsyncLoopTimeout timeout;
@@ -272,6 +292,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             fixedBufferWriterErrors();
         }
+        if (test_section("incoming body framing errors"))
+        {
+            incomingBodyFramingErrors();
+        }
         if (test_section("server lifecycle diagnostic messages"))
         {
             serverLifecycleDiagnosticMessages();
@@ -309,6 +333,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void responseBodyHelpers();
     void responseDiagnosticMessages();
     void fixedBufferWriterErrors();
+    void incomingBodyFramingErrors();
     void serverLifecycleDiagnosticMessages();
     void connectionBodyCopyHelper();
     void chunkedRequestDecoding();
@@ -784,7 +809,7 @@ void SC::HttpAsyncServerTest::chunkedRequestRejectsTrailers()
     httpServer.onError = [this, &serverContext](Result result)
     {
         serverContext.sawError = true;
-        SC_TEST_EXPECT(resultMessageEquals(result, "HttpIncomingMessage non-empty trailers are not supported"));
+        SC_TEST_EXPECT(resultHasHttpError(result, HttpError::ChunkTrailersUnsupported));
     };
 
     httpServer.onRequest = [this, &serverContext](HttpConnection& client)
@@ -1037,6 +1062,28 @@ void SC::HttpAsyncServerTest::responseBodyHelpers()
 
         SC_TEST_EXPECT(not response.sendBody(200, "body", "text/plain"));
     }
+}
+
+void SC::HttpAsyncServerTest::incomingBodyFramingErrors()
+{
+    ProbeHttpIncomingMessage incoming;
+    incoming.setContentLength(3);
+    SC_TEST_EXPECT(resultHasHttpError(incoming.consumeBodyBytes(4), HttpError::BodyExceedsContentLength));
+    SC_TEST_EXPECT(incoming.getBodyBytesRemaining() == 3);
+    SC_TEST_EXPECT(incoming.consumeBodyBytes(2));
+    SC_TEST_EXPECT(incoming.getBodyBytesRemaining() == 1);
+    SC_TEST_EXPECT(resultHasHttpError(incoming.consumeBodyBytes(2), HttpError::BodyExceedsContentLength));
+
+    incoming.setChunked();
+    SC_TEST_EXPECT(resultHasHttpError(incoming.processPrefix("G"), HttpError::ChunkSizeInvalid));
+    incoming.setChunked();
+    SC_TEST_EXPECT(resultHasHttpError(incoming.processPrefix("FFFFFFFFFFFFFFFFF"), HttpError::ChunkSizeOverflow));
+    incoming.setChunked();
+    SC_TEST_EXPECT(resultHasHttpError(incoming.processPrefix("1\rx"), HttpError::ChunkHeaderMalformed));
+    incoming.setChunked();
+    SC_TEST_EXPECT(resultHasHttpError(incoming.processPrefix("0\r\n\rx"), HttpError::ChunkTrailerTerminatorMalformed));
+    incoming.setChunked();
+    SC_TEST_EXPECT(resultHasHttpError(incoming.processPrefix("0\r\n\r\nx"), HttpError::PipelinedBodyUnsupported));
 }
 
 void SC::HttpAsyncServerTest::fixedBufferWriterErrors()

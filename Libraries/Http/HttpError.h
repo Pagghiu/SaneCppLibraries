@@ -67,6 +67,18 @@ enum class HttpError : uint32_t
     MultipartWriterFileNameUnsafe,
     MultipartWriterContentTypeUnsafe,
     MultipartWriterPartLimitExceeded,
+    BodyExceedsContentLength,
+    BodyFramingHeadersConflict,
+    TransferEncodingUnsupported,
+    UnexpectedBodyData,
+    BodyStreamConsumptionMismatch,
+    ChunkSizeOverflow,
+    ChunkSizeInvalid,
+    ChunkHeaderMalformed,
+    ChunkTerminatorMalformed,
+    ChunkTrailersUnsupported,
+    ChunkTrailerTerminatorMalformed,
+    PipelinedBodyUnsupported,
 };
 
 /// @brief Stable category assigned to Http-owned errors.
