@@ -3,6 +3,7 @@
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "HttpStringAppend.h"
 #include "HttpTestClient.h"
+#include "Libraries/AsyncStreams/ZLibTransformStreams.h"
 #include "Libraries/Http/HttpAsyncClient.h"
 #include "Libraries/Http/Internal/HttpFixedBufferWriter.h"
 #include "Libraries/Memory/Buffer.h"
@@ -1432,10 +1433,27 @@ void SC::HttpAsyncServerTest::chunkedClientRequestWriting()
     ChunkedBodyStream bodyStream;
     SC_TEST_EXPECT(bodyStream.init(pool, StringSpan("ChunkedBody").toCharSpan(), 3));
 
+    HttpContentEncoding parsedEncoding = HttpContentEncoding::Identity;
+    SC_TEST_EXPECT(
+        resultHasHttpError(httpContentEncodingFromHeader("br", parsedEncoding), HttpError::ContentEncodingUnsupported));
+    SyncZLibTransformStream compressor;
+    SC_TEST_EXPECT(resultHasHttpError(request.setCompressedBody(bodyStream, compressor, HttpContentEncoding::Identity),
+                                      HttpError::CompressedBodyEncodingInvalid));
+
     SC_TEST_EXPECT(request.startRequest(HttpParser::Method::HttpPUT, "/chunked"));
+    SC_TEST_EXPECT(resultHasHttpError(request.startRequest(HttpParser::Method::HttpPOST, "/again"),
+                                      HttpError::RequestStartAlreadyWritten));
     SC_TEST_EXPECT(request.addHeader("Host", "127.0.0.1"));
     SC_TEST_EXPECT(request.setBody(bodyStream));
     SC_TEST_EXPECT(request.sendHeaders());
+
+    ProbeRequest        invalidRequest;
+    HttpMultipartWriter missingBoundary;
+    char                invalidHeaders[256] = {};
+    invalidRequest.setup(invalidHeaders, writable);
+    SC_TEST_EXPECT(invalidRequest.startRequest(HttpParser::Method::HttpPOST, "/multipart"));
+    invalidRequest.setMultipart(missingBoundary);
+    SC_TEST_EXPECT(resultHasHttpError(invalidRequest.sendHeaders(), HttpError::MultipartWriterBoundaryMissing));
 
     AsyncPipeline pipeline;
     pipeline.source   = &bodyStream;

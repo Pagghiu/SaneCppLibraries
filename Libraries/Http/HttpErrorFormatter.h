@@ -116,6 +116,12 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ResponseStatusFormattingFailed: formatter.append("HTTP response status formatting failed"); break;
     case HttpError::RedirectStatusInvalid: formatter.append("HTTP redirect status must be 3xx"); break;
     case HttpError::RedirectLocationEmpty: formatter.append("HTTP redirect location is empty"); break;
+    case HttpError::ContentEncodingUnsupported: formatter.append("HTTP Content-Encoding is unsupported"); break;
+    case HttpError::RequestStartAlreadyWritten: formatter.append("HTTP request start has already been written"); break;
+    case HttpError::CompressedBodyEncodingInvalid:
+        formatter.append("Compressed HTTP request body requires gzip or deflate");
+        break;
+    case HttpError::MultipartWriterMissing: formatter.append("Multipart request writer is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -178,7 +178,7 @@ Result httpContentEncodingFromHeader(StringSpan headerValue, HttpContentEncoding
         encoding = HttpContentEncoding::Deflate;
         return Result(true);
     }
-    return Result::Error("HttpContentEncoding unsupported content encoding");
+    return Result::Error(HttpResultCategory, HttpError::ContentEncodingUnsupported);
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -1261,8 +1261,10 @@ Result HttpAsyncClientRequest::startRequest(HttpParser::Method value, StringSpan
 {
     static constexpr HttpError HeaderSpaceFinished = HttpError::HeaderOutputTooSmall;
 
-    SC_TRY_MSG(not headersSent, "Headers already sent");
-    SC_TRY_MSG(responseHeaders.writtenBytes() == 0, "startRequest must be the first call");
+    if (headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
+    if (responseHeaders.writtenBytes() != 0)
+        return Result::Error(HttpResultCategory, HttpError::RequestStartAlreadyWritten);
 
     method = value;
     url    = valueURL.sizeInBytes() > 0 ? valueURL : StringSpan("/");
@@ -1336,8 +1338,8 @@ void HttpAsyncClientRequest::setBody(AsyncReadableStream& stream, uint64_t conte
 Result HttpAsyncClientRequest::setCompressedBody(AsyncReadableStream& stream, SyncZLibTransformStream& compressor,
                                                  HttpContentEncoding encoding)
 {
-    SC_TRY_MSG(encoding == HttpContentEncoding::GZip or encoding == HttpContentEncoding::Deflate,
-               "HttpAsyncClientRequest compressed body requires gzip or deflate");
+    if (encoding != HttpContentEncoding::GZip and encoding != HttpContentEncoding::Deflate)
+        return Result::Error(HttpResultCategory, HttpError::CompressedBodyEncodingInvalid);
 
     bodyType        = BodyType::Stream;
     bodySpan        = {};
@@ -1380,9 +1382,10 @@ Result HttpAsyncClientRequest::sendHeaders(Function<void(AsyncBufferView::ID)> c
     }
     if (bodyType == BodyType::Multipart and not hasHeader(KnownHeader::ContentType))
     {
-        SC_TRY_MSG(multipartWriter != nullptr, "HttpAsyncClientRequest multipart writer missing");
-        SC_TRY_MSG(multipartWriter->getBoundary().sizeInBytes() > 0,
-                   "HttpAsyncClientRequest multipart boundary missing");
+        if (multipartWriter == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::MultipartWriterMissing);
+        if (multipartWriter->getBoundary().isEmpty())
+            return Result::Error(HttpResultCategory, HttpError::MultipartWriterBoundaryMissing);
         SC_TRY(responseHeaders.appendLiteral("Content-Type: multipart/form-data; boundary=", HeaderSpaceFinished));
         SC_TRY(responseHeaders.append(multipartWriter->getBoundary(), HeaderSpaceFinished));
         SC_TRY(responseHeaders.appendLiteral("\r\n", HeaderSpaceFinished));

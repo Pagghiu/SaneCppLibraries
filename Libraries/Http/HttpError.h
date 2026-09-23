@@ -95,6 +95,10 @@ enum class HttpError : uint32_t
     ResponseStatusFormattingFailed,
     RedirectStatusInvalid,
     RedirectLocationEmpty,
+    ContentEncodingUnsupported,
+    RequestStartAlreadyWritten,
+    CompressedBodyEncodingInvalid,
+    MultipartWriterMissing,
 };
 
 /// @brief Stable category assigned to Http-owned errors.
