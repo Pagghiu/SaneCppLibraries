@@ -120,6 +120,19 @@ enum class HttpError : uint32_t
     ParserHeaderTerminatorMalformed,
     ParserSpanInvalid,
     HeaderBlockIncomplete,
+    ServerReadQueueEmpty,
+    ServerWriteQueueEmpty,
+    ServerBufferPoolEmpty,
+    ServerResizeAddressChanged,
+    ServerResizeActiveConnection,
+    ServerAlreadyStarted,
+    ServerNotInitialized,
+    ServerExternalListenerRequired,
+    ServerConnectionSlotUnavailable,
+    ServerStopRequired,
+    ServerNotStarted,
+    ServerNotStopping,
+    ServerDataListenerUnavailable,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

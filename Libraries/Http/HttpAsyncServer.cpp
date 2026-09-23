@@ -12,13 +12,14 @@ Result HttpAsyncServer::initInternal(SpanWithStride<HttpConnection> connectionsS
         HttpConnection& connection = connectionsSpan[idx];
         if (connection.readableSocketStream.getReadQueueSize() == 0)
         {
-            return Result::Error("HttpConnection::readableSocketStream::readQueue is empty");
+            return Result::Error(HttpResultCategory, HttpError::ServerReadQueueEmpty);
         }
         if (connection.writableSocketStream.getWriteQueueSize() == 0)
         {
-            return Result::Error("HttpConnection::writableSocketStream::writeQueue is empty");
+            return Result::Error(HttpResultCategory, HttpError::ServerWriteQueueEmpty);
         }
-        SC_TRY_MSG(connection.buffersPool.getNumBuffers() > 0, "HttpAsyncServer - AsyncBuffersPool is empty");
+        if (connection.buffersPool.getNumBuffers() == 0)
+            return Result::Error(HttpResultCategory, HttpError::ServerBufferPoolEmpty);
     }
     SC_TRY(connections.init(connectionsSpan.castTo<HttpConnection>()));
     return Result(true);
@@ -28,17 +29,20 @@ Result HttpAsyncServer::resizeInternal(SpanWithStride<HttpConnection> connection
 {
     if (connections.getNumTotalConnections() > 0 and not connectionsSpan.empty())
     {
-        SC_TRY_MSG(&connectionsSpan[0] == &connections.getConnectionAt(0), "HttpAsyncServer::resize changed address");
+        if (&connectionsSpan[0] != &connections.getConnectionAt(0))
+            return Result::Error(HttpResultCategory, HttpError::ServerResizeAddressChanged);
     }
-    SC_TRY_MSG(connectionsSpan.sizeInElements() > connections.getHighestActiveConnection(),
-               "HttpAsyncServer::resize connection in use");
+    if (connectionsSpan.sizeInElements() <= connections.getHighestActiveConnection())
+        return Result::Error(HttpResultCategory, HttpError::ServerResizeActiveConnection);
     return initInternal(connectionsSpan);
 }
 
 Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port)
 {
-    SC_TRY_MSG(state == State::Stopped, "HttpAsyncServer::start requires stopped state");
-    SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::start - init not called");
+    if (state != State::Stopped)
+        return Result::Error(HttpResultCategory, HttpError::ServerAlreadyStarted);
+    if (connections.getNumTotalConnections() == 0)
+        return Result::Error(HttpResultCategory, HttpError::ServerNotInitialized);
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
     eventLoop = &loop;
@@ -57,8 +61,10 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
 
 Result HttpAsyncServer::startExternal(AsyncEventLoop& loop)
 {
-    SC_TRY_MSG(state == State::Stopped, "HttpAsyncServer::startExternal requires stopped state");
-    SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::startExternal - init not called");
+    if (state != State::Stopped)
+        return Result::Error(HttpResultCategory, HttpError::ServerAlreadyStarted);
+    if (connections.getNumTotalConnections() == 0)
+        return Result::Error(HttpResultCategory, HttpError::ServerNotInitialized);
     eventLoop        = &loop;
     externalListener = true;
     state            = State::Started;
@@ -68,11 +74,11 @@ Result HttpAsyncServer::startExternal(AsyncEventLoop& loop)
 Result HttpAsyncServer::acceptExternalConnection(HttpConnection& connection, AsyncReadableStream& readable,
                                                  AsyncWritableStream& writable)
 {
-    SC_TRY_MSG(state == State::Started and externalListener,
-               "HttpAsyncServer::acceptExternalConnection requires an external listener");
+    if (state != State::Started or not externalListener)
+        return Result::Error(HttpResultCategory, HttpError::ServerExternalListenerRequired);
     HttpConnection::ID connectionID;
-    SC_TRY_MSG(connections.activate(connection, connectionID),
-               "HttpAsyncServer::acceptExternalConnection slot unavailable");
+    if (not connections.activate(connection, connectionID))
+        return Result::Error(HttpResultCategory, HttpError::ServerConnectionSlotUnavailable);
 
     connection.resetTransportStreams();
     connection.setTransportStreams(readable, writable);
@@ -87,7 +93,8 @@ Result HttpAsyncServer::acceptExternalConnection(HttpConnection& connection, Asy
 
 Result HttpAsyncServer::close()
 {
-    SC_TRY_MSG(state == State::Stopping, "HttpAsyncServer::close requires stop before close");
+    if (state != State::Stopping)
+        return Result::Error(HttpResultCategory, HttpError::ServerStopRequired);
     SC_TRY(waitForStopToFinish());
     SC_TRY(connections.close());
     externalListener = false;
@@ -97,7 +104,8 @@ Result HttpAsyncServer::close()
 
 Result HttpAsyncServer::stop()
 {
-    SC_TRY_MSG(state == State::Started, "HttpAsyncServer::stop requires started state");
+    if (state != State::Started)
+        return Result::Error(HttpResultCategory, HttpError::ServerNotStarted);
 
     state = State::Stopping;
     if (not externalListener and not asyncServerAccept.isFree())
@@ -115,7 +123,8 @@ Result HttpAsyncServer::stop()
 
 Result HttpAsyncServer::waitForStopToFinish()
 {
-    SC_TRY_MSG(state == State::Stopping, "HttpAsyncServer::waitForStopToFinish requires stopping state");
+    if (state != State::Stopping)
+        return Result::Error(HttpResultCategory, HttpError::ServerNotStopping);
     while (connections.getNumActiveConnections() > 0)
     {
         SC_TRY(eventLoop->runNoWait());
@@ -234,8 +243,8 @@ Result HttpAsyncServer::beginHttpConnection(HttpConnection& client)
     client.response.setWritableStream(client.getWritableTransportStream());
 
     EventDataListener dataListener{*this, client};
-    SC_TRY_MSG(client.getReadableTransportStream().eventData.addListener(dataListener),
-               "HttpAsyncServer readable data listener unavailable");
+    if (not client.getReadableTransportStream().eventData.addListener(dataListener))
+        return Result::Error(HttpResultCategory, HttpError::ServerDataListenerUnavailable);
     if (client.getReadableTransportStream().canStart())
     {
         SC_TRY(client.getReadableTransportStream().start());

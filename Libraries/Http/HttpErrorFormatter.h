@@ -149,6 +149,29 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ParserHeaderTerminatorMalformed: formatter.append("HTTP header terminator is malformed"); break;
     case HttpError::ParserSpanInvalid: formatter.append("HTTP parser span is invalid"); break;
     case HttpError::HeaderBlockIncomplete: formatter.append("HTTP header block is incomplete"); break;
+    case HttpError::ServerReadQueueEmpty: formatter.append("HTTP server connection read queue is empty"); break;
+    case HttpError::ServerWriteQueueEmpty: formatter.append("HTTP server connection write queue is empty"); break;
+    case HttpError::ServerBufferPoolEmpty: formatter.append("HTTP server connection buffer pool is empty"); break;
+    case HttpError::ServerResizeAddressChanged:
+        formatter.append("HTTP server connection storage address changed");
+        break;
+    case HttpError::ServerResizeActiveConnection:
+        formatter.append("HTTP server resize would remove an active connection");
+        break;
+    case HttpError::ServerAlreadyStarted: formatter.append("HTTP server is already started or stopping"); break;
+    case HttpError::ServerNotInitialized: formatter.append("HTTP server has no initialized connections"); break;
+    case HttpError::ServerExternalListenerRequired:
+        formatter.append("HTTP server has no active external listener");
+        break;
+    case HttpError::ServerConnectionSlotUnavailable:
+        formatter.append("HTTP server connection slot is unavailable");
+        break;
+    case HttpError::ServerStopRequired: formatter.append("HTTP server must stop before closing"); break;
+    case HttpError::ServerNotStarted: formatter.append("HTTP server is not started"); break;
+    case HttpError::ServerNotStopping: formatter.append("HTTP server is not stopping"); break;
+    case HttpError::ServerDataListenerUnavailable:
+        formatter.append("HTTP server readable data listener is unavailable");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

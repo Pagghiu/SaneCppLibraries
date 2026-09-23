@@ -243,15 +243,6 @@ struct TimeoutGuard
     }
 };
 
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
-{
-    if (result or result.message == nullptr)
-    {
-        return false;
-    }
-    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
-}
-
 static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
     return not result and result.category() == SC::HttpResultCategory and
@@ -405,9 +396,9 @@ void SC::HttpAsyncServerTest::externalListenerInjectsAcceptedStreams()
             accepted = server->acceptExternalConnection(*connection, connection->readableSocketStream,
                                                         connection->writableSocketStream);
             slotRejected =
-                resultMessageEquals(server->acceptExternalConnection(*connection, connection->readableSocketStream,
-                                                                     connection->writableSocketStream),
-                                    "HttpAsyncServer::acceptExternalConnection slot unavailable");
+                resultHasHttpError(server->acceptExternalConnection(*connection, connection->readableSocketStream,
+                                                                    connection->writableSocketStream),
+                                   HttpError::ServerConnectionSlotUnavailable);
         }
 
         void onResponse(HttpAsyncClientResponse& response)
@@ -1263,8 +1254,8 @@ void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()
     {
         HttpConnection  connection;
         HttpAsyncServer server;
-        SC_TEST_EXPECT(resultMessageEquals(server.init(Span<HttpConnection>(&connection, 1)),
-                                           "HttpConnection::readableSocketStream::readQueue is empty"));
+        SC_TEST_EXPECT(
+            resultHasHttpError(server.init(Span<HttpConnection>(&connection, 1)), HttpError::ServerReadQueueEmpty));
     }
 
     {
@@ -1272,8 +1263,8 @@ void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()
         AsyncReadableStream::Request readQueue[1];
         HttpAsyncServer              server;
         connection.readableSocketStream.setReadQueue(readQueue);
-        SC_TEST_EXPECT(resultMessageEquals(server.init(Span<HttpConnection>(&connection, 1)),
-                                           "HttpConnection::writableSocketStream::writeQueue is empty"));
+        SC_TEST_EXPECT(
+            resultHasHttpError(server.init(Span<HttpConnection>(&connection, 1)), HttpError::ServerWriteQueueEmpty));
     }
 
     {
@@ -1283,19 +1274,19 @@ void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()
         HttpAsyncServer              server;
         connection.readableSocketStream.setReadQueue(readQueue);
         connection.writableSocketStream.setWriteQueue(writeQueue);
-        SC_TEST_EXPECT(resultMessageEquals(server.init(Span<HttpConnection>(&connection, 1)),
-                                           "HttpAsyncServer - AsyncBuffersPool is empty"));
+        SC_TEST_EXPECT(
+            resultHasHttpError(server.init(Span<HttpConnection>(&connection, 1)), HttpError::ServerBufferPoolEmpty));
     }
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
     HttpAsyncServer uninitializedServer;
-    SC_TEST_EXPECT(resultMessageEquals(uninitializedServer.start(eventLoop, "127.0.0.1", report.mapPort(6169)),
-                                       "HttpAsyncServer::start - init not called"));
-    SC_TEST_EXPECT(resultMessageEquals(uninitializedServer.stop(), "HttpAsyncServer::stop requires started state"));
-    SC_TEST_EXPECT(
-        resultMessageEquals(uninitializedServer.close(), "HttpAsyncServer::close requires stop before close"));
+    SC_TEST_EXPECT(resultHasHttpError(uninitializedServer.start(eventLoop, "127.0.0.1", report.mapPort(6169)),
+                                      HttpError::ServerNotInitialized));
+    SC_TEST_EXPECT(resultHasHttpError(uninitializedServer.startExternal(eventLoop), HttpError::ServerNotInitialized));
+    SC_TEST_EXPECT(resultHasHttpError(uninitializedServer.stop(), HttpError::ServerNotStarted));
+    SC_TEST_EXPECT(resultHasHttpError(uninitializedServer.close(), HttpError::ServerStopRequired));
 
     using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
 
@@ -1304,8 +1295,13 @@ void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()
     const uint16_t     serverPort = report.mapPort(6170);
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
-    SC_TEST_EXPECT(resultMessageEquals(httpServer.start(eventLoop, "127.0.0.1", report.mapPort(6171)),
-                                       "HttpAsyncServer::start requires stopped state"));
+    SC_TEST_EXPECT(resultHasHttpError(httpServer.start(eventLoop, "127.0.0.1", report.mapPort(6171)),
+                                      HttpError::ServerAlreadyStarted));
+    SC_TEST_EXPECT(resultHasHttpError(httpServer.startExternal(eventLoop), HttpError::ServerAlreadyStarted));
+    SC_TEST_EXPECT(
+        resultHasHttpError(httpServer.acceptExternalConnection(connections[0], connections[0].readableSocketStream,
+                                                               connections[0].writableSocketStream),
+                           HttpError::ServerExternalListenerRequired));
     SC_TEST_EXPECT(httpServer.stop());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());

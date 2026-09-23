@@ -68,6 +68,10 @@ The incremental HTTP parser treats empty input and repeated calls after completi
 Malformed token classes and internal span failures use Http codes. Shared header accumulation retains the first
 parser/callback/stream error and returns that identity on retries instead of collapsing it to a boolean failure.
 
+Async server setup and lifecycle use portable queue/pool, connection-slot, listener, and state-transition identities.
+The same precondition uses the same code in native-listener and external-listener modes; socket and transport failures
+retain their originating library identities.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched
