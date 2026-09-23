@@ -206,6 +206,12 @@ static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
     }
     return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
 }
+
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
+{
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
+}
 } // namespace
 
 struct SC::HttpAsyncClientTest : public SC::TestCase
@@ -406,26 +412,32 @@ void SC::HttpAsyncClientTest::multipartWriterValidation()
 {
     HttpMultipartWriter writer;
 
-    SC_TEST_EXPECT(
-        resultMessageEquals(writer.addField("field", "value"), "HttpMultipartWriter::addField boundary not set"));
-    SC_TEST_EXPECT(
-        resultMessageEquals(writer.setBoundary("bad boundary"), "HttpMultipartWriter::setBoundary unsafe boundary"));
-    SC_TEST_EXPECT(resultMessageEquals(writer.setBoundary(StringSpan({"\r\n", 2}, false, StringEncoding::Ascii)),
-                                       "HttpMultipartWriter::setBoundary unsafe boundary"));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addField("field", "value"), HttpError::MultipartWriterBoundaryMissing));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addFile("field", "ok.txt", StringSpan("body").toCharSpan()),
+                                      HttpError::MultipartWriterBoundaryMissing));
+    SC_TEST_EXPECT(resultHasHttpError(writer.setBoundary(""), HttpError::MultipartWriterBoundaryEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(writer.setBoundary("bad boundary"), HttpError::MultipartWriterBoundaryUnsafe));
+    SC_TEST_EXPECT(resultHasHttpError(writer.setBoundary(StringSpan({"\r\n", 2}, false, StringEncoding::Ascii)),
+                                      HttpError::MultipartWriterBoundaryUnsafe));
+    SC_TEST_EXPECT(resultHasHttpError(
+        writer.setBoundary("01234567890123456789012345678901234567890123456789012345678901234567890"),
+        HttpError::MultipartBoundaryTooLong));
 
     SC_TEST_EXPECT(writer.setBoundary("----SCMultipartBoundary"));
-    SC_TEST_EXPECT(resultMessageEquals(writer.addField("", "value"), "HttpMultipartWriter::addField empty field name"));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addField("", "value"), HttpError::MultipartWriterFieldNameEmpty));
     SC_TEST_EXPECT(
-        resultMessageEquals(writer.addField("bad\"name", "value"), "HttpMultipartWriter::addField unsafe field name"));
-    SC_TEST_EXPECT(resultMessageEquals(writer.addFile("", "ok.txt", StringSpan("body").toCharSpan()),
-                                       "HttpMultipartWriter::addFile empty field name"));
-    SC_TEST_EXPECT(resultMessageEquals(writer.addFile("file", "bad\"name.txt", StringSpan("body").toCharSpan()),
-                                       "HttpMultipartWriter::addFile unsafe file name"));
-    SC_TEST_EXPECT(resultMessageEquals(writer.addFile("file", "bad\\name.txt", StringSpan("body").toCharSpan()),
-                                       "HttpMultipartWriter::addFile unsafe file name"));
+        resultHasHttpError(writer.addField("bad\"name", "value"), HttpError::MultipartWriterFieldNameUnsafe));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addFile("", "ok.txt", StringSpan("body").toCharSpan()),
+                                      HttpError::MultipartWriterFieldNameEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addFile("bad\"name", "ok.txt", StringSpan("body").toCharSpan()),
+                                      HttpError::MultipartWriterFieldNameUnsafe));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addFile("file", "bad\"name.txt", StringSpan("body").toCharSpan()),
+                                      HttpError::MultipartWriterFileNameUnsafe));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addFile("file", "bad\\name.txt", StringSpan("body").toCharSpan()),
+                                      HttpError::MultipartWriterFileNameUnsafe));
     SC_TEST_EXPECT(
-        resultMessageEquals(writer.addFile("file", "ok.txt", StringSpan("body").toCharSpan(), "text/plain\r\nX-Bad: 1"),
-                            "HttpMultipartWriter::addFile unsafe content type"));
+        resultHasHttpError(writer.addFile("file", "ok.txt", StringSpan("body").toCharSpan(), "text/plain\r\nX-Bad: 1"),
+                           HttpError::MultipartWriterContentTypeUnsafe));
     SC_TEST_EXPECT(writer.getNumParts() == 0);
 
     SC_TEST_EXPECT(writer.addField("field", "value"));
@@ -436,10 +448,9 @@ void SC::HttpAsyncClientTest::multipartWriterValidation()
     {
         SC_TEST_EXPECT(writer.addField("field", "value"));
     }
-    SC_TEST_EXPECT(
-        resultMessageEquals(writer.addField("field", "value"), "HttpMultipartWriter::addField too many parts"));
-    SC_TEST_EXPECT(resultMessageEquals(writer.addFile("file", "safe-name.txt", StringSpan("body").toCharSpan()),
-                                       "HttpMultipartWriter::addFile too many parts"));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addField("field", "value"), HttpError::MultipartWriterPartLimitExceeded));
+    SC_TEST_EXPECT(resultHasHttpError(writer.addFile("file", "safe-name.txt", StringSpan("body").toCharSpan()),
+                                      HttpError::MultipartWriterPartLimitExceeded));
 }
 
 void SC::HttpAsyncClientTest::basicGet()

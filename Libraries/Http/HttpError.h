@@ -59,6 +59,14 @@ enum class HttpError : uint32_t
     HeaderOutputTooSmall,
     MultipartBodyOutputTooSmall,
     ContentLengthFormattingFailed,
+    MultipartWriterBoundaryEmpty,
+    MultipartWriterBoundaryUnsafe,
+    MultipartWriterBoundaryMissing,
+    MultipartWriterFieldNameEmpty,
+    MultipartWriterFieldNameUnsafe,
+    MultipartWriterFileNameUnsafe,
+    MultipartWriterContentTypeUnsafe,
+    MultipartWriterPartLimitExceeded,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

@@ -193,9 +193,12 @@ void HttpMultipartWriter::reset()
 Result HttpMultipartWriter::setBoundary(StringSpan boundaryValue)
 {
     reset();
-    SC_TRY_MSG(boundaryValue.sizeInBytes() > 0, "HttpMultipartWriter::setBoundary empty boundary");
-    SC_TRY_MSG(boundaryValue.sizeInBytes() < sizeof(boundaryStorage), "HttpMultipartWriter::setBoundary too long");
-    SC_TRY_MSG(scHttpMultipartBoundaryIsSafe(boundaryValue), "HttpMultipartWriter::setBoundary unsafe boundary");
+    if (boundaryValue.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterBoundaryEmpty);
+    if (boundaryValue.sizeInBytes() >= sizeof(boundaryStorage))
+        return Result::Error(HttpResultCategory, HttpError::MultipartBoundaryTooLong);
+    if (not scHttpMultipartBoundaryIsSafe(boundaryValue))
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterBoundaryUnsafe);
     ::memcpy(boundaryStorage, boundaryValue.bytesWithoutTerminator(), boundaryValue.sizeInBytes());
     boundary = StringSpan::fromNullTerminated(boundaryStorage, StringEncoding::Ascii);
     return Result(true);
@@ -203,10 +206,14 @@ Result HttpMultipartWriter::setBoundary(StringSpan boundaryValue)
 
 Result HttpMultipartWriter::addField(StringSpan fieldName, StringSpan value)
 {
-    SC_TRY_MSG(boundary.sizeInBytes() > 0, "HttpMultipartWriter::addField boundary not set");
-    SC_TRY_MSG(not fieldName.isEmpty(), "HttpMultipartWriter::addField empty field name");
-    SC_TRY_MSG(scHttpMultipartQuotedParameterIsSafe(fieldName), "HttpMultipartWriter::addField unsafe field name");
-    SC_TRY_MSG(numParts < MaxParts, "HttpMultipartWriter::addField too many parts");
+    if (boundary.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterBoundaryMissing);
+    if (fieldName.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterFieldNameEmpty);
+    if (not scHttpMultipartQuotedParameterIsSafe(fieldName))
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterFieldNameUnsafe);
+    if (numParts >= MaxParts)
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterPartLimitExceeded);
     Part& part       = parts[numParts++];
     part.partName    = fieldName;
     part.fileName    = {};
@@ -218,14 +225,18 @@ Result HttpMultipartWriter::addField(StringSpan fieldName, StringSpan value)
 Result HttpMultipartWriter::addFile(StringSpan fieldName, StringSpan fileName, Span<const char> body,
                                     StringSpan contentType)
 {
-    SC_TRY_MSG(boundary.sizeInBytes() > 0, "HttpMultipartWriter::addFile boundary not set");
-    SC_TRY_MSG(not fieldName.isEmpty(), "HttpMultipartWriter::addFile empty field name");
-    SC_TRY_MSG(scHttpMultipartQuotedParameterIsSafe(fieldName), "HttpMultipartWriter::addFile unsafe field name");
-    SC_TRY_MSG(fileName.isEmpty() or scHttpMultipartQuotedParameterIsSafe(fileName),
-               "HttpMultipartWriter::addFile unsafe file name");
-    SC_TRY_MSG(contentType.isEmpty() or scHttpHeaderValueIsSafe(contentType),
-               "HttpMultipartWriter::addFile unsafe content type");
-    SC_TRY_MSG(numParts < MaxParts, "HttpMultipartWriter::addFile too many parts");
+    if (boundary.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterBoundaryMissing);
+    if (fieldName.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterFieldNameEmpty);
+    if (not scHttpMultipartQuotedParameterIsSafe(fieldName))
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterFieldNameUnsafe);
+    if (not fileName.isEmpty() and not scHttpMultipartQuotedParameterIsSafe(fileName))
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterFileNameUnsafe);
+    if (not contentType.isEmpty() and not scHttpHeaderValueIsSafe(contentType))
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterContentTypeUnsafe);
+    if (numParts >= MaxParts)
+        return Result::Error(HttpResultCategory, HttpError::MultipartWriterPartLimitExceeded);
     Part& part       = parts[numParts++];
     part.partName    = fieldName;
     part.fileName    = fileName;

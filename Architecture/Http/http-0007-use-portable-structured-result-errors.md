@@ -46,6 +46,9 @@ The fixed-buffer writer accepts an Http error code for its caller-owned output c
 and multipart body staging to remain distinct without carrying diagnostic text. Content-Length formatting has a
 separate code; its English text stays in the optional formatter.
 
+The multipart writer distinguishes absent, empty, unsafe, and oversized boundaries; malformed field/file names;
+unsafe content types; and part-count limits. Field and file paths share identities for the same portable condition.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

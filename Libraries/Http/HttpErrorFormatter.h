@@ -66,6 +66,18 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::HeaderOutputTooSmall: formatter.append("HTTP header output buffer is too small"); break;
     case HttpError::MultipartBodyOutputTooSmall: formatter.append("Multipart body output buffer is too small"); break;
     case HttpError::ContentLengthFormattingFailed: formatter.append("Content-Length formatting failed"); break;
+    case HttpError::MultipartWriterBoundaryEmpty: formatter.append("Multipart output boundary is empty"); break;
+    case HttpError::MultipartWriterBoundaryUnsafe: formatter.append("Multipart output boundary is unsafe"); break;
+    case HttpError::MultipartWriterBoundaryMissing: formatter.append("Multipart output boundary is not set"); break;
+    case HttpError::MultipartWriterFieldNameEmpty: formatter.append("Multipart output field name is empty"); break;
+    case HttpError::MultipartWriterFieldNameUnsafe: formatter.append("Multipart output field name is unsafe"); break;
+    case HttpError::MultipartWriterFileNameUnsafe: formatter.append("Multipart output file name is unsafe"); break;
+    case HttpError::MultipartWriterContentTypeUnsafe:
+        formatter.append("Multipart output content type is unsafe");
+        break;
+    case HttpError::MultipartWriterPartLimitExceeded:
+        formatter.append("Multipart output part limit is exceeded");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
