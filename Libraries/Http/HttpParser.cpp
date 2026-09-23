@@ -59,11 +59,12 @@ static bool scHttpEqualsIgnoreCaseAscii(const char* lhs, const char* rhs, SC::si
 
 SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData)
 {
+    readBytes  = 0;
+    parsedData = {};
     if (state == State::Finished)
     {
-        return SC::Result(false);
+        return Result(true);
     }
-    readBytes = 0;
     if (type == Type::Request)
     {
         if (token == Token::HeadersEnd)
@@ -89,7 +90,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
 
     if (data.sizeInBytes() == 0)
     {
-        return SC::Result(false);
+        return Result(true);
     }
 
     SC_CO_BEGIN(topLevelCoroutine);
@@ -104,7 +105,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         globalLength = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseMethod, Token::Method>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseMethod, Token::Method, HttpError::ParserMethodMalformed>(data, readBytes,
+                                                                                                       parsedData)));
             SC_CO_RETURN(topLevelCoroutine, Result(true));
         } while (state == State::Parsing);
         //------------------------
@@ -117,7 +119,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseUrl, Token::Url>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseUrl, Token::Url, HttpError::ParserRequestTargetMalformed>(data, readBytes,
+                                                                                                        parsedData)));
             SC_CO_RETURN(topLevelCoroutine, Result(true));
         } while (state == State::Parsing);
         //------------------------
@@ -130,7 +133,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseVersion<false>, Token::Version>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseVersion<false>, Token::Version, HttpError::ParserVersionMalformed>(
+                data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, Result(true));
         } while (state == State::Parsing);
     }
@@ -143,7 +147,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseVersion<true>, Token::Version>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseVersion<true>, Token::Version, HttpError::ParserVersionMalformed>(
+                data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, Result(true));
         } while (state == State::Parsing);
 
@@ -154,7 +159,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseStatusCode, Token::StatusCode>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseStatusCode, Token::StatusCode, HttpError::ParserStatusCodeMalformed>(
+                data, readBytes, parsedData)));
             statusCode = static_cast<uint32_t>(number);
             SC_CO_RETURN(topLevelCoroutine, Result(true));
         } while (state == State::Parsing);
@@ -168,7 +174,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseHeaderValue, Token::StatusString>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseHeaderValue, Token::StatusString, HttpError::ParserStatusTextMalformed>(
+                data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, Result(true));
         } while (state == State::Parsing);
     }
@@ -189,7 +196,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
             matchIndex   = 0;
             do
             {
-                SC_TRY((process<&HttpParser::parseHeadersEnd, Token::HeadersEnd>(data, readBytes, parsedData)));
+                SC_TRY((process<&HttpParser::parseHeadersEnd, Token::HeadersEnd,
+                                HttpError::ParserHeaderTerminatorMalformed>(data, readBytes, parsedData)));
                 SC_CO_RETURN(topLevelCoroutine, Result(true));
             } while (state == State::Parsing);
             if (type == Type::Request)
@@ -219,7 +227,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                         }
                         readBytes = tokenLength - oldLength;
                     }
-                    SC_TRY(data.sliceStartLength(0, readBytes, parsedData));
+                    if (not data.sliceStartLength(0, readBytes, parsedData))
+                        return Result::Error(HttpResultCategory, HttpError::ParserSpanInvalid);
                     if (tokenLength == contentLength)
                     {
                         state = State::Result;
@@ -245,7 +254,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
             matchIndex   = 0;
             do
             {
-                SC_TRY((process<&HttpParser::parseHeaderName, Token::HeaderName>(data, readBytes, parsedData)));
+                SC_TRY((process<&HttpParser::parseHeaderName, Token::HeaderName, HttpError::ParserHeaderNameMalformed>(
+                    data, readBytes, parsedData)));
                 SC_CO_RETURN(topLevelCoroutine, Result(true));
             } while (state == State::Parsing);
 
@@ -261,7 +271,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY((process<&HttpParser::parseNumberValue, Token::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseNumberValue, Token::HeaderValue,
+                                    HttpError::ParserContentLengthMalformed>(data, readBytes, parsedData)));
                     contentLength = number;
                     SC_CO_RETURN(topLevelCoroutine, Result(true));
                 } while (state == State::Parsing);
@@ -277,8 +288,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY(
-                        (process<&HttpParser::parseConnectionValue, Token::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseConnectionValue, Token::HeaderValue,
+                                    HttpError::ParserConnectionHeaderMalformed>(data, readBytes, parsedData)));
                     SC_CO_RETURN(topLevelCoroutine, Result(true));
                 } while (state == State::Parsing);
             }
@@ -294,7 +305,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY((process<&HttpParser::parseHeaderValue, Token::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseHeaderValue, Token::HeaderValue,
+                                    HttpError::ParserHeaderValueMalformed>(data, readBytes, parsedData)));
                     SC_CO_RETURN(topLevelCoroutine, Result(true));
                 } while (state == State::Parsing);
             }
@@ -312,7 +324,7 @@ bool SC::HttpParser::matchesHeader(HeaderType headerName) const
     return matchingHeaderValid[headerIndex];
 }
 
-template <bool (SC::HttpParser::*Func)(char), SC::HttpParser::Token currentResult>
+template <bool (SC::HttpParser::*Func)(char), SC::HttpParser::Token currentResult, SC::HttpError malformed>
 SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData)
 {
     const auto initialStart  = tokenStart;
@@ -380,7 +392,8 @@ SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Sp
         while (it != end)
         {
             tokenLength++;
-            SC_TRY((this->*Func)(*it)); // can modify start or length with spaces
+            if (not(this->*Func)(*it)) // can modify start or length with spaces
+                return Result::Error(HttpResultCategory, malformed);
             readBytes++;
             if (state == State::Result)
             {
@@ -394,13 +407,16 @@ SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Sp
     const auto lengthDelta = tokenLength - initialLength;
     if (state == State::Result)
     {
-        SC_TRY(data.sliceStartLength(startDelta, lengthDelta, parsedData));
-        SC_TRY(data.sliceStart(readBytes, data));
+        if (not data.sliceStartLength(startDelta, lengthDelta, parsedData))
+            return Result::Error(HttpResultCategory, HttpError::ParserSpanInvalid);
+        if (not data.sliceStart(readBytes, data))
+            return Result::Error(HttpResultCategory, HttpError::ParserSpanInvalid);
         crReset(nestedParserCoroutine);
     }
     else
     {
-        SC_TRY(data.sliceStartLength(startDelta, lengthDelta, parsedData));
+        if (not data.sliceStartLength(startDelta, lengthDelta, parsedData))
+            return Result::Error(HttpResultCategory, HttpError::ParserSpanInvalid);
     }
     return Result(true);
 }

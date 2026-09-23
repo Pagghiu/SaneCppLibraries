@@ -64,6 +64,10 @@ Connection-pool initialization distinguishes active-connection lifecycle, empty 
 storage shortages, and invalid read/buffer queue configuration. Capacity checks use division rather than multiplying
 untrusted counts, so an overflowing per-client requirement cannot evade validation.
 
+The incremental HTTP parser treats empty input and repeated calls after completion as successful zero-progress states.
+Malformed token classes and internal span failures use Http codes. Shared header accumulation retains the first
+parser/callback/stream error and returns that identity on retries instead of collapsing it to a boolean failure.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

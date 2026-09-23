@@ -137,6 +137,18 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::PoolBufferQueueStorageTooSmall: formatter.append("HTTP buffer queue storage is too small"); break;
     case HttpError::PoolHeaderStorageTooSmall: formatter.append("HTTP header storage is too small"); break;
     case HttpError::PoolStreamStorageTooSmall: formatter.append("HTTP stream storage is too small"); break;
+    case HttpError::ParserMethodMalformed: formatter.append("HTTP request method is malformed"); break;
+    case HttpError::ParserRequestTargetMalformed: formatter.append("HTTP request target is malformed"); break;
+    case HttpError::ParserVersionMalformed: formatter.append("HTTP version is malformed"); break;
+    case HttpError::ParserStatusCodeMalformed: formatter.append("HTTP response status code is malformed"); break;
+    case HttpError::ParserStatusTextMalformed: formatter.append("HTTP response status text is malformed"); break;
+    case HttpError::ParserHeaderNameMalformed: formatter.append("HTTP header name is malformed"); break;
+    case HttpError::ParserHeaderValueMalformed: formatter.append("HTTP header value is malformed"); break;
+    case HttpError::ParserContentLengthMalformed: formatter.append("HTTP Content-Length is malformed"); break;
+    case HttpError::ParserConnectionHeaderMalformed: formatter.append("HTTP Connection header is malformed"); break;
+    case HttpError::ParserHeaderTerminatorMalformed: formatter.append("HTTP header terminator is malformed"); break;
+    case HttpError::ParserSpanInvalid: formatter.append("HTTP parser span is invalid"); break;
+    case HttpError::HeaderBlockIncomplete: formatter.append("HTTP header block is incomplete"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

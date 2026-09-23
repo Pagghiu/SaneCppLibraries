@@ -12,7 +12,7 @@ void HttpParsedHeaders::reset(HttpParser::Type type, Span<char> memory)
     readHeaders        = {memory.data(), 0};
     availableHeader    = memory;
     headersEndReceived = false;
-    parsedSuccessfully = true;
+    failure            = Result(true);
     headersEndMatch    = 0;
     parser             = {};
     parser.type        = type;
@@ -127,7 +127,6 @@ Result HttpParsedHeaders::copyHeaderBytes(uint32_t maxHeaderSize, Span<const cha
 
     if (not availableHeader.sliceStart(bytesToCopy, availableHeader))
     {
-        parsedSuccessfully = false;
         return Result::Error(HttpResultCategory, HttpError::HeaderStorageExhausted);
     }
     return Result(true);
@@ -144,7 +143,6 @@ Result HttpParsedHeaders::pushToken()
         tokenOffsets[numTokens++] = token;
         return Result(true);
     }
-    parsedSuccessfully = false;
     return Result::Error(HttpResultCategory, HttpError::HeaderTokenLimitExceeded);
 }
 

@@ -307,6 +307,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             connectionPoolStorageErrors();
         }
+        if (test_section("parsed header errors preserve identity"))
+        {
+            parsedHeaderErrorsPreserveIdentity();
+        }
         if (test_section("connection body copy helper"))
         {
             connectionBodyCopyHelper();
@@ -343,6 +347,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void incomingBodyFramingErrors();
     void serverLifecycleDiagnosticMessages();
     void connectionPoolStorageErrors();
+    void parsedHeaderErrorsPreserveIdentity();
     void connectionBodyCopyHelper();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
@@ -1172,6 +1177,28 @@ void SC::HttpAsyncServerTest::responseDiagnosticMessages()
         SC_TEST_EXPECT(
             resultHasHttpError(response.addContentLength(3), HttpError::ContentLengthTransferEncodingConflict));
     }
+}
+
+void SC::HttpAsyncServerTest::parsedHeaderErrorsPreserveIdentity()
+{
+    char                            storage[128] = {};
+    HttpParsedHeaders               headers;
+    HttpIncomingMessage::BodyStream source;
+    headers.reset(HttpParser::Type::Request, storage);
+
+    const Span<const char> malformed      = StringSpan("X / HTTP/1.1\r\n\r\n").toCharSpan();
+    const auto             onParserResult = [](const HttpParser&) -> Result { return Result(true); };
+    const Result first = headers.writeHeaders(sizeof(storage), malformed, source, {}, false, false, onParserResult);
+    SC_TEST_EXPECT(resultHasHttpError(first, HttpError::ParserMethodMalformed));
+
+    const Result repeated = headers.writeHeaders(sizeof(storage), malformed, source, {}, false, false, onParserResult);
+    SC_TEST_EXPECT(resultHasHttpError(repeated, HttpError::ParserMethodMalformed));
+
+    headers.reset(HttpParser::Type::Request, storage);
+    const Result valid = headers.writeHeaders(sizeof(storage), StringSpan("GET / HTTP/1.1\r\n\r\n").toCharSpan(),
+                                              source, {}, false, false, onParserResult);
+    SC_TEST_EXPECT(valid);
+    SC_TEST_EXPECT(headers.headersEndReceived);
 }
 
 void SC::HttpAsyncServerTest::connectionPoolStorageErrors()

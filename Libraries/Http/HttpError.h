@@ -108,6 +108,18 @@ enum class HttpError : uint32_t
     PoolBufferQueueStorageTooSmall,
     PoolHeaderStorageTooSmall,
     PoolStreamStorageTooSmall,
+    ParserMethodMalformed,
+    ParserRequestTargetMalformed,
+    ParserVersionMalformed,
+    ParserStatusCodeMalformed,
+    ParserStatusTextMalformed,
+    ParserHeaderNameMalformed,
+    ParserHeaderValueMalformed,
+    ParserContentLengthMalformed,
+    ParserConnectionHeaderMalformed,
+    ParserHeaderTerminatorMalformed,
+    ParserSpanInvalid,
+    HeaderBlockIncomplete,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

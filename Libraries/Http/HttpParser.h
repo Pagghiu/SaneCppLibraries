@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Result.h"
 #include "../Common/Span.h"
 #include "../Common/StringSpan.h"
+#include "HttpError.h"
 #include "HttpExport.h"
 
 namespace SC
@@ -70,7 +70,8 @@ struct SC_HTTP_EXPORT HttpParser
     /// @param data Incoming chunk of bytes to be parsed
     /// @param readBytes Number of bytes actually read
     /// @param parsedData A sub-span of `data` pointing at the actually parsed data
-    /// @return Valid result if parse didn't encounter any error
+    /// @return Success when input is empty or parsing is finished, with zero bytes and empty parsed data.
+    ///         Malformed input returns a structured Http error.
     Result parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
 
     /// @brief Header types
@@ -111,7 +112,7 @@ struct SC_HTTP_EXPORT HttpParser
     template <bool spaces>
     [[nodiscard]] bool parseVersion(char currentChar);
 
-    template <bool (HttpParser::*Func)(char), Token currentResult>
+    template <bool (HttpParser::*Func)(char), Token currentResult, HttpError malformed>
     Result process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
 };
 

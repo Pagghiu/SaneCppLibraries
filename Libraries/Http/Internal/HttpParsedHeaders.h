@@ -31,6 +31,10 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
                         AsyncBufferView::ID bufferID, bool stopAtHeadersEnd, bool unshiftPendingBodyToStream,
                         OnParserResult&& onParserResult)
     {
+        if (not failure)
+        {
+            return failure;
+        }
         if (headersEndReceived)
         {
             return Result(true);
@@ -38,11 +42,21 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
 
         size_t bytesToCopy     = readData.sizeInBytes();
         bool   foundHeadersEnd = false;
-        SC_TRY(scanHeadersEnd(readData, bytesToCopy, foundHeadersEnd));
+        Result result          = scanHeadersEnd(readData, bytesToCopy, foundHeadersEnd);
+        if (not result)
+        {
+            failure = result;
+            return result;
+        }
 
         if (bytesToCopy > 0)
         {
-            SC_TRY(copyHeaderBytes(maxHeaderSize, readData, bytesToCopy));
+            result = copyHeaderBytes(maxHeaderSize, readData, bytesToCopy);
+            if (not result)
+            {
+                failure = result;
+                return result;
+            }
         }
 
         if (not foundHeadersEnd)
@@ -52,29 +66,44 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
 
         Span<const char> headerData = {readHeaders.data(), readHeaders.sizeInBytes()};
         size_t           readBytes  = 0;
-        while (parsedSuccessfully and parser.state != HttpParser::State::Finished)
+        while (parser.state != HttpParser::State::Finished)
         {
             Span<const char> parsedData;
-            parsedSuccessfully &= parser.parse(headerData, readBytes, parsedData);
-            if (not parsedSuccessfully)
+            result = parser.parse(headerData, readBytes, parsedData);
+            if (not result)
             {
-                break;
+                failure = result;
+                return result;
             }
 
             if (parser.state == HttpParser::State::Result)
             {
-                SC_TRY(pushToken());
-                SC_TRY(onParserResult(parser));
+                result = pushToken();
+                if (not result)
+                {
+                    failure = result;
+                    return result;
+                }
+                result = onParserResult(parser);
+                if (not result)
+                {
+                    failure = result;
+                    return result;
+                }
             }
 
             if (readBytes > 0)
             {
-                parsedSuccessfully &= headerData.sliceStart(readBytes, headerData);
+                if (not headerData.sliceStart(readBytes, headerData))
+                {
+                    failure = Result::Error(HttpResultCategory, HttpError::ParserSpanInvalid);
+                    return failure;
+                }
             }
             else if (parser.state != HttpParser::State::Finished)
             {
-                parsedSuccessfully = false;
-                break;
+                failure = Result::Error(HttpResultCategory, HttpError::HeaderBlockIncomplete);
+                return failure;
             }
 
             if (stopAtHeadersEnd and parser.token == HttpParser::Token::HeadersEnd)
@@ -83,12 +112,16 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
             }
         }
 
-        SC_TRY(parsedSuccessfully);
         headersEndReceived = true;
 
         if (unshiftPendingBodyToStream and bytesToCopy < readData.sizeInBytes())
         {
-            SC_TRY(unshiftPendingBody(readData, stream, bufferID, bytesToCopy));
+            result = unshiftPendingBody(readData, stream, bufferID, bytesToCopy);
+            if (not result)
+            {
+                failure = result;
+                return result;
+            }
         }
 
         return Result(true);
@@ -98,8 +131,9 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
     Span<char> availableHeader;
 
     bool    headersEndReceived = false;
-    bool    parsedSuccessfully = true;
     uint8_t headersEndMatch    = 0;
+
+    Result failure = Result(true);
 
     HttpParser parser;
 

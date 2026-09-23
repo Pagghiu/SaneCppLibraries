@@ -10,6 +10,11 @@
 
 namespace SC
 {
+static bool resultHasHttpError(Result result, HttpError expected)
+{
+    return not result and result.category() == HttpResultCategory and
+           result.errorValue() == static_cast<uint32_t>(expected);
+}
 
 struct HttpParserTest : public TestCase
 {
@@ -229,6 +234,24 @@ struct HttpParserTest : public TestCase
 
             SC_TEST_EXPECT(parser.contentLength == 4294967297ULL);
         }
+        if (test_section("empty input and malformed syntax"))
+        {
+            HttpParser       parser;
+            size_t           readBytes  = 99;
+            Span<const char> parsedData = StringSpan("old").toCharSpan();
+            SC_TEST_EXPECT(parser.parse({}, readBytes, parsedData));
+            SC_TEST_EXPECT(readBytes == 0);
+            SC_TEST_EXPECT(parsedData.empty());
+            SC_TEST_EXPECT(parser.state == HttpParser::State::Parsing);
+
+            SC_TEST_EXPECT(resultHasHttpError(parser.parse("X / HTTP/1.1\r\n\r\n", readBytes, parsedData),
+                                              HttpError::ParserMethodMalformed));
+
+            HttpParser response;
+            response.type = HttpParser::Type::Response;
+            SC_TEST_EXPECT(
+                resultHasHttpError(response.parse("BAD", readBytes, parsedData), HttpError::ParserVersionMalformed));
+        }
         if (test_section("benchmark contiguous request"))
         {
             benchmarkContiguousRequest();
@@ -393,6 +416,13 @@ void HttpParserTest::testRequest(HttpParser& parser, const StringView originalSt
     SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::StatusCode)] == 0);
     SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::StatusString)] == 0);
     SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::Body)] == 0);
+
+    readBytes                = 99;
+    Span<const char> ignored = StringSpan("old").toCharSpan();
+    SC_TEST_EXPECT(parser.parse("ignored", readBytes, ignored));
+    SC_TEST_EXPECT(readBytes == 0);
+    SC_TEST_EXPECT(ignored.empty());
+    SC_TEST_EXPECT(parser.state == HttpParser::State::Finished);
 }
 
 void runHttpParserTest(SC::TestReport& report) { HttpParserTest test(report); }
