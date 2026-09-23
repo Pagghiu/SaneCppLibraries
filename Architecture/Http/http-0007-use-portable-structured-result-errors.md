@@ -42,6 +42,10 @@ formatting remains outside mandatory headers.
 Incoming request and response headers share storage, size-limit, and token-limit errors. Their identities no longer
 depend on caller-provided literal strings; the same parsing failure propagates through server and client paths.
 
+The fixed-buffer writer accepts an Http error code for its caller-owned output capacity, allowing header emission
+and multipart body staging to remain distinct without carrying diagnostic text. Content-Length formatting has a
+separate code; its English text stays in the optional formatter.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

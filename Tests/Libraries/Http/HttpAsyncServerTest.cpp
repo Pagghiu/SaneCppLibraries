@@ -4,6 +4,7 @@
 #include "HttpStringAppend.h"
 #include "HttpTestClient.h"
 #include "Libraries/Http/HttpAsyncClient.h"
+#include "Libraries/Http/Internal/HttpFixedBufferWriter.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -227,6 +228,12 @@ static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
     }
     return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
 }
+
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
+{
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
+}
 } // namespace
 
 struct SC::HttpAsyncServerTest : public SC::TestCase
@@ -260,6 +267,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         if (test_section("response diagnostic messages"))
         {
             responseDiagnosticMessages();
+        }
+        if (test_section("fixed buffer writer errors"))
+        {
+            fixedBufferWriterErrors();
         }
         if (test_section("server lifecycle diagnostic messages"))
         {
@@ -297,6 +308,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void emptyResponseHelper();
     void responseBodyHelpers();
     void responseDiagnosticMessages();
+    void fixedBufferWriterErrors();
     void serverLifecycleDiagnosticMessages();
     void connectionBodyCopyHelper();
     void chunkedRequestDecoding();
@@ -1025,6 +1037,26 @@ void SC::HttpAsyncServerTest::responseBodyHelpers()
 
         SC_TEST_EXPECT(not response.sendBody(200, "body", "text/plain"));
     }
+}
+
+void SC::HttpAsyncServerTest::fixedBufferWriterErrors()
+{
+    char                      storage[8] = {};
+    SC::HttpFixedBufferWriter writer;
+    writer.reset(storage);
+
+    SC_TEST_EXPECT(resultHasHttpError(writer.appendLiteral("123456789", HttpError::HeaderOutputTooSmall),
+                                      HttpError::HeaderOutputTooSmall));
+    SC_TEST_EXPECT(writer.writtenBytes() == 0);
+    SC_TEST_EXPECT(writer.appendLiteral("12345678", HttpError::HeaderOutputTooSmall));
+    SC_TEST_EXPECT(writer.writtenBytes() == sizeof(storage));
+    SC_TEST_EXPECT(resultHasHttpError(writer.appendLiteral("x", HttpError::MultipartBodyOutputTooSmall),
+                                      HttpError::MultipartBodyOutputTooSmall));
+    SC_TEST_EXPECT(writer.writtenBytes() == sizeof(storage));
+
+    writer.reset(storage);
+    SC_TEST_EXPECT(resultHasHttpError(writer.appendContentLength(42, HttpError::HeaderOutputTooSmall),
+                                      HttpError::HeaderOutputTooSmall));
 }
 
 void SC::HttpAsyncServerTest::responseDiagnosticMessages()

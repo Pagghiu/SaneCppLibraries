@@ -7,11 +7,11 @@
 
 namespace SC
 {
-Result HttpFixedBufferWriter::append(Span<const char> value, const char* outOfSpaceError)
+Result HttpFixedBufferWriter::append(Span<const char> value, HttpError outOfSpaceError)
 {
-    if (size + value.sizeInBytes() > buffer.sizeInBytes())
+    if (size > buffer.sizeInBytes() or value.sizeInBytes() > buffer.sizeInBytes() - size)
     {
-        return Result::FromStableCharPointer(outOfSpaceError);
+        return Result::Error(HttpResultCategory, outOfSpaceError);
     }
     if (not value.empty())
     {
@@ -21,7 +21,7 @@ Result HttpFixedBufferWriter::append(Span<const char> value, const char* outOfSp
     return Result(true);
 }
 
-Result HttpFixedBufferWriter::appendHeader(StringSpan name, StringSpan value, const char* outOfSpaceError)
+Result HttpFixedBufferWriter::appendHeader(StringSpan name, StringSpan value, HttpError outOfSpaceError)
 {
     SC_TRY(append(name, outOfSpaceError));
     SC_TRY(appendLiteral(": ", outOfSpaceError));
@@ -30,13 +30,13 @@ Result HttpFixedBufferWriter::appendHeader(StringSpan name, StringSpan value, co
     return Result(true);
 }
 
-Result HttpFixedBufferWriter::appendContentLength(uint64_t value, const char* outOfSpaceError, const char* formatError)
+Result HttpFixedBufferWriter::appendContentLength(uint64_t value, HttpError outOfSpaceError)
 {
     char      lengthBuffer[32];
     const int len = ::snprintf(lengthBuffer, sizeof(lengthBuffer), "%llu", static_cast<unsigned long long>(value));
     if (len <= 0)
     {
-        return Result::FromStableCharPointer(formatError);
+        return Result::Error(HttpResultCategory, HttpError::ContentLengthFormattingFailed);
     }
     return appendHeader("Content-Length", {{lengthBuffer, static_cast<size_t>(len)}, false, StringEncoding::Ascii},
                         outOfSpaceError);

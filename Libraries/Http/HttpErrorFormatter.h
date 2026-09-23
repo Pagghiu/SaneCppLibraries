@@ -63,6 +63,9 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::HeaderStorageExhausted: formatter.append("HTTP header storage is exhausted"); break;
     case HttpError::HeaderSizeLimitExceeded: formatter.append("HTTP header size limit is exceeded"); break;
     case HttpError::HeaderTokenLimitExceeded: formatter.append("HTTP header token limit is exceeded"); break;
+    case HttpError::HeaderOutputTooSmall: formatter.append("HTTP header output buffer is too small"); break;
+    case HttpError::MultipartBodyOutputTooSmall: formatter.append("Multipart body output buffer is too small"); break;
+    case HttpError::ContentLengthFormattingFailed: formatter.append("Content-Length formatting failed"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

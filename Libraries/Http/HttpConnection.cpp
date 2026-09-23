@@ -989,8 +989,7 @@ Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerVa
         acceptEncodingAdded = true;
     }
 
-    SC_TRY(responseHeaders.appendHeader(headerName, headerValue,
-                                        "HttpOutgoingMessage::appendAscii - header space is finished"));
+    SC_TRY(responseHeaders.appendHeader(headerName, headerValue, HttpError::HeaderOutputTooSmall));
     return Result(true);
 }
 
@@ -1000,8 +999,7 @@ Result HttpOutgoingMessage::addContentLength(uint64_t value)
     SC_TRY_MSG(responseHeaders.writtenBytes() != 0, "startResponse or startRequest must be the first call");
     SC_TRY_MSG(not chunkedTransferEncodingEnabled and not transferEncodingAdded,
                "HttpOutgoingMessage does not support Content-Length with Transfer-Encoding");
-    SC_TRY(responseHeaders.appendContentLength(value, "HttpOutgoingMessage::appendAscii - header space is finished",
-                                               "HttpOutgoingMessage failed formatting Content-Length"));
+    SC_TRY(responseHeaders.appendContentLength(value, HttpError::HeaderOutputTooSmall));
     contentLengthAdded = true;
     return Result(true);
 }
@@ -1043,16 +1041,14 @@ Result HttpOutgoingMessage::sendHeaders(Function<void(AsyncBufferView::ID)> call
     {
         if (forceDisableKeepAlive or not keepAlive)
         {
-            SC_TRY(responseHeaders.appendLiteral("Connection: close\r\n",
-                                                 "HttpOutgoingMessage::appendAscii - header space is finished"));
+            SC_TRY(responseHeaders.appendLiteral("Connection: close\r\n", HttpError::HeaderOutputTooSmall));
         }
         else
         {
-            SC_TRY(responseHeaders.appendLiteral("Connection: keep-alive\r\n",
-                                                 "HttpOutgoingMessage::appendAscii - header space is finished"));
+            SC_TRY(responseHeaders.appendLiteral("Connection: keep-alive\r\n", HttpError::HeaderOutputTooSmall));
         }
     }
-    SC_TRY(responseHeaders.appendLiteral("\r\n", "HttpOutgoingMessage::appendAscii - header space is finished"));
+    SC_TRY(responseHeaders.appendLiteral("\r\n", HttpError::HeaderOutputTooSmall));
     SC_TRY(destinationStream->write(responseHeaders.written(), move(callback)));
     headersSent = true;
     return Result(true);
@@ -1120,7 +1116,7 @@ Result HttpResponse::startResponse(int code)
 
 Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
 {
-    static constexpr const char* HeaderSpaceFinished = "HttpResponse::appendAscii - header space is finished";
+    static constexpr HttpError HeaderSpaceFinished = HttpError::HeaderOutputTooSmall;
 
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.writtenBytes() == 0, "startResponse must be the first call");
@@ -1225,7 +1221,7 @@ void HttpAsyncClientRequest::reset()
 
 Result HttpAsyncClientRequest::startRequest(HttpParser::Method value, StringSpan valueURL)
 {
-    static constexpr const char* HeaderSpaceFinished = "HttpAsyncClientRequest header space is finished";
+    static constexpr HttpError HeaderSpaceFinished = HttpError::HeaderOutputTooSmall;
 
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.writtenBytes() == 0, "startRequest must be the first call");
@@ -1334,7 +1330,7 @@ void HttpAsyncClientRequest::setMultipart(HttpMultipartWriter& value)
 
 Result HttpAsyncClientRequest::sendHeaders(Function<void(AsyncBufferView::ID)> callback)
 {
-    static constexpr const char* HeaderSpaceFinished = "HttpAsyncClientRequest header space is finished";
+    static constexpr HttpError HeaderSpaceFinished = HttpError::HeaderOutputTooSmall;
 
     if (not hasHeader(KnownHeader::UserAgent))
     {
@@ -1358,8 +1354,7 @@ Result HttpAsyncClientRequest::sendHeaders(Function<void(AsyncBufferView::ID)> c
     const bool hasBody = bodyType != BodyType::None;
     if (hasBody and not chunkedTransferEncodingEnabled and not hasHeader(KnownHeader::ContentLength))
     {
-        SC_TRY(responseHeaders.appendContentLength(contentLength, HeaderSpaceFinished,
-                                                   "HttpAsyncClientRequest failed formatting Content-Length"));
+        SC_TRY(responseHeaders.appendContentLength(contentLength, HeaderSpaceFinished));
         contentLengthAdded = true;
     }
 

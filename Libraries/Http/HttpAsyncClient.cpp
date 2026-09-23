@@ -905,7 +905,7 @@ void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
     }
     else if (currentRequest->getBodyType() == HttpAsyncClientRequest::BodyType::Multipart)
     {
-        static constexpr const char* HeaderSpaceFinished = "HttpAsyncClient header space is finished";
+        static constexpr HttpError BodySpaceFinished = HttpError::MultipartBodyOutputTooSmall;
 
         const HttpMultipartWriter& writer = *currentRequest->getMultipartWriter();
         HttpFixedBufferWriter      bodyWriter;
@@ -915,31 +915,31 @@ void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
             for (size_t idx = 0; idx < writer.getNumParts(); ++idx)
             {
                 const HttpMultipartWriter::Part& part = writer.getPart(idx);
-                SC_TRY(bodyWriter.appendLiteral("--", HeaderSpaceFinished));
-                SC_TRY(bodyWriter.append(writer.getBoundary(), HeaderSpaceFinished));
-                SC_TRY(bodyWriter.appendLiteral("\r\nContent-Disposition: form-data; name=\"", HeaderSpaceFinished));
-                SC_TRY(bodyWriter.append(part.partName, HeaderSpaceFinished));
-                SC_TRY(bodyWriter.appendLiteral("\"", HeaderSpaceFinished));
+                SC_TRY(bodyWriter.appendLiteral("--", BodySpaceFinished));
+                SC_TRY(bodyWriter.append(writer.getBoundary(), BodySpaceFinished));
+                SC_TRY(bodyWriter.appendLiteral("\r\nContent-Disposition: form-data; name=\"", BodySpaceFinished));
+                SC_TRY(bodyWriter.append(part.partName, BodySpaceFinished));
+                SC_TRY(bodyWriter.appendLiteral("\"", BodySpaceFinished));
                 if (part.fileName.sizeInBytes() > 0)
                 {
-                    SC_TRY(bodyWriter.appendLiteral("; filename=\"", HeaderSpaceFinished));
-                    SC_TRY(bodyWriter.append(part.fileName, HeaderSpaceFinished));
-                    SC_TRY(bodyWriter.appendLiteral("\"", HeaderSpaceFinished));
+                    SC_TRY(bodyWriter.appendLiteral("; filename=\"", BodySpaceFinished));
+                    SC_TRY(bodyWriter.append(part.fileName, BodySpaceFinished));
+                    SC_TRY(bodyWriter.appendLiteral("\"", BodySpaceFinished));
                 }
-                SC_TRY(bodyWriter.appendLiteral("\r\n", HeaderSpaceFinished));
+                SC_TRY(bodyWriter.appendLiteral("\r\n", BodySpaceFinished));
                 if (part.contentType.sizeInBytes() > 0)
                 {
-                    SC_TRY(bodyWriter.appendLiteral("Content-Type: ", HeaderSpaceFinished));
-                    SC_TRY(bodyWriter.append(part.contentType, HeaderSpaceFinished));
-                    SC_TRY(bodyWriter.appendLiteral("\r\n", HeaderSpaceFinished));
+                    SC_TRY(bodyWriter.appendLiteral("Content-Type: ", BodySpaceFinished));
+                    SC_TRY(bodyWriter.append(part.contentType, BodySpaceFinished));
+                    SC_TRY(bodyWriter.appendLiteral("\r\n", BodySpaceFinished));
                 }
-                SC_TRY(bodyWriter.appendLiteral("\r\n", HeaderSpaceFinished));
-                SC_TRY(bodyWriter.append(part.body, HeaderSpaceFinished));
-                SC_TRY(bodyWriter.appendLiteral("\r\n", HeaderSpaceFinished));
+                SC_TRY(bodyWriter.appendLiteral("\r\n", BodySpaceFinished));
+                SC_TRY(bodyWriter.append(part.body, BodySpaceFinished));
+                SC_TRY(bodyWriter.appendLiteral("\r\n", BodySpaceFinished));
             }
-            SC_TRY(bodyWriter.appendLiteral("--", HeaderSpaceFinished));
-            SC_TRY(bodyWriter.append(writer.getBoundary(), HeaderSpaceFinished));
-            SC_TRY(bodyWriter.appendLiteral("--\r\n", HeaderSpaceFinished));
+            SC_TRY(bodyWriter.appendLiteral("--", BodySpaceFinished));
+            SC_TRY(bodyWriter.append(writer.getBoundary(), BodySpaceFinished));
+            SC_TRY(bodyWriter.appendLiteral("--\r\n", BodySpaceFinished));
             return Result(true);
         };
 

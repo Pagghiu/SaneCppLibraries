@@ -56,6 +56,9 @@ enum class HttpError : uint32_t
     HeaderStorageExhausted,
     HeaderSizeLimitExceeded,
     HeaderTokenLimitExceeded,
+    HeaderOutputTooSmall,
+    MultipartBodyOutputTooSmall,
+    ContentLengthFormattingFailed,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

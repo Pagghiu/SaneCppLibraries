@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Result.h"
 #include "../../Common/Span.h"
 #include "../../Common/StringSpan.h"
+#include "../HttpError.h"
 #include "../HttpExport.h"
 
 namespace SC
@@ -21,17 +21,17 @@ struct SC_HTTP_EXPORT HttpFixedBufferWriter
     [[nodiscard]] size_t           writtenBytes() const { return size; }
     [[nodiscard]] size_t           capacity() const { return buffer.sizeInBytes(); }
 
-    Result append(Span<const char> value, const char* outOfSpaceError);
-    Result append(StringSpan value, const char* outOfSpaceError) { return append(value.toCharSpan(), outOfSpaceError); }
+    Result append(Span<const char> value, HttpError outOfSpaceError);
+    Result append(StringSpan value, HttpError outOfSpaceError) { return append(value.toCharSpan(), outOfSpaceError); }
 
     template <size_t N>
-    Result appendLiteral(const char (&value)[N], const char* outOfSpaceError)
+    Result appendLiteral(const char (&value)[N], HttpError outOfSpaceError)
     {
         return append({value, N - 1}, outOfSpaceError);
     }
 
-    Result appendHeader(StringSpan name, StringSpan value, const char* outOfSpaceError);
-    Result appendContentLength(uint64_t value, const char* outOfSpaceError, const char* formatError);
+    Result appendHeader(StringSpan name, StringSpan value, HttpError outOfSpaceError);
+    Result appendContentLength(uint64_t value, HttpError outOfSpaceError);
 
   private:
     Span<char> buffer;
