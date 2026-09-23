@@ -23,7 +23,7 @@ Result HttpAsyncClient::init(HttpConnectionBase& storage)
 Result HttpAsyncClient::close()
 {
     detachResponseDecompression();
-    response.failBodyStream(Result::Error("HttpAsyncClient closed"));
+    response.failBodyStream(Result::Error(HttpResultCategory, HttpError::ClientClosed));
     response.abortBodyStream();
     closeConnection();
     state             = State::Idle;
@@ -60,13 +60,15 @@ Result HttpAsyncClient::sendRequest(AsyncEventLoop& loop, const RequestOptions& 
         preset.bodySpan = options.body;
         break;
     case RequestOptions::BodyMode::Stream:
-        SC_TRY_MSG(options.bodyStream != nullptr, "HttpAsyncClient RequestOptions body stream missing");
+        if (options.bodyStream == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::ClientBodyStreamMissing);
         preset.bodyMode      = RequestPreset::BodyMode::Stream;
         preset.bodyStream    = options.bodyStream;
         preset.contentLength = options.bodyLength;
         break;
     case RequestOptions::BodyMode::Multipart:
-        SC_TRY_MSG(options.multipartWriter != nullptr, "HttpAsyncClient RequestOptions multipart writer missing");
+        if (options.multipartWriter == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::MultipartWriterMissing);
         preset.bodyMode        = RequestPreset::BodyMode::Multipart;
         preset.multipartWriter = options.multipartWriter;
         break;
@@ -157,15 +159,18 @@ Result HttpAsyncClient::postMultipart(AsyncEventLoop& loop, StringSpan url, Http
 
 Result HttpAsyncClient::startRequest(AsyncEventLoop& loop, const RequestPreset& preset)
 {
-    SC_TRY_MSG(connection != nullptr, "HttpAsyncClient::start init not called");
-    SC_TRY_MSG(not webSocketUpgraded, "HttpAsyncClient connection is upgraded to WebSocket");
+    if (connection == nullptr)
+        return Result::Error(HttpResultCategory, HttpError::ClientNotInitialized);
+    if (webSocketUpgraded)
+        return Result::Error(HttpResultCategory, HttpError::ClientConnectionUpgraded);
 
     if (state != State::Idle and response.isBodyComplete() and not responseFinalized)
     {
         finalizeResponse(false);
     }
 
-    SC_TRY_MSG(state == State::Idle, "HttpAsyncClient::start another request is in progress");
+    if (state != State::Idle)
+        return Result::Error(HttpResultCategory, HttpError::ClientRequestInProgress);
     eventLoop = &loop;
     return startPreparedRequest(preset);
 }
@@ -184,9 +189,12 @@ Result HttpAsyncClient::startPreparedRequest(const RequestPreset& preset)
 
 Result HttpAsyncClient::detachWebSocketTransport(HttpWebSocketTransportView& transport)
 {
-    SC_TRY_MSG(connection != nullptr, "HttpAsyncClient::detachWebSocketTransport init not called");
-    SC_TRY_MSG(response.hasReceivedHeaders(), "HttpAsyncClient::detachWebSocketTransport response headers missing");
-    SC_TRY_MSG(response.getParser().statusCode == 101, "HttpAsyncClient::detachWebSocketTransport expected 101");
+    if (connection == nullptr)
+        return Result::Error(HttpResultCategory, HttpError::ClientNotInitialized);
+    if (not response.hasReceivedHeaders())
+        return Result::Error(HttpResultCategory, HttpError::ClientUpgradeHeadersMissing);
+    if (response.getParser().statusCode != 101)
+        return Result::Error(HttpResultCategory, HttpError::ClientUpgradeStatusInvalid);
 
     transport.readableStream = &connection->getReadableTransportStream();
     transport.writableStream = &connection->getWritableTransportStream();
@@ -222,9 +230,10 @@ Result HttpAsyncClient::prepareRequest(const RequestPreset& preset)
     SC_TRY(currentURL.parse(preset.url));
     const bool isHttp  = HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "http");
     const bool isHttps = HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "https");
-    SC_TRY_MSG(isHttp or isHttps, "HttpAsyncClient only supports http and https URLs");
-    SC_TRY_MSG(currentURL.username.isEmpty() and currentURL.password.isEmpty(),
-               "HttpAsyncClient userinfo not supported");
+    if (not isHttp and not isHttps)
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
+    if (not currentURL.username.isEmpty() or not currentURL.password.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::ClientUserInfoUnsupported);
     if (transportPreflight.isValid())
     {
         SC_TRY(transportPreflight(currentURL));
@@ -277,7 +286,8 @@ Result HttpAsyncClient::closeConnectionForReconnect()
 
 Result HttpAsyncClient::beginReconnectClose()
 {
-    SC_TRY_MSG(reconnectPending, "HttpAsyncClient reconnect is not pending");
+    if (not reconnectPending)
+        return Result::Error(HttpResultCategory, HttpError::ClientReconnectNotPending);
     reconnectCloseInProgress = true;
     reconnectClosuresPending = 0;
 
@@ -295,7 +305,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error("HttpAsyncClient reconnect readable close listener unavailable");
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectReadableListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -306,7 +316,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error("HttpAsyncClient reconnect writable close listener unavailable");
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectWritableListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -317,7 +327,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error("HttpAsyncClient reconnect socket readable close listener unavailable");
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectSocketReadableListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -328,7 +338,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error("HttpAsyncClient reconnect socket writable close listener unavailable");
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectSocketWritableListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -556,8 +566,8 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
         setup.complete   = {[this](Result setupResult) { completeTransportSetup(setupResult); }};
         setup.fail       = {[this](Result transportError) { fail(transportError); }};
 
-        Result nativeSocket =
-            connection->socket.get(setup.nativeSocket, Result::Error("HttpAsyncClient invalid socket"));
+        Result nativeSocket = connection->socket.get(setup.nativeSocket,
+                                                     Result::Error(HttpResultCategory, HttpError::ClientSocketInvalid));
         if (not nativeSocket)
         {
             fail(nativeSocket);
@@ -574,7 +584,7 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
 
     if (HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "https"))
     {
-        fail(Result::Error("HttpAsyncClient HTTPS transport not configured"));
+        fail(Result::Error(HttpResultCategory, HttpError::ClientHttpsTransportMissing));
         return;
     }
 
@@ -584,10 +594,12 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
 Result HttpAsyncClient::rememberConnectedOrigin()
 {
     const size_t protocolLen = currentURL.protocol.sizeInBytes();
-    SC_TRY_MSG(protocolLen < sizeof(currentProtocolStorage), "HttpAsyncClient protocol too long");
+    if (protocolLen >= sizeof(currentProtocolStorage))
+        return Result::Error(HttpResultCategory, HttpError::ClientProtocolStorageTooSmall);
 
     const size_t hostLen = currentURL.host.sizeInBytes();
-    SC_TRY_MSG(hostLen < sizeof(currentHostStorage), "HttpAsyncClient host too long");
+    if (hostLen >= sizeof(currentHostStorage))
+        return Result::Error(HttpResultCategory, HttpError::ClientHostStorageTooSmall);
 
     ::memset(currentProtocolStorage, 0, sizeof(currentProtocolStorage));
     ::memcpy(currentProtocolStorage, currentURL.protocol.bytesWithoutTerminator(), protocolLen);
@@ -654,7 +666,8 @@ Result HttpAsyncClient::beginResponseRead()
 {
     const bool addedResponseData = connection->getReadableTransportStream()
                                        .eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
-    SC_TRY_MSG(addedResponseData, "HttpAsyncClient failed to register response listener");
+    if (not addedResponseData)
+        return Result::Error(HttpResultCategory, HttpError::ClientResponseListenerUnavailable);
     if (connection->getReadableTransportStream().canStart())
     {
         SC_TRY(connection->getReadableTransportStream().start());

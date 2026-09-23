@@ -75,6 +75,11 @@ retain their originating library identities.
 The static file server uses portable path-safety, directory, date, range, and ETag formatting identities. Failed
 directory validation or caller-storage assignment leaves it uninitialized so the caller can retry initialization.
 
+The async client preflight and connection lifecycle use Http identities for missing setup, request state, unsupported
+URL features, WebSocket-upgrade preconditions, reconnect listener capacity, native socket availability, missing HTTPS
+adapters, and connected-origin storage. User-supplied transport, connector, and preflight results keep their original
+identity instead of being wrapped.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

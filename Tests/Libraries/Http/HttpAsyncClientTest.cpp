@@ -230,6 +230,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             requestOptions();
         }
+        if (test_section("client preflight errors"))
+        {
+            clientPreflightErrors();
+        }
         if (test_section("request option body helpers"))
         {
             requestOptionBodyHelpers();
@@ -333,6 +337,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void commonMethodWrappers();
     void putSpanBody();
     void requestOptions();
+    void clientPreflightErrors();
     void requestOptionBodyHelpers();
     void multipartWriterValidation();
     void putStreamBody();
@@ -540,7 +545,7 @@ void SC::HttpAsyncClientTest::httpsRequiresTransportAdapter()
 
     SC_TEST_EXPECT(client.get(loop, url.view()));
     SC_TEST_EXPECT(loop.run());
-    SC_TEST_EXPECT(resultMessageEquals(error, "HttpAsyncClient HTTPS transport not configured"));
+    SC_TEST_EXPECT(resultHasHttpError(error, HttpError::ClientHttpsTransportMissing));
     SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(server.close());
     SC_TEST_EXPECT(loop.close());
@@ -875,6 +880,22 @@ void SC::HttpAsyncClientTest::putSpanBody()
     SC_TEST_EXPECT(loop.close());
 }
 
+void SC::HttpAsyncClientTest::clientPreflightErrors()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    HttpAsyncClient  client;
+    ClientConnection storage;
+    SC_TEST_EXPECT(resultHasHttpError(client.get(loop, "http://example.com/"), HttpError::ClientNotInitialized));
+    SC_TEST_EXPECT(client.init(storage));
+    SC_TEST_EXPECT(resultHasHttpError(client.get(loop, "ftp://example.com/"), HttpError::UnsupportedProtocol));
+    SC_TEST_EXPECT(
+        resultHasHttpError(client.get(loop, "http://user:pass@example.com/"), HttpError::ClientUserInfoUnsupported));
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
 void SC::HttpAsyncClientTest::requestOptions()
 {
     StringView     webServerFolder = report.applicationRootDirectory.view();
@@ -950,8 +971,9 @@ void SC::HttpAsyncClientTest::requestOptions()
     invalidOptions.url        = url.view();
     invalidOptions.bodyMode   = HttpAsyncClient::RequestOptions::BodyMode::Stream;
     invalidOptions.bodyLength = 11;
-    SC_TEST_EXPECT(resultMessageEquals(client.sendRequest(loop, invalidOptions),
-                                       "HttpAsyncClient RequestOptions body stream missing"));
+    SC_TEST_EXPECT(resultHasHttpError(client.sendRequest(loop, invalidOptions), HttpError::ClientBodyStreamMissing));
+    invalidOptions.bodyMode = HttpAsyncClient::RequestOptions::BodyMode::Multipart;
+    SC_TEST_EXPECT(resultHasHttpError(client.sendRequest(loop, invalidOptions), HttpError::MultipartWriterMissing));
 
     HttpAsyncClient::Header headers[] = {{"X-Upload-Mode", "request-options"}};
 

@@ -189,6 +189,38 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("Content-Range output buffer is too small");
         break;
     case HttpError::FileServerETagOutputTooSmall: formatter.append("ETag output buffer is too small"); break;
+    case HttpError::ClientClosed: formatter.append("HTTP client was closed"); break;
+    case HttpError::ClientBodyStreamMissing: formatter.append("HTTP client request body stream is missing"); break;
+    case HttpError::ClientNotInitialized: formatter.append("HTTP client is not initialized"); break;
+    case HttpError::ClientConnectionUpgraded: formatter.append("HTTP client connection is upgraded"); break;
+    case HttpError::ClientRequestInProgress: formatter.append("HTTP client request is already in progress"); break;
+    case HttpError::ClientUpgradeHeadersMissing: formatter.append("HTTP upgrade response headers are missing"); break;
+    case HttpError::ClientUpgradeStatusInvalid: formatter.append("HTTP upgrade response status is not 101"); break;
+    case HttpError::ClientUserInfoUnsupported:
+        formatter.append("HTTP client URL user information is unsupported");
+        break;
+    case HttpError::ClientReconnectNotPending: formatter.append("HTTP client reconnect is not pending"); break;
+    case HttpError::ClientReconnectReadableListenerUnavailable:
+        formatter.append("HTTP client reconnect readable close listener is unavailable");
+        break;
+    case HttpError::ClientReconnectWritableListenerUnavailable:
+        formatter.append("HTTP client reconnect writable close listener is unavailable");
+        break;
+    case HttpError::ClientReconnectSocketReadableListenerUnavailable:
+        formatter.append("HTTP client reconnect socket readable close listener is unavailable");
+        break;
+    case HttpError::ClientReconnectSocketWritableListenerUnavailable:
+        formatter.append("HTTP client reconnect socket writable close listener is unavailable");
+        break;
+    case HttpError::ClientSocketInvalid: formatter.append("HTTP client socket is invalid"); break;
+    case HttpError::ClientHttpsTransportMissing:
+        formatter.append("HTTP client HTTPS transport adapter is missing");
+        break;
+    case HttpError::ClientProtocolStorageTooSmall: formatter.append("HTTP client protocol storage is too small"); break;
+    case HttpError::ClientHostStorageTooSmall: formatter.append("HTTP client host storage is too small"); break;
+    case HttpError::ClientResponseListenerUnavailable:
+        formatter.append("HTTP client response listener is unavailable");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
