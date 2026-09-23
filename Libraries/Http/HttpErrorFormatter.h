@@ -172,6 +172,23 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ServerDataListenerUnavailable:
         formatter.append("HTTP server readable data listener is unavailable");
         break;
+    case HttpError::FileServerAlreadyInitialized: formatter.append("HTTP file server is already initialized"); break;
+    case HttpError::FileServerDirectoryUnavailable:
+        formatter.append("HTTP file server directory is unavailable");
+        break;
+    case HttpError::FileServerRequestTargetNotPath: formatter.append("HTTP file request target is not a path"); break;
+    case HttpError::FileServerPathEmpty: formatter.append("HTTP file path is empty"); break;
+    case HttpError::FileServerPathCharacterInvalid:
+        formatter.append("HTTP file path contains an invalid character");
+        break;
+    case HttpError::FileServerDotSegment: formatter.append("HTTP file path contains a dot segment"); break;
+    case HttpError::FileServerParentSegment: formatter.append("HTTP file path contains a parent segment"); break;
+    case HttpError::FileServerDateConversionFailed: formatter.append("HTTP date conversion failed"); break;
+    case HttpError::FileServerDateOutputTooSmall: formatter.append("HTTP date output buffer is too small"); break;
+    case HttpError::FileServerContentRangeOutputTooSmall:
+        formatter.append("Content-Range output buffer is too small");
+        break;
+    case HttpError::FileServerETagOutputTooSmall: formatter.append("ETag output buffer is too small"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

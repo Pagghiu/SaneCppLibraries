@@ -72,6 +72,9 @@ Async server setup and lifecycle use portable queue/pool, connection-slot, liste
 The same precondition uses the same code in native-listener and external-listener modes; socket and transport failures
 retain their originating library identities.
 
+The static file server uses portable path-safety, directory, date, range, and ETag formatting identities. Failed
+directory validation or caller-storage assignment leaves it uninitialized so the caller can retry initialization.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

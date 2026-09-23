@@ -133,6 +133,17 @@ enum class HttpError : uint32_t
     ServerNotStarted,
     ServerNotStopping,
     ServerDataListenerUnavailable,
+    FileServerAlreadyInitialized,
+    FileServerDirectoryUnavailable,
+    FileServerRequestTargetNotPath,
+    FileServerPathEmpty,
+    FileServerPathCharacterInvalid,
+    FileServerDotSegment,
+    FileServerParentSegment,
+    FileServerDateConversionFailed,
+    FileServerDateOutputTooSmall,
+    FileServerContentRangeOutputTooSmall,
+    FileServerETagOutputTooSmall,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

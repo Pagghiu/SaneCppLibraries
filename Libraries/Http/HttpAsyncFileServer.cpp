@@ -49,12 +49,13 @@ struct HttpAsyncFileServer::Internal
 
 Result HttpAsyncFileServer::init(ThreadPool& pool, AsyncEventLoop& loop, StringSpan directoryToServe)
 {
-    SC_TRY_MSG(eventLoop == nullptr, "HttpAsyncFileServer::init - already inited")
+    if (eventLoop != nullptr)
+        return Result::Error(HttpResultCategory, HttpError::FileServerAlreadyInitialized);
+    if (not FileSystem().existsAndIsDirectory(directoryToServe))
+        return Result::Error(HttpResultCategory, HttpError::FileServerDirectoryUnavailable);
+    SC_TRY(directory.assign(directoryToServe));
     eventLoop  = &loop;
     threadPool = &pool;
-
-    SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "HttpAsyncFileServer::init invalid directory");
-    SC_TRY(directory.assign(directoryToServe));
     return Result(true);
 }
 
@@ -483,7 +484,8 @@ Result HttpAsyncFileServer::Internal::extractSafeFilePath(StringSpan requestTarg
 {
     HttpRequestTargetView target;
     SC_TRY(target.parse(requestTarget));
-    SC_TRY_MSG(HttpStringIterator::startsWith(target.path, "/"), "HttpAsyncFileServer request target must be path");
+    if (not HttpStringIterator::startsWith(target.path, "/"))
+        return Result::Error(HttpResultCategory, HttpError::FileServerRequestTargetNotPath);
 
     filePath = HttpStringIterator::sliceStart(target.path, 1);
     if (filePath.isEmpty())
@@ -516,7 +518,8 @@ Result HttpAsyncFileServer::Internal::normalizeOptionFilePath(StringSpan filePat
 
 Result HttpAsyncFileServer::Internal::validateSafeRelativePath(StringSpan filePath)
 {
-    SC_TRY_MSG(not filePath.isEmpty(), "HttpAsyncFileServer empty file path rejected");
+    if (filePath.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::FileServerPathEmpty);
 
     const char* fileData     = filePath.bytesWithoutTerminator();
     size_t      segmentStart = 0;
@@ -525,18 +528,20 @@ Result HttpAsyncFileServer::Internal::validateSafeRelativePath(StringSpan filePa
         const bool atEnd     = idx == filePath.sizeInBytes();
         const char current   = atEnd ? '/' : fileData[idx];
         const bool separator = current == '/';
-        SC_TRY_MSG(current != '\\' and current != ':', "HttpAsyncFileServer invalid path character");
+        if (current == '\\' or current == ':')
+            return Result::Error(HttpResultCategory, HttpError::FileServerPathCharacterInvalid);
         if (separator)
         {
             const size_t segmentLength = idx - segmentStart;
             if (segmentLength == 1)
             {
-                SC_TRY_MSG(fileData[segmentStart] != '.', "HttpAsyncFileServer dot path segment rejected");
+                if (fileData[segmentStart] == '.')
+                    return Result::Error(HttpResultCategory, HttpError::FileServerDotSegment);
             }
             else if (segmentLength == 2)
             {
-                SC_TRY_MSG(fileData[segmentStart] != '.' or fileData[segmentStart + 1] != '.',
-                           "HttpAsyncFileServer parent path segment rejected");
+                if (fileData[segmentStart] == '.' and fileData[segmentStart + 1] == '.')
+                    return Result::Error(HttpResultCategory, HttpError::FileServerParentSegment);
             }
             segmentStart = idx + 1;
         }
@@ -814,12 +819,12 @@ Result HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecondsSinceEp
 #if SC_PLATFORM_WINDOWS
     if (_gmtime64_s(&parsedTm, &seconds) != 0)
     {
-        return Result::Error("Failed to convert time");
+        return Result::Error(HttpResultCategory, HttpError::FileServerDateConversionFailed);
     }
 #else
     if (gmtime_r(&seconds, &parsedTm) == nullptr)
     {
-        return Result::Error("Failed to convert time");
+        return Result::Error(HttpResultCategory, HttpError::FileServerDateConversionFailed);
     }
 #endif
 
@@ -833,7 +838,7 @@ Result HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecondsSinceEp
 
     if (outLength == 0 || outLength >= bufferSize)
     {
-        return Result::Error("Failed to format time");
+        return Result::Error(HttpResultCategory, HttpError::FileServerDateOutputTooSmall);
     }
 
     return Result(true);
@@ -847,7 +852,7 @@ Result HttpAsyncFileServer::Internal::formatContentRange(const ByteRange& range,
         static_cast<unsigned long long>(range.offset + range.length - 1), static_cast<unsigned long long>(fileSize)));
     if (outLength == 0 or outLength >= bufferSize)
     {
-        return Result::Error("Failed to format Content-Range");
+        return Result::Error(HttpResultCategory, HttpError::FileServerContentRangeOutputTooSmall);
     }
     return Result(true);
 }
@@ -859,7 +864,7 @@ Result HttpAsyncFileServer::Internal::formatUnsatisfiedContentRange(size_t fileS
         static_cast<size_t>(snprintf(buffer, bufferSize, "bytes */%llu", static_cast<unsigned long long>(fileSize)));
     if (outLength == 0 or outLength >= bufferSize)
     {
-        return Result::Error("Failed to format Content-Range");
+        return Result::Error(HttpResultCategory, HttpError::FileServerContentRangeOutputTooSmall);
     }
     return Result(true);
 }
@@ -872,7 +877,7 @@ Result HttpAsyncFileServer::Internal::formatWeakETag(const FileSystem::FileStat&
                                              static_cast<long long>(fileStat.modifiedTime.milliseconds)));
     if (outLength == 0 or outLength >= bufferSize)
     {
-        return Result::Error("Failed to format ETag");
+        return Result::Error(HttpResultCategory, HttpError::FileServerETagOutputTooSmall);
     }
     return Result(true);
 }

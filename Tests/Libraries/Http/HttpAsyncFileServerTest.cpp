@@ -31,9 +31,10 @@ SC::StringSpan httpAsyncFileServerTestMimeLookup(SC::StringSpan extension, void*
     return {};
 }
 
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
-    return not result and SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
 }
 } // namespace
 
@@ -153,23 +154,25 @@ void SC::HttpAsyncFileServerTest::optionDiagnosticMessages()
 
     ThreadPool          threadPool;
     HttpAsyncFileServer fileServer;
-    SC_TEST_EXPECT(resultMessageEquals(fileServer.init(threadPool, eventLoop, "missing-http-fixture-directory"),
-                                       "HttpAsyncFileServer::init invalid directory"));
+    SC_TEST_EXPECT(resultHasHttpError(fileServer.init(threadPool, eventLoop, "missing-http-fixture-directory"),
+                                      HttpError::FileServerDirectoryUnavailable));
+    SC_TEST_EXPECT(fileServer.init(threadPool, eventLoop, report.applicationRootDirectory.view()));
+    SC_TEST_EXPECT(resultHasHttpError(fileServer.init(threadPool, eventLoop, report.applicationRootDirectory.view()),
+                                      HttpError::FileServerAlreadyInitialized));
 
     HttpAsyncFileServerOptions options;
     options.spaFallbackPath = "../app.html";
-    SC_TEST_EXPECT(
-        resultMessageEquals(fileServer.setOptions(options), "HttpAsyncFileServer parent path segment rejected"));
+    SC_TEST_EXPECT(resultHasHttpError(fileServer.setOptions(options), HttpError::FileServerParentSegment));
 
     options.spaFallbackPath = "assets\\app.html";
-    SC_TEST_EXPECT(resultMessageEquals(fileServer.setOptions(options), "HttpAsyncFileServer invalid path character"));
+    SC_TEST_EXPECT(resultHasHttpError(fileServer.setOptions(options), HttpError::FileServerPathCharacterInvalid));
 
     options.spaFallbackPath = "./app.html";
-    SC_TEST_EXPECT(
-        resultMessageEquals(fileServer.setOptions(options), "HttpAsyncFileServer dot path segment rejected"));
+    SC_TEST_EXPECT(resultHasHttpError(fileServer.setOptions(options), HttpError::FileServerDotSegment));
 
     options.spaFallbackPath = "/app.html";
     SC_TEST_EXPECT(fileServer.setOptions(options));
+    SC_TEST_EXPECT(fileServer.close());
     SC_TEST_EXPECT(eventLoop.close());
 }
 
