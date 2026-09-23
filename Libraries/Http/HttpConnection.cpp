@@ -730,14 +730,13 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
 }
 
 Result HttpIncomingMessage::writeHeaders(const uint32_t maxSize, Span<const char> readData, AsyncReadableStream& stream,
-                                         AsyncBufferView::ID bufferID, const char* outOfSpaceError,
-                                         const char* sizeExceededError, bool stopAtHeadersEnd,
+                                         AsyncBufferView::ID bufferID, bool stopAtHeadersEnd,
                                          bool unshiftPendingBodyToStream)
 {
     attachReadableStream(stream);
     const auto onParserResult = [&](const HttpParser&) -> Result { return Result(true); };
-    SC_TRY(parsedHeaders.writeHeaders(maxSize, readData, stream, bufferID, outOfSpaceError, sizeExceededError,
-                                      stopAtHeadersEnd, unshiftPendingBodyToStream, onParserResult));
+    SC_TRY(parsedHeaders.writeHeaders(maxSize, readData, stream, bufferID, stopAtHeadersEnd, unshiftPendingBodyToStream,
+                                      onParserResult));
     return Result(true);
 }
 
@@ -799,8 +798,7 @@ void HttpRequest::reset()
 Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readData, AsyncReadableStream& stream,
                                  AsyncBufferView::ID bufferID)
 {
-    SC_TRY(HttpIncomingMessage::writeHeaders(maxSize, readData, stream, bufferID, "Header space is finished",
-                                             "Header size exceeded limit", false));
+    SC_TRY(HttpIncomingMessage::writeHeaders(maxSize, readData, stream, bufferID, false));
     SC_TRY(findParserToken(HttpParser::Token::Url, url));
     setBodyBytesRemaining(getParser().contentLength);
     return Result(true);
@@ -814,9 +812,7 @@ void HttpAsyncClientResponse::reset(Span<char> memory) { resetIncoming(HttpParse
 Result HttpAsyncClientResponse::writeHeaders(uint32_t maxHeaderSize, Span<const char> readData,
                                              AsyncReadableStream& stream, AsyncBufferView::ID bufferID)
 {
-    SC_TRY(HttpIncomingMessage::writeHeaders(maxHeaderSize, readData, stream, bufferID,
-                                             "HttpAsyncClientResponse header space is finished",
-                                             "HttpAsyncClientResponse header size exceeded", true, false));
+    SC_TRY(HttpIncomingMessage::writeHeaders(maxHeaderSize, readData, stream, bufferID, true, false));
     return Result(true);
 }
 

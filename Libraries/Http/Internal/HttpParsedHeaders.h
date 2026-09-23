@@ -3,6 +3,7 @@
 #pragma once
 #include "../../AsyncStreams/AsyncStreams.h"
 #include "../../Common/StringSpan.h"
+#include "../HttpError.h"
 #include "../HttpExport.h"
 #include "../HttpParser.h"
 
@@ -27,8 +28,8 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
 
     template <typename OnParserResult>
     Result writeHeaders(uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
-                        AsyncBufferView::ID bufferID, const char* outOfSpaceError, const char* sizeExceededError,
-                        bool stopAtHeadersEnd, bool unshiftPendingBodyToStream, OnParserResult&& onParserResult)
+                        AsyncBufferView::ID bufferID, bool stopAtHeadersEnd, bool unshiftPendingBodyToStream,
+                        OnParserResult&& onParserResult)
     {
         if (headersEndReceived)
         {
@@ -41,7 +42,7 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
 
         if (bytesToCopy > 0)
         {
-            SC_TRY(copyHeaderBytes(maxHeaderSize, readData, bytesToCopy, outOfSpaceError, sizeExceededError));
+            SC_TRY(copyHeaderBytes(maxHeaderSize, readData, bytesToCopy));
         }
 
         if (not foundHeadersEnd)
@@ -107,8 +108,7 @@ struct SC_HTTP_EXPORT HttpParsedHeaders
 
   private:
     Result scanHeadersEnd(Span<const char> readData, size_t& bytesToCopy, bool& foundHeadersEnd);
-    Result copyHeaderBytes(uint32_t maxHeaderSize, Span<const char> readData, size_t bytesToCopy,
-                           const char* outOfSpaceError, const char* sizeExceededError);
+    Result copyHeaderBytes(uint32_t maxHeaderSize, Span<const char> readData, size_t bytesToCopy);
     Result pushToken();
     Result unshiftPendingBody(Span<const char> readData, AsyncReadableStream& stream, AsyncBufferView::ID bufferID,
                               size_t bodyOffset);

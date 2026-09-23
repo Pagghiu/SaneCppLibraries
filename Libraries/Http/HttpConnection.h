@@ -195,8 +195,7 @@ struct SC_HTTP_EXPORT HttpIncomingMessage
     /// @brief Parses an incoming slice of data eventually copying it to the availableHeader.
     /// If it encounters body data, it will create a child view and unshift it to the stream.
     Result writeHeaders(const uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
-                        AsyncBufferView::ID bufferID, const char* outOfSpaceError, const char* sizeExceededError,
-                        bool stopAtHeadersEnd, bool unshiftPendingBodyToStream = true);
+                        AsyncBufferView::ID bufferID, bool stopAtHeadersEnd, bool unshiftPendingBodyToStream = true);
 
     /// @brief Gets the length of the headers in bytes
     [[nodiscard]] size_t getHeadersLength() const;

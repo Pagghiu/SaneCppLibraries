@@ -840,7 +840,8 @@ void SC::HttpAsyncServerTest::maxHeaderSizeError()
     httpServer.onError   = [this, &serverContext](Result result)
     {
         serverContext.sawError = true;
-        SC_TEST_EXPECT(resultMessageEquals(result, "Header size exceeded limit"));
+        SC_TEST_EXPECT(not result and result.category() == HttpResultCategory and
+                       result.errorValue() == static_cast<uint32_t>(HttpError::HeaderSizeLimitExceeded));
     };
 
     HttpTestClient client;

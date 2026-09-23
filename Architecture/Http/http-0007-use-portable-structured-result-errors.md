@@ -39,6 +39,9 @@ Set-Cookie and Cache-Control builders and parsers use the same category while di
 cookie fields, conflicting cache visibility, absent directives, and insufficient caller storage. Optional English
 formatting remains outside mandatory headers.
 
+Incoming request and response headers share storage, size-limit, and token-limit errors. Their identities no longer
+depend on caller-provided literal strings; the same parsing failure propagates through server and client paths.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

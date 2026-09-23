@@ -53,6 +53,9 @@ enum class HttpError : uint32_t
     CacheControlConflictingVisibility,
     CacheControlOutputTooSmall,
     CacheControlNoDirectives,
+    HeaderStorageExhausted,
+    HeaderSizeLimitExceeded,
+    HeaderTokenLimitExceeded,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

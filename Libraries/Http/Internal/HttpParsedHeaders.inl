@@ -110,16 +110,15 @@ Result HttpParsedHeaders::scanHeadersEnd(Span<const char> readData, size_t& byte
     return Result(true);
 }
 
-Result HttpParsedHeaders::copyHeaderBytes(uint32_t maxHeaderSize, Span<const char> readData, size_t bytesToCopy,
-                                          const char* outOfSpaceError, const char* sizeExceededError)
+Result HttpParsedHeaders::copyHeaderBytes(uint32_t maxHeaderSize, Span<const char> readData, size_t bytesToCopy)
 {
     if (bytesToCopy > availableHeader.sizeInBytes())
     {
-        return Result::FromStableCharPointer(outOfSpaceError);
+        return Result::Error(HttpResultCategory, HttpError::HeaderStorageExhausted);
     }
-    if (readHeaders.sizeInBytes() + bytesToCopy > maxHeaderSize)
+    if (readHeaders.sizeInBytes() > maxHeaderSize or bytesToCopy > maxHeaderSize - readHeaders.sizeInBytes())
     {
-        return Result::FromStableCharPointer(sizeExceededError);
+        return Result::Error(HttpResultCategory, HttpError::HeaderSizeLimitExceeded);
     }
 
     const size_t previousHeaderSize = readHeaders.sizeInBytes();
@@ -129,7 +128,7 @@ Result HttpParsedHeaders::copyHeaderBytes(uint32_t maxHeaderSize, Span<const cha
     if (not availableHeader.sliceStart(bytesToCopy, availableHeader))
     {
         parsedSuccessfully = false;
-        return Result::FromStableCharPointer(outOfSpaceError);
+        return Result::Error(HttpResultCategory, HttpError::HeaderStorageExhausted);
     }
     return Result(true);
 }
@@ -146,7 +145,7 @@ Result HttpParsedHeaders::pushToken()
         return Result(true);
     }
     parsedSuccessfully = false;
-    return Result(false);
+    return Result::Error(HttpResultCategory, HttpError::HeaderTokenLimitExceeded);
 }
 
 Result HttpParsedHeaders::unshiftPendingBody(Span<const char> readData, AsyncReadableStream& stream,

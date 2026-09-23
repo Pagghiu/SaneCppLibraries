@@ -60,6 +60,9 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         break;
     case HttpError::CacheControlOutputTooSmall: formatter.append("Cache-Control output buffer is too small"); break;
     case HttpError::CacheControlNoDirectives: formatter.append("Cache-Control has no directives"); break;
+    case HttpError::HeaderStorageExhausted: formatter.append("HTTP header storage is exhausted"); break;
+    case HttpError::HeaderSizeLimitExceeded: formatter.append("HTTP header size limit is exceeded"); break;
+    case HttpError::HeaderTokenLimitExceeded: formatter.append("HTTP header token limit is exceeded"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
