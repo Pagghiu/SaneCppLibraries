@@ -99,6 +99,15 @@ enum class HttpError : uint32_t
     RequestStartAlreadyWritten,
     CompressedBodyEncodingInvalid,
     MultipartWriterMissing,
+    PoolActiveConnectionsRemain,
+    PoolHeaderStorageEmpty,
+    PoolReadQueueConfigurationInvalid,
+    PoolBufferQueueConfigurationInvalid,
+    PoolReadQueueStorageTooSmall,
+    PoolWriteQueueStorageTooSmall,
+    PoolBufferQueueStorageTooSmall,
+    PoolHeaderStorageTooSmall,
+    PoolStreamStorageTooSmall,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

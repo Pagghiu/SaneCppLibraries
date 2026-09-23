@@ -303,6 +303,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             serverLifecycleDiagnosticMessages();
         }
+        if (test_section("connection pool storage errors"))
+        {
+            connectionPoolStorageErrors();
+        }
         if (test_section("connection body copy helper"))
         {
             connectionBodyCopyHelper();
@@ -338,6 +342,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void fixedBufferWriterErrors();
     void incomingBodyFramingErrors();
     void serverLifecycleDiagnosticMessages();
+    void connectionPoolStorageErrors();
     void connectionBodyCopyHelper();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
@@ -1167,6 +1172,63 @@ void SC::HttpAsyncServerTest::responseDiagnosticMessages()
         SC_TEST_EXPECT(
             resultHasHttpError(response.addContentLength(3), HttpError::ContentLengthTransferEncodingConflict));
     }
+}
+
+void SC::HttpAsyncServerTest::connectionPoolStorageErrors()
+{
+    HttpConnection                     connections[2];
+    HttpConnectionsPool::Memory        memory;
+    HttpConnectionsPool::Configuration conf;
+    conf.readQueueSize     = 1;
+    conf.writeQueueSize    = 1;
+    conf.buffersQueueSize  = 1;
+    conf.headerBytesLength = 1;
+    conf.streamBytesLength = 1;
+
+    Span<HttpConnection> one(connections, 1);
+    conf.readQueueSize = 0;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolReadQueueConfigurationInvalid));
+    conf.readQueueSize    = 1;
+    conf.buffersQueueSize = 0;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolBufferQueueConfigurationInvalid));
+    conf.buffersQueueSize = 1;
+
+    AsyncReadableStream::Request readQueue[1];
+    AsyncWritableStream::Request writeQueue[1];
+    AsyncBufferView              buffers[1];
+    char                         headerStorage[1];
+    char                         streamStorage[1];
+
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolReadQueueStorageTooSmall));
+    memory.allReadQueue = readQueue;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolWriteQueueStorageTooSmall));
+    memory.allWriteQueue = writeQueue;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolBufferQueueStorageTooSmall));
+    memory.allBuffers = buffers;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolHeaderStorageTooSmall));
+    memory.allHeaders = headerStorage;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(conf, one), HttpError::PoolStreamStorageTooSmall));
+    memory.allStreams = streamStorage;
+
+    HttpConnectionsPool::Configuration huge = conf;
+    huge.readQueueSize                      = static_cast<size_t>(-1) / 2 + 1;
+    huge.buffersQueueSize                   = huge.readQueueSize;
+    SC_TEST_EXPECT(resultHasHttpError(memory.assignTo(huge, Span<HttpConnection>(connections, 2)),
+                                      HttpError::PoolReadQueueStorageTooSmall));
+
+    SC_TEST_EXPECT(memory.assignTo(conf, one));
+    HttpConnectionsPool pool;
+    SC_TEST_EXPECT(pool.init(one));
+    HttpConnection::ID id;
+    SC_TEST_EXPECT(pool.activateNew(id));
+    SC_TEST_EXPECT(resultHasHttpError(pool.init(one), HttpError::PoolActiveConnectionsRemain));
+    SC_TEST_EXPECT(resultHasHttpError(pool.close(), HttpError::PoolActiveConnectionsRemain));
+    SC_TEST_EXPECT(pool.deactivate(id));
+    SC_TEST_EXPECT(pool.close());
+
+    HttpConnectionsPool emptyHeaderPool;
+    SC_TEST_EXPECT(resultHasHttpError(emptyHeaderPool.init(Span<HttpConnection>(connections + 1, 1)),
+                                      HttpError::PoolHeaderStorageEmpty));
 }
 
 void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()

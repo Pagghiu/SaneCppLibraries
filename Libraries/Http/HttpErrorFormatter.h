@@ -122,6 +122,21 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("Compressed HTTP request body requires gzip or deflate");
         break;
     case HttpError::MultipartWriterMissing: formatter.append("Multipart request writer is missing"); break;
+    case HttpError::PoolActiveConnectionsRemain:
+        formatter.append("HTTP connection pool still has active connections");
+        break;
+    case HttpError::PoolHeaderStorageEmpty: formatter.append("HTTP connection header storage is empty"); break;
+    case HttpError::PoolReadQueueConfigurationInvalid:
+        formatter.append("HTTP connection read queue configuration is invalid");
+        break;
+    case HttpError::PoolBufferQueueConfigurationInvalid:
+        formatter.append("HTTP connection buffer queue is smaller than its read queue");
+        break;
+    case HttpError::PoolReadQueueStorageTooSmall: formatter.append("HTTP read queue storage is too small"); break;
+    case HttpError::PoolWriteQueueStorageTooSmall: formatter.append("HTTP write queue storage is too small"); break;
+    case HttpError::PoolBufferQueueStorageTooSmall: formatter.append("HTTP buffer queue storage is too small"); break;
+    case HttpError::PoolHeaderStorageTooSmall: formatter.append("HTTP header storage is too small"); break;
+    case HttpError::PoolStreamStorageTooSmall: formatter.append("HTTP stream storage is too small"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

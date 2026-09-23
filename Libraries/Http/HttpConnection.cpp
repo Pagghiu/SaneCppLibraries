@@ -129,6 +129,11 @@ static bool scHttpHeaderValueIsSafe(SC::StringSpan value)
     }
     return true;
 }
+
+static bool scHttpHasStorageForClients(SC::size_t available, SC::size_t numClients, SC::size_t perClient)
+{
+    return perClient == 0 or numClients <= available / perClient;
+}
 } // namespace
 
 namespace SC
@@ -1422,13 +1427,14 @@ Result HttpAsyncClientRequest::sendHeaders(Function<void(AsyncBufferView::ID)> c
 //-------------------------------------------------------------------------------------------------------
 Result HttpConnectionsPool::init(SpanWithStride<HttpConnection> connectionsStorage)
 {
-    SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::init - numConnections != 0");
+    if (numConnections != 0)
+        return Result::Error(HttpResultCategory, HttpError::PoolActiveConnectionsRemain);
     for (size_t idx = 0; idx < connectionsStorage.sizeInElements(); ++idx)
     {
         HttpConnection& connection = connectionsStorage[idx];
         if (connection.getHeaderMemory().sizeInBytes() == 0)
         {
-            return Result::Error("HttpConnection::headerMemory is empty");
+            return Result::Error(HttpResultCategory, HttpError::PoolHeaderStorageEmpty);
         }
     }
 
@@ -1438,7 +1444,8 @@ Result HttpConnectionsPool::init(SpanWithStride<HttpConnection> connectionsStora
 
 Result HttpConnectionsPool::close()
 {
-    SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::close - numConnections != 0");
+    if (numConnections != 0)
+        return Result::Error(HttpResultCategory, HttpError::PoolActiveConnectionsRemain);
     connections = {};
     return Result(true);
 }
@@ -1517,11 +1524,20 @@ Result HttpConnectionsPool::Memory::assignTo(HttpConnectionsPool::Configuration 
                                              SpanWithStride<HttpConnection>     connectionsSpan)
 {
     const size_t numClients = connectionsSpan.sizeInElements();
-    SC_TRY_MSG(allReadQueue.sizeInElements() >= numClients * conf.readQueueSize, "Insufficient read queue");
-    SC_TRY_MSG(allWriteQueue.sizeInElements() >= numClients * conf.writeQueueSize, "Insufficient write queue");
-    SC_TRY_MSG(allBuffers.sizeInElements() >= numClients * conf.buffersQueueSize, "Insufficient buffers queue");
-    SC_TRY_MSG(allHeaders.sizeInElements() >= numClients * conf.headerBytesLength, "Insufficient headers storage");
-    SC_TRY_MSG(allStreams.sizeInElements() >= numClients * conf.streamBytesLength, "Insufficient streams storage");
+    if (numClients > 0 and conf.readQueueSize == 0)
+        return Result::Error(HttpResultCategory, HttpError::PoolReadQueueConfigurationInvalid);
+    if (numClients > 0 and conf.buffersQueueSize < conf.readQueueSize)
+        return Result::Error(HttpResultCategory, HttpError::PoolBufferQueueConfigurationInvalid);
+    if (not scHttpHasStorageForClients(allReadQueue.sizeInElements(), numClients, conf.readQueueSize))
+        return Result::Error(HttpResultCategory, HttpError::PoolReadQueueStorageTooSmall);
+    if (not scHttpHasStorageForClients(allWriteQueue.sizeInElements(), numClients, conf.writeQueueSize))
+        return Result::Error(HttpResultCategory, HttpError::PoolWriteQueueStorageTooSmall);
+    if (not scHttpHasStorageForClients(allBuffers.sizeInElements(), numClients, conf.buffersQueueSize))
+        return Result::Error(HttpResultCategory, HttpError::PoolBufferQueueStorageTooSmall);
+    if (not scHttpHasStorageForClients(allHeaders.sizeInElements(), numClients, conf.headerBytesLength))
+        return Result::Error(HttpResultCategory, HttpError::PoolHeaderStorageTooSmall);
+    if (not scHttpHasStorageForClients(allStreams.sizeInElements(), numClients, conf.streamBytesLength))
+        return Result::Error(HttpResultCategory, HttpError::PoolStreamStorageTooSmall);
     for (size_t idx = 0; idx < numClients; ++idx)
     {
         HttpConnection& connection = connectionsSpan[idx];
