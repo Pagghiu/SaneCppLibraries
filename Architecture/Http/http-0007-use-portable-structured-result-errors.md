@@ -53,6 +53,10 @@ Incoming message framing reports Content-Length violations, conflicting or unsup
 chunk syntax/terminators, trailers, and unsupported pipelined body bytes with portable codes. The same chunk-trailer
 identity propagates through server requests and client responses; no chunk text or OS status is retained in Result.
 
+Outgoing message and response failures now distinguish header lifecycle/order, incompatible framing, missing output
+streams, invalid response status/reason text, redirect validation, and fixed chunk-header storage. Shared conditions
+such as already-sent headers use one identity across request and response paths.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

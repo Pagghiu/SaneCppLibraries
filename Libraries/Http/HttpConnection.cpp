@@ -67,7 +67,8 @@ static SC::Result scHttpFormatChunkHeader(uint64_t size, SC::Span<char> storage,
 {
     static constexpr const char HexDigits[] = "0123456789ABCDEF";
 
-    SC_TRY_MSG(storage.sizeInBytes() >= 4, "HttpOutgoingMessage chunk header buffer too small");
+    if (storage.sizeInBytes() < 4)
+        return SC::Result::Error(SC::HttpResultCategory, SC::HttpError::ChunkHeaderOutputTooSmall);
 
     char   reversed[16];
     size_t numDigits = 0;
@@ -77,8 +78,8 @@ static SC::Result scHttpFormatChunkHeader(uint64_t size, SC::Span<char> storage,
         size >>= 4;
     } while (size > 0 and numDigits < sizeof(reversed));
 
-    SC_TRY_MSG(size == 0, "HttpOutgoingMessage chunk size overflow");
-    SC_TRY_MSG(numDigits + 2 <= storage.sizeInBytes(), "HttpOutgoingMessage chunk header buffer too small");
+    if (numDigits + 2 > storage.sizeInBytes())
+        return SC::Result::Error(SC::HttpResultCategory, SC::HttpError::ChunkHeaderOutputTooSmall);
 
     for (size_t idx = 0; idx < numDigits; ++idx)
     {
@@ -854,7 +855,8 @@ Result HttpOutgoingMessage::ChunkedWritableStream::init(AsyncBuffersPool&    buf
 Result HttpOutgoingMessage::ChunkedWritableStream::asyncWrite(AsyncBufferView::ID                 bufferID,
                                                               Function<void(AsyncBufferView::ID)> cb)
 {
-    SC_TRY_MSG(destination != nullptr, "HttpOutgoingMessage chunked destination missing");
+    if (destination == nullptr)
+        return Result::Error(HttpResultCategory, HttpError::ChunkedDestinationMissing);
 
     Span<const char> body;
     SC_TRY(getBuffersPool().getReadableData(bufferID, body));
@@ -959,8 +961,10 @@ bool HttpOutgoingMessage::hasHeader(KnownHeader header) const
 
 Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerValue)
 {
-    SC_TRY_MSG(not headersSent, "Headers already sent");
-    SC_TRY_MSG(responseHeaders.writtenBytes() != 0, "startResponse or startRequest must be the first call");
+    if (headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
+    if (responseHeaders.writtenBytes() == 0)
+        return Result::Error(HttpResultCategory, HttpError::HeaderStartMissing);
 
     if (HttpStringIterator::equalsIgnoreCase(headerName, StringSpan("Connection")))
     {
@@ -968,7 +972,7 @@ Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerVa
         {
             if (forceDisableKeepAlive)
             {
-                return Result::Error("HttpOutgoingMessage::addHeader - keep-alive forcefully disabled");
+                return Result::Error(HttpResultCategory, HttpError::KeepAliveDisabled);
             }
             keepAlive = true;
         }
@@ -1014,10 +1018,12 @@ Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerVa
 
 Result HttpOutgoingMessage::addContentLength(uint64_t value)
 {
-    SC_TRY_MSG(not headersSent, "Headers already sent");
-    SC_TRY_MSG(responseHeaders.writtenBytes() != 0, "startResponse or startRequest must be the first call");
-    SC_TRY_MSG(not chunkedTransferEncodingEnabled and not transferEncodingAdded,
-               "HttpOutgoingMessage does not support Content-Length with Transfer-Encoding");
+    if (headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
+    if (responseHeaders.writtenBytes() == 0)
+        return Result::Error(HttpResultCategory, HttpError::HeaderStartMissing);
+    if (chunkedTransferEncodingEnabled or transferEncodingAdded)
+        return Result::Error(HttpResultCategory, HttpError::ContentLengthTransferEncodingConflict);
     SC_TRY(responseHeaders.appendContentLength(value, HttpError::HeaderOutputTooSmall));
     contentLengthAdded = true;
     return Result(true);
@@ -1025,7 +1031,8 @@ Result HttpOutgoingMessage::addContentLength(uint64_t value)
 
 Result HttpOutgoingMessage::setChunkedTransferEncoding()
 {
-    SC_TRY_MSG(not headersSent, "Headers already sent");
+    if (headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
     if (chunkedTransferEncodingEnabled)
     {
         return Result(true);
@@ -1040,14 +1047,17 @@ Result HttpOutgoingMessage::setChunkedTransferEncoding()
 
 Result HttpOutgoingMessage::sendHeaders(Function<void(AsyncBufferView::ID)> callback)
 {
-    SC_TRY_MSG(not headersSent, "Headers already sent");
-    SC_TRY_MSG(responseHeaders.writtenBytes() != 0, "startResponse or startRequest must be the first call");
-    SC_TRY_MSG(not(chunkedTransferEncodingEnabled and contentLengthAdded),
-               "HttpOutgoingMessage does not support Content-Length with Transfer-Encoding");
+    if (headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
+    if (responseHeaders.writtenBytes() == 0)
+        return Result::Error(HttpResultCategory, HttpError::HeaderStartMissing);
+    if (chunkedTransferEncodingEnabled and contentLengthAdded)
+        return Result::Error(HttpResultCategory, HttpError::ContentLengthTransferEncodingConflict);
 
     if (chunkedTransferEncodingEnabled)
     {
-        SC_TRY_MSG(destinationStream != nullptr, "HttpOutgoingMessage missing destination stream");
+        if (destinationStream == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::DestinationStreamMissing);
         SC_TRY(chunkedWritableStream.init(destinationStream->getBuffersPool(), *destinationStream));
         writableStream = &chunkedWritableStream;
     }
@@ -1095,7 +1105,8 @@ void HttpOutgoingMessage::reset()
 
 Result HttpOutgoingMessage::end()
 {
-    SC_TRY_MSG(headersSent, "Forgot to send headers");
+    if (not headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersNotSent);
     writableStream->end();
     endCalled = true;
     return Result(true);
@@ -1128,7 +1139,7 @@ Result HttpResponse::startResponse(int code)
     case 416: reasonPhrase = "Range Not Satisfiable"; break;
     case 426: reasonPhrase = "Upgrade Required"; break;
     case 500: reasonPhrase = "Internal Server Error"; break;
-    default: return Result::Error("HttpResponse unsupported status code");
+    default: return Result::Error(HttpResultCategory, HttpError::ResponseStatusUnsupported);
     }
     return startResponse(code, reasonPhrase);
 }
@@ -1137,19 +1148,25 @@ Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
 {
     static constexpr HttpError HeaderSpaceFinished = HttpError::HeaderOutputTooSmall;
 
-    SC_TRY_MSG(not headersSent, "Headers already sent");
-    SC_TRY_MSG(responseHeaders.writtenBytes() == 0, "startResponse must be the first call");
-    SC_TRY_MSG(code >= 100 and code <= 999, "HttpResponse status code must have three digits");
-    SC_TRY_MSG(not reasonPhrase.isEmpty(), "HttpResponse reason phrase must not be empty");
+    if (headersSent)
+        return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
+    if (responseHeaders.writtenBytes() != 0)
+        return Result::Error(HttpResultCategory, HttpError::HeaderStartAlreadyWritten);
+    if (code < 100 or code > 999)
+        return Result::Error(HttpResultCategory, HttpError::ResponseStatusInvalid);
+    if (reasonPhrase.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::ResponseReasonPhraseEmpty);
 
     for (char current : reasonPhrase.toCharSpan())
     {
-        SC_TRY_MSG(current != '\r' and current != '\n', "HttpResponse reason phrase must not contain CR or LF");
+        if (current == '\r' or current == '\n')
+            return Result::Error(HttpResultCategory, HttpError::ResponseReasonPhraseInvalid);
     }
 
     char      codeBuffer[4];
     const int len = ::snprintf(codeBuffer, sizeof(codeBuffer), "%d", code);
-    SC_TRY_MSG(len == 3, "HttpResponse failed formatting status code");
+    if (len != 3)
+        return Result::Error(HttpResultCategory, HttpError::ResponseStatusFormattingFailed);
 
     SC_TRY(responseHeaders.appendLiteral("HTTP/1.1 ", HeaderSpaceFinished));
     SC_TRY(responseHeaders.append({codeBuffer, 3}, HeaderSpaceFinished));
@@ -1208,8 +1225,10 @@ Result HttpResponse::sendMethodNotAllowed(StringSpan allow)
 
 Result HttpResponse::sendRedirect(int code, StringSpan location)
 {
-    SC_TRY_MSG(code >= 300 and code <= 399, "HttpResponse redirect status must be 3xx");
-    SC_TRY_MSG(not location.isEmpty(), "HttpResponse redirect location must not be empty");
+    if (code < 300 or code > 399)
+        return Result::Error(HttpResultCategory, HttpError::RedirectStatusInvalid);
+    if (location.isEmpty())
+        return Result::Error(HttpResultCategory, HttpError::RedirectLocationEmpty);
     SC_TRY(startBody(code, 0));
     SC_TRY(addHeader("Location", location));
     SC_TRY(sendHeaders());

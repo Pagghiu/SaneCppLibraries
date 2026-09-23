@@ -96,6 +96,26 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("HTTP chunk trailer terminator is malformed");
         break;
     case HttpError::PipelinedBodyUnsupported: formatter.append("Pipelined HTTP body data is unsupported"); break;
+    case HttpError::ChunkHeaderOutputTooSmall: formatter.append("HTTP chunk header output buffer is too small"); break;
+    case HttpError::ChunkedDestinationMissing: formatter.append("Chunked HTTP output destination is missing"); break;
+    case HttpError::HeadersAlreadySent: formatter.append("HTTP headers have already been sent"); break;
+    case HttpError::HeaderStartMissing: formatter.append("HTTP message start must precede headers"); break;
+    case HttpError::HeaderStartAlreadyWritten: formatter.append("HTTP message start has already been written"); break;
+    case HttpError::KeepAliveDisabled: formatter.append("HTTP keep-alive is disabled for this connection"); break;
+    case HttpError::ContentLengthTransferEncodingConflict:
+        formatter.append("Content-Length conflicts with Transfer-Encoding");
+        break;
+    case HttpError::DestinationStreamMissing: formatter.append("HTTP output destination stream is missing"); break;
+    case HttpError::HeadersNotSent: formatter.append("HTTP headers have not been sent"); break;
+    case HttpError::ResponseStatusUnsupported: formatter.append("HTTP response status is unsupported"); break;
+    case HttpError::ResponseStatusInvalid: formatter.append("HTTP response status must have three digits"); break;
+    case HttpError::ResponseReasonPhraseEmpty: formatter.append("HTTP response reason phrase is empty"); break;
+    case HttpError::ResponseReasonPhraseInvalid:
+        formatter.append("HTTP response reason phrase contains a line break");
+        break;
+    case HttpError::ResponseStatusFormattingFailed: formatter.append("HTTP response status formatting failed"); break;
+    case HttpError::RedirectStatusInvalid: formatter.append("HTTP redirect status must be 3xx"); break;
+    case HttpError::RedirectLocationEmpty: formatter.append("HTTP redirect location is empty"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

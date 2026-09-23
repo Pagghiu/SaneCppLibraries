@@ -204,6 +204,8 @@ struct ProbeHttpResponse : SC::HttpResponse
         setWritableStream(stream);
         reset();
     }
+
+    void disableKeepAlive() { forceDisableKeepAlive = true; }
 };
 
 struct ProbeHttpIncomingMessage : SC::HttpIncomingMessage
@@ -1120,36 +1122,49 @@ void SC::HttpAsyncServerTest::responseDiagnosticMessages()
     {
         ProbeHttpResponse response;
         response.setup(headers, writable);
-        SC_TEST_EXPECT(resultMessageEquals(response.addHeader("X-Test", "before-start"),
-                                           "startResponse or startRequest must be the first call"));
+        SC_TEST_EXPECT(resultHasHttpError(response.addHeader("X-Test", "before-start"), HttpError::HeaderStartMissing));
+        SC_TEST_EXPECT(resultHasHttpError(response.end(), HttpError::HeadersNotSent));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(resultHasHttpError(response.startResponse(99, "Bad"), HttpError::ResponseStatusInvalid));
+        SC_TEST_EXPECT(resultHasHttpError(response.startResponse(777), HttpError::ResponseStatusUnsupported));
+        SC_TEST_EXPECT(resultHasHttpError(response.startResponse(200, ""), HttpError::ResponseReasonPhraseEmpty));
     }
 
     {
         ProbeHttpResponse response;
         response.setup(headers, writable);
         SC_TEST_EXPECT(
-            resultMessageEquals(response.startResponse(99, "Bad"), "HttpResponse status code must have three digits"));
-    }
-
-    {
-        ProbeHttpResponse response;
-        response.setup(headers, writable);
-        SC_TEST_EXPECT(resultMessageEquals(response.startResponse(200, "Bad\rReason"),
-                                           "HttpResponse reason phrase must not contain CR or LF"));
-    }
-
-    {
-        ProbeHttpResponse response;
-        response.setup(headers, writable);
-        SC_TEST_EXPECT(resultMessageEquals(response.sendRedirect(200, "/not-a-redirect"),
-                                           "HttpResponse redirect status must be 3xx"));
+            resultHasHttpError(response.startResponse(200, "Bad\rReason"), HttpError::ResponseReasonPhraseInvalid));
     }
 
     {
         ProbeHttpResponse response;
         response.setup(headers, writable);
         SC_TEST_EXPECT(
-            resultMessageEquals(response.sendRedirect(302, ""), "HttpResponse redirect location must not be empty"));
+            resultHasHttpError(response.sendRedirect(200, "/not-a-redirect"), HttpError::RedirectStatusInvalid));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(resultHasHttpError(response.sendRedirect(302, ""), HttpError::RedirectLocationEmpty));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(response.startResponse(200));
+        SC_TEST_EXPECT(resultHasHttpError(response.startResponse(201), HttpError::HeaderStartAlreadyWritten));
+        response.disableKeepAlive();
+        SC_TEST_EXPECT(
+            resultHasHttpError(response.addHeader("Connection", "keep-alive"), HttpError::KeepAliveDisabled));
+        SC_TEST_EXPECT(response.setChunkedTransferEncoding());
+        SC_TEST_EXPECT(
+            resultHasHttpError(response.addContentLength(3), HttpError::ContentLengthTransferEncodingConflict));
     }
 }
 

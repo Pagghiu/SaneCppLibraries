@@ -79,6 +79,22 @@ enum class HttpError : uint32_t
     ChunkTrailersUnsupported,
     ChunkTrailerTerminatorMalformed,
     PipelinedBodyUnsupported,
+    ChunkHeaderOutputTooSmall,
+    ChunkedDestinationMissing,
+    HeadersAlreadySent,
+    HeaderStartMissing,
+    HeaderStartAlreadyWritten,
+    KeepAliveDisabled,
+    ContentLengthTransferEncodingConflict,
+    DestinationStreamMissing,
+    HeadersNotSent,
+    ResponseStatusUnsupported,
+    ResponseStatusInvalid,
+    ResponseReasonPhraseEmpty,
+    ResponseReasonPhraseInvalid,
+    ResponseStatusFormattingFailed,
+    RedirectStatusInvalid,
+    RedirectLocationEmpty,
 };
 
 /// @brief Stable category assigned to Http-owned errors.
