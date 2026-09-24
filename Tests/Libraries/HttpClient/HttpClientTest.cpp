@@ -363,6 +363,7 @@ struct SC::HttpClientTest : public SC::TestCase
                            .isError(HttpClientResultCategory, HttpClientError::OperationAlreadyInitialized));
         SC_TEST_EXPECT(operation.close());
         SC_TEST_EXPECT(operation.cancel().isError(HttpClientResultCategory, HttpClientError::OperationNotInitialized));
+        SC_TEST_EXPECT(operation.poll(0).isError(HttpClientResultCategory, HttpClientError::OperationNotInitialized));
         HttpClientRequest  request;
         HttpClientResponse response;
         SC_TEST_EXPECT(operation.start(request, response)
@@ -831,6 +832,22 @@ struct SC::HttpClientTest : public SC::TestCase
             HttpClientOperation operation;
             SC_TEST_EXPECT(operation.init(client, memory));
             SC_TEST_EXPECT(operation.isInitialized());
+
+            size_t     bufferIndex = 0;
+            Span<char> data;
+            SC_TEST_EXPECT(operation.allocateResponseBuffer(3, bufferIndex, data)
+                               .isError(HttpClientResultCategory, HttpClientError::ResponseBufferCapacityInsufficient));
+            SC_TEST_EXPECT(operation.allocateResponseBuffer(1, bufferIndex, data)
+                               .isError(HttpClientResultCategory, HttpClientError::RequestCancelled));
+            SC_TEST_EXPECT(operation.copyResponseEffectiveUrl("abc"_a8).isError(
+                HttpClientResultCategory, HttpClientError::OperationResponseMissing));
+
+            HttpClientOperationEvent invalidEvent;
+            invalidEvent.type        = HttpClientOperationEvent::Type::ResponseData;
+            invalidEvent.bufferIndex = 2;
+            SC_TEST_EXPECT(operation.enqueueEvent(invalidEvent));
+            SC_TEST_EXPECT(
+                operation.poll(0).isError(HttpClientResultCategory, HttpClientError::ResponseBufferIndexInvalid));
             SC_TEST_EXPECT(operation.close());
         }
         {
@@ -847,7 +864,8 @@ struct SC::HttpClientTest : public SC::TestCase
 
             HttpClientOperation operation;
             SC_TEST_EXPECT(operation.init(client, memory));
-            SC_TEST_EXPECT(not operation.start(request, response, nullptr));
+            SC_TEST_EXPECT(operation.start(request, response, nullptr)
+                               .isError(HttpClientResultCategory, HttpClientError::ResponseMetadataTooSmall));
             SC_TEST_EXPECT(not operation.isRequestInFlight());
             SC_TEST_EXPECT(operation.close());
         }
@@ -931,8 +949,9 @@ struct SC::HttpClientTest : public SC::TestCase
                 size_t             bodyLength = 0;
 
                 request.url = server.endpoint.view();
-                SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
-                                                               memory.memory));
+                SC_TEST_EXPECT(
+                    HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory)
+                        .isError(HttpClientResultCategory, HttpClientError::BlockingResponseBodyBufferTooSmall));
                 SC_TEST_EXPECT(bodyLength == sizeof(body));
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "Hell");
                 SC_TEST_EXPECT(client.close());

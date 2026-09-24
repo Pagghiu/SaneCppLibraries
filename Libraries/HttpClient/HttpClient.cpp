@@ -1467,7 +1467,7 @@ SC::Result SC::HttpClientOperation::allocateResponseBuffer(size_t minimumSizeInB
     if (not supportsSize)
     {
         eventMutex.unlock();
-        return Result::Error("HttpClient: response buffer exhausted");
+        return Result::Error(HttpClientResultCategory, HttpClientError::ResponseBufferCapacityInsufficient);
     }
 
     while (requestInFlight)
@@ -1488,7 +1488,7 @@ SC::Result SC::HttpClientOperation::allocateResponseBuffer(size_t minimumSizeInB
     }
 
     eventMutex.unlock();
-    return Result::Error("HttpClient: request cancelled");
+    return Result::Error(HttpClientResultCategory, HttpClientError::RequestCancelled);
 }
 
 void SC::HttpClientOperation::releaseResponseBuffer(size_t bufferIndex)
@@ -1567,7 +1567,7 @@ SC::Result SC::HttpClientOperation::processPendingEvents()
         case HttpClientOperationEvent::Type::ResponseData: {
             if (event.bufferIndex >= responseBuffers.sizeInElements())
             {
-                return Result::Error("HttpClient: invalid response buffer index");
+                return Result::Error(HttpClientResultCategory, HttpClientError::ResponseBufferIndexInvalid);
             }
             const Span<char>       writable = responseBuffers[event.bufferIndex].data;
             const Span<const char> readable = {writable.data(), event.size};
@@ -1607,7 +1607,8 @@ SC::Result SC::HttpClientOperation::processPendingEvents()
 
 SC::Result SC::HttpClientOperation::poll(uint32_t timeoutMilliseconds)
 {
-    SC_TRY_MSG(initialized, "HttpClientOperation: not initialized");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationNotInitialized);
 
     SC_TRY(processPendingEvents());
     if (timeoutMilliseconds == 0 or not requestInFlight)
@@ -1662,8 +1663,10 @@ bool SC::HttpClientOperation::canAutomaticRedirectRequestReplay() const
 
 SC::Result SC::HttpClientOperation::copyResponseEffectiveUrl(StringSpan url)
 {
-    SC_TRY_MSG(currentResponse != nullptr, "HttpClientOperation: missing response");
-    SC_TRY_MSG(responseMetadata.sizeInBytes() >= url.sizeInBytes(), "HttpClient: response metadata buffer too small");
+    if (currentResponse == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationResponseMissing);
+    if (responseMetadata.sizeInBytes() < url.sizeInBytes())
+        return Result::Error(HttpClientResultCategory, HttpClientError::ResponseMetadataTooSmall);
 
     if (url.sizeInBytes() > 0)
     {
@@ -1777,7 +1780,8 @@ SC::Result SC::HttpClient::executeBlocking(const HttpClientRequest& request, Htt
             }
             if (toCopy != data.sizeInBytes())
             {
-                *finalRes  = Result::Error("HttpClient: blocking response body buffer too small");
+                *finalRes =
+                    Result::Error(HttpClientResultCategory, HttpClientError::BlockingResponseBodyBufferTooSmall);
                 *completed = true;
                 (void)operation->cancel();
             }

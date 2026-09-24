@@ -39,6 +39,9 @@ The request-body callback path reports a missing provider, empty destination, pr
 and declared-size mismatch through `outError`. An empty destination previously returned a value converted from a
 failed `Result` while leaving `outError` successful; the callback contract test exercises this internal helper
 without relying on a native backend to supply a zero-length buffer. Provider-returned errors remain unchanged.
+Response delivery distinguishes insufficient per-buffer capacity, cancellation, an invalid queued buffer index,
+missing response state, insufficient effective-URL metadata storage, and insufficient caller output for a blocking
+body. The same category/code is returned through ordinary polling or blocking APIs without carrying text in Result.
 
 ## Consequences
 

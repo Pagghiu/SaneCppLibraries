@@ -72,6 +72,12 @@ enum class HttpClientError : uint32_t
     RequestBodyProviderStalled,
     RequestBodyDeclaredSizeExceeded,
     RequestBodyDeclaredSizeIncomplete,
+    ResponseBufferCapacityInsufficient,
+    RequestCancelled,
+    ResponseBufferIndexInvalid,
+    OperationResponseMissing,
+    ResponseMetadataTooSmall,
+    BlockingResponseBodyBufferTooSmall,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

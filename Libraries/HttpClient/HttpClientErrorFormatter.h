@@ -168,6 +168,22 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::RequestBodyDeclaredSizeIncomplete:
         formatter.append("HTTP client request body ended before its declared size");
         break;
+    case HttpClientError::ResponseBufferCapacityInsufficient:
+        formatter.append("HTTP client response buffer cannot hold the requested data");
+        break;
+    case HttpClientError::RequestCancelled: formatter.append("HTTP client request was cancelled"); break;
+    case HttpClientError::ResponseBufferIndexInvalid:
+        formatter.append("HTTP client response buffer index is invalid");
+        break;
+    case HttpClientError::OperationResponseMissing:
+        formatter.append("HTTP client operation response is missing");
+        break;
+    case HttpClientError::ResponseMetadataTooSmall:
+        formatter.append("HTTP client response metadata buffer is too small");
+        break;
+    case HttpClientError::BlockingResponseBodyBufferTooSmall:
+        formatter.append("HTTP client blocking response body buffer is too small");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
