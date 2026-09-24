@@ -312,6 +312,24 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("WebSocket frame payload exceeds its declared length");
         break;
     case HttpError::WebSocketFramePayloadIncomplete: formatter.append("WebSocket frame payload is incomplete"); break;
+    case HttpError::WebSocketMessageMissing: formatter.append("WebSocket message is not in progress"); break;
+    case HttpError::WebSocketMessageStorageTooSmall: formatter.append("WebSocket message storage is too small"); break;
+    case HttpError::WebSocketMaskKeyMissing: formatter.append("WebSocket client mask key is missing"); break;
+    case HttpError::WebSocketFramePayloadLengthMismatch:
+        formatter.append("WebSocket frame payload length differs from its header");
+        break;
+    case HttpError::WebSocketFrameOutputTooSmall: formatter.append("WebSocket frame output buffer is too small"); break;
+    case HttpError::WebSocketDataOpcodeRequired: formatter.append("WebSocket data opcode is required"); break;
+    case HttpError::WebSocketCloseStatusRequired:
+        formatter.append("WebSocket close reason requires a status code");
+        break;
+    case HttpError::WebSocketClosePayloadMalformed: formatter.append("WebSocket close payload is malformed"); break;
+    case HttpError::WebSocketControlBackpressure:
+        formatter.append("WebSocket automatic control frame is still pending");
+        break;
+    case HttpError::WebSocketAutomaticControlOutputTooSmall:
+        formatter.append("WebSocket automatic control storage is too small");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

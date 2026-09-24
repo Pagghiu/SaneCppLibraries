@@ -92,6 +92,11 @@ WebSocket frame reader and writer share primary codes when the protocol conditio
 masking, control-frame constraints, and continuation sequencing. Writer-only lifecycle and caller-header-storage
 errors remain distinct, as do malformed extended length and payload-progress failures in the reader.
 
+WebSocket message assembly and endpoints share continuation/control-frame identities with framing where applicable.
+Missing client mask keys, message or frame storage, malformed close payloads, and automatic-control backpressure are
+explicit. A missing pending automatic control frame is expected absence, not a failure: the accessor returns an empty
+borrowed view, whose storage remains owned by the endpoint.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

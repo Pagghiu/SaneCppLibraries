@@ -203,6 +203,16 @@ enum class HttpError : uint32_t
     WebSocketFrameMissing,
     WebSocketFramePayloadExceedsLength,
     WebSocketFramePayloadIncomplete,
+    WebSocketMessageMissing,
+    WebSocketMessageStorageTooSmall,
+    WebSocketMaskKeyMissing,
+    WebSocketFramePayloadLengthMismatch,
+    WebSocketFrameOutputTooSmall,
+    WebSocketDataOpcodeRequired,
+    WebSocketCloseStatusRequired,
+    WebSocketClosePayloadMalformed,
+    WebSocketControlBackpressure,
+    WebSocketAutomaticControlOutputTooSmall,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

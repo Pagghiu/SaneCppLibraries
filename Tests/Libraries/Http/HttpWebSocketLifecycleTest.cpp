@@ -152,6 +152,12 @@ static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
     }
     return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
 }
+
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
+{
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
+}
 } // namespace
 
 struct SC::HttpWebSocketLifecycleTest : public SC::TestCase
@@ -261,7 +267,8 @@ void SC::HttpWebSocketLifecycleTest::messageAssemblerLimit()
         assembler);
 
     size_t consumed = 0;
-    SC_TEST_EXPECT(not reader.parse({frameStorage, encodedFrame.sizeInBytes()}, consumed));
+    SC_TEST_EXPECT(resultHasHttpError(reader.parse({frameStorage, encodedFrame.sizeInBytes()}, consumed),
+                                      HttpError::WebSocketMessageStorageTooSmall));
 }
 
 void SC::HttpWebSocketLifecycleTest::automaticPong()
@@ -282,8 +289,8 @@ void SC::HttpWebSocketLifecycleTest::automaticPong()
     SC_TEST_EXPECT(consumed == pingFrame.sizeInBytes());
     SC_TEST_EXPECT(server.hasPendingControlFrame());
 
-    Span<const char> pongFrame;
-    SC_TEST_EXPECT(server.getPendingControlFrame(pongFrame));
+    const Span<const char> pongFrame = server.getPendingControlFrame();
+    SC_TEST_EXPECT(not pongFrame.empty());
 
     FrameCollector           collector;
     HttpWebSocketFrameReader reader;
@@ -316,8 +323,8 @@ void SC::HttpWebSocketLifecycleTest::closeEcho()
     SC_TEST_EXPECT(server.hasCloseBeenReceived());
     SC_TEST_EXPECT(server.hasCloseBeenSent());
 
-    Span<const char> echoFrame;
-    SC_TEST_EXPECT(server.getPendingControlFrame(echoFrame));
+    const Span<const char> echoFrame = server.getPendingControlFrame();
+    SC_TEST_EXPECT(not echoFrame.empty());
 
     FrameCollector           collector;
     HttpWebSocketFrameReader reader;
@@ -356,7 +363,9 @@ void SC::HttpWebSocketLifecycleTest::pendingControlBackpressure()
     server.reset(HttpWebSocketEndpointRole::Server);
 
     size_t consumed = 0;
-    SC_TEST_EXPECT(not server.receive({combined, firstFrame.sizeInBytes() + secondFrame.sizeInBytes()}, consumed));
+    SC_TEST_EXPECT(
+        resultHasHttpError(server.receive({combined, firstFrame.sizeInBytes() + secondFrame.sizeInBytes()}, consumed),
+                           HttpError::WebSocketControlBackpressure));
     SC_TEST_EXPECT(server.hasPendingControlFrame());
 }
 
@@ -364,11 +373,23 @@ void SC::HttpWebSocketLifecycleTest::sendDataHelper()
 {
     HttpWebSocketEndpoint server;
     server.reset(HttpWebSocketEndpointRole::Server);
+    SC_TEST_EXPECT(server.getPendingControlFrame().empty());
 
     char             frameStorage[64] = {0};
     Span<const char> encodedFrame;
     SC_TEST_EXPECT(
         server.sendData(HttpWebSocketOpcode::Text, "hello"_a8.toCharSpan(), true, nullptr, frameStorage, encodedFrame));
+    SC_TEST_EXPECT(
+        resultHasHttpError(server.sendData(HttpWebSocketOpcode::Ping, {}, true, nullptr, frameStorage, encodedFrame),
+                           HttpError::WebSocketDataOpcodeRequired));
+    SC_TEST_EXPECT(
+        resultHasHttpError(server.sendClose(0, "reason"_a8.toCharSpan(), nullptr, frameStorage, encodedFrame),
+                           HttpError::WebSocketCloseStatusRequired));
+
+    HttpWebSocketEndpoint client;
+    client.reset(HttpWebSocketEndpointRole::Client);
+    SC_TEST_EXPECT(resultHasHttpError(client.sendPing({}, nullptr, frameStorage, encodedFrame),
+                                      HttpError::WebSocketMaskKeyMissing));
 
     FrameCollector           collector;
     HttpWebSocketFrameReader reader;

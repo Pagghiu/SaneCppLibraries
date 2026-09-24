@@ -1196,11 +1196,13 @@ Result HttpWebSocketMessageAssembler::onFrameHeader(const HttpWebSocketFrameHead
 
     if (header.opcode == HttpWebSocketOpcode::Continuation)
     {
-        SC_TRY_MSG(assemblingMessage, "HttpWebSocketMessageAssembler unexpected continuation");
+        if (not assemblingMessage)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketContinuationUnexpected);
     }
     else
     {
-        SC_TRY_MSG(not assemblingMessage, "HttpWebSocketMessageAssembler new message before final continuation");
+        if (assemblingMessage)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketContinuationExpected);
         messageOpcode     = header.opcode;
         messageSize       = 0;
         assemblingMessage = true;
@@ -1225,9 +1227,10 @@ Result HttpWebSocketMessageAssembler::onFramePayload(Span<char> payload, bool fr
         return Result(true);
     }
 
-    SC_TRY_MSG(assemblingMessage, "HttpWebSocketMessageAssembler payload without message");
-    SC_TRY_MSG(messageSize + payload.sizeInBytes() <= messageStorage.sizeInBytes(),
-               "HttpWebSocketMessageAssembler message storage too small");
+    if (not assemblingMessage)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketMessageMissing);
+    if (payload.sizeInBytes() > messageStorage.sizeInBytes() - messageSize)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketMessageStorageTooSmall);
     if (payload.sizeInBytes() > 0)
     {
         ::memcpy(messageStorage.data() + messageSize, payload.data(), payload.sizeInBytes());
@@ -1282,7 +1285,8 @@ Result HttpWebSocketEndpoint::applyOutgoingMask(HttpWebSocketFrameHeaderView& he
     header.masked           = requiresMask;
     if (requiresMask)
     {
-        SC_TRY_MSG(maskKey != nullptr, "HttpWebSocketEndpoint mask key required for client frames");
+        if (maskKey == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketMaskKeyMissing);
         for (size_t idx = 0; idx < 4; ++idx)
         {
             header.maskKey[idx] = maskKey[idx];
@@ -1301,13 +1305,13 @@ Result HttpWebSocketEndpoint::applyOutgoingMask(HttpWebSocketFrameHeaderView& he
 Result HttpWebSocketEndpoint::sendFrame(const HttpWebSocketFrameHeaderView& header, Span<const char> payload,
                                         Span<char> storage, Span<const char>& encodedFrame)
 {
-    SC_TRY_MSG(header.payloadLength == payload.sizeInBytes(),
-               "HttpWebSocketEndpoint payload does not match frame length");
+    if (header.payloadLength != payload.sizeInBytes())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFramePayloadLengthMismatch);
 
     Span<const char> encodedHeader;
     SC_TRY(writer.beginFrame(header, storage, encodedHeader));
-    SC_TRY_MSG(storage.sizeInBytes() >= encodedHeader.sizeInBytes() + payload.sizeInBytes(),
-               "HttpWebSocketEndpoint frame storage too small");
+    if (payload.sizeInBytes() > storage.sizeInBytes() - encodedHeader.sizeInBytes())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameOutputTooSmall);
 
     if (payload.sizeInBytes() > 0)
     {
@@ -1324,9 +1328,9 @@ Result HttpWebSocketEndpoint::sendFrame(const HttpWebSocketFrameHeaderView& head
 Result HttpWebSocketEndpoint::sendData(HttpWebSocketOpcode opcode, Span<const char> payload, bool fin,
                                        const uint8_t* maskKey, Span<char> storage, Span<const char>& encodedFrame)
 {
-    SC_TRY_MSG(opcode == HttpWebSocketOpcode::Text or opcode == HttpWebSocketOpcode::Binary or
-                   opcode == HttpWebSocketOpcode::Continuation,
-               "HttpWebSocketEndpoint sendData requires a data opcode");
+    if (opcode != HttpWebSocketOpcode::Text and opcode != HttpWebSocketOpcode::Binary and
+        opcode != HttpWebSocketOpcode::Continuation)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketDataOpcodeRequired);
     HttpWebSocketFrameHeaderView header;
     header.opcode        = opcode;
     header.fin           = fin;
@@ -1338,7 +1342,8 @@ Result HttpWebSocketEndpoint::sendData(HttpWebSocketOpcode opcode, Span<const ch
 Result HttpWebSocketEndpoint::sendPing(Span<const char> payload, const uint8_t* maskKey, Span<char> storage,
                                        Span<const char>& encodedFrame)
 {
-    SC_TRY_MSG(payload.sizeInBytes() <= sizeof(controlPayload), "HttpWebSocketEndpoint ping payload too large");
+    if (payload.sizeInBytes() > sizeof(controlPayload))
+        return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameTooLarge);
     HttpWebSocketFrameHeaderView header;
     header.opcode        = HttpWebSocketOpcode::Ping;
     header.fin           = true;
@@ -1350,7 +1355,8 @@ Result HttpWebSocketEndpoint::sendPing(Span<const char> payload, const uint8_t* 
 Result HttpWebSocketEndpoint::sendPong(Span<const char> payload, const uint8_t* maskKey, Span<char> storage,
                                        Span<const char>& encodedFrame)
 {
-    SC_TRY_MSG(payload.sizeInBytes() <= sizeof(controlPayload), "HttpWebSocketEndpoint pong payload too large");
+    if (payload.sizeInBytes() > sizeof(controlPayload))
+        return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameTooLarge);
     HttpWebSocketFrameHeaderView header;
     header.opcode        = HttpWebSocketOpcode::Pong;
     header.fin           = true;
@@ -1362,9 +1368,10 @@ Result HttpWebSocketEndpoint::sendPong(Span<const char> payload, const uint8_t* 
 Result HttpWebSocketEndpoint::sendClose(uint16_t statusCode, Span<const char> reason, const uint8_t* maskKey,
                                         Span<char> storage, Span<const char>& encodedFrame)
 {
-    SC_TRY_MSG(statusCode != 0 or reason.empty(), "HttpWebSocketEndpoint close reason requires a status code");
-    SC_TRY_MSG(reason.sizeInBytes() + (statusCode == 0 ? 0 : 2) <= sizeof(controlPayload),
-               "HttpWebSocketEndpoint close payload too large");
+    if (statusCode == 0 and not reason.empty())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketCloseStatusRequired);
+    if (reason.sizeInBytes() > sizeof(controlPayload) - (statusCode == 0 ? 0 : 2))
+        return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameTooLarge);
 
     char   closePayload[125] = {0};
     size_t closePayloadSize  = 0;
@@ -1386,13 +1393,6 @@ Result HttpWebSocketEndpoint::sendClose(uint16_t statusCode, Span<const char> re
     SC_TRY(applyOutgoingMask(header, maskKey));
     SC_TRY(sendFrame(header, {closePayload, closePayloadSize}, storage, encodedFrame));
     closeSent = true;
-    return Result(true);
-}
-
-Result HttpWebSocketEndpoint::getPendingControlFrame(Span<const char>& frame) const
-{
-    SC_TRY_MSG(hasPendingControlFrame(), "HttpWebSocketEndpoint no pending control frame");
-    frame = pendingControlFrame;
     return Result(true);
 }
 
@@ -1420,8 +1420,8 @@ Result HttpWebSocketEndpoint::onReaderPayload(Span<char> payload, bool frameFini
 {
     if (currentFrame.isControlFrame())
     {
-        SC_TRY_MSG(controlPayloadSize + payload.sizeInBytes() <= sizeof(controlPayload),
-                   "HttpWebSocketEndpoint control payload too large");
+        if (payload.sizeInBytes() > sizeof(controlPayload) - controlPayloadSize)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameTooLarge);
         if (payload.sizeInBytes() > 0)
         {
             ::memcpy(controlPayload + controlPayloadSize, payload.data(), payload.sizeInBytes());
@@ -1458,7 +1458,8 @@ Result HttpWebSocketEndpoint::handleControlFrame(Span<char> payload)
         }
         return Result(true);
     case HttpWebSocketOpcode::Close: {
-        SC_TRY_MSG(payload.sizeInBytes() != 1, "HttpWebSocketEndpoint malformed close payload");
+        if (payload.sizeInBytes() == 1)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketClosePayloadMalformed);
         uint16_t   statusCode = 0;
         Span<char> reason;
         if (payload.sizeInBytes() >= 2)
@@ -1486,7 +1487,8 @@ Result HttpWebSocketEndpoint::handleControlFrame(Span<char> payload)
 
 Result HttpWebSocketEndpoint::queueAutomaticControl(HttpWebSocketOpcode opcode, Span<const char> payload)
 {
-    SC_TRY_MSG(not hasPendingControlFrame(), "HttpWebSocketEndpoint pending control frame backpressure");
+    if (hasPendingControlFrame())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketControlBackpressure);
 
     HttpWebSocketFrameHeaderView header;
     header.opcode        = opcode;
@@ -1499,8 +1501,8 @@ Result HttpWebSocketEndpoint::queueAutomaticControl(HttpWebSocketOpcode opcode, 
 
     Span<const char> encodedHeader;
     SC_TRY(controlWriter.beginFrame(header, automaticControlStorage, encodedHeader));
-    SC_TRY_MSG(sizeof(automaticControlStorage) >= encodedHeader.sizeInBytes() + payload.sizeInBytes(),
-               "HttpWebSocketEndpoint automatic control storage too small");
+    if (payload.sizeInBytes() > sizeof(automaticControlStorage) - encodedHeader.sizeInBytes())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketAutomaticControlOutputTooSmall);
     if (payload.sizeInBytes() > 0)
     {
         Span<char> destinationPayload = {automaticControlStorage + encodedHeader.sizeInBytes(), payload.sizeInBytes()};
@@ -1599,8 +1601,7 @@ Result HttpWebSocketConnectionPump::flushPendingControlFrame()
         return Result(true);
     }
 
-    Span<const char> controlFrame;
-    SC_TRY(endpoint.getPendingControlFrame(controlFrame));
+    const Span<const char> controlFrame = endpoint.getPendingControlFrame();
     SC_TRY(writeFrame(controlFrame));
     endpoint.clearPendingControlFrame();
     return Result(true);

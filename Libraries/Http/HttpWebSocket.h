@@ -282,8 +282,10 @@ struct SC_HTTP_EXPORT HttpWebSocketEndpoint
                      Span<const char>& encodedFrame);
 
     [[nodiscard]] bool hasPendingControlFrame() const { return pendingControlFrame.sizeInBytes() > 0; }
-    Result             getPendingControlFrame(Span<const char>& frame) const;
-    void               clearPendingControlFrame();
+    /// @brief Returns an empty view when no automatic control frame is pending.
+    /// @note The view borrows this endpoint's storage until the frame is cleared or another frame is queued.
+    [[nodiscard]] Span<const char> getPendingControlFrame() const { return pendingControlFrame; }
+    void                           clearPendingControlFrame();
 
     [[nodiscard]] bool hasCloseBeenSent() const { return closeSent; }
     [[nodiscard]] bool hasCloseBeenReceived() const { return closeReceived; }
