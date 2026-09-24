@@ -361,10 +361,12 @@ static SC::Result validateProxyOptions(const SC::HttpClientRequestProxyOptions& 
 
 static SC::Result validateRequestUrl(SC::StringSpan url)
 {
-    SC_TRY_MSG(url.sizeInBytes() > 0, "HttpClientRequest: URL is empty");
+    if (url.sizeInBytes() == 0)
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestUrlEmpty);
 
     const SC::Span<const char> bytes = url.toCharSpan();
-    SC_TRY_MSG(not hasUrlUnsafeBytes(url), "HttpClientRequest: URL contains whitespace or control bytes");
+    if (hasUrlUnsafeBytes(url))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestUrlUnsafe);
 
     size_t schemeBytes = 0;
     if (asciiStartsWithIgnoreCase(url, SC::StringSpan("http://")))
@@ -377,22 +379,23 @@ static SC::Result validateRequestUrl(SC::StringSpan url)
     }
     else
     {
-        return SC::Result::Error("HttpClientRequest: only http:// and https:// URLs are supported");
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestUrlSchemeUnsupported);
     }
 
-    SC_TRY_MSG(bytes.sizeInBytes() > schemeBytes, "HttpClientRequest: URL host is empty");
-    SC_TRY_MSG(bytes[schemeBytes] != '/' and bytes[schemeBytes] != '?' and bytes[schemeBytes] != '#',
-               "HttpClientRequest: URL host is empty");
+    if (bytes.sizeInBytes() <= schemeBytes or bytes[schemeBytes] == '/' or bytes[schemeBytes] == '?' or
+        bytes[schemeBytes] == '#')
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestUrlHostEmpty);
     return SC::Result(true);
 }
 
 static SC::Result validateRequestOptionsShape(const SC::HttpClientRequestOptions& options)
 {
-    SC_TRY_MSG(isValidRedirectMode(options.redirect.mode), "HttpClientRequestOptions: invalid redirect mode");
-    SC_TRY_MSG(isValidProtocolPreference(options.protocol.preference),
-               "HttpClientRequestOptions: invalid protocol preference");
-    SC_TRY_MSG(not hasPathUnsafeBytes(options.tls.caCertificatesPath),
-               "HttpClientRequestOptions: TLS CA path contains control bytes");
+    if (not isValidRedirectMode(options.redirect.mode))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestRedirectModeInvalid);
+    if (not isValidProtocolPreference(options.protocol.preference))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestProtocolPreferenceInvalid);
+    if (hasPathUnsafeBytes(options.tls.caCertificatesPath))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestTlsCaPathInvalid);
     SC_TRY(validateProxyOptions(options.proxy));
     return SC::Result(true);
 }
@@ -400,7 +403,8 @@ static SC::Result validateRequestOptionsShape(const SC::HttpClientRequestOptions
 static SC::Result validateRequestShape(const SC::HttpClientRequest& request)
 {
     SC_TRY(validateRequestUrl(request.url));
-    SC_TRY_MSG(isValidRequestMethod(request.method), "HttpClientRequest: invalid request method");
+    if (not isValidRequestMethod(request.method))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestMethodInvalid);
     SC_TRY(validateRequestHeaders(request.headers));
     SC_TRY(validateRequestBodyFramingHeaders(request));
     SC_TRY(validateRequestBodyShape(request.body));
@@ -408,14 +412,14 @@ static SC::Result validateRequestShape(const SC::HttpClientRequest& request)
 
     if (request.options.redirect.mode == SC::HttpClientRequestRedirectOptions::FollowGetHead)
     {
-        SC_TRY_MSG(request.method == SC::HttpClientRequest::HttpGET or
-                       request.method == SC::HttpClientRequest::HttpHEAD,
-                   "HttpClientRequest: FollowGetHead requires GET or HEAD");
+        if (request.method != SC::HttpClientRequest::HttpGET and request.method != SC::HttpClientRequest::HttpHEAD)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestRedirectMethodInvalid);
     }
     if (request.options.redirect.mode != SC::HttpClientRequestRedirectOptions::NoRedirects)
     {
-        SC_TRY_MSG((not request.body.isStreamed()) or request.body.canReplay,
-                   "HttpClientRequest: automatic redirects require a replayable request body");
+        if (request.body.isStreamed() and not request.body.canReplay)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::RequestRedirectBodyNotReplayable);
     }
     return SC::Result(true);
 }

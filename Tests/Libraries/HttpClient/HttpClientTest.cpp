@@ -1042,32 +1042,36 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(request.validate());
         }
 
-        auto expectUrlRejected = [&](StringSpan url)
+        auto expectUrlRejected = [&](StringSpan url, HttpClientError expectedError)
         {
             HttpClientRequest  request;
             HttpClientResponse response;
 
-            request.url = url;
-            SC_TEST_EXPECT(not request.validate());
-            SC_TEST_EXPECT(not operation.start(request, response));
+            request.url             = url;
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(validation.isError(HttpClientResultCategory, expectedError));
+            const Result start = operation.start(request, response);
+            SC_TEST_EXPECT(start.isError(HttpClientResultCategory, expectedError));
             SC_TEST_EXPECT(not operation.isRequestInFlight());
         };
 
         {
-            expectUrlRejected("ftp://127.0.0.1:1/invalid-url"_a8);
+            expectUrlRejected(""_a8, HttpClientError::RequestUrlEmpty);
+            expectUrlRejected("ftp://127.0.0.1:1/invalid-url"_a8, HttpClientError::RequestUrlSchemeUnsupported);
         }
         {
-            expectUrlRejected("http://"_a8);
+            expectUrlRejected("http://"_a8, HttpClientError::RequestUrlHostEmpty);
         }
         {
-            expectUrlRejected("https:///missing-host"_a8);
+            expectUrlRejected("https:///missing-host"_a8, HttpClientError::RequestUrlHostEmpty);
         }
         {
-            expectUrlRejected("http://127.0.0.1:1/bad url"_a8);
+            expectUrlRejected("http://127.0.0.1:1/bad url"_a8, HttpClientError::RequestUrlUnsafe);
         }
         {
             static const char BadUrl[] = {'h', 't', 't', 'p', ':', '/', '/', 'b', 'a', 'd', '\0', 'h', 'o', 's', 't'};
-            expectUrlRejected({{BadUrl, sizeof(BadUrl)}, false, StringEncoding::Ascii});
+            expectUrlRejected({{BadUrl, sizeof(BadUrl)}, false, StringEncoding::Ascii},
+                              HttpClientError::RequestUrlUnsafe);
         }
 
         auto expectRejected = [&](HttpClientHeader& header, HttpClientError expectedError)
@@ -1126,8 +1130,9 @@ struct SC::HttpClientTest : public SC::TestCase
 
             request.url    = "http://127.0.0.1:1/invalid-method"_a8;
             request.method = static_cast<HttpClientRequest::Method>(0xFF);
-            SC_TEST_EXPECT(not request.validate());
-            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(request.validate().isError(HttpClientResultCategory, HttpClientError::RequestMethodInvalid));
+            SC_TEST_EXPECT(operation.start(request, response)
+                               .isError(HttpClientResultCategory, HttpClientError::RequestMethodInvalid));
         }
 
         SC_TEST_EXPECT(operation.close());
@@ -1897,7 +1902,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.options.redirect.mode = static_cast<HttpClientRequestRedirectOptions::Mode>(0xFF);
 
             HttpClientResponse response;
-            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(
+                request.validate().isError(HttpClientResultCategory, HttpClientError::RequestRedirectModeInvalid));
+            SC_TEST_EXPECT(operation.start(request, response)
+                               .isError(HttpClientResultCategory, HttpClientError::RequestRedirectModeInvalid));
         }
 
         {
@@ -1907,7 +1915,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.options.redirect.mode = HttpClientRequestRedirectOptions::FollowGetHead;
 
             HttpClientResponse response;
-            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(
+                request.validate().isError(HttpClientResultCategory, HttpClientError::RequestRedirectMethodInvalid));
+            SC_TEST_EXPECT(operation.start(request, response)
+                               .isError(HttpClientResultCategory, HttpClientError::RequestRedirectMethodInvalid));
         }
 
         {
@@ -1921,7 +1932,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.body.framing          = HttpClientRequestBody::SizedStream;
 
             HttpClientResponse response;
-            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(request.validate().isError(HttpClientResultCategory,
+                                                      HttpClientError::RequestRedirectBodyNotReplayable));
+            SC_TEST_EXPECT(operation.start(request, response)
+                               .isError(HttpClientResultCategory, HttpClientError::RequestRedirectBodyNotReplayable));
         }
 
         SC_TEST_EXPECT(operation.close());
@@ -1944,7 +1958,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.url                         = "http://127.0.0.1:1/protocol"_a8;
             request.options.protocol.preference = static_cast<HttpClientRequestProtocolOptions::Preference>(0xFF);
 
-            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(request.validate().isError(HttpClientResultCategory,
+                                                      HttpClientError::RequestProtocolPreferenceInvalid));
+            SC_TEST_EXPECT(operation.start(request, response)
+                               .isError(HttpClientResultCategory, HttpClientError::RequestProtocolPreferenceInvalid));
         }
 
 #if SC_PLATFORM_APPLE

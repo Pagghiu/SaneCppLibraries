@@ -24,6 +24,8 @@ removed only after all libraries and callers have moved to structured errors.
 
 The initial slice assigns distinct portable identities to request header syntax, framing-header conflicts, and
 request body shape. Sized and chunked streams share identities when the underlying invalid condition is the same.
+Request URL syntax/scheme/host, method, redirect/protocol settings, TLS CA path shape, and redirect replayability
+follow the same rule; preflight returns the first invalid condition without embedding its text.
 
 ## Consequences
 

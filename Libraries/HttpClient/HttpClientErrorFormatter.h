@@ -45,6 +45,28 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::RequestBodyFramingInvalid:
         formatter.append("HTTP client request body framing is invalid");
         break;
+    case HttpClientError::RequestUrlEmpty: formatter.append("HTTP client request URL is empty"); break;
+    case HttpClientError::RequestUrlUnsafe:
+        formatter.append("HTTP client request URL contains whitespace or control bytes");
+        break;
+    case HttpClientError::RequestUrlSchemeUnsupported:
+        formatter.append("HTTP client request URL must use HTTP or HTTPS");
+        break;
+    case HttpClientError::RequestUrlHostEmpty: formatter.append("HTTP client request URL host is empty"); break;
+    case HttpClientError::RequestMethodInvalid: formatter.append("HTTP client request method is invalid"); break;
+    case HttpClientError::RequestRedirectModeInvalid: formatter.append("HTTP client redirect mode is invalid"); break;
+    case HttpClientError::RequestProtocolPreferenceInvalid:
+        formatter.append("HTTP client protocol preference is invalid");
+        break;
+    case HttpClientError::RequestTlsCaPathInvalid:
+        formatter.append("HTTP client TLS CA path contains control bytes");
+        break;
+    case HttpClientError::RequestRedirectMethodInvalid:
+        formatter.append("HTTP client redirect policy requires GET or HEAD");
+        break;
+    case HttpClientError::RequestRedirectBodyNotReplayable:
+        formatter.append("HTTP client automatic redirects require a replayable request body");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

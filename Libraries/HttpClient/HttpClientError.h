@@ -23,6 +23,16 @@ enum class HttpClientError : uint32_t
     RequestStreamProviderMissing,
     RequestChunkedDeclaredSizeInvalid,
     RequestBodyFramingInvalid,
+    RequestUrlEmpty,
+    RequestUrlUnsafe,
+    RequestUrlSchemeUnsupported,
+    RequestUrlHostEmpty,
+    RequestMethodInvalid,
+    RequestRedirectModeInvalid,
+    RequestProtocolPreferenceInvalid,
+    RequestTlsCaPathInvalid,
+    RequestRedirectMethodInvalid,
+    RequestRedirectBodyNotReplayable,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);
