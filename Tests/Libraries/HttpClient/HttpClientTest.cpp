@@ -125,6 +125,10 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             streamedBodySizeValidation();
         }
+        if (test_section("request body callback contract"))
+        {
+            requestBodyCallbackContract();
+        }
         if (test_section("request body framing validation"))
         {
             requestBodyFramingValidation();
@@ -2467,6 +2471,73 @@ struct SC::HttpClientTest : public SC::TestCase
         (void)clientThread.join();
         SC_TEST_EXPECT(server.server.close());
         SC_TEST_EXPECT(loop.close());
+    }
+
+    void requestBodyCallbackContract()
+    {
+        struct Provider final : HttpClientRequestBodyProvider
+        {
+            size_t bytesToReport = 0;
+            bool   endReached    = false;
+            Result nextResult    = Result(true);
+            size_t calls         = 0;
+
+            Result pullRequestBody(Span<char>, size_t& bytesWritten, bool& outEndReached) override
+            {
+                calls += 1;
+                bytesWritten  = bytesToReport;
+                outEndReached = endReached;
+                return nextResult;
+            }
+        } provider;
+
+        HttpClientOperation operation;
+        operation.currentRequest.body.framing     = HttpClientRequestBody::SizedStream;
+        operation.currentRequest.body.sizeInBytes = 2;
+        operation.currentRequest.body.provider    = &provider;
+
+        char   storage[4] = {};
+        Result error(true);
+        bool   endReached = false;
+        SC_TEST_EXPECT(operation.readRequestBodyChunk({}, error, endReached) == 0);
+        SC_TEST_EXPECT(error.isError(HttpClientResultCategory, HttpClientError::RequestBodyDestinationEmpty));
+        SC_TEST_EXPECT(provider.calls == 0);
+
+        operation.currentRequest.body.provider = nullptr;
+        SC_TEST_EXPECT(operation.readRequestBodyChunk(storage, error, endReached) == 0);
+        SC_TEST_EXPECT(error.isError(HttpClientResultCategory, HttpClientError::RequestStreamProviderMissing));
+        operation.currentRequest.body.provider = &provider;
+
+        auto expectProviderError = [&](size_t bytes, bool finished, HttpClientError expectedError)
+        {
+            operation.resetRequestBodyState();
+            provider.bytesToReport = bytes;
+            provider.endReached    = finished;
+            provider.nextResult    = Result(true);
+            SC_TEST_EXPECT(operation.readRequestBodyChunk(storage, error, endReached) == 0);
+            SC_TEST_EXPECT(error.isError(HttpClientResultCategory, expectedError));
+        };
+
+        expectProviderError(5, false, HttpClientError::RequestBodyProviderOverflow);
+        expectProviderError(0, false, HttpClientError::RequestBodyProviderStalled);
+        expectProviderError(3, false, HttpClientError::RequestBodyDeclaredSizeExceeded);
+        expectProviderError(1, true, HttpClientError::RequestBodyDeclaredSizeIncomplete);
+
+        operation.resetRequestBodyState();
+        provider.nextResult = Result::Error(ResultCategory(0x80000000u), 77);
+        SC_TEST_EXPECT(operation.readRequestBodyChunk(storage, error, endReached) == 0);
+        SC_TEST_EXPECT(error.isError(ResultCategory(0x80000000u), 77));
+
+        operation.resetRequestBodyState();
+        provider.nextResult    = Result(true);
+        provider.bytesToReport = 2;
+        provider.endReached    = true;
+        SC_TEST_EXPECT(operation.readRequestBodyChunk(storage, error, endReached) == 2);
+        SC_TEST_EXPECT(error);
+        SC_TEST_EXPECT(not endReached);
+        SC_TEST_EXPECT(operation.readRequestBodyChunk(storage, error, endReached) == 0);
+        SC_TEST_EXPECT(error);
+        SC_TEST_EXPECT(endReached);
     }
 
     void streamedBodySizeValidation()

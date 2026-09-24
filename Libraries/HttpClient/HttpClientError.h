@@ -67,6 +67,11 @@ enum class HttpClientError : uint32_t
     OperationResponseMetadataMissing,
     OperationNotInitialized,
     OperationRequestInFlight,
+    RequestBodyDestinationEmpty,
+    RequestBodyProviderOverflow,
+    RequestBodyProviderStalled,
+    RequestBodyDeclaredSizeExceeded,
+    RequestBodyDeclaredSizeIncomplete,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

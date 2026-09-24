@@ -1692,14 +1692,18 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
 
     if (currentRequest.body.provider == nullptr)
     {
-        outError = Result::Error("HttpClientOperation: missing request body provider");
+        outError = Result::Error(HttpClientResultCategory, HttpClientError::RequestStreamProviderMissing);
         return 0;
     }
 
     size_t bytesWritten = 0;
     bool   endReached   = false;
 
-    SC_TRY_MSG(dest.sizeInBytes() > 0, "HttpClientOperation: request body destination is empty");
+    if (dest.empty())
+    {
+        outError = Result::Error(HttpClientResultCategory, HttpClientError::RequestBodyDestinationEmpty);
+        return 0;
+    }
 
     outError = currentRequest.body.provider->pullRequestBody(dest, bytesWritten, endReached);
     if (not outError)
@@ -1709,13 +1713,13 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
 
     if (bytesWritten > dest.sizeInBytes())
     {
-        outError = Result::Error("HttpClientOperation: request body provider overflowed destination span");
+        outError = Result::Error(HttpClientResultCategory, HttpClientError::RequestBodyProviderOverflow);
         return 0;
     }
 
     if (bytesWritten == 0 and not endReached)
     {
-        outError = Result::Error("HttpClientOperation: request body provider returned zero bytes without ending");
+        outError = Result::Error(HttpClientResultCategory, HttpClientError::RequestBodyProviderStalled);
         return 0;
     }
 
@@ -1723,7 +1727,7 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
     if (currentRequest.body.framing == HttpClientRequestBody::SizedStream and
         requestBodyBytesRead > currentRequest.body.sizeInBytes)
     {
-        outError = Result::Error("HttpClientOperation: streamed body exceeded declared size");
+        outError = Result::Error(HttpClientResultCategory, HttpClientError::RequestBodyDeclaredSizeExceeded);
         return 0;
     }
 
@@ -1733,7 +1737,7 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
         if (currentRequest.body.framing == HttpClientRequestBody::SizedStream and
             requestBodyBytesRead != currentRequest.body.sizeInBytes)
         {
-            outError = Result::Error("HttpClientOperation: streamed body ended before expected size");
+            outError = Result::Error(HttpClientResultCategory, HttpClientError::RequestBodyDeclaredSizeIncomplete);
             return 0;
         }
         if (bytesWritten == 0)

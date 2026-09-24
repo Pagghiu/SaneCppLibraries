@@ -153,6 +153,21 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::OperationRequestInFlight:
         formatter.append("HTTP client operation already has a request in flight");
         break;
+    case HttpClientError::RequestBodyDestinationEmpty:
+        formatter.append("HTTP client request body destination is empty");
+        break;
+    case HttpClientError::RequestBodyProviderOverflow:
+        formatter.append("HTTP client request body provider exceeded its destination");
+        break;
+    case HttpClientError::RequestBodyProviderStalled:
+        formatter.append("HTTP client request body provider made no progress");
+        break;
+    case HttpClientError::RequestBodyDeclaredSizeExceeded:
+        formatter.append("HTTP client request body exceeded its declared size");
+        break;
+    case HttpClientError::RequestBodyDeclaredSizeIncomplete:
+        formatter.append("HTTP client request body ended before its declared size");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

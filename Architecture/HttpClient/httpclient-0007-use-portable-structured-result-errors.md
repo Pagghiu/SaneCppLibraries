@@ -35,6 +35,10 @@ options use specific codes so callers can tell which requested policy cannot be 
 Client and operation initialization now distinguish repeated initialization, an uninitialized client, missing
 caller-owned event/header/metadata storage, empty or insufficient response buffers, and operation state. Repeated
 cancel or start attempts return portable operation-state codes; no native backend detail is exposed.
+The request-body callback path reports a missing provider, empty destination, provider overflow or no-progress,
+and declared-size mismatch through `outError`. An empty destination previously returned a value converted from a
+failed `Result` while leaving `outError` successful; the callback contract test exercises this internal helper
+without relying on a native backend to supply a zero-length buffer. Provider-returned errors remain unchanged.
 
 ## Consequences
 

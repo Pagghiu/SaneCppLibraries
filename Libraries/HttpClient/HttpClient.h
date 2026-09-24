@@ -538,6 +538,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
     struct Internal;
 
   private:
+    friend struct HttpClientTest; // Exercise the request-body callback contract without a native backend.
     friend struct HttpClientAppleCallbacks;
     friend struct HttpClientLinuxCallbacks;
     friend struct HttpClientWindowsCallbacks;
