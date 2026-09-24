@@ -1,0 +1,31 @@
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+#pragma once
+
+#include "../Common/Result.h"
+
+namespace SC
+{
+//! @addtogroup group_http_client
+//! @{
+
+/// @brief Stable portable failures owned by HttpClient. Values are append-only.
+enum class HttpClientError : uint32_t
+{
+    RequestHeaderNameEmpty = 1,
+    RequestHeaderNameInvalid,
+    RequestHeaderValueInvalid,
+    RequestTransferEncodingForbidden,
+    RequestChunkedContentLengthConflict,
+    RequestFixedBodyProviderUnexpected,
+    RequestFixedBodySizeMismatch,
+    RequestStreamInlineBytesUnexpected,
+    RequestStreamProviderMissing,
+    RequestChunkedDeclaredSizeInvalid,
+    RequestBodyFramingInvalid,
+};
+
+static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);
+
+//! @}
+} // namespace SC

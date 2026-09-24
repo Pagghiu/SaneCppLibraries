@@ -59,6 +59,7 @@ Do not model `HttpClient` after `Http` internals, browser networking stacks, hea
 - [HTTPCLIENT-0004 - Report backend capabilities and fail fast on unsupported request policy](httpclient-0004-report-backend-capabilities-and-fail-fast-on-unsupported-request-policy.md)
 - [HTTPCLIENT-0005 - Keep session and scheduler as optional caller-owned layers](httpclient-0005-keep-session-and-scheduler-as-optional-caller-owned-layers.md)
 - [HTTPCLIENT-0006 - Keep content coding out of the core transport operation](httpclient-0006-keep-content-coding-out-of-the-core-transport-operation.md)
+- [HTTPCLIENT-0007 - Use portable structured Result errors](httpclient-0007-use-portable-structured-result-errors.md)
 - [SC-0001 - Library Code Must Not Hide Dynamic Allocation](../Global/sc-0001-no-hidden-allocation.md)
 - [SC-0003 - Keep Libraries Independently Consumable](../Global/sc-0003-keep-libraries-independently-consumable.md)
 - [SC-0008 - Prefer Native OS APIs Over Third-Party Dependencies](../Global/sc-0008-prefer-native-os-apis-over-third-party-dependencies.md)
@@ -74,3 +75,4 @@ Do not model `HttpClient` after `Http` internals, browser networking stacks, hea
 - [HTTPCLIENT-0004 - Report backend capabilities and fail fast on unsupported request policy](httpclient-0004-report-backend-capabilities-and-fail-fast-on-unsupported-request-policy.md)
 - [HTTPCLIENT-0005 - Keep session and scheduler as optional caller-owned layers](httpclient-0005-keep-session-and-scheduler-as-optional-caller-owned-layers.md)
 - [HTTPCLIENT-0006 - Keep content coding out of the core transport operation](httpclient-0006-keep-content-coding-out-of-the-core-transport-operation.md)
+- [HTTPCLIENT-0007 - Use portable structured Result errors](httpclient-0007-use-portable-structured-result-errors.md)

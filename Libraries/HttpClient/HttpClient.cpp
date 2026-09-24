@@ -181,17 +181,19 @@ static SC::Result validateRequestHeaders(SC::Span<const SC::HttpClientHeader> he
     for (size_t headerIdx = 0; headerIdx < headers.sizeInElements(); ++headerIdx)
     {
         const SC::Span<const char> name = headers[headerIdx].name.toCharSpan();
-        SC_TRY_MSG(name.sizeInBytes() > 0, "HttpClientRequest: request header name is empty");
+        if (name.sizeInBytes() == 0)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestHeaderNameEmpty);
         for (size_t byteIdx = 0; byteIdx < name.sizeInBytes(); ++byteIdx)
         {
-            SC_TRY_MSG(isHttpHeaderNameByte(name[byteIdx]), "HttpClientRequest: request header name is invalid");
+            if (not isHttpHeaderNameByte(name[byteIdx]))
+                return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestHeaderNameInvalid);
         }
 
         const SC::Span<const char> value = headers[headerIdx].value.toCharSpan();
         for (size_t byteIdx = 0; byteIdx < value.sizeInBytes(); ++byteIdx)
         {
-            SC_TRY_MSG(value[byteIdx] != '\r' and value[byteIdx] != '\n' and value[byteIdx] != '\0',
-                       "HttpClientRequest: request header value is invalid");
+            if (value[byteIdx] == '\r' or value[byteIdx] == '\n' or value[byteIdx] == '\0')
+                return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestHeaderValueInvalid);
         }
     }
     return SC::Result(true);
@@ -199,10 +201,11 @@ static SC::Result validateRequestHeaders(SC::Span<const SC::HttpClientHeader> he
 
 static SC::Result validateRequestBodyFramingHeaders(const SC::HttpClientRequest& request)
 {
-    SC_TRY_MSG(not requestHasHeader(request, SC::StringSpan("Transfer-Encoding")),
-               "HttpClientRequest: Transfer-Encoding is controlled by request body framing");
-    SC_TRY_MSG(not(request.body.isChunkedStream() and requestHasHeader(request, SC::StringSpan("Content-Length"))),
-               "HttpClientRequest: chunked request body cannot use Content-Length");
+    if (requestHasHeader(request, SC::StringSpan("Transfer-Encoding")))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestTransferEncodingForbidden);
+    if (request.body.isChunkedStream() and requestHasHeader(request, SC::StringSpan("Content-Length")))
+        return SC::Result::Error(SC::HttpClientResultCategory,
+                                 SC::HttpClientError::RequestChunkedContentLengthConflict);
     return SC::Result(true);
 }
 
@@ -210,26 +213,34 @@ static SC::Result validateRequestBodyShape(const SC::HttpClientRequestBody& body
 {
     if (body.framing == SC::HttpClientRequestBody::FixedSize)
     {
-        SC_TRY_MSG(body.provider == nullptr, "HttpClientRequest: fixed request body cannot use provider");
-        SC_TRY_MSG(body.sizeInBytes == 0 or body.sizeInBytes == body.bytes.sizeInBytes(),
-                   "HttpClientRequest: inline request body size mismatch");
+        if (body.provider != nullptr)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::RequestFixedBodyProviderUnexpected);
+        if (body.sizeInBytes != 0 and body.sizeInBytes != body.bytes.sizeInBytes())
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestFixedBodySizeMismatch);
     }
     else if (body.framing == SC::HttpClientRequestBody::SizedStream)
     {
-        SC_TRY_MSG(body.bytes.sizeInBytes() == 0,
-                   "HttpClientRequest: sized stream request body cannot use inline bytes");
-        SC_TRY_MSG(body.provider != nullptr, "HttpClientRequest: sized stream request body requires provider");
+        if (body.bytes.sizeInBytes() != 0)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::RequestStreamInlineBytesUnexpected);
+        if (body.provider == nullptr)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestStreamProviderMissing);
     }
     else if (body.framing == SC::HttpClientRequestBody::ChunkedStream)
     {
-        SC_TRY_MSG(body.bytes.sizeInBytes() == 0,
-                   "HttpClientRequest: chunked stream request body cannot use inline bytes");
-        SC_TRY_MSG(body.sizeInBytes == 0, "HttpClientRequest: chunked stream request body cannot declare a fixed size");
-        SC_TRY_MSG(body.provider != nullptr, "HttpClientRequest: chunked stream request body requires provider");
+        if (body.bytes.sizeInBytes() != 0)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::RequestStreamInlineBytesUnexpected);
+        if (body.sizeInBytes != 0)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::RequestChunkedDeclaredSizeInvalid);
+        if (body.provider == nullptr)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestStreamProviderMissing);
     }
     else
     {
-        return SC::Result::Error("HttpClientRequest: invalid request body framing");
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestBodyFramingInvalid);
     }
     return SC::Result(true);
 }

@@ -12,6 +12,7 @@
 #include "../Common/Result.h"
 #include "../Common/Span.h"
 #include "../Common/StringSpan.h"
+#include "HttpClientError.h"
 #include "Internal/HttpClientThreading.h"
 
 namespace SC

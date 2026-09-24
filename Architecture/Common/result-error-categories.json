@@ -112,6 +112,12 @@
       "owner": "Http",
       "declaration": "Libraries/Http/HttpError.h",
       "constant": "HttpResultCategory"
+    },
+    {
+      "value": 18,
+      "owner": "HttpClient",
+      "declaration": "Libraries/HttpClient/HttpClientError.h",
+      "constant": "HttpClientResultCategory"
     }
   ]
 }

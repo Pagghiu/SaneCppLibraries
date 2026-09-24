@@ -5,6 +5,7 @@
 #include "Libraries/Common/Deferred.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/HttpClient/HttpClientAsync.h"
+#include "Libraries/HttpClient/HttpClientErrorFormatter.h"
 #include "Libraries/HttpClient/HttpClientScheduler.h"
 #include "Libraries/HttpClient/HttpClientSession.h"
 #include "Libraries/Memory/String.h"
@@ -1069,41 +1070,54 @@ struct SC::HttpClientTest : public SC::TestCase
             expectUrlRejected({{BadUrl, sizeof(BadUrl)}, false, StringEncoding::Ascii});
         }
 
-        auto expectRejected = [&](HttpClientHeader& header)
+        auto expectRejected = [&](HttpClientHeader& header, HttpClientError expectedError)
         {
             HttpClientRequest  request;
             HttpClientResponse response;
 
-            request.url     = "http://127.0.0.1:1/invalid-header"_a8;
-            request.headers = {&header, 1};
-            SC_TEST_EXPECT(not request.validate());
-            SC_TEST_EXPECT(not operation.start(request, response));
+            request.url             = "http://127.0.0.1:1/invalid-header"_a8;
+            request.headers         = {&header, 1};
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(not validation);
+            SC_TEST_EXPECT(validation.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(validation.errorValue() == static_cast<uint32_t>(expectedError));
+            const Result start = operation.start(request, response);
+            SC_TEST_EXPECT(not start);
+            SC_TEST_EXPECT(start.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(start.errorValue() == static_cast<uint32_t>(expectedError));
         };
 
         {
             HttpClientHeader header = {""_a8, "value"_a8};
-            expectRejected(header);
+            expectRejected(header, HttpClientError::RequestHeaderNameEmpty);
         }
         {
             HttpClientHeader header = {"Bad Header"_a8, "value"_a8};
-            expectRejected(header);
+            expectRejected(header, HttpClientError::RequestHeaderNameInvalid);
         }
         {
             HttpClientHeader header = {"Bad:Header"_a8, "value"_a8};
-            expectRejected(header);
+            expectRejected(header, HttpClientError::RequestHeaderNameInvalid);
         }
         {
             HttpClientHeader header = {"Bad\rHeader"_a8, "value"_a8};
-            expectRejected(header);
+            expectRejected(header, HttpClientError::RequestHeaderNameInvalid);
         }
         {
             HttpClientHeader header = {"X-Test"_a8, "bad\r\nvalue"_a8};
-            expectRejected(header);
+            expectRejected(header, HttpClientError::RequestHeaderValueInvalid);
         }
         {
             static const char BadValue[] = {'b', 'a', 'd', '\0', 'v', 'a', 'l', 'u', 'e'};
             HttpClientHeader  header     = {"X-Test"_a8, {{BadValue, sizeof(BadValue)}, false, StringEncoding::Ascii}};
-            expectRejected(header);
+            expectRejected(header, HttpClientError::RequestHeaderValueInvalid);
+        }
+
+        {
+            char                    storage[96] = {};
+            const ResultErrorFormat formatted = formatHttpClientError(HttpClientError::RequestHeaderNameEmpty, storage);
+            SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
+            SC_TEST_EXPECT(strcmp(storage, "HTTP client request header name is empty") == 0);
         }
 
         {
@@ -2479,6 +2493,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.body.sizeInBytes = 3;
             request.body.framing     = HttpClientRequestBody::SizedStream;
 
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(validation.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(validation.errorValue() ==
+                           static_cast<uint32_t>(HttpClientError::RequestStreamInlineBytesUnexpected));
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
@@ -2492,6 +2510,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.body.sizeInBytes = 4;
             request.body.framing     = HttpClientRequestBody::FixedSize;
 
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(validation.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(validation.errorValue() ==
+                           static_cast<uint32_t>(HttpClientError::RequestFixedBodySizeMismatch));
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
@@ -2505,6 +2527,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.body.sizeInBytes = 3;
             request.body.framing     = HttpClientRequestBody::ChunkedStream;
 
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(validation.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(validation.errorValue() ==
+                           static_cast<uint32_t>(HttpClientError::RequestChunkedDeclaredSizeInvalid));
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
@@ -2519,6 +2545,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.body.provider = &provider;
             request.body.framing  = HttpClientRequestBody::ChunkedStream;
 
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(validation.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(validation.errorValue() ==
+                           static_cast<uint32_t>(HttpClientError::RequestChunkedContentLengthConflict));
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
@@ -2530,6 +2560,10 @@ struct SC::HttpClientTest : public SC::TestCase
             request.url     = "http://127.0.0.1:1/body"_a8;
             request.headers = {&header, 1};
 
+            const Result validation = request.validate();
+            SC_TEST_EXPECT(validation.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(validation.errorValue() ==
+                           static_cast<uint32_t>(HttpClientError::RequestTransferEncodingForbidden));
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
