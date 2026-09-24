@@ -33,6 +33,17 @@ enum class HttpClientError : uint32_t
     RequestTlsCaPathInvalid,
     RequestRedirectMethodInvalid,
     RequestRedirectBodyNotReplayable,
+    ProxyModeInvalid,
+    ProxyUrlEmpty,
+    ProxyUrlSchemeUnsupported,
+    ProxyUrlUnsafe,
+    ProxyUrlHostEmpty,
+    ProxyUrlPathUnsupported,
+    ProxyAuthorizationInvalid,
+    ProxyBypassListInvalid,
+    ProxyUrlWithoutHttpMode,
+    ProxyAuthorizationWithoutHttpMode,
+    ProxyBypassListWithoutHttpMode,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

@@ -322,39 +322,41 @@ static bool hasPathUnsafeBytes(SC::StringSpan value)
 
 static SC::Result validateProxyOptions(const SC::HttpClientRequestProxyOptions& proxy)
 {
-    SC_TRY_MSG(isValidProxyMode(proxy.mode), "HttpClientRequestOptions: invalid proxy mode");
+    if (not isValidProxyMode(proxy.mode))
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyModeInvalid);
     if (proxy.mode == SC::HttpClientRequestProxyOptions::Http)
     {
         static constexpr size_t HttpProxySchemeBytes = sizeof("http://") - 1;
 
-        SC_TRY_MSG(proxy.url.sizeInBytes() > sizeof("http://") - 1,
-                   "HttpClientRequestOptions: HTTP proxy URL is empty");
-        SC_TRY_MSG(asciiStartsWithIgnoreCase(proxy.url, SC::StringSpan("http://")),
-                   "HttpClientRequestOptions: only http:// proxy URLs are supported");
-        SC_TRY_MSG(not hasUrlUnsafeBytes(proxy.url),
-                   "HttpClientRequestOptions: HTTP proxy URL contains whitespace or control bytes");
+        if (proxy.url.sizeInBytes() <= HttpProxySchemeBytes)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyUrlEmpty);
+        if (not asciiStartsWithIgnoreCase(proxy.url, SC::StringSpan("http://")))
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyUrlSchemeUnsupported);
+        if (hasUrlUnsafeBytes(proxy.url))
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyUrlUnsafe);
         const SC::Span<const char> proxyBytes = proxy.url.toCharSpan();
-        SC_TRY_MSG(proxyBytes[HttpProxySchemeBytes] != '/' and proxyBytes[HttpProxySchemeBytes] != '?' and
-                       proxyBytes[HttpProxySchemeBytes] != '#',
-                   "HttpClientRequestOptions: HTTP proxy URL host is empty");
+        if (proxyBytes[HttpProxySchemeBytes] == '/' or proxyBytes[HttpProxySchemeBytes] == '?' or
+            proxyBytes[HttpProxySchemeBytes] == '#')
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyUrlHostEmpty);
         for (size_t idx = HttpProxySchemeBytes; idx < proxyBytes.sizeInBytes(); ++idx)
         {
-            SC_TRY_MSG(proxyBytes[idx] != '/' and proxyBytes[idx] != '?' and proxyBytes[idx] != '#',
-                       "HttpClientRequestOptions: HTTP proxy URL must not include path, query, or fragment");
+            if (proxyBytes[idx] == '/' or proxyBytes[idx] == '?' or proxyBytes[idx] == '#')
+                return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyUrlPathUnsupported);
         }
-        SC_TRY_MSG(not hasHttpHeaderUnsafeBytes(proxy.authorization),
-                   "HttpClientRequestOptions: proxy authorization contains an invalid line break");
-        SC_TRY_MSG(not hasHttpHeaderUnsafeBytes(proxy.bypassList),
-                   "HttpClientRequestOptions: proxy bypass list contains an invalid line break");
+        if (hasHttpHeaderUnsafeBytes(proxy.authorization))
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyAuthorizationInvalid);
+        if (hasHttpHeaderUnsafeBytes(proxy.bypassList))
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyBypassListInvalid);
     }
     else
     {
-        SC_TRY_MSG(proxy.url.sizeInBytes() == 0,
-                   "HttpClientRequestOptions: proxy URL is only valid with HTTP proxy mode");
-        SC_TRY_MSG(proxy.authorization.sizeInBytes() == 0,
-                   "HttpClientRequestOptions: proxy authorization is only valid with HTTP proxy mode");
-        SC_TRY_MSG(proxy.bypassList.sizeInBytes() == 0,
-                   "HttpClientRequestOptions: proxy bypass list is only valid with HTTP proxy mode");
+        if (proxy.url.sizeInBytes() != 0)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyUrlWithoutHttpMode);
+        if (proxy.authorization.sizeInBytes() != 0)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::ProxyAuthorizationWithoutHttpMode);
+        if (proxy.bypassList.sizeInBytes() != 0)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyBypassListWithoutHttpMode);
     }
     return SC::Result(true);
 }

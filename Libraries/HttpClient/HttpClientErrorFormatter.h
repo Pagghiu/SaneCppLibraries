@@ -67,6 +67,31 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::RequestRedirectBodyNotReplayable:
         formatter.append("HTTP client automatic redirects require a replayable request body");
         break;
+    case HttpClientError::ProxyModeInvalid: formatter.append("HTTP client proxy mode is invalid"); break;
+    case HttpClientError::ProxyUrlEmpty: formatter.append("HTTP client proxy URL is empty"); break;
+    case HttpClientError::ProxyUrlSchemeUnsupported: formatter.append("HTTP client proxy URL must use HTTP"); break;
+    case HttpClientError::ProxyUrlUnsafe:
+        formatter.append("HTTP client proxy URL contains whitespace or control bytes");
+        break;
+    case HttpClientError::ProxyUrlHostEmpty: formatter.append("HTTP client proxy URL host is empty"); break;
+    case HttpClientError::ProxyUrlPathUnsupported:
+        formatter.append("HTTP client proxy URL must not include a path, query, or fragment");
+        break;
+    case HttpClientError::ProxyAuthorizationInvalid:
+        formatter.append("HTTP client proxy authorization contains invalid bytes");
+        break;
+    case HttpClientError::ProxyBypassListInvalid:
+        formatter.append("HTTP client proxy bypass list contains invalid bytes");
+        break;
+    case HttpClientError::ProxyUrlWithoutHttpMode:
+        formatter.append("HTTP client proxy URL requires HTTP proxy mode");
+        break;
+    case HttpClientError::ProxyAuthorizationWithoutHttpMode:
+        formatter.append("HTTP client proxy authorization requires HTTP proxy mode");
+        break;
+    case HttpClientError::ProxyBypassListWithoutHttpMode:
+        formatter.append("HTTP client proxy bypass list requires HTTP proxy mode");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

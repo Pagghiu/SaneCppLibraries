@@ -26,6 +26,9 @@ The initial slice assigns distinct portable identities to request header syntax,
 request body shape. Sized and chunked streams share identities when the underlying invalid condition is the same.
 Request URL syntax/scheme/host, method, redirect/protocol settings, TLS CA path shape, and redirect replayability
 follow the same rule; preflight returns the first invalid condition without embedding its text.
+Proxy configuration distinguishes invalid mode, URL scheme/host/path, unsafe bytes, malformed authorization or
+bypass values, and proxy settings supplied without HTTP-proxy mode. These are request-policy errors regardless of
+which native backend subsequently carries out the request.
 
 ## Consequences
 

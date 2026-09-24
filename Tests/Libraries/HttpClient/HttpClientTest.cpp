@@ -2066,42 +2066,46 @@ struct SC::HttpClientTest : public SC::TestCase
         HttpClientOperation                                    operation;
         SC_TEST_EXPECT(operation.init(client, memory.memory));
 
+        auto expectRejected = [&](HttpClientRequest& request, HttpClientError expectedError)
         {
-            HttpClientRequest  request;
             HttpClientResponse response;
+            SC_TEST_EXPECT(request.validate().isError(HttpClientResultCategory, expectedError));
+            SC_TEST_EXPECT(operation.start(request, response).isError(HttpClientResultCategory, expectedError));
+            SC_TEST_EXPECT(not operation.isRequestInFlight());
+        };
+
+        {
+            HttpClientRequest request;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.mode                = static_cast<HttpClientRequestProxyOptions::Mode>(0xFF);
             request.options.timeouts.requestTimeoutMs = 1;
 
-            SC_TEST_EXPECT(not operation.start(request, response));
+            expectRejected(request, HttpClientError::ProxyModeInvalid);
         }
 
         {
-            HttpClientRequest  request;
-            HttpClientResponse response;
+            HttpClientRequest request;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.url                 = "http://127.0.0.1:1"_a8;
             request.options.timeouts.requestTimeoutMs = 1;
 
-            SC_TEST_EXPECT(not operation.start(request, response));
+            expectRejected(request, HttpClientError::ProxyUrlWithoutHttpMode);
         }
 
         {
-            HttpClientRequest  request;
-            HttpClientResponse response;
+            HttpClientRequest request;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.authorization       = "Basic dGVzdA=="_a8;
             request.options.timeouts.requestTimeoutMs = 1;
 
-            SC_TEST_EXPECT(not operation.start(request, response));
+            expectRejected(request, HttpClientError::ProxyAuthorizationWithoutHttpMode);
         }
 
         {
-            HttpClientRequest  request;
-            HttpClientResponse response;
+            HttpClientRequest request;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.mode                = HttpClientRequestProxyOptions::Http;
@@ -2109,55 +2113,64 @@ struct SC::HttpClientTest : public SC::TestCase
             request.options.proxy.authorization       = "Basic bad\r\n"_a8;
             request.options.timeouts.requestTimeoutMs = 1;
 
-            SC_TEST_EXPECT(not operation.start(request, response));
+            expectRejected(request, HttpClientError::ProxyAuthorizationInvalid);
         }
 
         {
-            HttpClientRequest  request;
-            HttpClientResponse response;
+            HttpClientRequest request;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.mode                = HttpClientRequestProxyOptions::NoProxy;
             request.options.proxy.bypassList          = "127.0.0.1"_a8;
             request.options.timeouts.requestTimeoutMs = 1;
 
-            SC_TEST_EXPECT(not operation.start(request, response));
+            expectRejected(request, HttpClientError::ProxyBypassListWithoutHttpMode);
         }
 
-        auto expectProxyUrlRejected = [&](StringSpan proxyUrl)
         {
-            HttpClientRequest  request;
-            HttpClientResponse response;
+            HttpClientRequest request;
+
+            request.url                               = "http://127.0.0.1:1/proxy"_a8;
+            request.options.proxy.mode                = HttpClientRequestProxyOptions::Http;
+            request.options.proxy.url                 = "http://127.0.0.1:1"_a8;
+            request.options.proxy.bypassList          = "bad\r\nlist"_a8;
+            request.options.timeouts.requestTimeoutMs = 1;
+
+            expectRejected(request, HttpClientError::ProxyBypassListInvalid);
+        }
+
+        auto expectProxyUrlRejected = [&](StringSpan proxyUrl, HttpClientError expectedError)
+        {
+            HttpClientRequest request;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.mode                = HttpClientRequestProxyOptions::Http;
             request.options.proxy.url                 = proxyUrl;
             request.options.timeouts.requestTimeoutMs = 1;
 
-            SC_TEST_EXPECT(not request.validate());
-            SC_TEST_EXPECT(not operation.start(request, response));
-            SC_TEST_EXPECT(not operation.isRequestInFlight());
+            expectRejected(request, expectedError);
         };
 
         {
-            expectProxyUrlRejected("https://127.0.0.1:1"_a8);
+            expectProxyUrlRejected("https://127.0.0.1:1"_a8, HttpClientError::ProxyUrlSchemeUnsupported);
         }
         {
-            expectProxyUrlRejected("http://"_a8);
+            expectProxyUrlRejected("http://"_a8, HttpClientError::ProxyUrlEmpty);
         }
         {
-            expectProxyUrlRejected("http:///missing-host"_a8);
+            expectProxyUrlRejected("http:///missing-host"_a8, HttpClientError::ProxyUrlHostEmpty);
         }
         {
-            expectProxyUrlRejected("http://127.0.0.1:1/path"_a8);
+            expectProxyUrlRejected("http://127.0.0.1:1/path"_a8, HttpClientError::ProxyUrlPathUnsupported);
         }
         {
-            expectProxyUrlRejected("http://bad proxy:1"_a8);
+            expectProxyUrlRejected("http://bad proxy:1"_a8, HttpClientError::ProxyUrlUnsafe);
         }
         {
             static const char BadProxyUrl[] = {'h', 't', 't',  'p', ':', '/', '/', 'b',
                                                'a', 'd', '\0', 'p', 'r', 'o', 'x', 'y'};
-            expectProxyUrlRejected({{BadProxyUrl, sizeof(BadProxyUrl)}, false, StringEncoding::Ascii});
+            expectProxyUrlRejected({{BadProxyUrl, sizeof(BadProxyUrl)}, false, StringEncoding::Ascii},
+                                   HttpClientError::ProxyUrlUnsafe);
         }
 
 #if SC_PLATFORM_APPLE
