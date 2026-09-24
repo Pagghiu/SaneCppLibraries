@@ -330,6 +330,20 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::WebSocketAutomaticControlOutputTooSmall:
         formatter.append("WebSocket automatic control storage is too small");
         break;
+    case HttpError::WebSocketTransportInvalid: formatter.append("WebSocket transport is invalid"); break;
+    case HttpError::WebSocketPumpDataListenerUnavailable:
+        formatter.append("WebSocket pump data listener is unavailable");
+        break;
+    case HttpError::WebSocketPumpEndListenerUnavailable:
+        formatter.append("WebSocket pump end listener is unavailable");
+        break;
+    case HttpError::WebSocketPumpCloseListenerUnavailable:
+        formatter.append("WebSocket pump close listener is unavailable");
+        break;
+    case HttpError::WebSocketPumpNotAttached: formatter.append("WebSocket pump is not attached"); break;
+    case HttpError::WebSocketFrameEmpty: formatter.append("WebSocket encoded frame is empty"); break;
+    case HttpError::WebSocketHubFull: formatter.append("WebSocket hub has no free client slot"); break;
+    case HttpError::WebSocketHubClientIndexInvalid: formatter.append("WebSocket hub client index is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -97,6 +97,10 @@ Missing client mask keys, message or frame storage, malformed close payloads, an
 explicit. A missing pending automatic control frame is expected absence, not a failure: the accessor returns an empty
 borrowed view, whose storage remains owned by the endpoint.
 
+The connection pump and small hub share invalid-transport and empty-frame identities. Pump listener registration,
+unattached state, hub capacity, and invalid client index remain distinct. Buffer-pool, stream, and callback failures
+are forwarded unchanged.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

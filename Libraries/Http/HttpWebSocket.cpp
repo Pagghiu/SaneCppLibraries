@@ -1518,7 +1518,8 @@ Result HttpWebSocketEndpoint::queueAutomaticControl(HttpWebSocketOpcode opcode, 
 Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& newTransport,
                                            HttpWebSocketEndpointRole         endpointRole)
 {
-    SC_TRY_MSG(newTransport.isValid(), "HttpWebSocketConnectionPump transport is invalid");
+    if (not newTransport.isValid())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketTransportInvalid);
     detach();
 
     transport = newTransport;
@@ -1531,7 +1532,7 @@ Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& new
     if (not dataListenerAdded)
     {
         detach();
-        return Result::Error("HttpWebSocketConnectionPump data listener limit reached");
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpDataListenerUnavailable);
     }
 
     endListenerAdded = transport.readableStream->eventEnd
@@ -1539,7 +1540,7 @@ Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& new
     if (not endListenerAdded)
     {
         detach();
-        return Result::Error("HttpWebSocketConnectionPump end listener limit reached");
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpEndListenerUnavailable);
     }
 
     closeListenerAdded =
@@ -1548,7 +1549,7 @@ Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& new
     if (not closeListenerAdded)
     {
         detach();
-        return Result::Error("HttpWebSocketConnectionPump close listener limit reached");
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpCloseListenerUnavailable);
     }
     return Result(true);
 }
@@ -1581,8 +1582,10 @@ void HttpWebSocketConnectionPump::detach()
 
 Result HttpWebSocketConnectionPump::writeFrame(Span<const char> frame)
 {
-    SC_TRY_MSG(transport.isValid(), "HttpWebSocketConnectionPump is not attached");
-    SC_TRY_MSG(not frame.empty(), "HttpWebSocketConnectionPump cannot write empty frame");
+    if (not transport.isValid())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpNotAttached);
+    if (frame.empty())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameEmpty);
 
     AsyncBufferView::ID bufferID;
     Span<char>          writableData;
@@ -1684,7 +1687,8 @@ Result HttpWebSocketSmallHub::init(Span<HttpWebSocketHubClient> clientStorage)
 
 Result HttpWebSocketSmallHub::join(const HttpWebSocketTransportView& transport, size_t& clientIndex)
 {
-    SC_TRY_MSG(transport.isValid(), "HttpWebSocketSmallHub transport is invalid");
+    if (not transport.isValid())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketTransportInvalid);
     for (size_t idx = 0; idx < clients.sizeInElements(); ++idx)
     {
         HttpWebSocketHubClient& client = clients[idx];
@@ -1697,12 +1701,13 @@ Result HttpWebSocketSmallHub::join(const HttpWebSocketTransportView& transport, 
             return Result(true);
         }
     }
-    return Result::Error("HttpWebSocketSmallHub is full");
+    return Result::Error(HttpResultCategory, HttpError::WebSocketHubFull);
 }
 
 Result HttpWebSocketSmallHub::leave(size_t clientIndex)
 {
-    SC_TRY_MSG(clientIndex < clients.sizeInElements(), "HttpWebSocketSmallHub client index out of range");
+    if (clientIndex >= clients.sizeInElements())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketHubClientIndexInvalid);
     HttpWebSocketHubClient& client = clients[clientIndex];
     if (client.active)
     {
@@ -1719,7 +1724,8 @@ bool HttpWebSocketSmallHub::isClientActive(size_t clientIndex) const
 
 Result HttpWebSocketSmallHub::broadcastFrame(Span<const char> encodedFrame)
 {
-    SC_TRY_MSG(not encodedFrame.empty(), "HttpWebSocketSmallHub cannot broadcast an empty frame");
+    if (encodedFrame.empty())
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameEmpty);
     for (size_t idx = 0; idx < clients.sizeInElements(); ++idx)
     {
         HttpWebSocketHubClient& client = clients[idx];

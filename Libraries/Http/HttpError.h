@@ -213,6 +213,14 @@ enum class HttpError : uint32_t
     WebSocketClosePayloadMalformed,
     WebSocketControlBackpressure,
     WebSocketAutomaticControlOutputTooSmall,
+    WebSocketTransportInvalid,
+    WebSocketPumpDataListenerUnavailable,
+    WebSocketPumpEndListenerUnavailable,
+    WebSocketPumpCloseListenerUnavailable,
+    WebSocketPumpNotAttached,
+    WebSocketFrameEmpty,
+    WebSocketHubFull,
+    WebSocketHubClientIndexInvalid,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

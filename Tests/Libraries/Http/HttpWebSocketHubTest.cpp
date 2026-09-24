@@ -83,9 +83,10 @@ struct PayloadCollector
     }
 };
 
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
-    return not result and SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
 }
 } // namespace
 
@@ -194,8 +195,7 @@ void SC::HttpWebSocketHubTest::diagnosticMessages()
 
     HttpWebSocketTransportView invalidTransport;
     size_t                     index = 0;
-    SC_TEST_EXPECT(
-        resultMessageEquals(hub.join(invalidTransport, index), "HttpWebSocketSmallHub transport is invalid"));
+    SC_TEST_EXPECT(resultHasHttpError(hub.join(invalidTransport, index), HttpError::WebSocketTransportInvalid));
 
     DummyReadableStream readable;
     DummyWritableStream writable;
@@ -207,10 +207,9 @@ void SC::HttpWebSocketHubTest::diagnosticMessages()
     transport.buffersPool    = &buffersPool;
 
     SC_TEST_EXPECT(hub.join(transport, index));
-    SC_TEST_EXPECT(resultMessageEquals(hub.join(transport, index), "HttpWebSocketSmallHub is full"));
-    SC_TEST_EXPECT(
-        resultMessageEquals(hub.broadcastFrame({}), "HttpWebSocketSmallHub cannot broadcast an empty frame"));
-    SC_TEST_EXPECT(resultMessageEquals(hub.leave(2), "HttpWebSocketSmallHub client index out of range"));
+    SC_TEST_EXPECT(resultHasHttpError(hub.join(transport, index), HttpError::WebSocketHubFull));
+    SC_TEST_EXPECT(resultHasHttpError(hub.broadcastFrame({}), HttpError::WebSocketFrameEmpty));
+    SC_TEST_EXPECT(resultHasHttpError(hub.leave(2), HttpError::WebSocketHubClientIndexInvalid));
 }
 
 void SC::runHttpWebSocketHubTest(SC::TestReport& report) { HttpWebSocketHubTest test(report); }
