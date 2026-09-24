@@ -282,6 +282,36 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::WebSocketRejectAcceptedRequest:
         formatter.append("Accepted WebSocket request cannot be rejected");
         break;
+    case HttpError::WebSocketFrameReservedBitsUnsupported:
+        formatter.append("WebSocket frame reserved bits are unsupported");
+        break;
+    case HttpError::WebSocketOpcodeUnsupported: formatter.append("WebSocket frame opcode is unsupported"); break;
+    case HttpError::WebSocketFrameLengthInvalid: formatter.append("WebSocket frame payload length is invalid"); break;
+    case HttpError::WebSocketFramePayloadProgressInvalid:
+        formatter.append("WebSocket frame payload parsing made no progress");
+        break;
+    case HttpError::WebSocketFrameMaskInvalid:
+        formatter.append("WebSocket frame masking does not match the endpoint role");
+        break;
+    case HttpError::WebSocketControlFrameFragmented:
+        formatter.append("WebSocket control frame must not be fragmented");
+        break;
+    case HttpError::WebSocketControlFrameTooLarge:
+        formatter.append("WebSocket control frame payload is too large");
+        break;
+    case HttpError::WebSocketContinuationUnexpected:
+        formatter.append("WebSocket continuation frame is unexpected");
+        break;
+    case HttpError::WebSocketContinuationExpected: formatter.append("WebSocket continuation frame is expected"); break;
+    case HttpError::WebSocketFrameAlreadyInProgress: formatter.append("WebSocket frame is already in progress"); break;
+    case HttpError::WebSocketFrameHeaderOutputTooSmall:
+        formatter.append("WebSocket frame header output buffer is too small");
+        break;
+    case HttpError::WebSocketFrameMissing: formatter.append("WebSocket frame is not in progress"); break;
+    case HttpError::WebSocketFramePayloadExceedsLength:
+        formatter.append("WebSocket frame payload exceeds its declared length");
+        break;
+    case HttpError::WebSocketFramePayloadIncomplete: formatter.append("WebSocket frame payload is incomplete"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

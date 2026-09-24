@@ -126,14 +126,10 @@ static bool spansEqual(SC::Span<const char> lhs, SC::Span<const char> rhs)
     return true;
 }
 
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
-    if (result or result.message == nullptr)
-    {
-        return false;
-    }
-
-    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
 }
 } // namespace
 
@@ -497,7 +493,7 @@ void SC::HttpWebSocketFrameTest::maskingRoleValidation()
     clientReader.reset(HttpWebSocketEndpointRole::Client);
     size_t consumed = 0;
     Result result   = clientReader.parse({maskedOutput, maskedSize}, consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader invalid frame masking for endpoint role"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketFrameMaskInvalid));
 
     HttpWebSocketFrameWriter serverWriter;
     serverWriter.reset(HttpWebSocketEndpointRole::Server);
@@ -518,7 +514,7 @@ void SC::HttpWebSocketFrameTest::maskingRoleValidation()
     serverReader.reset(HttpWebSocketEndpointRole::Server);
     consumed = 0;
     result   = serverReader.parse({unmaskedOutput, unmaskedSize}, consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader invalid frame masking for endpoint role"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketFrameMaskInvalid));
 }
 
 void SC::HttpWebSocketFrameTest::invalidFrameRejection()
@@ -529,37 +525,37 @@ void SC::HttpWebSocketFrameTest::invalidFrameRejection()
     SC::uint8_t rsvFrame[] = {0xC1, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
     Result result = reader.parse(byteSpan(rsvFrame, sizeof(rsvFrame)), consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader RSV bits are not supported"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketFrameReservedBitsUnsupported));
 
     SC::uint8_t invalidOpcodeFrame[] = {0x83, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
     result = reader.parse(byteSpan(invalidOpcodeFrame, sizeof(invalidOpcodeFrame)), consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader unsupported opcode"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketOpcodeUnsupported));
 
     char fragmentedControl[] = {char(0x09), char(0x00)};
     reader.reset(HttpWebSocketEndpointRole::Client);
     result = reader.parse({fragmentedControl, sizeof(fragmentedControl)}, consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader control frames must not be fragmented"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketControlFrameFragmented));
 
     SC::uint8_t oversizedControl[] = {0x89, 0x7E, 0x00, 0x7E};
     reader.reset(HttpWebSocketEndpointRole::Client);
     result = reader.parse(byteSpan(oversizedControl, sizeof(oversizedControl)), consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader control frame payload too large"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketControlFrameTooLarge));
 
     SC::uint8_t invalid64Length[] = {0x82, 0x7F, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
     result = reader.parse(byteSpan(invalid64Length, sizeof(invalid64Length)), consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader invalid 64-bit payload length"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketFrameLengthInvalid));
 
     SC::uint8_t continuationWithoutStart[] = {0x80, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
     result = reader.parse(byteSpan(continuationWithoutStart, sizeof(continuationWithoutStart)), consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader unexpected continuation frame"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketContinuationUnexpected));
 
     SC::uint8_t unexpectedNewDataFrame[] = {0x01, 0x00, 0x81, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
     result = reader.parse(byteSpan(unexpectedNewDataFrame, sizeof(unexpectedNewDataFrame)), consumed);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader expected continuation frame"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketContinuationExpected));
 
     HttpWebSocketFrameWriter writer;
     writer.reset(HttpWebSocketEndpointRole::Server);
@@ -571,7 +567,21 @@ void SC::HttpWebSocketFrameTest::invalidFrameRejection()
     Span<const char> encodedHeader;
     char             storage[16] = {0};
     result                       = writer.beginFrame(invalidControl, {storage, sizeof(storage)}, encodedHeader);
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameWriter control frames must not be fragmented"));
+    SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketControlFrameFragmented));
+
+    SC_TEST_EXPECT(resultHasHttpError(writer.finishFrame(), HttpError::WebSocketFrameMissing));
+    invalidControl.fin           = true;
+    invalidControl.payloadLength = 2;
+    SC_TEST_EXPECT(resultHasHttpError(writer.beginFrame(invalidControl, {storage, 1}, encodedHeader),
+                                      HttpError::WebSocketFrameHeaderOutputTooSmall));
+    SC_TEST_EXPECT(writer.beginFrame(invalidControl, {storage, sizeof(storage)}, encodedHeader));
+    char oversizedPayload[] = {'a', 'b', 'c'};
+    SC_TEST_EXPECT(
+        resultHasHttpError(writer.writePayload(oversizedPayload), HttpError::WebSocketFramePayloadExceedsLength));
+    SC_TEST_EXPECT(resultHasHttpError(writer.finishFrame(), HttpError::WebSocketFramePayloadIncomplete));
+    char payload[] = {'a', 'b'};
+    SC_TEST_EXPECT(writer.writePayload(payload));
+    SC_TEST_EXPECT(writer.finishFrame());
 }
 
 void SC::HttpWebSocketFrameTest::writerRoundtrip()

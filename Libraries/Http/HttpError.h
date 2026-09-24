@@ -189,6 +189,20 @@ enum class HttpError : uint32_t
     WebSocketAcceptHeaderInvalid,
     WebSocketServerRequestNotAcceptable,
     WebSocketRejectAcceptedRequest,
+    WebSocketFrameReservedBitsUnsupported,
+    WebSocketOpcodeUnsupported,
+    WebSocketFrameLengthInvalid,
+    WebSocketFramePayloadProgressInvalid,
+    WebSocketFrameMaskInvalid,
+    WebSocketControlFrameFragmented,
+    WebSocketControlFrameTooLarge,
+    WebSocketContinuationUnexpected,
+    WebSocketContinuationExpected,
+    WebSocketFrameAlreadyInProgress,
+    WebSocketFrameHeaderOutputTooSmall,
+    WebSocketFrameMissing,
+    WebSocketFramePayloadExceedsLength,
+    WebSocketFramePayloadIncomplete,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

@@ -886,12 +886,13 @@ Result HttpWebSocketFrameReader::parse(Span<char> data, size_t& consumedBytes)
 
         case State::HeaderByte1: {
             const uint8_t opcodeValue = headerByte0 & 0x0F;
-            SC_TRY_MSG((headerByte0 & 0x70) == 0, "HttpWebSocketFrameReader RSV bits are not supported");
+            if ((headerByte0 & 0x70) != 0)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketFrameReservedBitsUnsupported);
             currentFrame        = {};
             currentFrame.fin    = (headerByte0 & 0x80) != 0;
             currentFrame.opcode = static_cast<HttpWebSocketOpcode>(opcodeValue);
-            SC_TRY_MSG(scHttpWebSocketIsSupportedOpcode(currentFrame.opcode),
-                       "HttpWebSocketFrameReader unsupported opcode");
+            if (not scHttpWebSocketIsSupportedOpcode(currentFrame.opcode))
+                return Result::Error(HttpResultCategory, HttpError::WebSocketOpcodeUnsupported);
 
             currentFrame.masked              = (current & 0x80) != 0;
             const uint8_t payloadLengthField = current & 0x7F;
@@ -923,8 +924,8 @@ Result HttpWebSocketFrameReader::parse(Span<char> data, size_t& consumedBytes)
         }
 
         case State::ExtendedLength:
-            SC_TRY_MSG(not(extendedLengthBytesExpected == 8 and extendedLengthBytesRead == 0 and (current & 0x80) != 0),
-                       "HttpWebSocketFrameReader invalid 64-bit payload length");
+            if (extendedLengthBytesExpected == 8 and extendedLengthBytesRead == 0 and (current & 0x80) != 0)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketFrameLengthInvalid);
             extendedLengthAccumulator = (extendedLengthAccumulator << 8) | current;
             extendedLengthBytesRead++;
             consumedBytes++;
@@ -956,7 +957,8 @@ Result HttpWebSocketFrameReader::parse(Span<char> data, size_t& consumedBytes)
             const size_t toConsume =
                 availableBytes < payloadBytesRemaining ? availableBytes : static_cast<size_t>(payloadBytesRemaining);
 
-            SC_TRY_MSG(toConsume > 0, "HttpWebSocketFrameReader invalid payload progress");
+            if (toConsume == 0)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketFramePayloadProgressInvalid);
             Span<char> payload = {data.data() + consumedBytes, toConsume};
             if (currentFrame.masked)
             {
@@ -985,23 +987,27 @@ Result HttpWebSocketFrameReader::parse(Span<char> data, size_t& consumedBytes)
 
 Result HttpWebSocketFrameReader::onHeaderReady()
 {
-    SC_TRY_MSG(currentFrame.masked == scHttpWebSocketRequiresIncomingMask(endpointRole),
-               "HttpWebSocketFrameReader invalid frame masking for endpoint role");
+    if (currentFrame.masked != scHttpWebSocketRequiresIncomingMask(endpointRole))
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameMaskInvalid);
 
     if (currentFrame.isControlFrame())
     {
-        SC_TRY_MSG(currentFrame.fin, "HttpWebSocketFrameReader control frames must not be fragmented");
-        SC_TRY_MSG(currentFrame.payloadLength <= 125, "HttpWebSocketFrameReader control frame payload too large");
+        if (not currentFrame.fin)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameFragmented);
+        if (currentFrame.payloadLength > 125)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameTooLarge);
     }
     else
     {
         if (currentFrame.opcode == HttpWebSocketOpcode::Continuation)
         {
-            SC_TRY_MSG(fragmentedMessageInProgress, "HttpWebSocketFrameReader unexpected continuation frame");
+            if (not fragmentedMessageInProgress)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketContinuationUnexpected);
         }
         else
         {
-            SC_TRY_MSG(not fragmentedMessageInProgress, "HttpWebSocketFrameReader expected continuation frame");
+            if (fragmentedMessageInProgress)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketContinuationExpected);
         }
     }
 
@@ -1059,32 +1065,40 @@ void HttpWebSocketFrameWriter::reset(HttpWebSocketEndpointRole role)
 Result HttpWebSocketFrameWriter::beginFrame(const HttpWebSocketFrameHeaderView& frame, Span<char> storage,
                                             Span<const char>& encodedHeader)
 {
-    SC_TRY_MSG(not frameInProgress, "HttpWebSocketFrameWriter frame already in progress");
-    SC_TRY_MSG(scHttpWebSocketIsSupportedOpcode(frame.opcode), "HttpWebSocketFrameWriter unsupported opcode");
+    if (frameInProgress)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameAlreadyInProgress);
+    if (not scHttpWebSocketIsSupportedOpcode(frame.opcode))
+        return Result::Error(HttpResultCategory, HttpError::WebSocketOpcodeUnsupported);
 
     if (frame.isControlFrame())
     {
-        SC_TRY_MSG(frame.fin, "HttpWebSocketFrameWriter control frames must not be fragmented");
-        SC_TRY_MSG(frame.payloadLength <= 125, "HttpWebSocketFrameWriter control frame payload too large");
+        if (not frame.fin)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameFragmented);
+        if (frame.payloadLength > 125)
+            return Result::Error(HttpResultCategory, HttpError::WebSocketControlFrameTooLarge);
     }
     else
     {
         if (frame.opcode == HttpWebSocketOpcode::Continuation)
         {
-            SC_TRY_MSG(fragmentedMessageInProgress, "HttpWebSocketFrameWriter unexpected continuation frame");
+            if (not fragmentedMessageInProgress)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketContinuationUnexpected);
         }
         else
         {
-            SC_TRY_MSG(not fragmentedMessageInProgress, "HttpWebSocketFrameWriter expected continuation frame");
+            if (fragmentedMessageInProgress)
+                return Result::Error(HttpResultCategory, HttpError::WebSocketContinuationExpected);
         }
     }
 
     const bool requiresMask = scHttpWebSocketRequiresOutgoingMask(endpointRole);
-    SC_TRY_MSG(frame.masked == requiresMask, "HttpWebSocketFrameWriter invalid frame masking for endpoint role");
+    if (frame.masked != requiresMask)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameMaskInvalid);
 
     const size_t encodedLength =
         2 + (frame.payloadLength < 126 ? 0 : (frame.payloadLength <= 0xFFFF ? 2 : 8)) + (frame.masked ? 4 : 0);
-    SC_TRY_MSG(storage.sizeInBytes() >= encodedLength, "HttpWebSocketFrameWriter header buffer too small");
+    if (storage.sizeInBytes() < encodedLength)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameHeaderOutputTooSmall);
 
     currentFrame = frame;
 
@@ -1128,9 +1142,10 @@ Result HttpWebSocketFrameWriter::beginFrame(const HttpWebSocketFrameHeaderView& 
 
 Result HttpWebSocketFrameWriter::writePayload(Span<char> payload)
 {
-    SC_TRY_MSG(frameInProgress, "HttpWebSocketFrameWriter no frame in progress");
-    SC_TRY_MSG(payload.sizeInBytes() <= payloadBytesRemaining,
-               "HttpWebSocketFrameWriter payload exceeds declared frame length");
+    if (not frameInProgress)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameMissing);
+    if (payload.sizeInBytes() > payloadBytesRemaining)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFramePayloadExceedsLength);
 
     if (currentFrame.masked and not payload.empty())
     {
@@ -1144,8 +1159,10 @@ Result HttpWebSocketFrameWriter::writePayload(Span<char> payload)
 
 Result HttpWebSocketFrameWriter::finishFrame()
 {
-    SC_TRY_MSG(frameInProgress, "HttpWebSocketFrameWriter no frame in progress");
-    SC_TRY_MSG(payloadBytesRemaining == 0, "HttpWebSocketFrameWriter frame payload incomplete");
+    if (not frameInProgress)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFrameMissing);
+    if (payloadBytesRemaining != 0)
+        return Result::Error(HttpResultCategory, HttpError::WebSocketFramePayloadIncomplete);
 
     if (not currentFrame.isControlFrame())
     {

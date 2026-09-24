@@ -88,6 +88,10 @@ WebSocket handshake failures distinguish key length/Base64 syntax, caller output
 upgrade-response headers, and invalid accept/reject operations. The existing handshake validation status remains the
 non-error outcome for a server deciding whether to accept a request or which HTTP rejection status to send.
 
+WebSocket frame reader and writer share primary codes when the protocol condition is the same: invalid opcode,
+masking, control-frame constraints, and continuation sequencing. Writer-only lifecycle and caller-header-storage
+errors remain distinct, as do malformed extended length and payload-progress failures in the reader.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched
