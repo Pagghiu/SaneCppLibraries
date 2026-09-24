@@ -29,6 +29,9 @@ follow the same rule; preflight returns the first invalid condition without embe
 Proxy configuration distinguishes invalid mode, URL scheme/host/path, unsafe bytes, malformed authorization or
 bypass values, and proxy settings supplied without HTTP-proxy mode. These are request-policy errors regardless of
 which native backend subsequently carries out the request.
+Capability preflight reports the unsupported policy or feature, rather than naming the current OS backend. A
+required-backend mismatch and a generic required-feature failure retain portable identities; specific request
+options use specific codes so callers can tell which requested policy cannot be honored.
 
 ## Consequences
 

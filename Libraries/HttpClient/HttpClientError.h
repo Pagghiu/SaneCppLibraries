@@ -44,6 +44,18 @@ enum class HttpClientError : uint32_t
     ProxyUrlWithoutHttpMode,
     ProxyAuthorizationWithoutHttpMode,
     ProxyBypassListWithoutHttpMode,
+    RedirectPolicyUnsupported,
+    Http11OnlyUnsupported,
+    Http2PreferredUnsupported,
+    Http2RequiredUnsupported,
+    TlsDisablePeerVerificationUnsupported,
+    TlsCustomCaPathUnsupported,
+    NoProxyPolicyUnsupported,
+    HttpProxyPolicyUnsupported,
+    ProxyAuthorizationUnsupported,
+    ProxyBypassListUnsupported,
+    RequiredBackendUnavailable,
+    RequiredFeatureUnsupported,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

@@ -431,46 +431,57 @@ static SC::Result validateRequestOptionsSupported(const SC::HttpClientRequestOpt
 {
     if (options.redirect.mode != SC::HttpClientRequestRedirectOptions::NoRedirects)
     {
-        SC_TRY_MSG(capabilities.redirectPolicy, "HttpClient: backend does not support redirect policy");
+        if (not capabilities.redirectPolicy)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RedirectPolicyUnsupported);
     }
 
     if (options.protocol.preference == SC::HttpClientRequestProtocolOptions::Http11Only)
     {
-        SC_TRY_MSG(capabilities.protocolHttp11Only, "HttpClient: backend does not support forcing HTTP/1.1");
+        if (not capabilities.protocolHttp11Only)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::Http11OnlyUnsupported);
     }
     else if (options.protocol.preference == SC::HttpClientRequestProtocolOptions::Http2Preferred)
     {
-        SC_TRY_MSG(capabilities.protocolHttp2Preferred, "HttpClient: backend does not support HTTP/2");
+        if (not capabilities.protocolHttp2Preferred)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::Http2PreferredUnsupported);
     }
     else if (options.protocol.preference == SC::HttpClientRequestProtocolOptions::Http2Required)
     {
-        SC_TRY_MSG(capabilities.protocolHttp2Required, "HttpClient: backend does not support requiring HTTP/2");
+        if (not capabilities.protocolHttp2Required)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::Http2RequiredUnsupported);
     }
 
     if (not options.tls.verifyPeer)
     {
-        SC_TRY_MSG(capabilities.tlsDisablePeerVerification,
-                   "HttpClient: backend does not support disabling TLS peer verification");
+        if (not capabilities.tlsDisablePeerVerification)
+            return SC::Result::Error(SC::HttpClientResultCategory,
+                                     SC::HttpClientError::TlsDisablePeerVerificationUnsupported);
     }
     if (options.tls.caCertificatesPath.sizeInBytes() > 0)
     {
-        SC_TRY_MSG(capabilities.tlsCustomCaPath, "HttpClient: backend does not support custom TLS CA paths");
+        if (not capabilities.tlsCustomCaPath)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::TlsCustomCaPathUnsupported);
     }
 
     if (options.proxy.mode == SC::HttpClientRequestProxyOptions::NoProxy)
     {
-        SC_TRY_MSG(capabilities.proxyNoProxy, "HttpClient: backend does not support no-proxy policy");
+        if (not capabilities.proxyNoProxy)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::NoProxyPolicyUnsupported);
     }
     else if (options.proxy.mode == SC::HttpClientRequestProxyOptions::Http)
     {
-        SC_TRY_MSG(capabilities.proxyHttp, "HttpClient: backend does not support HTTP proxy policy");
+        if (not capabilities.proxyHttp)
+            return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::HttpProxyPolicyUnsupported);
         if (options.proxy.authorization.sizeInBytes() > 0)
         {
-            SC_TRY_MSG(capabilities.proxyAuthorization, "HttpClient: backend does not support proxy authorization");
+            if (not capabilities.proxyAuthorization)
+                return SC::Result::Error(SC::HttpClientResultCategory,
+                                         SC::HttpClientError::ProxyAuthorizationUnsupported);
         }
         if (options.proxy.bypassList.sizeInBytes() > 0)
         {
-            SC_TRY_MSG(capabilities.proxyBypassList, "HttpClient: backend does not support proxy bypass lists");
+            if (not capabilities.proxyBypassList)
+                return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ProxyBypassListUnsupported);
         }
     }
     return SC::Result(true);
@@ -741,13 +752,15 @@ bool SC::HttpClientCapabilities::supportsAll(Span<const Feature> features) const
 
 SC::Result SC::HttpClientCapabilities::requireBackend(Backend requiredBackend) const
 {
-    SC_TRY_MSG(hasBackend(requiredBackend), "HttpClient: required backend is not active");
+    if (not hasBackend(requiredBackend))
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequiredBackendUnavailable);
     return Result(true);
 }
 
 SC::Result SC::HttpClientCapabilities::requireFeatures(Span<const Feature> features) const
 {
-    SC_TRY_MSG(supportsAll(features), "HttpClient: required backend feature is not supported");
+    if (not supportsAll(features))
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequiredFeatureUnsupported);
     return Result(true);
 }
 

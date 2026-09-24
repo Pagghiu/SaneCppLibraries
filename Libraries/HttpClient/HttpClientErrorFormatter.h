@@ -92,6 +92,42 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::ProxyBypassListWithoutHttpMode:
         formatter.append("HTTP client proxy bypass list requires HTTP proxy mode");
         break;
+    case HttpClientError::RedirectPolicyUnsupported:
+        formatter.append("HTTP client redirect policy is unsupported");
+        break;
+    case HttpClientError::Http11OnlyUnsupported:
+        formatter.append("HTTP client HTTP/1.1-only policy is unsupported");
+        break;
+    case HttpClientError::Http2PreferredUnsupported:
+        formatter.append("HTTP client HTTP/2 preference is unsupported");
+        break;
+    case HttpClientError::Http2RequiredUnsupported:
+        formatter.append("HTTP client required HTTP/2 policy is unsupported");
+        break;
+    case HttpClientError::TlsDisablePeerVerificationUnsupported:
+        formatter.append("HTTP client disabling TLS peer verification is unsupported");
+        break;
+    case HttpClientError::TlsCustomCaPathUnsupported:
+        formatter.append("HTTP client custom TLS CA path is unsupported");
+        break;
+    case HttpClientError::NoProxyPolicyUnsupported:
+        formatter.append("HTTP client no-proxy policy is unsupported");
+        break;
+    case HttpClientError::HttpProxyPolicyUnsupported:
+        formatter.append("HTTP client HTTP proxy policy is unsupported");
+        break;
+    case HttpClientError::ProxyAuthorizationUnsupported:
+        formatter.append("HTTP client proxy authorization is unsupported");
+        break;
+    case HttpClientError::ProxyBypassListUnsupported:
+        formatter.append("HTTP client proxy bypass list is unsupported");
+        break;
+    case HttpClientError::RequiredBackendUnavailable:
+        formatter.append("HTTP client required backend is unavailable");
+        break;
+    case HttpClientError::RequiredFeatureUnsupported:
+        formatter.append("HTTP client required feature is unsupported");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

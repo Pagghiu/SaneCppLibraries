@@ -425,7 +425,8 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(strcmp(HttpClientCapabilities::getBackendName(capabilities.backend), "unsupported") == 0);
 #endif
         SC_TEST_EXPECT(not capabilities.hasBackend(static_cast<HttpClientCapabilities::Backend>(0xFF)));
-        SC_TEST_EXPECT(not capabilities.requireBackend(static_cast<HttpClientCapabilities::Backend>(0xFF)));
+        SC_TEST_EXPECT(capabilities.requireBackend(static_cast<HttpClientCapabilities::Backend>(0xFF))
+                           .isError(HttpClientResultCategory, HttpClientError::RequiredBackendUnavailable));
 
         SC_TEST_EXPECT(
             strcmp(HttpClientCapabilities::getFeatureName(HttpClientCapabilities::MultipleOperationsPerClient),
@@ -471,7 +472,42 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(capabilities.requireFeatures(commonRequired));
         HttpClientCapabilities::Feature unsupportedRequired[] = {HttpClientCapabilities::ContentCodingPolicy};
         SC_TEST_EXPECT(not capabilities.supportsAll(unsupportedRequired));
-        SC_TEST_EXPECT(not capabilities.requireFeatures(unsupportedRequired));
+        SC_TEST_EXPECT(capabilities.requireFeatures(unsupportedRequired)
+                           .isError(HttpClientResultCategory, HttpClientError::RequiredFeatureUnsupported));
+
+        {
+            HttpClientCapabilities unavailable;
+            auto                   expectUnsupported = [&](HttpClientRequestOptions options, HttpClientError error)
+            { SC_TEST_EXPECT(unavailable.requireRequestOptions(options).isError(HttpClientResultCategory, error)); };
+            HttpClientRequestOptions options;
+            options.redirect.mode = HttpClientRequestRedirectOptions::FollowAll;
+            expectUnsupported(options, HttpClientError::RedirectPolicyUnsupported);
+            options                     = {};
+            options.protocol.preference = HttpClientRequestProtocolOptions::Http11Only;
+            expectUnsupported(options, HttpClientError::Http11OnlyUnsupported);
+            options.protocol.preference = HttpClientRequestProtocolOptions::Http2Preferred;
+            expectUnsupported(options, HttpClientError::Http2PreferredUnsupported);
+            options.protocol.preference = HttpClientRequestProtocolOptions::Http2Required;
+            expectUnsupported(options, HttpClientError::Http2RequiredUnsupported);
+            options                = {};
+            options.tls.verifyPeer = false;
+            expectUnsupported(options, HttpClientError::TlsDisablePeerVerificationUnsupported);
+            options                        = {};
+            options.tls.caCertificatesPath = "/tmp/ca.pem"_a8;
+            expectUnsupported(options, HttpClientError::TlsCustomCaPathUnsupported);
+            options            = {};
+            options.proxy.mode = HttpClientRequestProxyOptions::NoProxy;
+            expectUnsupported(options, HttpClientError::NoProxyPolicyUnsupported);
+            options.proxy.mode = HttpClientRequestProxyOptions::Http;
+            options.proxy.url  = "http://127.0.0.1:1"_a8;
+            expectUnsupported(options, HttpClientError::HttpProxyPolicyUnsupported);
+            unavailable.proxyHttp       = true;
+            options.proxy.authorization = "Basic dGVzdA=="_a8;
+            expectUnsupported(options, HttpClientError::ProxyAuthorizationUnsupported);
+            unavailable.proxyAuthorization = true;
+            options.proxy.bypassList       = "127.0.0.1"_a8;
+            expectUnsupported(options, HttpClientError::ProxyBypassListUnsupported);
+        }
 
         {
             HttpClientRequestOptions options;
@@ -655,12 +691,12 @@ struct SC::HttpClientTest : public SC::TestCase
         HttpClientOperation                                    operation;
         SC_TEST_EXPECT(operation.init(client, memory.memory));
 
-        auto expectRejected = [&](HttpClientRequest& request)
+        auto expectRejected = [&](HttpClientRequest& request, HttpClientError expectedError)
         {
             HttpClientResponse response;
             request.url                               = "https://127.0.0.1:1/preflight"_a8;
             request.options.timeouts.requestTimeoutMs = 1;
-            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(operation.start(request, response).isError(HttpClientResultCategory, expectedError));
             SC_TEST_EXPECT(not operation.isRequestInFlight());
         };
 
@@ -668,38 +704,38 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             HttpClientRequest request;
             request.options.protocol.preference = HttpClientRequestProtocolOptions::Http11Only;
-            expectRejected(request);
+            expectRejected(request, HttpClientError::Http11OnlyUnsupported);
         }
         if (not capabilities.protocolHttp2Required)
         {
             HttpClientRequest request;
             request.options.protocol.preference = HttpClientRequestProtocolOptions::Http2Required;
-            expectRejected(request);
+            expectRejected(request, HttpClientError::Http2RequiredUnsupported);
         }
         if (not capabilities.tlsDisablePeerVerification)
         {
             HttpClientRequest request;
             request.options.tls.verifyPeer = false;
-            expectRejected(request);
+            expectRejected(request, HttpClientError::TlsDisablePeerVerificationUnsupported);
         }
         if (not capabilities.tlsCustomCaPath)
         {
             HttpClientRequest request;
             request.options.tls.caCertificatesPath = "/tmp/sc-http-client-test-ca.pem"_a8;
-            expectRejected(request);
+            expectRejected(request, HttpClientError::TlsCustomCaPathUnsupported);
         }
         if (not capabilities.proxyNoProxy)
         {
             HttpClientRequest request;
             request.options.proxy.mode = HttpClientRequestProxyOptions::NoProxy;
-            expectRejected(request);
+            expectRejected(request, HttpClientError::NoProxyPolicyUnsupported);
         }
         if (not capabilities.proxyHttp)
         {
             HttpClientRequest request;
             request.options.proxy.mode = HttpClientRequestProxyOptions::Http;
             request.options.proxy.url  = "http://127.0.0.1:1"_a8;
-            expectRejected(request);
+            expectRejected(request, HttpClientError::HttpProxyPolicyUnsupported);
         }
 
         SC_TEST_EXPECT(operation.close());
