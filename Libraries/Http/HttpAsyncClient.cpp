@@ -696,11 +696,13 @@ Result HttpAsyncClient::beginRequestSend()
     case RequestPreset::BodyMode::None: break;
     case RequestPreset::BodyMode::Span: SC_TRY(request.setBody(currentPreset.bodySpan)); break;
     case RequestPreset::BodyMode::Stream:
-        SC_TRY_MSG(currentPreset.bodyStream != nullptr, "HttpAsyncClient body stream missing");
+        if (currentPreset.bodyStream == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::ClientBodyStreamMissing);
         request.setBody(*currentPreset.bodyStream, currentPreset.contentLength);
         break;
     case RequestPreset::BodyMode::Multipart:
-        SC_TRY_MSG(currentPreset.multipartWriter != nullptr, "HttpAsyncClient multipart writer missing");
+        if (currentPreset.multipartWriter == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::MultipartWriterMissing);
         request.setMultipart(*currentPreset.multipartWriter);
         break;
     }
@@ -735,7 +737,8 @@ Result HttpAsyncClient::beginRequestSend()
     }
     else
     {
-        SC_TRY_MSG(request.hasSentHeaders(), "HttpAsyncClient request headers not sent");
+        if (not request.hasSentHeaders())
+            return Result::Error(HttpResultCategory, HttpError::HeadersNotSent);
     }
 
     state = State::WaitingResponse;
@@ -746,27 +749,29 @@ Result HttpAsyncClient::validateActiveRequest() const
 {
     if (request.hasTransferEncodingHeader() and not request.usesChunkedTransferEncoding())
     {
-        return Result::Error("HttpAsyncClient does not support Transfer-Encoding request headers");
+        return Result::Error(HttpResultCategory, HttpError::TransferEncodingUnsupported);
     }
 
     if (request.getBodyType() == HttpAsyncClientRequest::BodyType::Stream)
     {
-        SC_TRY_MSG(request.getBodyStream() != nullptr, "HttpAsyncClient body stream missing");
-        SC_TRY_MSG(&request.getBodyStream()->getBuffersPool() == &connection->buffersPool,
-                   "HttpAsyncClient body stream must use the client buffers pool");
+        if (request.getBodyStream() == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::ClientBodyStreamMissing);
+        if (&request.getBodyStream()->getBuffersPool() != &connection->buffersPool)
+            return Result::Error(HttpResultCategory, HttpError::ClientBodyStreamPoolMismatch);
         if (request.getBodyTransform() != nullptr)
         {
-            SC_TRY_MSG(&request.getBodyTransform()->AsyncReadableStream::getBuffersPool() == &connection->buffersPool,
-                       "HttpAsyncClient body transform readable side must use the client buffers pool");
-            SC_TRY_MSG(&request.getBodyTransform()->AsyncWritableStream::getBuffersPool() == &connection->buffersPool,
-                       "HttpAsyncClient body transform writable side must use the client buffers pool");
+            if (&request.getBodyTransform()->AsyncReadableStream::getBuffersPool() != &connection->buffersPool)
+                return Result::Error(HttpResultCategory, HttpError::ClientTransformReadablePoolMismatch);
+            if (&request.getBodyTransform()->AsyncWritableStream::getBuffersPool() != &connection->buffersPool)
+                return Result::Error(HttpResultCategory, HttpError::ClientTransformWritablePoolMismatch);
         }
     }
     if (request.getBodyType() == HttpAsyncClientRequest::BodyType::Multipart)
     {
-        SC_TRY_MSG(request.getMultipartWriter() != nullptr, "HttpAsyncClient multipart writer missing");
-        SC_TRY_MSG(request.getMultipartWriter()->getBoundary().sizeInBytes() > 0,
-                   "HttpAsyncClient multipart boundary missing");
+        if (request.getMultipartWriter() == nullptr)
+            return Result::Error(HttpResultCategory, HttpError::MultipartWriterMissing);
+        if (request.getMultipartWriter()->getBoundary().isEmpty())
+            return Result::Error(HttpResultCategory, HttpError::MultipartWriterBoundaryMissing);
     }
     return Result(true);
 }
@@ -806,18 +811,18 @@ Result HttpAsyncClient::prepareResponseDecompression()
     SC_TRY(responseDecoder->stream.init(algorithm));
 
     HttpIncomingMessage::BodyStream& rawBody = response.rawBodyStream();
-    SC_TRY_MSG((rawBody.eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyData>(*this)),
-               "HttpAsyncClient response decoder data listener limit reached");
-    SC_TRY_MSG((rawBody.eventEnd.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyEnd>(*this)),
-               "HttpAsyncClient response decoder end listener limit reached");
-    SC_TRY_MSG((rawBody.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this)),
-               "HttpAsyncClient response decoder raw error listener limit reached");
-    SC_TRY_MSG((responseDecoder->AsyncReadableStream::eventError
-                    .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this)),
-               "HttpAsyncClient response decoder readable error listener limit reached");
-    SC_TRY_MSG((responseDecoder->AsyncWritableStream::eventError
-                    .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this)),
-               "HttpAsyncClient response decoder writable error listener limit reached");
+    if (not rawBody.eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyData>(*this))
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderDataListenerUnavailable);
+    if (not rawBody.eventEnd.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyEnd>(*this))
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderEndListenerUnavailable);
+    if (not rawBody.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this))
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderRawErrorListenerUnavailable);
+    if (not responseDecoder->AsyncReadableStream::eventError
+                .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this))
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderReadableErrorListenerUnavailable);
+    if (not responseDecoder->AsyncWritableStream::eventError
+                .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this))
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderWritableErrorListenerUnavailable);
 
     response.attachReadableStream(*responseDecoder);
     responseDecoderActive = true;
@@ -1020,7 +1025,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
 
     if (response.getParser().statusCode < 200 and not responseMustNotHaveBody())
     {
-        fail(Result::Error("HttpAsyncClient does not support informational responses"));
+        fail(Result::Error(HttpResultCategory, HttpError::ClientInformationalResponseUnsupported));
         return;
     }
 
@@ -1069,7 +1074,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
 
     if (responseMustNotHaveBody() and bufferedBodyBytes > 0)
     {
-        fail(Result::Error("HttpAsyncClient received an unexpected response body"));
+        fail(Result::Error(HttpResultCategory, HttpError::UnexpectedBodyData));
         return;
     }
 
@@ -1261,7 +1266,7 @@ void HttpAsyncClient::onReadableEnd()
     }
     else
     {
-        fail(Result::Error("HttpAsyncClient disconnected before response completed"));
+        fail(Result::Error(HttpResultCategory, HttpError::ClientResponseIncomplete));
     }
 }
 

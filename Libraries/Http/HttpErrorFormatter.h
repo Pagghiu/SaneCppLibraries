@@ -221,6 +221,34 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ClientResponseListenerUnavailable:
         formatter.append("HTTP client response listener is unavailable");
         break;
+    case HttpError::ClientBodyStreamPoolMismatch:
+        formatter.append("HTTP client body stream uses a different buffer pool");
+        break;
+    case HttpError::ClientTransformReadablePoolMismatch:
+        formatter.append("HTTP client body transform readable side uses a different buffer pool");
+        break;
+    case HttpError::ClientTransformWritablePoolMismatch:
+        formatter.append("HTTP client body transform writable side uses a different buffer pool");
+        break;
+    case HttpError::ClientDecoderDataListenerUnavailable:
+        formatter.append("HTTP response decoder data listener is unavailable");
+        break;
+    case HttpError::ClientDecoderEndListenerUnavailable:
+        formatter.append("HTTP response decoder end listener is unavailable");
+        break;
+    case HttpError::ClientDecoderRawErrorListenerUnavailable:
+        formatter.append("HTTP response decoder raw error listener is unavailable");
+        break;
+    case HttpError::ClientDecoderReadableErrorListenerUnavailable:
+        formatter.append("HTTP response decoder readable error listener is unavailable");
+        break;
+    case HttpError::ClientDecoderWritableErrorListenerUnavailable:
+        formatter.append("HTTP response decoder writable error listener is unavailable");
+        break;
+    case HttpError::ClientInformationalResponseUnsupported:
+        formatter.append("HTTP informational response is unsupported by this client");
+        break;
+    case HttpError::ClientResponseIncomplete: formatter.append("HTTP response was incomplete at disconnect"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

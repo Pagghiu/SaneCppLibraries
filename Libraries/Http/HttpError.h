@@ -162,6 +162,16 @@ enum class HttpError : uint32_t
     ClientProtocolStorageTooSmall,
     ClientHostStorageTooSmall,
     ClientResponseListenerUnavailable,
+    ClientBodyStreamPoolMismatch,
+    ClientTransformReadablePoolMismatch,
+    ClientTransformWritablePoolMismatch,
+    ClientDecoderDataListenerUnavailable,
+    ClientDecoderEndListenerUnavailable,
+    ClientDecoderRawErrorListenerUnavailable,
+    ClientDecoderReadableErrorListenerUnavailable,
+    ClientDecoderWritableErrorListenerUnavailable,
+    ClientInformationalResponseUnsupported,
+    ClientResponseIncomplete,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

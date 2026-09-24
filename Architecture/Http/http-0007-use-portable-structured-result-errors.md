@@ -80,6 +80,10 @@ URL features, WebSocket-upgrade preconditions, reconnect listener capacity, nati
 adapters, and connected-origin storage. User-supplied transport, connector, and preflight results keep their original
 identity instead of being wrapped.
 
+Its request-body path shares the outgoing-message codes for missing headers, unsupported Transfer-Encoding, and
+missing multipart state, while distinguishing a body stream or transform bound to the wrong caller-owned buffer pool.
+Response decompression listener shortages and incomplete or unsupported responses have separate portable identities.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

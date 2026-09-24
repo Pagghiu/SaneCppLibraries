@@ -234,6 +234,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             clientPreflightErrors();
         }
+        if (test_section("client body pool mismatch"))
+        {
+            clientBodyPoolMismatch();
+        }
         if (test_section("request option body helpers"))
         {
             requestOptionBodyHelpers();
@@ -338,6 +342,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void putSpanBody();
     void requestOptions();
     void clientPreflightErrors();
+    void clientBodyPoolMismatch();
     void requestOptionBodyHelpers();
     void multipartWriterValidation();
     void putStreamBody();
@@ -893,6 +898,51 @@ void SC::HttpAsyncClientTest::clientPreflightErrors()
     SC_TEST_EXPECT(
         resultHasHttpError(client.get(loop, "http://user:pass@example.com/"), HttpError::ClientUserInfoUnsupported));
     SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::clientBodyPoolMismatch()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection serverStorage[1];
+    HttpAsyncServer  server;
+    const uint16_t   port = report.mapPort(26131);
+    SC_TEST_EXPECT(server.init(Span<ServerConnection>(serverStorage)));
+    SC_TEST_EXPECT(server.start(loop, "127.0.0.1", port));
+
+    ClientConnection  clientStorage;
+    ClientConnection  otherStorage;
+    HttpAsyncClient   client;
+    ChunkedBodyStream bodyStream;
+    TimeoutGuard      timeout;
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(bodyStream.init(otherStorage.buffersPool, StringSpan("x").toCharSpan(), 1));
+
+    Result error(true);
+    struct ErrorContext
+    {
+        HttpAsyncClientTest* test;
+        Result*              error;
+        HttpAsyncServer*     server;
+    } errorContext = {this, &error, &server};
+    client.onError = [&errorContext](Result result)
+    {
+        *errorContext.error = result;
+        errorContext.test->recordExpectation("stop after pool mismatch", errorContext.server->stop());
+    };
+
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/pool-mismatch", port));
+    HttpAsyncClient::RequestOptions options;
+    options.setRequest(HttpParser::Method::HttpPOST, url.view()).setBody(bodyStream, 1);
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.sendRequest(loop, options));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(resultHasHttpError(error, HttpError::ClientBodyStreamPoolMismatch));
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(server.close());
     SC_TEST_EXPECT(loop.close());
 }
 
