@@ -489,12 +489,14 @@ static SC::Result validateRequestOptionsSupported(const SC::HttpClientRequestOpt
 
 static SC::Result sliceResponseBuffers(SC::Span<SC::HttpClientResponseBuffer> buffers, SC::Span<char> memory)
 {
-    SC_TRY_MSG(not buffers.empty(), "HttpClientOperation: response buffers missing");
-    SC_TRY_MSG(memory.sizeInBytes() >= buffers.sizeInElements(),
-               "HttpClientOperation: response buffer memory too small for slicing");
+    if (buffers.empty())
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ResponseBuffersMissing);
+    if (memory.sizeInBytes() < buffers.sizeInElements())
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ResponseBufferMemoryTooSmall);
 
     const size_t sliceSize = memory.sizeInBytes() / buffers.sizeInElements();
-    SC_TRY_MSG(sliceSize > 0, "HttpClientOperation: response buffer slices would be empty");
+    if (sliceSize == 0)
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ResponseBufferMemoryTooSmall);
 
     for (size_t idx = 0; idx < buffers.sizeInElements(); ++idx)
     {
@@ -1224,7 +1226,8 @@ const char* SC::HttpClientResponse::getProtocolName(Protocol protocol)
 
 SC::Result SC::HttpClient::init()
 {
-    SC_TRY_MSG(not initialized, "HttpClient: already initialized");
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::ClientAlreadyInitialized);
     SC_TRY(platformInit());
     initialized = true;
     return Result(true);
@@ -1232,7 +1235,8 @@ SC::Result SC::HttpClient::init()
 
 SC::Result SC::HttpClient::init(HttpClientCapabilities::Backend requiredBackend)
 {
-    SC_TRY_MSG(not initialized, "HttpClient: already initialized");
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::ClientAlreadyInitialized);
     SC_TRY(getCapabilities().requireBackend(requiredBackend));
     SC_TRY(platformInit());
     initialized = true;
@@ -1241,7 +1245,8 @@ SC::Result SC::HttpClient::init(HttpClientCapabilities::Backend requiredBackend)
 
 SC::Result SC::HttpClient::init(Span<const HttpClientCapabilities::Feature> requiredFeatures)
 {
-    SC_TRY_MSG(not initialized, "HttpClient: already initialized");
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::ClientAlreadyInitialized);
     SC_TRY(getCapabilities().requireFeatures(requiredFeatures));
     SC_TRY(platformInit());
     initialized = true;
@@ -1251,7 +1256,8 @@ SC::Result SC::HttpClient::init(Span<const HttpClientCapabilities::Feature> requ
 SC::Result SC::HttpClient::init(HttpClientCapabilities::Backend             requiredBackend,
                                 Span<const HttpClientCapabilities::Feature> requiredFeatures)
 {
-    SC_TRY_MSG(not initialized, "HttpClient: already initialized");
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::ClientAlreadyInitialized);
     const HttpClientCapabilities capabilities = getCapabilities();
     SC_TRY(capabilities.requireBackend(requiredBackend));
     SC_TRY(capabilities.requireFeatures(requiredFeatures));
@@ -1273,12 +1279,18 @@ SC::Result SC::HttpClient::close()
 
 SC::Result SC::HttpClientOperation::init(HttpClient& clientValue, const HttpClientOperationMemory& memory)
 {
-    SC_TRY_MSG(clientValue.isInitialized(), "HttpClientOperation: client not initialized");
-    SC_TRY_MSG(not initialized, "HttpClientOperation: already initialized");
-    SC_TRY_MSG(memory.responseBuffers.sizeInElements() > 0, "HttpClientOperation: response buffers missing");
-    SC_TRY_MSG(memory.eventQueue.sizeInElements() > 0, "HttpClientOperation: event queue missing");
-    SC_TRY_MSG(memory.responseHeaders.sizeInBytes() > 0, "HttpClientOperation: response headers buffer missing");
-    SC_TRY_MSG(memory.responseMetadata.sizeInBytes() > 0, "HttpClientOperation: response metadata buffer missing");
+    if (not clientValue.isInitialized())
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationClientNotInitialized);
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationAlreadyInitialized);
+    if (memory.responseBuffers.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::ResponseBuffersMissing);
+    if (memory.eventQueue.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationEventQueueMissing);
+    if (memory.responseHeaders.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationResponseHeadersMissing);
+    if (memory.responseMetadata.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationResponseMetadataMissing);
 
     client           = &clientValue;
     responseBuffers  = memory.responseBuffers;
@@ -1295,7 +1307,8 @@ SC::Result SC::HttpClientOperation::init(HttpClient& clientValue, const HttpClie
     {
         for (HttpClientResponseBuffer& buffer : responseBuffers)
         {
-            SC_TRY_MSG(buffer.data.sizeInBytes() > 0, "HttpClientOperation: response buffer is empty");
+            if (buffer.data.empty())
+                return Result::Error(HttpClientResultCategory, HttpClientError::ResponseBufferEmpty);
             buffer.inUse = false;
         }
     }
@@ -1352,7 +1365,8 @@ SC::Result SC::HttpClientOperation::close()
 
 SC::Result SC::HttpClientOperation::cancel()
 {
-    SC_TRY_MSG(initialized, "HttpClientOperation: not initialized");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationNotInitialized);
     if (not requestInFlight)
     {
         return Result(true);
@@ -1363,8 +1377,10 @@ SC::Result SC::HttpClientOperation::cancel()
 SC::Result SC::HttpClientOperation::start(const HttpClientRequest& request, HttpClientResponse& response,
                                           HttpClientOperationListener* listener)
 {
-    SC_TRY_MSG(initialized, "HttpClientOperation: not initialized");
-    SC_TRY_MSG(not requestInFlight, "HttpClientOperation: request already in flight");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationNotInitialized);
+    if (requestInFlight)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationRequestInFlight);
     SC_TRY(request.validate());
     SC_TRY(validateRequestOptionsSupported(request.options, HttpClient::getCapabilities()));
 

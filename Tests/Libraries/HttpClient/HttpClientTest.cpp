@@ -350,11 +350,19 @@ struct SC::HttpClientTest : public SC::TestCase
     {
         HttpClient client;
         SC_TEST_EXPECT(client.init());
+        SC_TEST_EXPECT(client.init().isError(HttpClientResultCategory, HttpClientError::ClientAlreadyInitialized));
 
         CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> coreMemory;
         HttpClientOperation                                    operation;
         SC_TEST_EXPECT(operation.init(client, coreMemory.memory));
+        SC_TEST_EXPECT(operation.init(client, coreMemory.memory)
+                           .isError(HttpClientResultCategory, HttpClientError::OperationAlreadyInitialized));
         SC_TEST_EXPECT(operation.close());
+        SC_TEST_EXPECT(operation.cancel().isError(HttpClientResultCategory, HttpClientError::OperationNotInitialized));
+        HttpClientRequest  request;
+        HttpClientResponse response;
+        SC_TEST_EXPECT(operation.start(request, response)
+                           .isError(HttpClientResultCategory, HttpClientError::OperationNotInitialized));
 
         AsyncEventLoop loop;
         SC_TEST_EXPECT(loop.create());
@@ -365,6 +373,8 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(asyncOperation.close());
 
         SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(operation.init(client, coreMemory.memory)
+                           .isError(HttpClientResultCategory, HttpClientError::OperationClientNotInitialized));
         SC_TEST_EXPECT(loop.close());
 
         const HttpClientCapabilities    capabilities       = HttpClient::getCapabilities();
@@ -758,7 +768,8 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             HttpClientOperationMemory memory;
             HttpClientOperation       operation;
-            SC_TEST_EXPECT(not operation.init(client, memory));
+            SC_TEST_EXPECT(operation.init(client, memory)
+                               .isError(HttpClientResultCategory, HttpClientError::ResponseBuffersMissing));
             SC_TEST_EXPECT(not operation.isInitialized());
         }
         {
@@ -769,7 +780,8 @@ struct SC::HttpClientTest : public SC::TestCase
             memory.responseMetadata = {responseMetadata, sizeof(responseMetadata)};
 
             HttpClientOperation operation;
-            SC_TEST_EXPECT(not operation.init(client, memory));
+            SC_TEST_EXPECT(
+                operation.init(client, memory).isError(HttpClientResultCategory, HttpClientError::ResponseBufferEmpty));
             SC_TEST_EXPECT(not operation.isInitialized());
         }
         {
@@ -781,8 +793,28 @@ struct SC::HttpClientTest : public SC::TestCase
             memory.responseMetadata     = {responseMetadata, sizeof(responseMetadata)};
 
             HttpClientOperation operation;
-            SC_TEST_EXPECT(not operation.init(client, memory));
+            SC_TEST_EXPECT(operation.init(client, memory)
+                               .isError(HttpClientResultCategory, HttpClientError::ResponseBufferMemoryTooSmall));
             SC_TEST_EXPECT(not operation.isInitialized());
+        }
+        {
+            HttpClientOperationMemory memory;
+            memory.responseBuffers      = {responseBuffers, 2};
+            memory.responseBufferMemory = {responseMemory, sizeof(responseMemory)};
+            memory.responseHeaders      = {responseHeaders, sizeof(responseHeaders)};
+            memory.responseMetadata     = {responseMetadata, sizeof(responseMetadata)};
+
+            HttpClientOperation operation;
+            SC_TEST_EXPECT(operation.init(client, memory)
+                               .isError(HttpClientResultCategory, HttpClientError::OperationEventQueueMissing));
+            memory.eventQueue      = {eventQueue, 2};
+            memory.responseHeaders = {};
+            SC_TEST_EXPECT(operation.init(client, memory)
+                               .isError(HttpClientResultCategory, HttpClientError::OperationResponseHeadersMissing));
+            memory.responseHeaders  = {responseHeaders, sizeof(responseHeaders)};
+            memory.responseMetadata = {};
+            SC_TEST_EXPECT(operation.init(client, memory)
+                               .isError(HttpClientResultCategory, HttpClientError::OperationResponseMetadataMissing));
         }
         {
             HttpClientOperationMemory memory;

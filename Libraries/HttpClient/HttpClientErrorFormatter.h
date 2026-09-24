@@ -128,6 +128,31 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::RequiredFeatureUnsupported:
         formatter.append("HTTP client required feature is unsupported");
         break;
+    case HttpClientError::ClientAlreadyInitialized: formatter.append("HTTP client is already initialized"); break;
+    case HttpClientError::OperationClientNotInitialized:
+        formatter.append("HTTP client operation requires an initialized client");
+        break;
+    case HttpClientError::OperationAlreadyInitialized:
+        formatter.append("HTTP client operation is already initialized");
+        break;
+    case HttpClientError::ResponseBuffersMissing: formatter.append("HTTP client response buffers are missing"); break;
+    case HttpClientError::ResponseBufferMemoryTooSmall:
+        formatter.append("HTTP client response buffer memory is too small");
+        break;
+    case HttpClientError::ResponseBufferEmpty: formatter.append("HTTP client response buffer is empty"); break;
+    case HttpClientError::OperationEventQueueMissing:
+        formatter.append("HTTP client operation event queue is missing");
+        break;
+    case HttpClientError::OperationResponseHeadersMissing:
+        formatter.append("HTTP client operation response header storage is missing");
+        break;
+    case HttpClientError::OperationResponseMetadataMissing:
+        formatter.append("HTTP client operation response metadata storage is missing");
+        break;
+    case HttpClientError::OperationNotInitialized: formatter.append("HTTP client operation is not initialized"); break;
+    case HttpClientError::OperationRequestInFlight:
+        formatter.append("HTTP client operation already has a request in flight");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

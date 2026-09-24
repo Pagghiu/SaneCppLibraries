@@ -32,6 +32,9 @@ which native backend subsequently carries out the request.
 Capability preflight reports the unsupported policy or feature, rather than naming the current OS backend. A
 required-backend mismatch and a generic required-feature failure retain portable identities; specific request
 options use specific codes so callers can tell which requested policy cannot be honored.
+Client and operation initialization now distinguish repeated initialization, an uninitialized client, missing
+caller-owned event/header/metadata storage, empty or insufficient response buffers, and operation state. Repeated
+cancel or start attempts return portable operation-state codes; no native backend detail is exposed.
 
 ## Consequences
 

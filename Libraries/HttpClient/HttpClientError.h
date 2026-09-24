@@ -56,6 +56,17 @@ enum class HttpClientError : uint32_t
     ProxyBypassListUnsupported,
     RequiredBackendUnavailable,
     RequiredFeatureUnsupported,
+    ClientAlreadyInitialized,
+    OperationClientNotInitialized,
+    OperationAlreadyInitialized,
+    ResponseBuffersMissing,
+    ResponseBufferMemoryTooSmall,
+    ResponseBufferEmpty,
+    OperationEventQueueMissing,
+    OperationResponseHeadersMissing,
+    OperationResponseMetadataMissing,
+    OperationNotInitialized,
+    OperationRequestInFlight,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);
