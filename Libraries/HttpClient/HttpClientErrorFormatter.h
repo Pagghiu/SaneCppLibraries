@@ -184,6 +184,12 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::BlockingResponseBodyBufferTooSmall:
         formatter.append("HTTP client blocking response body buffer is too small");
         break;
+    case HttpClientError::PlatformUnsupported: formatter.append("HTTP client platform is unsupported"); break;
+    case HttpClientError::ContentCodingListEmpty: formatter.append("HTTP client content coding list is empty"); break;
+    case HttpClientError::ContentCodingUnknown: formatter.append("HTTP client content coding is unknown"); break;
+    case HttpClientError::AcceptEncodingOutputTooSmall:
+        formatter.append("HTTP client Accept-Encoding output buffer is too small");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -42,6 +42,8 @@ without relying on a native backend to supply a zero-length buffer. Provider-ret
 Response delivery distinguishes insufficient per-buffer capacity, cancellation, an invalid queued buffer index,
 missing response state, insufficient effective-URL metadata storage, and insufficient caller output for a blocking
 body. The same category/code is returned through ordinary polling or blocking APIs without carrying text in Result.
+The optional Accept-Encoding builder distinguishes empty lists, unknown codings, and insufficient caller output.
+The unsupported-platform stub uses one portable capability code across client and operation entry points.
 
 ## Consequences
 

@@ -1461,11 +1461,17 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(acceptEncoding == "gzip, deflate"_a8);
 
         HttpClientContentCoding::Type unknownCodings[] = {HttpClientContentCoding::Unknown};
-        SC_TEST_EXPECT(not HttpClientContentCoding::writeAcceptEncoding(
-            unknownCodings, {acceptEncodingScratch, sizeof(acceptEncodingScratch)}, acceptEncoding));
+        SC_TEST_EXPECT(HttpClientContentCoding::writeAcceptEncoding(
+                           {}, {acceptEncodingScratch, sizeof(acceptEncodingScratch)}, acceptEncoding)
+                           .isError(HttpClientResultCategory, HttpClientError::ContentCodingListEmpty));
+        SC_TEST_EXPECT(HttpClientContentCoding::writeAcceptEncoding(
+                           unknownCodings, {acceptEncodingScratch, sizeof(acceptEncodingScratch)}, acceptEncoding)
+                           .isError(HttpClientResultCategory, HttpClientError::ContentCodingUnknown));
         char tinyAcceptEncodingScratch[4];
-        SC_TEST_EXPECT(not HttpClientContentCoding::writeAcceptEncoding(
-            acceptedCodings, {tinyAcceptEncodingScratch, sizeof(tinyAcceptEncodingScratch)}, acceptEncoding));
+        SC_TEST_EXPECT(
+            HttpClientContentCoding::writeAcceptEncoding(
+                acceptedCodings, {tinyAcceptEncodingScratch, sizeof(tinyAcceptEncodingScratch)}, acceptEncoding)
+                .isError(HttpClientResultCategory, HttpClientError::AcceptEncodingOutputTooSmall));
     }
 
     void contentCodingPolicy()

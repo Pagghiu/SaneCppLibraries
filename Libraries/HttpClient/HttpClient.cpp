@@ -19,14 +19,23 @@
 #else
 SC::HttpClient::HttpClient() {}
 SC::HttpClient::~HttpClient() {}
-SC::Result SC::HttpClient::platformInit() { return Result::Error("HttpClient: unsupported platform"); }
+SC::Result SC::HttpClient::platformInit()
+{
+    return Result::Error(HttpClientResultCategory, HttpClientError::PlatformUnsupported);
+}
 SC::Result SC::HttpClient::platformClose() { return Result(true); }
 
 SC::HttpClientOperation::HttpClientOperation() {}
 SC::HttpClientOperation::~HttpClientOperation() {}
-SC::Result SC::HttpClientOperation::platformInit() { return Result::Error("HttpClient: unsupported platform"); }
+SC::Result SC::HttpClientOperation::platformInit()
+{
+    return Result::Error(HttpClientResultCategory, HttpClientError::PlatformUnsupported);
+}
 SC::Result SC::HttpClientOperation::platformClose() { return Result(true); }
-SC::Result SC::HttpClientOperation::platformStart() { return Result::Error("HttpClient: unsupported platform"); }
+SC::Result SC::HttpClientOperation::platformStart()
+{
+    return Result::Error(HttpClientResultCategory, HttpClientError::PlatformUnsupported);
+}
 SC::Result SC::HttpClientOperation::platformCancel() { return Result(true); }
 #endif
 
@@ -948,18 +957,20 @@ const char* SC::HttpClientTransferCoding::getName(Type type)
 SC::Result SC::HttpClientContentCoding::writeAcceptEncoding(Span<const Type> types, Span<char> destination,
                                                             StringSpan& value)
 {
-    SC_TRY_MSG(not types.empty(), "HttpClientContentCoding: content coding list is empty");
+    if (types.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::ContentCodingListEmpty);
 
     size_t usedBytes = 0;
     for (size_t idx = 0; idx < types.sizeInElements(); ++idx)
     {
-        SC_TRY_MSG(types[idx] != Unknown, "HttpClientContentCoding: cannot write unknown content coding");
+        if (types[idx] == Unknown)
+            return Result::Error(HttpClientResultCategory, HttpClientError::ContentCodingUnknown);
 
         const char* const name      = getName(types[idx]);
         const size_t      nameBytes = strlen(name);
         const size_t      sepBytes  = idx == 0 ? 0 : 2;
-        SC_TRY_MSG(destination.sizeInBytes() - usedBytes >= sepBytes + nameBytes,
-                   "HttpClientContentCoding: destination too small");
+        if (destination.sizeInBytes() - usedBytes < sepBytes + nameBytes)
+            return Result::Error(HttpClientResultCategory, HttpClientError::AcceptEncodingOutputTooSmall);
 
         if (sepBytes > 0)
         {

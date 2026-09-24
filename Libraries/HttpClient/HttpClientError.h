@@ -78,6 +78,10 @@ enum class HttpClientError : uint32_t
     OperationResponseMissing,
     ResponseMetadataTooSmall,
     BlockingResponseBodyBufferTooSmall,
+    PlatformUnsupported,
+    ContentCodingListEmpty,
+    ContentCodingUnknown,
+    AcceptEncodingOutputTooSmall,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);
