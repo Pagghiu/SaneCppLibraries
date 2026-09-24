@@ -249,6 +249,39 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("HTTP informational response is unsupported by this client");
         break;
     case HttpError::ClientResponseIncomplete: formatter.append("HTTP response was incomplete at disconnect"); break;
+    case HttpError::WebSocketBase64OutputTooSmall:
+        formatter.append("WebSocket Base64 output buffer is too small");
+        break;
+    case HttpError::WebSocketBase64LengthInvalid: formatter.append("WebSocket Base64 length is invalid"); break;
+    case HttpError::WebSocketBase64PaddingInvalid: formatter.append("WebSocket Base64 padding is invalid"); break;
+    case HttpError::WebSocketBase64CharacterInvalid: formatter.append("WebSocket Base64 character is invalid"); break;
+    case HttpError::WebSocketBase64DecodeOutputTooSmall:
+        formatter.append("WebSocket Base64 decode output buffer is too small");
+        break;
+    case HttpError::WebSocketSha1ProviderUnavailable:
+        formatter.append("WebSocket SHA-1 provider is unavailable");
+        break;
+    case HttpError::WebSocketSha1ModeInvalid: formatter.append("WebSocket SHA-1 mode is invalid"); break;
+    case HttpError::WebSocketSha1DigestSizeInvalid: formatter.append("WebSocket SHA-1 digest size is invalid"); break;
+    case HttpError::WebSocketNonceLengthInvalid: formatter.append("WebSocket nonce length must be 16 bytes"); break;
+    case HttpError::WebSocketClientKeyLengthInvalid: formatter.append("WebSocket client key length is invalid"); break;
+    case HttpError::WebSocketClientKeyDecodedLengthInvalid:
+        formatter.append("WebSocket decoded client key length is invalid");
+        break;
+    case HttpError::WebSocketUpgradeStatusInvalid:
+        formatter.append("WebSocket upgrade response status is not 101");
+        break;
+    case HttpError::WebSocketUpgradeHeaderInvalid: formatter.append("WebSocket Upgrade header is invalid"); break;
+    case HttpError::WebSocketConnectionHeaderInvalid: formatter.append("WebSocket Connection header is invalid"); break;
+    case HttpError::WebSocketAcceptHeaderInvalid:
+        formatter.append("WebSocket Sec-WebSocket-Accept header is invalid");
+        break;
+    case HttpError::WebSocketServerRequestNotAcceptable:
+        formatter.append("WebSocket server request is not acceptable");
+        break;
+    case HttpError::WebSocketRejectAcceptedRequest:
+        formatter.append("Accepted WebSocket request cannot be rejected");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

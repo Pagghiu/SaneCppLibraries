@@ -84,6 +84,10 @@ Its request-body path shares the outgoing-message codes for missing headers, uns
 missing multipart state, while distinguishing a body stream or transform bound to the wrong caller-owned buffer pool.
 Response decompression listener shortages and incomplete or unsupported responses have separate portable identities.
 
+WebSocket handshake failures distinguish key length/Base64 syntax, caller output capacity, SHA-1 provider and mode,
+upgrade-response headers, and invalid accept/reject operations. The existing handshake validation status remains the
+non-error outcome for a server deciding whether to accept a request or which HTTP rejection status to send.
+
 One Http category is sufficient for now even though the library has several domains; error values are grouped and
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched

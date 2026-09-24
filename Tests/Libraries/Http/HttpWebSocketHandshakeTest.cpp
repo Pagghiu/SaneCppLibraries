@@ -25,10 +25,10 @@ static bool sha1DigestEquals(const SC::uint8_t actual[20], const SC::uint8_t exp
     return ::memcmp(actual, expected, 20) == 0;
 }
 
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
 {
-    return not result and result.message != nullptr and
-           SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+    return not result and result.category() == SC::HttpResultCategory and
+           result.errorValue() == static_cast<SC::uint32_t>(expected);
 }
 
 struct SC::HttpWebSocketHandshakeTest : public SC::TestCase
@@ -124,13 +124,13 @@ void SC::HttpWebSocketHandshakeTest::sha1ProviderPolicies()
         "dGhlIHNhbXBsZSBub25jZQ==", selfContainedStorage, selfContainedAccept, HttpWebSocketSha1Mode::SelfContained);
     httpWebSocketTestForceSha1ProvidersUnavailable(false, false);
 
-    SC_TEST_EXPECT(resultMessageEquals(unavailable, "HttpWebSocketHandshake platform SHA1 provider unavailable"));
+    SC_TEST_EXPECT(resultHasHttpError(unavailable, HttpError::WebSocketSha1ProviderUnavailable));
     SC_TEST_EXPECT(selfContained);
     SC_TEST_EXPECT(selfContainedAccept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
 
     const Result invalidMode = HttpWebSocketHandshake::computeAccept(
         "dGhlIHNhbXBsZSBub25jZQ==", selfContainedStorage, selfContainedAccept, static_cast<HttpWebSocketSha1Mode>(255));
-    SC_TEST_EXPECT(resultMessageEquals(invalidMode, "HttpWebSocketHandshake SHA1 mode invalid"));
+    SC_TEST_EXPECT(resultHasHttpError(invalidMode, HttpError::WebSocketSha1ModeInvalid));
 }
 
 void SC::HttpWebSocketHandshakeTest::selfContainedSha1StandardVectors()
@@ -201,7 +201,7 @@ void SC::HttpWebSocketHandshakeTest::linuxSha1Fallback()
     }
     else
     {
-        SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketHandshake platform SHA1 provider unavailable"));
+        SC_TEST_EXPECT(resultHasHttpError(result, HttpError::WebSocketSha1ProviderUnavailable));
     }
 }
 #endif
@@ -216,6 +216,11 @@ void SC::HttpWebSocketHandshakeTest::clientKeyAndAcceptGeneration()
     SC_TEST_EXPECT(HttpWebSocketHandshake::createClientKey(nonce, keyStorage, key));
     SC_TEST_EXPECT(key == "dGhlIHNhbXBsZSBub25jZQ==");
     SC_TEST_EXPECT(HttpWebSocketHandshake::validateClientKey(key));
+    SC_TEST_EXPECT(
+        resultHasHttpError(HttpWebSocketHandshake::createClientKey({nonce, sizeof(nonce) - 1}, keyStorage, key),
+                           HttpError::WebSocketNonceLengthInvalid));
+    SC_TEST_EXPECT(resultHasHttpError(HttpWebSocketHandshake::validateClientKey("short"),
+                                      HttpError::WebSocketClientKeyLengthInvalid));
 
     char       acceptStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
     StringSpan accept;
@@ -262,7 +267,13 @@ void SC::HttpWebSocketHandshakeTest::clientResponseValidation()
     SC_TEST_EXPECT(HttpWebSocketHandshake::validateClientResponse(response, "dGhlIHNhbXBsZSBub25jZQ=="));
 
     response.secWebSocketAccept = "aaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    SC_TEST_EXPECT(not HttpWebSocketHandshake::validateClientResponse(response, "dGhlIHNhbXBsZSBub25jZQ=="));
+    SC_TEST_EXPECT(
+        resultHasHttpError(HttpWebSocketHandshake::validateClientResponse(response, "dGhlIHNhbXBsZSBub25jZQ=="),
+                           HttpError::WebSocketAcceptHeaderInvalid));
+    response.statusCode = 200;
+    SC_TEST_EXPECT(
+        resultHasHttpError(HttpWebSocketHandshake::validateClientResponse(response, "dGhlIHNhbXBsZSBub25jZQ=="),
+                           HttpError::WebSocketUpgradeStatusInvalid));
 }
 
 void SC::HttpWebSocketHandshakeTest::asyncServerAcceptIntegration()

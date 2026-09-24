@@ -172,6 +172,23 @@ enum class HttpError : uint32_t
     ClientDecoderWritableErrorListenerUnavailable,
     ClientInformationalResponseUnsupported,
     ClientResponseIncomplete,
+    WebSocketBase64OutputTooSmall,
+    WebSocketBase64LengthInvalid,
+    WebSocketBase64PaddingInvalid,
+    WebSocketBase64CharacterInvalid,
+    WebSocketBase64DecodeOutputTooSmall,
+    WebSocketSha1ProviderUnavailable,
+    WebSocketSha1ModeInvalid,
+    WebSocketSha1DigestSizeInvalid,
+    WebSocketNonceLengthInvalid,
+    WebSocketClientKeyLengthInvalid,
+    WebSocketClientKeyDecodedLengthInvalid,
+    WebSocketUpgradeStatusInvalid,
+    WebSocketUpgradeHeaderInvalid,
+    WebSocketConnectionHeaderInvalid,
+    WebSocketAcceptHeaderInvalid,
+    WebSocketServerRequestNotAcceptable,
+    WebSocketRejectAcceptedRequest,
 };
 
 /// @brief Stable category assigned to Http-owned errors.
