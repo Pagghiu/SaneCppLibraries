@@ -74,7 +74,7 @@ SC::ResultSerialPort SC::SerialDescriptor::setSettings(const SerialSettings& set
 {
     SC_TRY(detail::validateSerialSettings(settings));
     FileDescriptor::Handle nativeHandle = FileDescriptor::Invalid;
-    if (not get(nativeHandle, Result::Error("SerialDescriptor::setSettings - Invalid handle")))
+    if (not get(nativeHandle, Result::Error(SerialPortResultCategory, SerialPortError::InvalidHandle)))
         return ResultSerialPort(SerialPortError::InvalidHandle);
     return detail::setSerialSettings(nativeHandle, settings);
 }
@@ -82,7 +82,7 @@ SC::ResultSerialPort SC::SerialDescriptor::setSettings(const SerialSettings& set
 SC::ResultSerialPort SC::SerialDescriptor::getSettings(SerialSettings& settings) const
 {
     FileDescriptor::Handle nativeHandle = FileDescriptor::Invalid;
-    if (not get(nativeHandle, Result::Error("SerialDescriptor::getSettings - Invalid handle")))
+    if (not get(nativeHandle, Result::Error(SerialPortResultCategory, SerialPortError::InvalidHandle)))
         return ResultSerialPort(SerialPortError::InvalidHandle);
     return detail::getSerialSettings(nativeHandle, settings);
 }
