@@ -64,7 +64,8 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
         virtual Result asyncWrite(typename T_AsyncBufferView::ID                 bufferID,
                                   Function<void(typename T_AsyncBufferView::ID)> cb) override
         {
-            SC_TRY_MSG(owner != nullptr, "HttpClientAsyncT::RequestBodySink missing owner");
+            if (owner == nullptr)
+                return Result::Error(HttpClientResultCategory, HttpClientError::AsyncRequestBodySinkOwnerMissing);
             owner->onRequestBodyWritableBuffer(bufferID, move(cb));
             return Result(true);
         }
@@ -73,7 +74,8 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
         {
             if (owner != nullptr and owner->operation.isRequestInFlight() and not owner->requestBodyFinished)
             {
-                owner->onRequestBodyWritableError(Result::Error("HttpClientAsyncT: request body sink destroyed"));
+                owner->onRequestBodyWritableError(
+                    Result::Error(HttpClientResultCategory, HttpClientError::AsyncRequestBodySinkDestroyed));
             }
             T_AsyncWritableStream::finishedDestroyingWritable();
             return Result(true);
@@ -96,28 +98,34 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
     Result init(HttpClient& client, T_AsyncEventLoop& loop, const HttpClientOperationMemory& operationMemory,
                 const HttpClientAsyncOperationMemoryT<T_AsyncStreams>& asyncMemory)
     {
-        SC_TRY_MSG(eventLoop == nullptr, "HttpClientAsyncT: already initialized");
-        SC_TRY_MSG(asyncMemory.responseBuffers.sizeInElements() > 0, "HttpClientAsyncT: response buffers missing");
-        SC_TRY_MSG(asyncMemory.responseReadQueue.sizeInElements() > 0, "HttpClientAsyncT: response read queue missing");
-        SC_TRY_MSG(asyncMemory.requestWriteQueue.sizeInElements() > 0, "HttpClientAsyncT: request write queue missing");
+        if (initialized)
+            return Result::Error(HttpClientResultCategory, HttpClientError::AsyncAlreadyInitialized);
+        if (asyncMemory.responseBuffers.empty())
+            return Result::Error(HttpClientResultCategory, HttpClientError::AsyncResponseBuffersMissing);
+        if (asyncMemory.responseReadQueue.empty())
+            return Result::Error(HttpClientResultCategory, HttpClientError::AsyncResponseReadQueueMissing);
+        if (asyncMemory.requestWriteQueue.empty())
+            return Result::Error(HttpClientResultCategory, HttpClientError::AsyncRequestWriteQueueMissing);
 
-        eventLoop         = &loop;
-        responseReadQueue = asyncMemory.responseReadQueue;
-        requestWriteQueue = asyncMemory.requestWriteQueue;
-
-        responseBuffersPool.setBuffers(asyncMemory.responseBuffers);
         if (asyncMemory.responseBufferMemory.sizeInBytes() > 0)
         {
             SC_TRY(T_AsyncBuffersPool::sliceInEqualParts(asyncMemory.responseBuffers, asyncMemory.responseBufferMemory,
                                                          asyncMemory.responseBuffers.sizeInElements()));
         }
 
+        SC_TRY(operation.init(client, operationMemory));
+
+        eventLoop         = &loop;
+        responseReadQueue = asyncMemory.responseReadQueue;
+        requestWriteQueue = asyncMemory.requestWriteQueue;
+
+        responseBuffersPool.setBuffers(asyncMemory.responseBuffers);
+
         responseBodyStream.setReadQueue(responseReadQueue);
         responseBodyStream.setAutoDestroy(false);
         requestBodySink.setAutoDestroy(false);
         wakeUp.callback = [this](typename T_AsyncLoopWakeUp::Result& result) { onWakeUp(result); };
 
-        SC_TRY(operation.init(client, operationMemory));
         operation.setNotifier(this);
         initialized = true;
         return Result(true);
@@ -157,10 +165,12 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
     Result start(const HttpClientRequest& request, HttpClientResponse& response,
                  T_AsyncBuffersPool* requestBodyPool = nullptr)
     {
-        SC_TRY_MSG(initialized, "HttpClientAsyncT: not initialized");
+        if (not initialized)
+            return Result::Error(HttpClientResultCategory, HttpClientError::AsyncNotInitialized);
         if (request.body.isStreamed())
         {
-            SC_TRY_MSG(requestBodyPool != nullptr, "HttpClientAsyncT: streamed request body requires buffers pool");
+            if (requestBodyPool == nullptr)
+                return Result::Error(HttpClientResultCategory, HttpClientError::AsyncRequestBodyPoolMissing);
         }
 
         requestBodyBuffersPool = requestBodyPool;
@@ -207,15 +217,17 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
     [[nodiscard]] bool isRequestInFlight() const { return operation.isRequestInFlight(); }
 
   private:
+    friend struct HttpClientTest; // Test preflight and cross-library buffer-error propagation without network timing.
     virtual void onResponseHead(HttpClientResponse& response) override { eventResponseHead.emit(response); }
 
     virtual void onResponseBody(Span<const char> data) override
     {
         typename T_AsyncBufferView::ID bufferID;
         Span<char>                     writable;
-        if (not responseBuffersPool.requestNewBuffer(data.sizeInBytes(), bufferID, writable))
+        const Result bufferResult = responseBuffersPool.requestNewBuffer(data.sizeInBytes(), bufferID, writable);
+        if (not bufferResult)
         {
-            responseBodyStream.emitError(Result::Error("HttpClientAsyncT: response buffer exhausted"));
+            responseBodyStream.emitError(bufferResult);
             (void)operation.cancel();
             return;
         }
@@ -273,7 +285,8 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
         const size_t                         activeOffset = requestBodyActiveOffset;
         requestBodyMutex.unlock();
 
-        SC_TRY_MSG(requestBodyBuffersPool != nullptr, "HttpClientAsyncT: missing request body buffers pool");
+        if (requestBodyBuffersPool == nullptr)
+            return Result::Error(HttpClientResultCategory, HttpClientError::AsyncRequestBodyPoolMissing);
 
         Span<const char> readable;
         SC_TRY(requestBodyBuffersPool->getReadableData(activeBuffer, readable));

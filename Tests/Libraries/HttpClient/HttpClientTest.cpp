@@ -378,7 +378,42 @@ struct SC::HttpClientTest : public SC::TestCase
 
         AsyncOperationMemory<64 * 1024, 8, 16, 8, 4096, 16 * 1024> asyncMemory;
         AsyncClientOperation                                       asyncOperation;
+        SC_TEST_EXPECT(asyncOperation.start(request, response)
+                           .isError(HttpClientResultCategory, HttpClientError::AsyncNotInitialized));
+        auto missingAsyncMemory            = asyncMemory.asyncMemory;
+        missingAsyncMemory.responseBuffers = {};
+        SC_TEST_EXPECT(asyncOperation.init(client, loop, asyncMemory.coreMemory, missingAsyncMemory)
+                           .isError(HttpClientResultCategory, HttpClientError::AsyncResponseBuffersMissing));
+        missingAsyncMemory                   = asyncMemory.asyncMemory;
+        missingAsyncMemory.responseReadQueue = {};
+        SC_TEST_EXPECT(asyncOperation.init(client, loop, asyncMemory.coreMemory, missingAsyncMemory)
+                           .isError(HttpClientResultCategory, HttpClientError::AsyncResponseReadQueueMissing));
+        missingAsyncMemory                   = asyncMemory.asyncMemory;
+        missingAsyncMemory.requestWriteQueue = {};
+        SC_TEST_EXPECT(asyncOperation.init(client, loop, asyncMemory.coreMemory, missingAsyncMemory)
+                           .isError(HttpClientResultCategory, HttpClientError::AsyncRequestWriteQueueMissing));
+        SC_TEST_EXPECT(asyncOperation.init(client, loop, {}, asyncMemory.asyncMemory)
+                           .isError(HttpClientResultCategory, HttpClientError::ResponseBuffersMissing));
+        SC_TEST_EXPECT(not asyncOperation.isInitialized());
         SC_TEST_EXPECT(asyncOperation.init(client, loop, asyncMemory.coreMemory, asyncMemory.asyncMemory));
+        SC_TEST_EXPECT(asyncOperation.init(client, loop, asyncMemory.coreMemory, asyncMemory.asyncMemory)
+                           .isError(HttpClientResultCategory, HttpClientError::AsyncAlreadyInitialized));
+
+        request.body.framing = HttpClientRequestBody::SizedStream;
+        SC_TEST_EXPECT(asyncOperation.start(request, response)
+                           .isError(HttpClientResultCategory, HttpClientError::AsyncRequestBodyPoolMissing));
+
+        bool              errorSeen = false;
+        Result            forwarded(true);
+        AsyncEndCollector errorCollector = {&errorSeen, &forwarded};
+        const bool        errorListenerAdded =
+            asyncOperation.getResponseBodyStream()
+                .eventError.addListener<AsyncEndCollector, &AsyncEndCollector::onError>(errorCollector);
+        SC_TEST_EXPECT(errorListenerAdded);
+        char oversized[8193] = {};
+        asyncOperation.onResponseBody({oversized, sizeof(oversized)});
+        SC_TEST_EXPECT(errorSeen);
+        SC_TEST_EXPECT(forwarded.isError(AsyncStreamsResultCategory, AsyncStreamsError::NoReusableBuffer));
         SC_TEST_EXPECT(asyncOperation.close());
 
         SC_TEST_EXPECT(client.close());

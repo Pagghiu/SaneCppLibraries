@@ -207,6 +207,28 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::SchedulerOperationNotRegistered:
         formatter.append("HTTP client scheduler operation is not registered");
         break;
+    case HttpClientError::AsyncAlreadyInitialized:
+        formatter.append("HTTP client async adapter is already initialized");
+        break;
+    case HttpClientError::AsyncResponseBuffersMissing:
+        formatter.append("HTTP client async response buffers are missing");
+        break;
+    case HttpClientError::AsyncResponseReadQueueMissing:
+        formatter.append("HTTP client async response read queue is missing");
+        break;
+    case HttpClientError::AsyncRequestWriteQueueMissing:
+        formatter.append("HTTP client async request write queue is missing");
+        break;
+    case HttpClientError::AsyncNotInitialized: formatter.append("HTTP client async adapter is not initialized"); break;
+    case HttpClientError::AsyncRequestBodyPoolMissing:
+        formatter.append("HTTP client async streamed request body buffer pool is missing");
+        break;
+    case HttpClientError::AsyncRequestBodySinkOwnerMissing:
+        formatter.append("HTTP client async request body sink owner is missing");
+        break;
+    case HttpClientError::AsyncRequestBodySinkDestroyed:
+        formatter.append("HTTP client async request body sink was destroyed");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

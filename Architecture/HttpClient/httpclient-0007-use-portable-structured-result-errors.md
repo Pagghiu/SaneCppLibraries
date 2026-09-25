@@ -48,6 +48,10 @@ The optional operation scheduler distinguishes missing/insufficient caller stora
 operations, duplicate/uninitialized scheduler state, and unregistered operations. Initialization validates every
 operation before mutating ready bytes or attaching notifiers, so a failed later entry leaves earlier operations
 untouched and allows a corrected retry.
+The optional async adapter reports its own setup and request-body-pool lifecycle with HttpClient identities.
+Initialization commits adapter state only after the core operation initializes, so a failed core preflight can be
+retried. A response-buffer allocation failure from AsyncStreams passes its original category and code through the
+stream error event rather than being replaced with a generic HttpClient text error.
 
 ## Consequences
 

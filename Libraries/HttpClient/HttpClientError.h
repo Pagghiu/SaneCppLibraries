@@ -89,6 +89,14 @@ enum class HttpClientError : uint32_t
     SchedulerOperationNotInitialized,
     SchedulerNotInitialized,
     SchedulerOperationNotRegistered,
+    AsyncAlreadyInitialized,
+    AsyncResponseBuffersMissing,
+    AsyncResponseReadQueueMissing,
+    AsyncRequestWriteQueueMissing,
+    AsyncNotInitialized,
+    AsyncRequestBodyPoolMissing,
+    AsyncRequestBodySinkOwnerMissing,
+    AsyncRequestBodySinkDestroyed,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);
