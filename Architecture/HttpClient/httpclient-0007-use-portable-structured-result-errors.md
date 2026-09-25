@@ -52,6 +52,9 @@ The optional async adapter reports its own setup and request-body-pool lifecycle
 Initialization commits adapter state only after the core operation initializes, so a failed core preflight can be
 retried. A response-buffer allocation failure from AsyncStreams passes its original category and code through the
 stream error event rather than being replaced with a generic HttpClient text error.
+Session state and authentication errors distinguish missing caller storage, invalid lifecycle or copy state,
+exhausted scratch/cache capacity, malformed origins or authorization bytes, and Basic challenge failures. Shared
+conditions retain one portable code across session entry points; the Result never references cached strings.
 
 ## Consequences
 

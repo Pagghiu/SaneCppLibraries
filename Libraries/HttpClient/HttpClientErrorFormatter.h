@@ -229,6 +229,62 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::AsyncRequestBodySinkDestroyed:
         formatter.append("HTTP client async request body sink was destroyed");
         break;
+    case HttpClientError::SessionAlreadyInitialized:
+        formatter.append("HTTP client session is already initialized");
+        break;
+    case HttpClientError::SessionRequestHeadersMissing:
+        formatter.append("HTTP client session request header storage is missing");
+        break;
+    case HttpClientError::SessionNotInitialized: formatter.append("HTTP client session is not initialized"); break;
+    case HttpClientError::SessionStateInvalid: formatter.append("HTTP client session state is invalid"); break;
+    case HttpClientError::SessionCopySpanMismatch:
+        formatter.append("HTTP client session state source and destination counts differ");
+        break;
+    case HttpClientError::SessionStateStorageTooSmall:
+        formatter.append("HTTP client session state storage is too small");
+        break;
+    case HttpClientError::SessionRequestHeaderStorageTooSmall:
+        formatter.append("HTTP client session request header storage is too small");
+        break;
+    case HttpClientError::SessionHeaderScratchTooSmall:
+        formatter.append("HTTP client session header scratch storage is too small");
+        break;
+    case HttpClientError::SessionAuthOriginMissing:
+        formatter.append("HTTP client session authorization origin is missing");
+        break;
+    case HttpClientError::SessionAuthorizationMissing:
+        formatter.append("HTTP client session authorization header is missing");
+        break;
+    case HttpClientError::SessionAuthorizationInvalid:
+        formatter.append("HTTP client session authorization header contains invalid bytes");
+        break;
+    case HttpClientError::SessionAuthOriginInvalid:
+        formatter.append("HTTP client session authorization origin is invalid");
+        break;
+    case HttpClientError::SessionAuthOriginPathUnsupported:
+        formatter.append("HTTP client session authorization origin must not include a path, query, or fragment");
+        break;
+    case HttpClientError::SessionAuthCacheFull:
+        formatter.append("HTTP client session authorization cache is full");
+        break;
+    case HttpClientError::SessionBasicUsernameMissing:
+        formatter.append("HTTP client session Basic authorization username is missing");
+        break;
+    case HttpClientError::SessionBasicUsernameColonInvalid:
+        formatter.append("HTTP client session Basic authorization username contains a colon");
+        break;
+    case HttpClientError::SessionBasicOutputTooSmall:
+        formatter.append("HTTP client session Basic authorization output is too small");
+        break;
+    case HttpClientError::SessionAuthChallengeTargetInvalid:
+        formatter.append("HTTP client session authorization challenge target is invalid");
+        break;
+    case HttpClientError::SessionAuthResponseStatusInvalid:
+        formatter.append("HTTP client session response status is not an authorization challenge");
+        break;
+    case HttpClientError::SessionBasicChallengeMissing:
+        formatter.append("HTTP client session Basic authorization challenge is missing");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

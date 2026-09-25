@@ -652,8 +652,10 @@ static char basicAuthorizationSourceByte(SC::Span<const char> username, SC::Span
 
 SC::Result SC::HttpClientSession::init(const HttpClientSessionMemory& memory)
 {
-    SC_TRY_MSG(not initialized, "HttpClientSession: already initialized");
-    SC_TRY_MSG(not memory.requestHeaders.empty(), "HttpClientSession: request header workspace missing");
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAlreadyInitialized);
+    if (memory.requestHeaders.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionRequestHeadersMissing);
     sessionMemory = memory;
     clear();
     initialized = true;
@@ -706,14 +708,18 @@ const char* SC::HttpClientSessionAuthChallenge::getSchemeName(Scheme scheme)
 
 SC::Result SC::HttpClientSession::copyStateStrings(Span<const StringSpan> sources, Span<StringSpan> destinations)
 {
-    SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
-    SC_TRY_MSG(stateScratchUsed <= sessionMemory.stateScratch.sizeInBytes(), "HttpClientSession: invalid state");
-    SC_TRY_MSG(sources.sizeInElements() == destinations.sizeInElements(), "HttpClientSession: invalid copy state");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionNotInitialized);
+    if (stateScratchUsed > sessionMemory.stateScratch.sizeInBytes())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionStateInvalid);
+    if (sources.sizeInElements() != destinations.sizeInElements())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionCopySpanMismatch);
 
     size_t remaining = sessionMemory.stateScratch.sizeInBytes() - stateScratchUsed;
     for (size_t idx = 0; idx < sources.sizeInElements(); ++idx)
     {
-        SC_TRY_MSG(remaining >= sources[idx].sizeInBytes(), "HttpClientSession: state scratch exhausted");
+        if (remaining < sources[idx].sizeInBytes())
+            return Result::Error(HttpClientResultCategory, HttpClientError::SessionStateStorageTooSmall);
         remaining -= sources[idx].sizeInBytes();
     }
 
@@ -738,8 +744,8 @@ SC::Result SC::HttpClientSession::copyStateStrings(Span<const StringSpan> source
 
 SC::Result SC::HttpClientSession::appendPreparedHeader(StringSpan name, StringSpan value, size_t& numHeaders)
 {
-    SC_TRY_MSG(numHeaders < sessionMemory.requestHeaders.sizeInElements(),
-               "HttpClientSession: request header capacity exhausted");
+    if (numHeaders >= sessionMemory.requestHeaders.sizeInElements())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionRequestHeaderStorageTooSmall);
     sessionMemory.requestHeaders[numHeaders] = {name, value};
     numHeaders += 1;
     return Result(true);
@@ -748,8 +754,8 @@ SC::Result SC::HttpClientSession::appendPreparedHeader(StringSpan name, StringSp
 SC::Result SC::HttpClientSession::appendScratch(StringSpan text, bool addSeparator)
 {
     const size_t separatorBytes = addSeparator ? 2 : 0;
-    SC_TRY_MSG(sessionMemory.headerScratch.sizeInBytes() - headerScratchUsed >= separatorBytes + text.sizeInBytes(),
-               "HttpClientSession: header scratch exhausted");
+    if (sessionMemory.headerScratch.sizeInBytes() - headerScratchUsed < separatorBytes + text.sizeInBytes())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionHeaderScratchTooSmall);
     if (addSeparator)
     {
         sessionMemory.headerScratch[headerScratchUsed++] = ';';
@@ -766,15 +772,19 @@ SC::Result SC::HttpClientSession::appendScratch(StringSpan text, bool addSeparat
 
 SC::Result SC::HttpClientSession::addAuthorization(StringSpan origin, StringSpan authorizationHeader)
 {
-    SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
-    SC_TRY_MSG(not origin.isEmpty(), "HttpClientSession: auth origin missing");
-    SC_TRY_MSG(not authorizationHeader.isEmpty(), "HttpClientSession: authorization header missing");
-    SC_TRY_MSG(not sessionHasHttpHeaderUnsafeBytes(authorizationHeader),
-               "HttpClientSession: authorization header contains invalid bytes");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionNotInitialized);
+    if (origin.isEmpty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthOriginMissing);
+    if (authorizationHeader.isEmpty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthorizationMissing);
+    if (sessionHasHttpHeaderUnsafeBytes(authorizationHeader))
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthorizationInvalid);
     ParsedUrl parsedOrigin;
-    SC_TRY_MSG(parseUrl(origin, parsedOrigin), "HttpClientSession: auth origin is invalid");
-    SC_TRY_MSG(parsedOrigin.origin.sizeInBytes() == origin.sizeInBytes(),
-               "HttpClientSession: auth origin must not include path, query, or fragment");
+    if (not parseUrl(origin, parsedOrigin))
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthOriginInvalid);
+    if (parsedOrigin.origin.sizeInBytes() != origin.sizeInBytes())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthOriginPathUnsupported);
 
     HttpClientSessionAuthCacheEntry* target = nullptr;
     for (size_t idx = 0; idx < sessionMemory.authEntries.sizeInElements(); ++idx)
@@ -791,7 +801,8 @@ SC::Result SC::HttpClientSession::addAuthorization(StringSpan origin, StringSpan
         }
     }
 
-    SC_TRY_MSG(target != nullptr, "HttpClientSession: auth cache capacity exhausted");
+    if (target == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthCacheFull);
     const StringSpan sources[] = {origin, authorizationHeader};
     StringSpan       destinations[2];
     SC_TRY(copyStateStrings(sources, destinations));
@@ -866,13 +877,15 @@ SC::Result SC::HttpClientSession::makeBasicAuthorization(StringSpan username, St
     const size_t           sourceBytes   = usernameBytes.sizeInBytes() + 1 + passwordBytes.sizeInBytes();
     const size_t           encodedBytes  = ((sourceBytes + 2) / 3) * 4;
 
-    SC_TRY_MSG(not username.isEmpty(), "HttpClientSession: basic auth username missing");
+    if (username.isEmpty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionBasicUsernameMissing);
     for (size_t idx = 0; idx < usernameBytes.sizeInBytes(); ++idx)
     {
-        SC_TRY_MSG(usernameBytes[idx] != ':', "HttpClientSession: basic auth username contains colon");
+        if (usernameBytes[idx] == ':')
+            return Result::Error(HttpClientResultCategory, HttpClientError::SessionBasicUsernameColonInvalid);
     }
-    SC_TRY_MSG(destination.sizeInBytes() >= PrefixBytes + encodedBytes,
-               "HttpClientSession: basic auth destination too small");
+    if (destination.sizeInBytes() < PrefixBytes + encodedBytes)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionBasicOutputTooSmall);
 
     memcpy(destination.data(), Prefix, PrefixBytes);
     char* output = destination.data() + PrefixBytes;
@@ -931,13 +944,15 @@ SC::Result SC::HttpClientSession::makeBasicAuthorizationForChallenge(const HttpC
                                                                      Span<char>  destination,
                                                                      StringSpan& authorizationHeader)
 {
-    SC_TRY_MSG(target == HttpClientSessionAuthChallenge::Origin or target == HttpClientSessionAuthChallenge::Proxy,
-               "HttpClientSession: invalid auth challenge target");
+    if (target != HttpClientSessionAuthChallenge::Origin and target != HttpClientSessionAuthChallenge::Proxy)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthChallengeTargetInvalid);
     const int expectedStatusCode = target == HttpClientSessionAuthChallenge::Proxy ? 407 : 401;
-    SC_TRY_MSG(response.statusCode == expectedStatusCode, "HttpClientSession: response is not an auth challenge");
+    if (response.statusCode != expectedStatusCode)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionAuthResponseStatusInvalid);
 
     HttpClientSessionAuthChallenge challenge;
-    SC_TRY_MSG(findBasicAuthChallenge(response, target, challenge), "HttpClientSession: basic auth challenge missing");
+    if (not findBasicAuthChallenge(response, target, challenge))
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionBasicChallengeMissing);
     return makeBasicAuthorization(username, password, destination, authorizationHeader);
 }
 

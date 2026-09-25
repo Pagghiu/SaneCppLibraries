@@ -1592,7 +1592,17 @@ struct SC::HttpClientTest : public SC::TestCase
         sessionMemory.stateScratch   = {stateScratch, sizeof(stateScratch)};
 
         HttpClientSession session;
+        auto              expectSessionError = [&](Result result, HttpClientError error)
+        {
+            SC_TEST_EXPECT(not result);
+            SC_TEST_EXPECT(result.category() == HttpClientResultCategory);
+            SC_TEST_EXPECT(result.errorValue() == static_cast<uint32_t>(error));
+        };
+        HttpClientSessionMemory missingHeaderMemory = sessionMemory;
+        missingHeaderMemory.requestHeaders          = {};
+        expectSessionError(session.init(missingHeaderMemory), HttpClientError::SessionRequestHeadersMissing);
         SC_TEST_EXPECT(session.init(sessionMemory));
+        expectSessionError(session.init(sessionMemory), HttpClientError::SessionAlreadyInitialized);
 
         static const char RawHeaders[] = "HTTP/1.1 200 OK\r\n"
                                          "Set-Cookie: sid=abc; Path=/api; HttpOnly\r\n"
@@ -1688,11 +1698,14 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(basicAuthorization == "Basic dGVzdDpzZWNyZXQ="_a8);
         char       tinyAuthorizationScratch[8];
         StringSpan tinyAuthorization;
-        SC_TEST_EXPECT(not HttpClientSession::makeBasicAuthorization(
-            "test"_a8, "secret"_a8, {tinyAuthorizationScratch, sizeof(tinyAuthorizationScratch)}, tinyAuthorization));
-        SC_TEST_EXPECT(not HttpClientSession::makeBasicAuthorization(
-            "bad:name"_a8, "secret"_a8, {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)},
-            tinyAuthorization));
+        expectSessionError(HttpClientSession::makeBasicAuthorization(
+                               "test"_a8, "secret"_a8, {tinyAuthorizationScratch, sizeof(tinyAuthorizationScratch)},
+                               tinyAuthorization),
+                           HttpClientError::SessionBasicOutputTooSmall);
+        expectSessionError(HttpClientSession::makeBasicAuthorization(
+                               "bad:name"_a8, "secret"_a8,
+                               {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)}, tinyAuthorization),
+                           HttpClientError::SessionBasicUsernameColonInvalid);
         SC_TEST_EXPECT(session.addAuthorization("https://example.test"_a8, basicAuthorization));
         SC_TEST_EXPECT(session.getNumAuthorizations() == 1);
         StringSpan cachedAuthorization;
@@ -1701,7 +1714,8 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(session.hasAuthorization("https://example.test"_a8));
         SC_TEST_EXPECT(not session.hasAuthorization("https://other.test"_a8));
         {
-            SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test"_a8, "Basic bad\r\n"_a8));
+            expectSessionError(session.addAuthorization("https://bad.example.test"_a8, "Basic bad\r\n"_a8),
+                               HttpClientError::SessionAuthorizationInvalid);
             static const char BadAuthorization[] = {'B', 'a', 's', 'i', 'c', ' ', 'b', 'a', 'd', '\0'};
             SC_TEST_EXPECT(not session.addAuthorization(
                 "https://bad.example.test"_a8,
@@ -1710,8 +1724,10 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(not session.hasAuthorization("https://bad.example.test"_a8));
         }
         {
-            SC_TEST_EXPECT(not session.addAuthorization("ftp://bad.example.test"_a8, basicAuthorization));
-            SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test/path"_a8, basicAuthorization));
+            expectSessionError(session.addAuthorization("ftp://bad.example.test"_a8, basicAuthorization),
+                               HttpClientError::SessionAuthOriginInvalid);
+            expectSessionError(session.addAuthorization("https://bad.example.test/path"_a8, basicAuthorization),
+                               HttpClientError::SessionAuthOriginPathUnsupported);
             SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test?query"_a8, basicAuthorization));
             SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test#fragment"_a8, basicAuthorization));
             static const char BadOrigin[] = {'h', 't', 't', 'p', ':', '/', '/', 'b', 'a', 'd', '\0'};
@@ -1771,9 +1787,10 @@ struct SC::HttpClientTest : public SC::TestCase
         HttpClientSessionAuthChallenge invalidChallenge;
         SC_TEST_EXPECT(not HttpClientSession::findBasicAuthChallenge(originChallengeResponse, invalidChallengeTarget,
                                                                      invalidChallenge));
-        SC_TEST_EXPECT(not HttpClientSession::makeBasicAuthorizationForChallenge(
-            originChallengeResponse, invalidChallengeTarget, "test"_a8, "secret"_a8,
-            {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)}, challengeAuthorization));
+        expectSessionError(HttpClientSession::makeBasicAuthorizationForChallenge(
+                               originChallengeResponse, invalidChallengeTarget, "test"_a8, "secret"_a8,
+                               {basicAuthorizationScratch, sizeof(basicAuthorizationScratch)}, challengeAuthorization),
+                           HttpClientError::SessionAuthChallengeTargetInvalid);
         SC_TEST_EXPECT(challenge.realm == "proxy"_a8);
         SC_TEST_EXPECT(HttpClientSession::makeBasicAuthorizationForChallenge(
             proxyChallengeResponse, HttpClientSessionAuthChallenge::Proxy, "test"_a8, "secret"_a8,
