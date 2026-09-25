@@ -285,6 +285,13 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::SessionBasicChallengeMissing:
         formatter.append("HTTP client session Basic authorization challenge is missing");
         break;
+    case HttpClientError::SessionRequestUrlInvalid:
+        formatter.append("HTTP client session request URL is invalid");
+        break;
+    case HttpClientError::SessionCookieCacheFull: formatter.append("HTTP client session cookie cache is full"); break;
+    case HttpClientError::SessionRetryAttemptsInvalid:
+        formatter.append("HTTP client session retry policy must allow at least one attempt");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

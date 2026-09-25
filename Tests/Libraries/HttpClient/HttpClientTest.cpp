@@ -1852,8 +1852,10 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             HttpClientRequest invalidSource;
             invalidSource.url = url;
-            SC_TEST_EXPECT(not session.prepareRequest(invalidSource, prepared));
-            SC_TEST_EXPECT(not session.captureResponse(invalidSource, response));
+            expectSessionError(session.prepareRequest(invalidSource, prepared),
+                               HttpClientError::SessionRequestUrlInvalid);
+            expectSessionError(session.captureResponse(invalidSource, response),
+                               HttpClientError::SessionRequestUrlInvalid);
         };
 
         {
@@ -1931,7 +1933,8 @@ struct SC::HttpClientTest : public SC::TestCase
             HttpClientResponse oversizedCookieResponse;
             oversizedCookieResponse.headers       = {OversizedCookieHeaders, sizeof(OversizedCookieHeaders) - 1};
             oversizedCookieResponse.headersLength = sizeof(OversizedCookieHeaders) - 1;
-            SC_TEST_EXPECT(not tinySession.captureResponse(responseRequest, oversizedCookieResponse));
+            expectSessionError(tinySession.captureResponse(responseRequest, oversizedCookieResponse),
+                               HttpClientError::SessionStateStorageTooSmall);
             SC_TEST_EXPECT(tinySession.getNumCookies() == 0);
 
             static const char  RecoverableCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
@@ -1943,6 +1946,16 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(tinySession.captureResponse(responseRequest, recoverableCookieResponse));
             SC_TEST_EXPECT(tinySession.findCookie("x"_a8, "example.test"_a8, "/api"_a8, cookie));
             SC_TEST_EXPECT(cookie.value == "1"_a8);
+
+            static const char  FullCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                     "Set-Cookie: y=1\r\n"
+                                                     "\r\n";
+            HttpClientResponse fullCookieResponse;
+            fullCookieResponse.headers       = {FullCookieHeaders, sizeof(FullCookieHeaders) - 1};
+            fullCookieResponse.headersLength = sizeof(FullCookieHeaders) - 1;
+            expectSessionError(tinySession.captureResponse(responseRequest, fullCookieResponse),
+                               HttpClientError::SessionCookieCacheFull);
+            SC_TEST_EXPECT(tinySession.getNumCookies() == 1);
         }
 
         HttpClientSessionRetryPolicy policy;
@@ -1958,6 +1971,11 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(HttpClientSession::isRetryableStatusCode(503));
         SC_TEST_EXPECT(HttpClientSession::isRetryableStatusCode(429));
         SC_TEST_EXPECT(not HttpClientSession::isRetryableStatusCode(404));
+        HttpClientSessionRetryPolicy invalidPolicy;
+        invalidPolicy.maxAttempts = 0;
+        expectSessionError(session.beginRetry(retryState, source, invalidPolicy),
+                           HttpClientError::SessionRetryAttemptsInvalid);
+        SC_TEST_EXPECT(not retryState.isStarted());
         SC_TEST_EXPECT(session.beginRetry(retryState, source, policy));
         SC_TEST_EXPECT(retryState.isStarted());
         SC_TEST_EXPECT(retryState.hasAttemptsRemaining());
@@ -1966,7 +1984,8 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(session.shouldRetry(retryState, Result(true), &response));
         SC_TEST_EXPECT(retryState.attemptsStarted == 2);
         SC_TEST_EXPECT(retryState.getRemainingAttempts() == 1);
-        SC_TEST_EXPECT(session.shouldRetry(retryState, Result::Error("transport"), nullptr));
+        const Result transportFailure = Result::Error(HttpClientResultCategory, HttpClientError::RequestCancelled);
+        SC_TEST_EXPECT(session.shouldRetry(retryState, transportFailure, nullptr));
         SC_TEST_EXPECT(retryState.attemptsStarted == 3);
         SC_TEST_EXPECT(not retryState.hasAttemptsRemaining());
         SC_TEST_EXPECT(retryState.getRemainingAttempts() == 0);
@@ -1977,11 +1996,11 @@ struct SC::HttpClientTest : public SC::TestCase
         postSource.url        = "https://example.test/api/list"_a8;
         postSource.body.bytes = {"body", 4};
         SC_TEST_EXPECT(session.beginRetry(retryState, postSource, policy));
-        SC_TEST_EXPECT(not session.shouldRetry(retryState, Result::Error("transport"), nullptr));
+        SC_TEST_EXPECT(not session.shouldRetry(retryState, transportFailure, nullptr));
 
         policy.retryNonIdempotentReplayableBody = true;
         SC_TEST_EXPECT(session.beginRetry(retryState, postSource, policy));
-        SC_TEST_EXPECT(session.shouldRetry(retryState, Result::Error("transport"), nullptr));
+        SC_TEST_EXPECT(session.shouldRetry(retryState, transportFailure, nullptr));
 
         session.clear();
         SC_TEST_EXPECT(session.getNumCookies() == 0);

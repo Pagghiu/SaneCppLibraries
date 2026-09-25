@@ -959,7 +959,8 @@ SC::Result SC::HttpClientSession::makeBasicAuthorizationForChallenge(const HttpC
 SC::Result SC::HttpClientSession::appendMatchingCookies(StringSpan url, size_t& numHeaders)
 {
     ParsedUrl parsed;
-    SC_TRY_MSG(parseUrl(url, parsed), "HttpClientSession: invalid request URL");
+    if (not parseUrl(url, parsed))
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionRequestUrlInvalid);
 
     const size_t cookieHeaderStart = headerScratchUsed;
     bool         wroteCookie       = false;
@@ -997,9 +998,10 @@ SC::Result SC::HttpClientSession::appendMatchingCookies(StringSpan url, size_t& 
 
 SC::Result SC::HttpClientSession::prepareRequest(const HttpClientRequest& source, HttpClientRequest& prepared)
 {
-    SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
-    SC_TRY_MSG(source.headers.sizeInElements() <= sessionMemory.requestHeaders.sizeInElements(),
-               "HttpClientSession: request header capacity exhausted");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionNotInitialized);
+    if (source.headers.sizeInElements() > sessionMemory.requestHeaders.sizeInElements())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionRequestHeaderStorageTooSmall);
 
     headerScratchUsed = 0;
     size_t numHeaders = 0;
@@ -1016,7 +1018,8 @@ SC::Result SC::HttpClientSession::prepareRequest(const HttpClientRequest& source
     if (not sessionRequestHasHeader(source, StringSpan("Authorization")))
     {
         ParsedUrl parsed;
-        SC_TRY_MSG(parseUrl(source.url, parsed), "HttpClientSession: invalid request URL");
+        if (not parseUrl(source.url, parsed))
+            return Result::Error(HttpClientResultCategory, HttpClientError::SessionRequestUrlInvalid);
         for (size_t idx = 0; idx < sessionMemory.authEntries.sizeInElements(); ++idx)
         {
             const HttpClientSessionAuthCacheEntry& entry = sessionMemory.authEntries[idx];
@@ -1036,7 +1039,8 @@ SC::Result SC::HttpClientSession::prepareRequest(const HttpClientRequest& source
 SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, StringSpan setCookie)
 {
     ParsedUrl parsed;
-    SC_TRY_MSG(parseUrl(requestUrl, parsed), "HttpClientSession: invalid request URL");
+    if (not parseUrl(requestUrl, parsed))
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionRequestUrlInvalid);
 
     StringSpan firstAttribute;
     StringSpan remaining;
@@ -1147,7 +1151,8 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
         }
     }
 
-    SC_TRY_MSG(target != nullptr, "HttpClientSession: cookie capacity exhausted");
+    if (target == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionCookieCacheFull);
     const StringSpan sources[] = {name, value, domain, path};
     StringSpan       destinations[4];
     SC_TRY(copyStateStrings(sources, destinations));
@@ -1161,7 +1166,8 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
 
 SC::Result SC::HttpClientSession::captureResponse(const HttpClientRequest& request, const HttpClientResponse& response)
 {
-    SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionNotInitialized);
 
     HttpClientResponseHeaderIterator iterator;
     StringSpan                       setCookie;
@@ -1175,8 +1181,10 @@ SC::Result SC::HttpClientSession::captureResponse(const HttpClientRequest& reque
 SC::Result SC::HttpClientSession::beginRetry(HttpClientSessionRetryState& state, const HttpClientRequest& request,
                                              HttpClientSessionRetryPolicy policy) const
 {
-    SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
-    SC_TRY_MSG(policy.maxAttempts > 0, "HttpClientSession: retry policy has no attempts");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionNotInitialized);
+    if (policy.maxAttempts == 0)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SessionRetryAttemptsInvalid);
 
     state.method                = request.method;
     state.policy                = policy;

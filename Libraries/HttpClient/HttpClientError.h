@@ -117,6 +117,9 @@ enum class HttpClientError : uint32_t
     SessionAuthChallengeTargetInvalid,
     SessionAuthResponseStatusInvalid,
     SessionBasicChallengeMissing,
+    SessionRequestUrlInvalid,
+    SessionCookieCacheFull,
+    SessionRetryAttemptsInvalid,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

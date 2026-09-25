@@ -55,6 +55,8 @@ stream error event rather than being replaced with a generic HttpClient text err
 Session state and authentication errors distinguish missing caller storage, invalid lifecycle or copy state,
 exhausted scratch/cache capacity, malformed origins or authorization bytes, and Basic challenge failures. Shared
 conditions retain one portable code across session entry points; the Result never references cached strings.
+Cookie handling, request preparation, and retries reuse session lifecycle/storage codes and add distinct identities
+for invalid request URLs, a full cookie cache, and a retry policy with no attempts.
 
 ## Consequences
 
