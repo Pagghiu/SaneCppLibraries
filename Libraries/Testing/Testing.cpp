@@ -194,7 +194,7 @@ static bool parsePortOffset(const char* value, uint16_t& parsedOffset)
     return true;
 }
 
-static Result getDirectoryName(StringSpan path, StringPath& directory)
+static bool getDirectoryName(StringSpan path, StringPath& directory)
 {
     const native_char_t* text   = path.getNullTerminatedNative();
     const size_t         length = nativeLength(path);
@@ -203,11 +203,11 @@ static Result getDirectoryName(StringSpan path, StringPath& directory)
     {
         if (isSeparator(text[last - 1]))
         {
-            return assignNativeSlice(directory, text, last - 1);
+            return static_cast<bool>(assignNativeSlice(directory, text, last - 1));
         }
         last--;
     }
-    return Result::Error("Missing directory separator");
+    return false;
 }
 
 static bool pathViewEquals(StringSpan lhs, StringSpan rhs)
