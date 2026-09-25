@@ -292,6 +292,25 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::SessionRetryAttemptsInvalid:
         formatter.append("HTTP client session retry policy must allow at least one attempt");
         break;
+    case HttpClientError::ResponseHeadersTooSmall:
+        formatter.append("HTTP client response header storage is too small");
+        break;
+    case HttpClientError::TransportFailed: formatter.append("HTTP client transport failed"); break;
+    case HttpClientError::RequestUrlConversionFailed:
+        formatter.append("HTTP client request URL could not be converted for the transport");
+        break;
+    case HttpClientError::RequestUrlInvalid:
+        formatter.append("HTTP client request URL is invalid for the transport");
+        break;
+    case HttpClientError::BackendScratchTooSmall:
+        formatter.append("HTTP client backend scratch storage is too small");
+        break;
+    case HttpClientError::RequestBodyStreamUnavailable:
+        formatter.append("HTTP client request body stream could not be created");
+        break;
+    case HttpClientError::RequestTaskUnavailable:
+        formatter.append("HTTP client request task could not be created");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

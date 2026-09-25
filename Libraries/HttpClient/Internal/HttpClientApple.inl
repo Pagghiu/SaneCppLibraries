@@ -358,7 +358,8 @@ struct SC::HttpClientAppleCallbacks
             const size_t valLen = strlen(valCStr);
             if (appended + keyLen + valLen + 4 > capacity)
             {
-                internal.callbackError = SC::Result::Error("HttpClient: response headers buffer too small");
+                internal.callbackError =
+                    SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ResponseHeadersTooSmall);
                 operation->enqueueError(internal.callbackError);
                 internal.cancelRequested = true;
                 block->invoke(block, 0);
@@ -456,11 +457,11 @@ struct SC::HttpClientAppleCallbacks
             }
             else if (internal.cancelRequested)
             {
-                operation->enqueueError(Result::Error("HttpClient: request cancelled"));
+                operation->enqueueError(Result::Error(HttpClientResultCategory, HttpClientError::RequestCancelled));
             }
             else
             {
-                operation->enqueueError(Result::Error("HttpClient: NSURLSession error"));
+                operation->enqueueError(Result::Error(HttpClientResultCategory, HttpClientError::TransportFailed));
             }
         }
         else
@@ -612,15 +613,20 @@ SC::Result SC::HttpClientOperation::platformStart()
     internal.callbackError      = Result(true);
     internal.negotiatedProtocol = HttpClientResponse::Protocol::Unknown;
 
-    SC_TRY_MSG(currentRequest.options.tls.verifyPeer, "HttpClient: Apple custom TLS settings not supported");
-    SC_TRY_MSG(currentRequest.options.tls.caCertificatesPath.sizeInBytes() == 0,
-               "HttpClient: Apple custom TLS settings not supported");
-    SC_TRY_MSG(currentRequest.options.protocol.preference != HttpClientRequestProtocolOptions::Http11Only,
-               "HttpClient: Apple backend does not support forcing HTTP/1.1");
-    SC_TRY_MSG(currentRequest.options.protocol.preference != HttpClientRequestProtocolOptions::Http2Required,
-               "HttpClient: Apple backend does not support requiring HTTP/2");
-    SC_TRY_MSG(currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Default,
-               "HttpClient: Apple backend does not support custom proxy policy");
+    if (not currentRequest.options.tls.verifyPeer)
+        return Result::Error(HttpClientResultCategory, HttpClientError::TlsDisablePeerVerificationUnsupported);
+    if (currentRequest.options.tls.caCertificatesPath.sizeInBytes() != 0)
+        return Result::Error(HttpClientResultCategory, HttpClientError::TlsCustomCaPathUnsupported);
+    if (currentRequest.options.protocol.preference == HttpClientRequestProtocolOptions::Http11Only)
+        return Result::Error(HttpClientResultCategory, HttpClientError::Http11OnlyUnsupported);
+    if (currentRequest.options.protocol.preference == HttpClientRequestProtocolOptions::Http2Required)
+        return Result::Error(HttpClientResultCategory, HttpClientError::Http2RequiredUnsupported);
+    if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::NoProxy)
+        return Result::Error(HttpClientResultCategory, HttpClientError::NoProxyPolicyUnsupported);
+    if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Http)
+        return Result::Error(HttpClientResultCategory, HttpClientError::HttpProxyPolicyUnsupported);
+    if (currentRequest.options.proxy.mode != HttpClientRequestProxyOptions::Default)
+        return Result::Error(HttpClientResultCategory, HttpClientError::ProxyModeInvalid);
 
     id configurationClass = reinterpret_cast<id>(objc_getClass("NSURLSessionConfiguration"));
     id configuration      = sc_objc_msgSend<id>(configurationClass, sel_getUid("ephemeralSessionConfiguration"));
@@ -638,11 +644,13 @@ SC::Result SC::HttpClientOperation::platformStart()
     id urlString   = sc_objc_msgSend<id>(stringClass, sel_getUid("stringWithBytes:length:encoding:"),
                                          currentRequest.url.toCharSpan().data(), currentRequest.url.sizeInBytes(),
                                          NSUTF8StringEncoding);
-    SC_TRY_MSG(urlString != nullptr, "HttpClient: failed creating NSURL string");
+    if (urlString == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequestUrlConversionFailed);
 
     id urlClass = reinterpret_cast<id>(objc_getClass("NSURL"));
     id url      = sc_objc_msgSend<id>(urlClass, sel_getUid("URLWithString:"), urlString);
-    SC_TRY_MSG(url != nullptr, "HttpClient: invalid NSURL");
+    if (url == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequestUrlInvalid);
 
     id requestClass = reinterpret_cast<id>(objc_getClass("NSMutableURLRequest"));
     id requestObj   = sc_objc_msgSend<id>(requestClass, sel_getUid("requestWithURL:"), url);
@@ -705,7 +713,8 @@ SC::Result SC::HttpClientOperation::platformStart()
     if (declaredBodySize > 0 and not httpClientAppleHasHeader(currentRequest, SC::StringSpan("Content-Length")))
     {
         const size_t encodedLength = httpClientAppleWriteUnsigned(declaredBodySize, backendScratch);
-        SC_TRY_MSG(encodedLength > 0, "HttpClient: backend scratch too small for Content-Length");
+        if (encodedLength == 0)
+            return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
         id headerName  = sc_objc_msgSend<id>(reinterpret_cast<id>(objc_getClass("NSString")),
                                              sel_getUid("stringWithUTF8String:"), "Content-Length");
         id headerValue = sc_objc_msgSend<id>(reinterpret_cast<id>(objc_getClass("NSString")),
@@ -732,7 +741,8 @@ SC::Result SC::HttpClientOperation::platformStart()
     else if (currentRequest.body.isStreamed())
     {
         internal.bodyStream = HttpClientAppleCallbacks::createBodyStream(*this);
-        SC_TRY_MSG(internal.bodyStream != nullptr, "HttpClient: failed creating request body stream");
+        if (internal.bodyStream == nullptr)
+            return Result::Error(HttpClientResultCategory, HttpClientError::RequestBodyStreamUnavailable);
         sc_objc_msgSend<void>(requestObj, sel_getUid("setHTTPBodyStream:"), internal.bodyStream);
     }
 
@@ -740,7 +750,8 @@ SC::Result SC::HttpClientOperation::platformStart()
 #if !__has_feature(objc_arc)
     internal.task = sc_objc_msgSend<id>(internal.task, sel_getUid("retain"));
 #endif
-    SC_TRY_MSG(internal.task != nullptr, "HttpClient: failed creating NSURLSessionDataTask");
+    if (internal.task == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequestTaskUnavailable);
     sc_objc_msgSend<void>(internal.task, sel_getUid("resume"));
     return Result(true);
 }

@@ -120,6 +120,13 @@ enum class HttpClientError : uint32_t
     SessionRequestUrlInvalid,
     SessionCookieCacheFull,
     SessionRetryAttemptsInvalid,
+    ResponseHeadersTooSmall,
+    TransportFailed,
+    RequestUrlConversionFailed,
+    RequestUrlInvalid,
+    BackendScratchTooSmall,
+    RequestBodyStreamUnavailable,
+    RequestTaskUnavailable,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

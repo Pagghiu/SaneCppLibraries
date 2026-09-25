@@ -57,6 +57,9 @@ exhausted scratch/cache capacity, malformed origins or authorization bytes, and 
 conditions retain one portable code across session entry points; the Result never references cached strings.
 Cookie handling, request preparation, and retries reuse session lifecycle/storage codes and add distinct identities
 for invalid request URLs, a full cookie cache, and a retry policy with no attempts.
+The Apple transport maps native request-task, body-stream, URL-conversion, and completion failures to portable
+identities. Repeated capability checks reuse preflight codes; response-header and backend-scratch capacity failures
+have their own storage identities. Native framework names and status values are not primary error codes.
 
 ## Consequences
 
