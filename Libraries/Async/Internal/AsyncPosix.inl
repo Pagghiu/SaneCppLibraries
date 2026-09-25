@@ -1505,7 +1505,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             return completeProcessExitWaitPid(result);
         }
-        return Result(false);
+        return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
     }
 #endif
 
