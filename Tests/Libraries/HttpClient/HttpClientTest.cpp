@@ -149,6 +149,10 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             operationScheduler();
         }
+        if (test_section("operation scheduler validation"))
+        {
+            operationSchedulerValidation();
+        }
         if (test_section("async GET local"))
         {
             asyncGet();
@@ -3022,6 +3026,63 @@ struct SC::HttpClientTest : public SC::TestCase
         (void)clientThread.join();
         SC_TEST_EXPECT(server.server.close());
         SC_TEST_EXPECT(loop.close());
+    }
+
+    void operationSchedulerValidation()
+    {
+        HttpClient client;
+        SC_TEST_EXPECT(client.init());
+
+        CoreOperationMemory<1024, 2, 2, 64, 128> memories[2];
+        HttpClientOperation                      operations[2];
+        SC_TEST_EXPECT(operations[0].init(client, memories[0].memory));
+
+        HttpClientOperation*               operationPointers[2] = {&operations[0], nullptr};
+        uint8_t                            readyOperations[2]   = {7, 9};
+        HttpClientOperationSchedulerMemory memory;
+        memory.operations      = {operationPointers, 2};
+        memory.readyOperations = {readyOperations, 2};
+
+        HttpClientOperationScheduler scheduler;
+        SC_TEST_EXPECT(
+            scheduler.init({}).isError(HttpClientResultCategory, HttpClientError::SchedulerOperationsMissing));
+        HttpClientOperationSchedulerMemory tooSmall = memory;
+        tooSmall.readyOperations                    = {readyOperations, 1};
+        SC_TEST_EXPECT(
+            scheduler.init(tooSmall).isError(HttpClientResultCategory, HttpClientError::SchedulerReadyStorageTooSmall));
+
+        SC_TEST_EXPECT(
+            scheduler.init(memory).isError(HttpClientResultCategory, HttpClientError::SchedulerOperationNull));
+        SC_TEST_EXPECT(operations[0].notifier == nullptr);
+        SC_TEST_EXPECT(readyOperations[0] == 7 and readyOperations[1] == 9);
+
+        operationPointers[1] = &operations[1];
+        SC_TEST_EXPECT(scheduler.init(memory).isError(HttpClientResultCategory,
+                                                      HttpClientError::SchedulerOperationNotInitialized));
+        SC_TEST_EXPECT(operations[0].notifier == nullptr);
+        SC_TEST_EXPECT(readyOperations[0] == 7 and readyOperations[1] == 9);
+
+        SC_TEST_EXPECT(operations[1].init(client, memories[1].memory));
+        SC_TEST_EXPECT(scheduler.init(memory));
+        SC_TEST_EXPECT(
+            scheduler.init(memory).isError(HttpClientResultCategory, HttpClientError::SchedulerAlreadyInitialized));
+        HttpClientOperation unregistered;
+        SC_TEST_EXPECT(scheduler.markReady(unregistered)
+                           .isError(HttpClientResultCategory, HttpClientError::SchedulerOperationNotRegistered));
+        SC_TEST_EXPECT(scheduler.close());
+        SC_TEST_EXPECT(operations[0].notifier == nullptr and operations[1].notifier == nullptr);
+
+        size_t numPolled = 0;
+        SC_TEST_EXPECT(scheduler.markReady(operations[0])
+                           .isError(HttpClientResultCategory, HttpClientError::SchedulerNotInitialized));
+        SC_TEST_EXPECT(
+            scheduler.pollReady(numPolled).isError(HttpClientResultCategory, HttpClientError::SchedulerNotInitialized));
+        SC_TEST_EXPECT(
+            scheduler.pollAll(numPolled).isError(HttpClientResultCategory, HttpClientError::SchedulerNotInitialized));
+
+        SC_TEST_EXPECT(operations[1].close());
+        SC_TEST_EXPECT(operations[0].close());
+        SC_TEST_EXPECT(client.close());
     }
 
     void operationScheduler()

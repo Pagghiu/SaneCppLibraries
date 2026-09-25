@@ -82,6 +82,13 @@ enum class HttpClientError : uint32_t
     ContentCodingListEmpty,
     ContentCodingUnknown,
     AcceptEncodingOutputTooSmall,
+    SchedulerAlreadyInitialized,
+    SchedulerOperationsMissing,
+    SchedulerReadyStorageTooSmall,
+    SchedulerOperationNull,
+    SchedulerOperationNotInitialized,
+    SchedulerNotInitialized,
+    SchedulerOperationNotRegistered,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

@@ -44,6 +44,10 @@ missing response state, insufficient effective-URL metadata storage, and insuffi
 body. The same category/code is returned through ordinary polling or blocking APIs without carrying text in Result.
 The optional Accept-Encoding builder distinguishes empty lists, unknown codings, and insufficient caller output.
 The unsupported-platform stub uses one portable capability code across client and operation entry points.
+The optional operation scheduler distinguishes missing/insufficient caller storage, null or uninitialized
+operations, duplicate/uninitialized scheduler state, and unregistered operations. Initialization validates every
+operation before mutating ready bytes or attaching notifiers, so a failed later entry leaves earlier operations
+untouched and allows a corrected retry.
 
 ## Consequences
 

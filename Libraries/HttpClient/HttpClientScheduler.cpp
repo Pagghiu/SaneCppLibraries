@@ -9,17 +9,25 @@ static constexpr SC::size_t InvalidOperationIndex = static_cast<SC::size_t>(-1);
 
 SC::Result SC::HttpClientOperationScheduler::init(const HttpClientOperationSchedulerMemory& memory)
 {
-    SC_TRY_MSG(not initialized, "HttpClientOperationScheduler: already initialized");
-    SC_TRY_MSG(not memory.operations.empty(), "HttpClientOperationScheduler: operations missing");
-    SC_TRY_MSG(memory.readyOperations.sizeInElements() >= memory.operations.sizeInElements(),
-               "HttpClientOperationScheduler: ready state capacity too small");
+    if (initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerAlreadyInitialized);
+    if (memory.operations.empty())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerOperationsMissing);
+    if (memory.readyOperations.sizeInElements() < memory.operations.sizeInElements())
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerReadyStorageTooSmall);
+
+    // Validate every entry before installing any notifier or changing caller-owned ready state.
+    for (size_t idx = 0; idx < memory.operations.sizeInElements(); ++idx)
+    {
+        if (memory.operations[idx] == nullptr)
+            return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerOperationNull);
+        if (not memory.operations[idx]->isInitialized())
+            return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerOperationNotInitialized);
+    }
 
     schedulerMemory = memory;
     for (size_t idx = 0; idx < schedulerMemory.operations.sizeInElements(); ++idx)
     {
-        SC_TRY_MSG(schedulerMemory.operations[idx] != nullptr, "HttpClientOperationScheduler: null operation");
-        SC_TRY_MSG(schedulerMemory.operations[idx]->isInitialized(),
-                   "HttpClientOperationScheduler: operation not initialized");
         schedulerMemory.readyOperations[idx] = 1;
         schedulerMemory.operations[idx]->setNotifier(this);
     }
@@ -75,10 +83,12 @@ bool SC::HttpClientOperationScheduler::hasReadyOperationLocked() const
 
 SC::Result SC::HttpClientOperationScheduler::markReady(HttpClientOperation& operation)
 {
-    SC_TRY_MSG(initialized, "HttpClientOperationScheduler: not initialized");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerNotInitialized);
 
     const size_t index = findOperationIndex(operation);
-    SC_TRY_MSG(index != InvalidOperationIndex, "HttpClientOperationScheduler: operation not registered");
+    if (index == InvalidOperationIndex)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerOperationNotRegistered);
 
     readyMutex.lock();
     schedulerMemory.readyOperations[index] = 1;
@@ -108,7 +118,8 @@ void SC::HttpClientOperationScheduler::notifyHttpClientOperation(HttpClientOpera
 
 SC::Result SC::HttpClientOperationScheduler::pollReady(size_t& numPolled, uint32_t waitMilliseconds)
 {
-    SC_TRY_MSG(initialized, "HttpClientOperationScheduler: not initialized");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerNotInitialized);
 
     numPolled = 0;
 
@@ -141,7 +152,8 @@ SC::Result SC::HttpClientOperationScheduler::pollReady(size_t& numPolled, uint32
 
 SC::Result SC::HttpClientOperationScheduler::pollAll(size_t& numPolled)
 {
-    SC_TRY_MSG(initialized, "HttpClientOperationScheduler: not initialized");
+    if (not initialized)
+        return Result::Error(HttpClientResultCategory, HttpClientError::SchedulerNotInitialized);
 
     numPolled = 0;
     for (size_t idx = 0; idx < schedulerMemory.operations.sizeInElements(); ++idx)

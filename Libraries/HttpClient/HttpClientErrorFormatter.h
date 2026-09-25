@@ -190,6 +190,23 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::AcceptEncodingOutputTooSmall:
         formatter.append("HTTP client Accept-Encoding output buffer is too small");
         break;
+    case HttpClientError::SchedulerAlreadyInitialized:
+        formatter.append("HTTP client scheduler is already initialized");
+        break;
+    case HttpClientError::SchedulerOperationsMissing:
+        formatter.append("HTTP client scheduler operations are missing");
+        break;
+    case HttpClientError::SchedulerReadyStorageTooSmall:
+        formatter.append("HTTP client scheduler ready storage is too small");
+        break;
+    case HttpClientError::SchedulerOperationNull: formatter.append("HTTP client scheduler operation is null"); break;
+    case HttpClientError::SchedulerOperationNotInitialized:
+        formatter.append("HTTP client scheduler operation is not initialized");
+        break;
+    case HttpClientError::SchedulerNotInitialized: formatter.append("HTTP client scheduler is not initialized"); break;
+    case HttpClientError::SchedulerOperationNotRegistered:
+        formatter.append("HTTP client scheduler operation is not registered");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
