@@ -202,7 +202,8 @@ SC::ResultProcess SC::Process::launchImplementation()
 
     const wchar_t* const* environmentArray = nullptr;
 
-    StringsArena arena = {environment, environmentNumber, environmentByteOffset};
+    StringsArena arena = {environment, environmentNumber, environmentByteOffset,
+                          Result::Error(ProcessResultCategory, ProcessError::EnvironmentCapacityExceeded)};
 
     ProcessEnvironment parentEnv;
     SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, arena, parentEnv));

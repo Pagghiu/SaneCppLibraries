@@ -286,7 +286,8 @@ SC::ResultProcess SC::Process::setEnvironment(StringSpan name, StringSpan value)
 {
     if (environmentNumber >= MAX_NUM_ENVIRONMENT)
         return ResultProcess(ProcessError::EnvironmentCapacityExceeded);
-    StringsArena table = {environment, environmentNumber, environmentByteOffset};
+    StringsArena table = {environment, environmentNumber, environmentByteOffset,
+                          Result::Error(ProcessResultCategory, ProcessError::EnvironmentCapacityExceeded)};
     return table.appendAsSingleString({name, SC_NATIVE_STR("="), value});
 }
 

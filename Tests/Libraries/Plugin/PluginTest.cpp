@@ -13,6 +13,7 @@
 #include "Libraries/Plugin/Internal/PluginString.h"
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Plugin/PluginErrorFormatter.h"
+#include "Libraries/Process/Internal/StringsArena.h"
 #include "Libraries/Process/Process.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -357,6 +358,17 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
 
     void structuredErrorsAndFormatter()
     {
+        {
+            native_char_t              storage[8] = {};
+            StringSpan::NativeWritable writable;
+            writable.writableSpan  = storage;
+            size_t           count = 0;
+            StringsArena     arena(writable, count, Span<size_t>(),
+                                   Result::Error(PluginResultCategory, PluginError::ArgumentCapacityExceeded));
+            const StringSpan argument = SC_NATIVE_STR("arg");
+            SC_TEST_EXPECT(arena.appendAsSingleString(argument).isError(PluginResultCategory,
+                                                                        PluginError::ArgumentCapacityExceeded));
+        }
         static_assert(PluginResultCategory.value == 7, "Plugin category is registry value 7");
         static_assert(static_cast<uint32_t>(PluginError::PathNotNullTerminated) == 1,
                       "Plugin error values are append-only");

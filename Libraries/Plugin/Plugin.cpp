@@ -566,7 +566,10 @@ SC::ResultPlugin SC::PluginCompiler::compileFile(const PluginDefinition& definit
 
     StringSpan::NativeWritable bufferWritable = {buffer};
 
-    StringsArena argumentsArena{bufferWritable, numberOfArguments, {argumentsLengths}};
+    StringsArena argumentsArena{bufferWritable,
+                                numberOfArguments,
+                                {argumentsLengths},
+                                Result::Error(PluginResultCategory, PluginError::ArgumentCapacityExceeded)};
     if (not argumentsArena.appendAsSingleString(compilerPath.view()))
         return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments);
 #if SC_PLATFORM_WINDOWS
@@ -718,7 +721,10 @@ SC::ResultPlugin SC::PluginCompiler::link(const PluginDefinition& definition, co
 
     StringSpan::NativeWritable bufferWritable = {buffer};
 
-    StringsArena arena = {bufferWritable, numberOfStrings, {stringLengths}};
+    StringsArena arena = {bufferWritable,
+                          numberOfStrings,
+                          {stringLengths},
+                          Result::Error(PluginResultCategory, PluginError::ArgumentCapacityExceeded)};
     if (not arena.appendAsSingleString({linkerPath.view()}))
         return ResultPlugin(PluginError::ArgumentCapacityExceeded, PluginErrorDetail::LinkerBuildArguments);
 

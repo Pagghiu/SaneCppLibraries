@@ -181,7 +181,8 @@ SC::ResultProcess SC::Process::launchForkChild(PipeDescriptor& pipe)
 
     const char* const* environmentArray = environ;
     ProcessEnvironment parentEnv;
-    StringsArena       table = {environment, environmentNumber, environmentByteOffset};
+    StringsArena       table = {environment, environmentNumber, environmentByteOffset,
+                                Result::Error(ProcessResultCategory, ProcessError::EnvironmentCapacityExceeded)};
 
     EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
     result = environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv);

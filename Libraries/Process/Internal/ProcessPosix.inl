@@ -121,7 +121,8 @@ SC::ResultProcess SC::Process::formatArguments(Span<const StringSpan> params)
 {
     if (params.sizeInElements() > MAX_NUM_ARGUMENTS - commandArgumentsNumber)
         return ResultProcess(ProcessError::ArgumentCapacityExceeded);
-    StringsArena table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
+    StringsArena table = {command, commandArgumentsNumber, commandArgumentsByteOffset,
+                          Result::Error(ProcessResultCategory, ProcessError::ArgumentCapacityExceeded)};
     for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
     {
         SC_TRY(table.appendAsSingleString(params[idx]));

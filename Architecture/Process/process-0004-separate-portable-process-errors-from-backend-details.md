@@ -26,6 +26,9 @@ Likewise, a POSIX-only failure while building an executable path during launch r
 
 Argument and environment capacity failures remain portable primary errors: `ArgumentCapacityExceeded` and
 `EnvironmentCapacityExceeded`.
+The string arena is shared by argument and environment construction and is also reused by Plugin. Its caller supplies
+a structured capacity Result owned by the calling library, so exhaustion of its entry table or destination view never
+falls back to an embedded implementation-specific literal or silently takes Process ownership for Plugin failures.
 
 `ResultProcess` retains the authoritative plain `Result` plus a public stable `ProcessErrorDetail` and native numeric
 error value. Details identify lower-level backend stages with explicit platform names where relevant, such as

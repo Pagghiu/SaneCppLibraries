@@ -23,7 +23,7 @@ struct StringsArena
     {
         if (numberOfStrings >= stringsStart.sizeInElements())
         {
-            return Result::Error("StringTable::append exceeded MAX_STRINGS");
+            return capacityError;
         }
         stringsStart[numberOfStrings] = view().sizeInBytesIncludingTerminator();
         for (size_t idx = 0; idx < strings.sizeInElements(); ++idx)
@@ -39,7 +39,7 @@ struct StringsArena
         const char* tableStart = view().bytesIncludingTerminator();
         if (strings.sizeInElements() < numberOfStrings)
         {
-            return Result::Error("StringTable::writeTo insufficient destination span");
+            return capacityError;
         }
         const auto sizeOfZero = StringEncodingGetSize(view().getEncoding());
         for (size_t idx = 0; idx < numberOfStrings; ++idx)
@@ -52,8 +52,9 @@ struct StringsArena
         return Result(true);
     }
 
-    StringsArena(StringSpan::NativeWritable& string, size_t& numberOfStrings, Span<size_t> stringsStart)
-        : numberOfStrings(numberOfStrings), stringsStart(stringsStart), string(string)
+    StringsArena(StringSpan::NativeWritable& string, size_t& numberOfStrings, Span<size_t> stringsStart,
+                 Result capacityError)
+        : numberOfStrings(numberOfStrings), stringsStart(stringsStart), string(string), capacityError(capacityError)
     {}
 
     StringSpan view() const { return string.view(); }
@@ -62,6 +63,7 @@ struct StringsArena
     Span<size_t> stringsStart; // Tracking start of each string in the table, its size is used as max number of elements
   private:
     StringSpan::NativeWritable& string; // The underlying buffer / arena where strings are written to
+    Result                      capacityError;
 };
 
 } // namespace SC

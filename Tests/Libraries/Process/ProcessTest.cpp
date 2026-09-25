@@ -8,6 +8,7 @@
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Process/Internal/StringsArena.h"
 #include "Libraries/Process/ProcessErrorFormatter.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
@@ -167,6 +168,29 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
     }
     const ResultProcess environmentCapacity = environmentProcess.setEnvironment("A", "B");
     SC_TEST_EXPECT(environmentCapacity.isError(ProcessError::EnvironmentCapacityExceeded));
+
+    {
+        native_char_t              storage[32] = {};
+        StringSpan::NativeWritable writable;
+        writable.writableSpan      = storage;
+        size_t           count     = 0;
+        size_t           starts[1] = {};
+        StringsArena     arena(writable, count, starts,
+                               Result::Error(ProcessResultCategory, ProcessError::ArgumentCapacityExceeded));
+        const StringSpan first  = SC_NATIVE_STR("first");
+        const StringSpan second = SC_NATIVE_STR("second");
+        SC_TEST_EXPECT(arena.appendAsSingleString(first));
+        SC_TEST_EXPECT(
+            arena.appendAsSingleString(second).isError(ProcessResultCategory, ProcessError::ArgumentCapacityExceeded));
+        SC_TEST_EXPECT(arena.writeTo({}).isError(ProcessResultCategory, ProcessError::ArgumentCapacityExceeded));
+
+        size_t       emptyCount = 0;
+        StringsArena environmentStringsArena(
+            writable, emptyCount, Span<size_t>(),
+            Result::Error(ProcessResultCategory, ProcessError::EnvironmentCapacityExceeded));
+        SC_TEST_EXPECT(environmentStringsArena.appendAsSingleString(first).isError(
+            ProcessResultCategory, ProcessError::EnvironmentCapacityExceeded));
+    }
 
 #if !SC_PLATFORM_WINDOWS
     StringSpan          arguments[65]    = {};
