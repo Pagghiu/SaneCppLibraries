@@ -1474,7 +1474,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         SC_TRY(
             KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle, INPUT_EVENTS_MASK));
-        return Result(::close(teardown.fileHandle) == 0);
+        if (::close(teardown.fileHandle) != 0)
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherRemovalFailed);
+        return Result(true);
     }
 
     Result completeAsync(AsyncProcessExit::Result& result) { return completeProcessExitWaitPid(result); }
@@ -1539,7 +1541,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         SC_TRY(
             KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle, INPUT_EVENTS_MASK));
-        return Result(::close(teardown.fileHandle) == 0);
+        if (::close(teardown.fileHandle) != 0)
+            return Result::Error(AsyncResultCategory, AsyncError::SignalWatcherRemovalFailed);
+        return Result(true);
     }
 
     Result completeAsync(AsyncSignal::Result& result)

@@ -416,7 +416,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result completeAsync(AsyncSocketAccept::Result& res)
     {
-        return Result(res.completionData.acceptedClient.assign(events[res.eventIndex].res));
+        if (not res.completionData.acceptedClient.assign(events[res.eventIndex].res))
+            return Result::Error(AsyncResultCategory, AsyncError::SocketAcceptFinalizationFailed);
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -614,7 +616,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             return Result(true);
         }
         result.completionData.numBytes = static_cast<size_t>(completion.res);
-        return Result(result.completionData.numBytes == Internal::getSummedSizeOfBuffers(result.getAsync()));
+        if (result.completionData.numBytes != Internal::getSummedSizeOfBuffers(result.getAsync()))
+            return Result::Error(AsyncResultCategory, AsyncError::FileWriteIncomplete);
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -744,7 +748,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
     {
         // pidfd is copied to fileHandle inside prepareTeardown
-        return Result(::close(teardown.fileHandle) == 0);
+        if (::close(teardown.fileHandle) != 0)
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherRemovalFailed);
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -787,7 +793,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     static Result teardownAsync(AsyncSignal*, AsyncTeardown& teardown)
     {
         // signalFd is copied to fileHandle inside prepareTeardown
-        return Result(::close(teardown.fileHandle) == 0);
+        if (::close(teardown.fileHandle) != 0)
+            return Result::Error(AsyncResultCategory, AsyncError::SignalWatcherRemovalFailed);
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------

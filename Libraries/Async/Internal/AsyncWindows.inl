@@ -428,7 +428,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
-        return Result(async.acceptData->clientSocket.assign(clientSocket));
+        if (not async.acceptData->clientSocket.assign(clientSocket))
+            return Result::Error(AsyncResultCategory, AsyncError::SocketAcceptFailed);
+        return Result(true);
     }
 
     static Result completeAsync(AsyncSocketAccept::Result& result)
@@ -449,7 +451,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         if (iocp != loopHandle)
             return Result::Error(AsyncResultCategory, AsyncError::DescriptorAssociationFailed);
 
-        return Result(result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket)));
+        if (not result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket)))
+            return Result::Error(AsyncResultCategory, AsyncError::SocketAcceptFinalizationFailed);
+        return Result(true);
     }
 
     Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketAccept& asyncAccept)
@@ -1299,7 +1303,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
             return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherCreationFailed);
         }
-        return Result(async.waitHandle.assign(waitHandle));
+        if (not async.waitHandle.assign(waitHandle))
+            return Result::Error(AsyncResultCategory, AsyncError::ProcessWatcherCreationFailed);
+        return Result(true);
     }
 
     static Result completeAsync(AsyncProcessExit::Result& result)
