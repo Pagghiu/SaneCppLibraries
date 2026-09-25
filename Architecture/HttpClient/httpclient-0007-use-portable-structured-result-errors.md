@@ -60,6 +60,10 @@ for invalid request URLs, a full cookie cache, and a retry policy with no attemp
 The Apple transport maps native request-task, body-stream, URL-conversion, and completion failures to portable
 identities. Repeated capability checks reuse preflight codes; response-header and backend-scratch capacity failures
 have their own storage identities. Native framework names and status values are not primary error codes.
+The Linux transport likewise reports backend availability, request task/header preparation, transport setup or
+execution, storage capacity, and body-size limits through portable identities. A required HTTP/2 policy that is
+accepted at preflight but not negotiated is distinct from an unsupported policy; callback failures retain their
+original category and code.
 
 ## Consequences
 

@@ -18,6 +18,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if SC_PLATFORM_LINUX
+#include <limits.h>
+#endif
 
 namespace SC
 {
@@ -2835,6 +2838,23 @@ struct SC::HttpClientTest : public SC::TestCase
                            static_cast<uint32_t>(HttpClientError::RequestTransferEncodingForbidden));
             SC_TEST_EXPECT(not operation.start(request, response));
         }
+
+#if SC_PLATFORM_LINUX
+        {
+            HttpClientRequest  request;
+            HttpClientResponse response;
+
+            request.url              = "http://127.0.0.1:1/body"_a8;
+            request.method           = HttpClientRequest::HttpPOST;
+            request.body.provider    = &provider;
+            request.body.sizeInBytes = static_cast<uint64_t>(LONG_MAX) + 1;
+            request.body.framing     = HttpClientRequestBody::SizedStream;
+
+            SC_TEST_EXPECT(request.validate());
+            const Result start = operation.start(request, response);
+            SC_TEST_EXPECT(start.isError(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported));
+        }
+#endif
 
         SC_TEST_EXPECT(operation.close());
         SC_TEST_EXPECT(client.close());

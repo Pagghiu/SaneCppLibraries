@@ -311,6 +311,18 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::RequestTaskUnavailable:
         formatter.append("HTTP client request task could not be created");
         break;
+    case HttpClientError::RequestHeaderPreparationFailed:
+        formatter.append("HTTP client request headers could not be prepared for the transport");
+        break;
+    case HttpClientError::TransportConfigurationFailed:
+        formatter.append("HTTP client transport configuration failed");
+        break;
+    case HttpClientError::Http2RequiredNotNegotiated:
+        formatter.append("HTTP client required HTTP/2 but the connection negotiated another protocol");
+        break;
+    case HttpClientError::RequestBodySizeUnsupported:
+        formatter.append("HTTP client request body size exceeds the transport limit");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

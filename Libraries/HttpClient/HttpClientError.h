@@ -127,6 +127,10 @@ enum class HttpClientError : uint32_t
     BackendScratchTooSmall,
     RequestBodyStreamUnavailable,
     RequestTaskUnavailable,
+    RequestHeaderPreparationFailed,
+    TransportConfigurationFailed,
+    Http2RequiredNotNegotiated,
+    RequestBodySizeUnsupported,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

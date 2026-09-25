@@ -30,7 +30,8 @@ namespace
 static SC::Result appendResponseHeaderLine(SC::HttpClientResponse& response, const char* data, size_t size)
 {
     const size_t remaining = response.headers.sizeInBytes() - response.headersLength;
-    SC_TRY_MSG(remaining >= size, "HttpClient: response headers buffer too small");
+    if (remaining < size)
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::ResponseHeadersTooSmall);
     memcpy(const_cast<char*>(response.headers.data()) + response.headersLength, data, size);
     response.headersLength += size;
     return SC::Result(true);
@@ -55,7 +56,8 @@ static SC::Result httpClientLinuxAppendHeader(HttpClientLinuxLibCurlLoader& curl
                                               const char* headerLine)
 {
     struct curl_slist* newHeaders = curl.curl_slist_append(headers, headerLine);
-    SC_TRY_MSG(newHeaders != nullptr, "HttpClient: curl_slist_append failed");
+    if (newHeaders == nullptr)
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::RequestHeaderPreparationFailed);
     headers = newHeaders;
     return SC::Result(true);
 }
@@ -68,8 +70,8 @@ static SC::Result httpClientLinuxAppendProxyAuthorization(HttpClientLinuxLibCurl
     static const size_t ProxyAuthorizationPrefixBytes = sizeof(ProxyAuthorizationPrefix) - 1;
 
     const SC::Span<const char> authorizationBytes = authorization.toCharSpan();
-    SC_TRY_MSG(scratch.sizeInBytes() > ProxyAuthorizationPrefixBytes + authorizationBytes.sizeInBytes(),
-               "HttpClient: backend scratch too small for proxy authorization");
+    if (scratch.sizeInBytes() <= ProxyAuthorizationPrefixBytes + authorizationBytes.sizeInBytes())
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::BackendScratchTooSmall);
     memcpy(scratch.data(), ProxyAuthorizationPrefix, ProxyAuthorizationPrefixBytes);
     memcpy(scratch.data() + ProxyAuthorizationPrefixBytes, authorizationBytes.data(), authorizationBytes.sizeInBytes());
     scratch[ProxyAuthorizationPrefixBytes + authorizationBytes.sizeInBytes()] = '\0';
@@ -97,8 +99,8 @@ static SC::Result getCurlStringPointer(SC::StringSpan source, SC::Span<char> sto
     }
 
     const SC::Span<const char> sourceBytes = source.toCharSpan();
-    SC_TRY_MSG(storage.sizeInBytes() > sourceBytes.sizeInBytes(),
-               "HttpClient: response metadata buffer too small for proxy URL");
+    if (storage.sizeInBytes() <= sourceBytes.sizeInBytes())
+        return SC::Result::Error(SC::HttpClientResultCategory, SC::HttpClientError::BackendScratchTooSmall);
     memcpy(storage.data(), sourceBytes.data(), sourceBytes.sizeInBytes());
     storage[sourceBytes.sizeInBytes()] = '\0';
     destination                        = storage.data();
@@ -200,7 +202,8 @@ struct HttpClientLinuxCallbacks
             updateNegotiatedProtocol(*operation);
             if (isHttp2Required(*operation) and response.negotiatedProtocol != HttpClientResponse::Protocol::Http2)
             {
-                internal.callbackError = Result::Error("HttpClient: HTTP/2 required but not negotiated");
+                internal.callbackError =
+                    Result::Error(HttpClientResultCategory, HttpClientError::Http2RequiredNotNegotiated);
                 return 0;
             }
             internal.responseHeadSeen = true;
@@ -287,7 +290,8 @@ SC::HttpClient::~HttpClient()
 SC::Result SC::HttpClient::platformInit()
 {
     Internal& internal = *reinterpret_cast<Internal*>(storage);
-    SC_TRY_MSG(internal.curl.init(), "HttpClient: failed to load libcurl");
+    if (not internal.curl.init())
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequiredBackendUnavailable);
     return Result(true);
 }
 
@@ -318,7 +322,8 @@ SC::Result SC::HttpClientOperation::platformInit()
     auto& session       = *reinterpret_cast<HttpClient::Internal*>(client->storage);
     auto& internal      = *reinterpret_cast<Internal*>(storage);
     internal.curlHandle = session.curl.curl_easy_init();
-    SC_TRY_MSG(internal.curlHandle != nullptr, "HttpClient: curl_easy_init failed");
+    if (internal.curlHandle == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequestTaskUnavailable);
     return Result(true);
 }
 
@@ -358,20 +363,22 @@ SC::Result SC::HttpClientOperation::platformStart()
 {
     auto& session  = *reinterpret_cast<HttpClient::Internal*>(client->storage);
     auto& internal = *reinterpret_cast<Internal*>(storage);
-    SC_TRY_MSG(not internal.workerRunning, "HttpClient: request already in flight");
+    if (internal.workerRunning)
+        return Result::Error(HttpClientResultCategory, HttpClientError::OperationRequestInFlight);
 
     internal.cancelRequested  = false;
     internal.responseHeadSeen = false;
     internal.callbackError    = Result(true);
 
     CURL* curlHandle = internal.curlHandle;
-    SC_TRY_MSG(curlHandle != nullptr, "HttpClient: missing curl handle");
+    if (curlHandle == nullptr)
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequestTaskUnavailable);
 
     session.curl.curl_easy_reset(curlHandle);
 
     // libcurl recommends disabling signal handlers for Unix multi-threaded callers.
-    SC_TRY_MSG(session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOSIGNAL, 1L) == CURLE_OK,
-               "HttpClient: libcurl signal policy not supported");
+    if (session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOSIGNAL, 1L) != CURLE_OK)
+        return Result::Error(HttpClientResultCategory, HttpClientError::TransportConfigurationFailed);
 
     Span<const char> urlSpan = currentRequest.url.toCharSpan();
     if (currentRequest.url.isNullTerminated())
@@ -380,8 +387,8 @@ SC::Result SC::HttpClientOperation::platformStart()
     }
     else
     {
-        SC_TRY_MSG(backendScratch.sizeInBytes() > urlSpan.sizeInBytes(),
-                   "HttpClient: backend scratch too small for URL");
+        if (backendScratch.sizeInBytes() <= urlSpan.sizeInBytes())
+            return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
         memcpy(backendScratch.data(), urlSpan.data(), urlSpan.sizeInBytes());
         backendScratch[urlSpan.sizeInBytes()] = '\0';
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_URL, backendScratch.data());
@@ -412,27 +419,39 @@ SC::Result SC::HttpClientOperation::platformStart()
     const long httpVersion = getCurlHttpVersionOption(currentRequest.options.protocol.preference);
     if (httpVersion != CURL_HTTP_VERSION_NONE)
     {
-        SC_TRY_MSG(session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_HTTP_VERSION, httpVersion) == CURLE_OK,
-                   "HttpClient: libcurl protocol preference not supported");
+        if (session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_HTTP_VERSION, httpVersion) != CURLE_OK)
+        {
+            switch (currentRequest.options.protocol.preference)
+            {
+            case HttpClientRequestProtocolOptions::Http11Only:
+                return Result::Error(HttpClientResultCategory, HttpClientError::Http11OnlyUnsupported);
+            case HttpClientRequestProtocolOptions::Http2Preferred:
+                return Result::Error(HttpClientResultCategory, HttpClientError::Http2PreferredUnsupported);
+            case HttpClientRequestProtocolOptions::Http2Required:
+                return Result::Error(HttpClientResultCategory, HttpClientError::Http2RequiredUnsupported);
+            case HttpClientRequestProtocolOptions::Default: break;
+            }
+            return Result::Error(HttpClientResultCategory, HttpClientError::TransportConfigurationFailed);
+        }
     }
 
     if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::NoProxy)
     {
-        SC_TRY_MSG(session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, "") == CURLE_OK,
-                   "HttpClient: libcurl proxy configuration not supported");
+        if (session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, "") != CURLE_OK)
+            return Result::Error(HttpClientResultCategory, HttpClientError::NoProxyPolicyUnsupported);
     }
     else if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Http)
     {
         const char* proxyUrl = nullptr;
         SC_TRY(getCurlStringPointer(currentRequest.options.proxy.url, backendScratch, proxyUrl));
-        SC_TRY_MSG(session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, proxyUrl) == CURLE_OK,
-                   "HttpClient: libcurl proxy configuration not supported");
+        if (session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, proxyUrl) != CURLE_OK)
+            return Result::Error(HttpClientResultCategory, HttpClientError::HttpProxyPolicyUnsupported);
         if (currentRequest.options.proxy.bypassList.sizeInBytes() > 0)
         {
             const char* noProxy = nullptr;
             SC_TRY(getCurlStringPointer(currentRequest.options.proxy.bypassList, backendScratch, noProxy));
-            SC_TRY_MSG(session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_NOPROXY, noProxy) == CURLE_OK,
-                       "HttpClient: libcurl proxy bypass list not supported");
+            if (session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_NOPROXY, noProxy) != CURLE_OK)
+                return Result::Error(HttpClientResultCategory, HttpClientError::ProxyBypassListUnsupported);
         }
     }
 
@@ -451,8 +470,8 @@ SC::Result SC::HttpClientOperation::platformStart()
         else
         {
             const Span<const char> caInfo = currentRequest.options.tls.caCertificatesPath.toCharSpan();
-            SC_TRY_MSG(backendScratch.sizeInBytes() > caInfo.sizeInBytes(),
-                       "HttpClient: backend scratch too small for CA path");
+            if (backendScratch.sizeInBytes() <= caInfo.sizeInBytes())
+                return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
             memcpy(backendScratch.data(), caInfo.data(), caInfo.sizeInBytes());
             backendScratch[caInfo.sizeInBytes()] = '\0';
             session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CAINFO, backendScratch.data());
@@ -488,16 +507,16 @@ SC::Result SC::HttpClientOperation::platformStart()
         const size_t valLen  = currentRequest.headers[idx].value.sizeInBytes();
         if (valLen == 0)
         {
-            SC_TRY_MSG(nameLen + 2 <= backendScratch.sizeInBytes(),
-                       "HttpClient: backend scratch too small for headers");
+            if (nameLen + 2 > backendScratch.sizeInBytes())
+                return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
             memcpy(backendScratch.data(), currentRequest.headers[idx].name.toCharSpan().data(), nameLen);
             backendScratch[nameLen]     = ';';
             backendScratch[nameLen + 1] = '\0';
             SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
             continue;
         }
-        SC_TRY_MSG(nameLen + valLen + 3 < backendScratch.sizeInBytes(),
-                   "HttpClient: backend scratch too small for headers");
+        if (nameLen + valLen + 3 >= backendScratch.sizeInBytes())
+            return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
         memcpy(backendScratch.data(), currentRequest.headers[idx].name.toCharSpan().data(), nameLen);
         backendScratch[nameLen]     = ':';
         backendScratch[nameLen + 1] = ' ';
@@ -524,8 +543,8 @@ SC::Result SC::HttpClientOperation::platformStart()
             session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
             if (currentRequest.body.framing == HttpClientRequestBody::SizedStream)
             {
-                SC_TRY_MSG(currentRequest.body.sizeInBytes <= static_cast<uint64_t>(LONG_MAX),
-                           "HttpClient: streamed body too large for libcurl");
+                if (currentRequest.body.sizeInBytes > static_cast<uint64_t>(LONG_MAX))
+                    return Result::Error(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported);
                 session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
                                                    static_cast<long>(currentRequest.body.sizeInBytes));
             }
@@ -535,8 +554,8 @@ SC::Result SC::HttpClientOperation::platformStart()
             session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_UPLOAD, 1L);
             if (currentRequest.body.framing == HttpClientRequestBody::SizedStream)
             {
-                SC_TRY_MSG(currentRequest.body.sizeInBytes <= static_cast<uint64_t>(LONG_MAX),
-                           "HttpClient: streamed body too large for libcurl");
+                if (currentRequest.body.sizeInBytes > static_cast<uint64_t>(LONG_MAX))
+                    return Result::Error(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported);
                 session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_INFILESIZE,
                                                    static_cast<long>(currentRequest.body.sizeInBytes));
             }
@@ -593,7 +612,8 @@ SC::Result SC::HttpClientOperation::platformStart()
                 if (HttpClientLinuxCallbacks::isHttp2Required(*operation) and
                     operation->currentResponse->negotiatedProtocol != HttpClientResponse::Protocol::Http2)
                 {
-                    operation->enqueueError(Result::Error("HttpClient: HTTP/2 required but not negotiated"));
+                    operation->enqueueError(
+                        Result::Error(HttpClientResultCategory, HttpClientError::Http2RequiredNotNegotiated));
                     internalRef.workerRunning = false;
                     return nullptr;
                 }
@@ -608,11 +628,11 @@ SC::Result SC::HttpClientOperation::platformStart()
                 }
                 else if (internalRef.cancelRequested)
                 {
-                    operation->enqueueError(Result::Error("HttpClient: request cancelled"));
+                    operation->enqueueError(Result::Error(HttpClientResultCategory, HttpClientError::RequestCancelled));
                 }
                 else
                 {
-                    operation->enqueueError(Result::Error("HttpClient: curl_easy_perform failed"));
+                    operation->enqueueError(Result::Error(HttpClientResultCategory, HttpClientError::TransportFailed));
                 }
             }
             else
@@ -627,7 +647,8 @@ SC::Result SC::HttpClientOperation::platformStart()
     {
         internal.workerRunning = false;
     }
-    SC_TRY_MSG(workerStartRes == 0, "HttpClient: pthread_create failed");
+    if (workerStartRes != 0)
+        return Result::Error(HttpClientResultCategory, HttpClientError::RequestTaskUnavailable);
     internal.workerThreadStarted = true;
 
     return Result(true);
