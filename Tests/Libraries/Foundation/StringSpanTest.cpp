@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Common/StringSpan.h"
+#include "Libraries/Common/StringSpanErrorFormatter.h"
 #include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Limits.h"
 #include "Libraries/Testing/Testing.h"
@@ -30,6 +31,10 @@ struct SC::StringSpanTest : public SC::TestCase
         if (test_section("StringSpan"))
         {
             testStringSpan();
+        }
+        if (test_section("StringSpan structured errors"))
+        {
+            testStringSpanErrors();
         }
         if (test_section("StringPath"))
         {
@@ -255,6 +260,44 @@ struct SC::StringSpanTest : public SC::TestCase
             SS emoji2_span(utf8_emoji2, false, StringEncoding::Utf8);
             SC_TEST_EXPECT(emoji1_span.compare(emoji2_span) == C::Smaller);
         }
+    }
+
+    void testStringSpanErrors()
+    {
+        native_char_t              storage[3] = {};
+        StringSpan::NativeWritable writable;
+        writable.writableSpan = storage;
+        const StringSpan text = SC_NATIVE_STR("abc");
+
+        writable.length            = 4;
+        const Result invalidOffset = text.appendNullTerminatedTo(writable);
+        SC_TEST_EXPECT(invalidOffset.isError(StringSpanResultCategory, StringSpanError::DestinationOffsetInvalid));
+
+        writable.length       = 0;
+        const Result tooSmall = text.appendNullTerminatedTo(writable);
+        SC_TEST_EXPECT(tooSmall.isError(StringSpanResultCategory, StringSpanError::DestinationTooSmall));
+
+#if SC_PLATFORM_WINDOWS
+        const char       invalidUtf8[] = {static_cast<char>(0xFF)};
+        const StringSpan invalidText({invalidUtf8, sizeof(invalidUtf8)}, false, StringEncoding::Utf8);
+        const Result     conversion = invalidText.writeNullTerminatedTo(writable);
+        SC_TEST_EXPECT(conversion.isError(StringSpanResultCategory, StringSpanError::NativeConversionFailed));
+#else
+        const char       utf16Text[] = {'a', 0};
+        const StringSpan unsupported({utf16Text, sizeof(utf16Text)}, false, StringEncoding::Utf16);
+        const Result     encoding = unsupported.writeNullTerminatedTo(writable);
+        SC_TEST_EXPECT(encoding.isError(StringSpanResultCategory, StringSpanError::EncodingUnsupported));
+#endif
+
+        constexpr char          expected[] = "String span destination is too small";
+        char                    message[sizeof(expected)];
+        const ResultErrorFormat formatted = formatStringSpanError(tooSmall, message);
+        SC_TEST_EXPECT(formatted);
+        SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+        SC_TEST_EXPECT(StringSpan(message) == expected);
+        SC_TEST_EXPECT(formatStringSpanError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+        SC_TEST_EXPECT(formatStringSpanError(Result::Error(ResultCategory(999), 1), message).status ==
+                       ResultErrorFormatStatus::ForeignCategory);
     }
 
     void testStringPath()

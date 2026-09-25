@@ -1,11 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #ifdef SC_FOUNDATION_STRING_SPAN_DEFINITION_H
-#if SC_FOUNDATION_STRING_SPAN_DEFINITION_H != 2
+#if SC_FOUNDATION_STRING_SPAN_DEFINITION_H != 3
 #error "StringSpan.h has been included multiple times in different versions."
 #endif
 #else
-#define SC_FOUNDATION_STRING_SPAN_DEFINITION_H 2 // Increment to indicate a new version of the file
+#define SC_FOUNDATION_STRING_SPAN_DEFINITION_H 3 // Increment to indicate a new version of the file
 
 #include "CompilerBuiltins.h"
 #include "PlatformMacrosType.h"
@@ -18,6 +18,18 @@
 
 namespace SC
 {
+/// @brief Stable failures of the shared StringSpan native-output helper.
+enum class StringSpanError : uint32_t
+{
+    DestinationOffsetInvalid = 1,
+    DestinationTooSmall,
+    NativeConversionFailed,
+    EncodingUnsupported,
+};
+
+/// @brief Category owned by the foundational StringSpan type, not by a higher-level string library.
+static constexpr ResultCategory StringSpanResultCategory = ResultCategory(19);
+
 #if SC_PLATFORM_WINDOWS
 #define SC_NATIVE_STR(str) L##str
 #else
@@ -202,13 +214,15 @@ struct SC_FOUNDATION_EXPORT StringSpan
         const size_t toSlice =
             removePreviousNullTerminator ? string.length : (string.length > 0 ? string.length + 1 : 0);
         Span<native_char_t> remaining;
-        SC_TRY_MSG(string.writableSpan.sliceStart(toSlice, remaining), "StringSpan::append - sliceStart failed");
+        if (not string.writableSpan.sliceStart(toSlice, remaining))
+            return Result::Error(StringSpanResultCategory, StringSpanError::DestinationOffsetInvalid);
         size_t         numWritten = 0;
         native_char_t* buffer     = remaining.data();
         if (getEncoding() == StringEncoding::Native or
             (not SC_PLATFORM_WINDOWS and getEncoding() == StringEncoding::Ascii))
         {
-            SC_TRY_MSG(sizeInBytes() < remaining.sizeInBytes(), "StringSpan::append - exceeded buffer size");
+            if (sizeInBytes() >= remaining.sizeInBytes())
+                return Result::Error(StringSpanResultCategory, StringSpanError::DestinationTooSmall);
             CompilerBuiltins::copy(reinterpret_cast<char*>(buffer), bytesWithoutTerminator(), sizeInBytes());
             buffer[sizeInBytes() / sizeof(native_char_t)] = 0;
 
@@ -217,13 +231,13 @@ struct SC_FOUNDATION_EXPORT StringSpan
 #if SC_PLATFORM_WINDOWS
         else
         {
-            SC_TRY_MSG(appendUTF8ToNative(buffer, remaining.sizeInElements(), numWritten),
-                       "StringSpan::append - invalid UTF8 or exceeded buffer size");
+            if (not appendUTF8ToNative(buffer, remaining.sizeInElements(), numWritten))
+                return Result::Error(StringSpanResultCategory, StringSpanError::NativeConversionFailed);
         }
 #else
         else
         {
-            SC_TRY_MSG(false, "StringSpan::append - UTF16 not supported");
+            return Result::Error(StringSpanResultCategory, StringSpanError::EncodingUnsupported);
         }
 #endif
         string.length = toSlice + numWritten;

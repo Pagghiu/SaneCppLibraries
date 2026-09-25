@@ -87,3 +87,4 @@ output, translation, sizing, and wording behavior.
 - [COMMON-0007 - Keep IGrowableBuffer as the minimal output-growth adapter](common-0007-keep-igrowablebuffer-as-the-minimal-output-growth-adapter.md)
 - [COMMON-0008 - Keep StringSpan and StringPath in Common](common-0008-keep-stringspan-and-stringpath-in-common.md)
 - [COMMON-0009 - Use library-owned structured Result errors](common-0009-use-library-owned-structured-result-errors.md)
+- [COMMON-0010 - Assign errors to foundational StringSpan](common-0010-assign-errors-to-foundational-stringspan.md)

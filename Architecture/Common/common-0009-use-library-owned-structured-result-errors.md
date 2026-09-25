@@ -30,6 +30,9 @@ branches on a plain `Result` independent of the backend that produced it.
 the library that owns them, not collected in Common. Built-in category numbers are centrally assigned, append-only,
 and collision-checked in the [Result error category registry](result-error-categories.md). A reserved numeric range is
 available for application and external-library categories.
+The foundational `StringSpan` source fragment is a narrow exception: it owns its own type-specific category and enum
+in its guarded header because Common cannot depend on Strings and several libraries propagate its native-output
+failures. This does not create a Common-wide error catalogue or collect any library's errors centrally.
 
 A library may define a composed enriched result when callers benefit from structured context. Its first-class status is
 still represented by `Result`; additional fields contain only copied scalar values, enums, offsets, sizes, or native

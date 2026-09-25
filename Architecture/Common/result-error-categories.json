@@ -118,6 +118,12 @@
       "owner": "HttpClient",
       "declaration": "Libraries/HttpClient/HttpClientError.h",
       "constant": "HttpClientResultCategory"
+    },
+    {
+      "value": 19,
+      "owner": "StringSpan",
+      "declaration": "Libraries/Common/StringSpan.h",
+      "constant": "StringSpanResultCategory"
     }
   ]
 }
