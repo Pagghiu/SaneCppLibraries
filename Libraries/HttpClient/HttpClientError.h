@@ -131,6 +131,16 @@ enum class HttpClientError : uint32_t
     TransportConfigurationFailed,
     Http2RequiredNotNegotiated,
     RequestBodySizeUnsupported,
+    ConnectionFailed,
+    ProxyUrlConversionFailed,
+    ProxyBypassConversionFailed,
+    ProxyAuthorizationConversionFailed,
+    RequestHeaderNameConversionFailed,
+    RequestHeaderValueConversionFailed,
+    RequestSendFailed,
+    RequestBodyWriteFailed,
+    ResponseReceiveFailed,
+    ResponseBodyReadFailed,
 };
 
 static constexpr ResultCategory HttpClientResultCategory = ResultCategory(18);

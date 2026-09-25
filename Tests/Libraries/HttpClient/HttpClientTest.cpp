@@ -1039,8 +1039,9 @@ struct SC::HttpClientTest : public SC::TestCase
                 size_t             bodyLength = 0;
 
                 request.url = server.endpoint.view();
-                SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
-                                                               memory.memory));
+                SC_TEST_EXPECT(
+                    HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory)
+                        .isError(HttpClientResultCategory, HttpClientError::ResponseHeadersTooSmall));
                 SC_TEST_EXPECT(response.headersLength <= response.headers.sizeInBytes());
                 SC_TEST_EXPECT(client.close());
                 SC_TEST_EXPECT(server.scheduleStop());
@@ -2853,6 +2854,29 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(request.validate());
             const Result start = operation.start(request, response);
             SC_TEST_EXPECT(start.isError(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported));
+        }
+#endif
+#if SC_PLATFORM_WINDOWS
+        {
+            HttpClientRequest     request;
+            HttpClientResponse    response;
+            PollResponseCollector collector;
+
+            request.url              = "http://127.0.0.1:1/body"_a8;
+            request.method           = HttpClientRequest::HttpPOST;
+            request.body.provider    = &provider;
+            request.body.sizeInBytes = 0x100000000ull;
+            request.body.framing     = HttpClientRequestBody::SizedStream;
+
+            SC_TEST_EXPECT(request.validate());
+            SC_TEST_EXPECT(operation.start(request, response, &collector));
+            for (size_t attempt = 0; attempt < 1000 and not collector.completed; ++attempt)
+            {
+                SC_TEST_EXPECT(operation.poll(5));
+            }
+            SC_TEST_EXPECT(collector.completed);
+            SC_TEST_EXPECT(
+                collector.finalRes.isError(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported));
         }
 #endif
 

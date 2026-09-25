@@ -323,6 +323,30 @@ inline ResultErrorFormat formatHttpClientError(HttpClientError error, Span<char>
     case HttpClientError::RequestBodySizeUnsupported:
         formatter.append("HTTP client request body size exceeds the transport limit");
         break;
+    case HttpClientError::ConnectionFailed: formatter.append("HTTP client connection failed"); break;
+    case HttpClientError::ProxyUrlConversionFailed:
+        formatter.append("HTTP client proxy URL could not be converted for the transport");
+        break;
+    case HttpClientError::ProxyBypassConversionFailed:
+        formatter.append("HTTP client proxy bypass list could not be converted for the transport");
+        break;
+    case HttpClientError::ProxyAuthorizationConversionFailed:
+        formatter.append("HTTP client proxy authorization could not be converted for the transport");
+        break;
+    case HttpClientError::RequestHeaderNameConversionFailed:
+        formatter.append("HTTP client request header name could not be converted for the transport");
+        break;
+    case HttpClientError::RequestHeaderValueConversionFailed:
+        formatter.append("HTTP client request header value could not be converted for the transport");
+        break;
+    case HttpClientError::RequestSendFailed: formatter.append("HTTP client request could not be sent"); break;
+    case HttpClientError::RequestBodyWriteFailed:
+        formatter.append("HTTP client request body could not be written");
+        break;
+    case HttpClientError::ResponseReceiveFailed: formatter.append("HTTP client response could not be received"); break;
+    case HttpClientError::ResponseBodyReadFailed:
+        formatter.append("HTTP client response body could not be read");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

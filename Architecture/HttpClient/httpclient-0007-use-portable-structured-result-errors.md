@@ -64,6 +64,10 @@ The Linux transport likewise reports backend availability, request task/header p
 execution, storage capacity, and body-size limits through portable identities. A required HTTP/2 policy that is
 accepted at preflight but not negotiated is distinct from an unsupported policy; callback failures retain their
 original category and code.
+The Windows transport maps connection, request send/write, and response receive/read failures to portable phases.
+Conversion failures identify the affected request or proxy field without naming native APIs; request-body limits,
+HTTP/2 negotiation, capability checks, and storage failures share codes with the other backends. Native handles,
+function names, and status values remain outside the primary taxonomy.
 
 ## Consequences
 
