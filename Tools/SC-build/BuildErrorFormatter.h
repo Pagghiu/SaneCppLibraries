@@ -51,6 +51,34 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
         formatter.append("Build generator does not support the requested architecture");
         break;
     case BuildError::NoWorkspacesDefined: formatter.append("Build definition has no workspaces"); break;
+    case BuildError::CoverageExecutableLaunchFailed:
+        formatter.append("Coverage executable could not be launched");
+        break;
+    case BuildError::CoverageExecutableExitedUnsuccessfully:
+        formatter.append("Coverage executable exited unsuccessfully");
+        break;
+    case BuildError::CoverageCompilerVersionUnavailable:
+        formatter.append("Coverage compiler version could not be read");
+        break;
+    case BuildError::CoverageProfileMergeLaunchFailed:
+        formatter.append("Coverage profile merger could not be launched");
+        break;
+    case BuildError::CoverageProfileMergeExitedUnsuccessfully:
+        formatter.append("Coverage profile merger exited unsuccessfully");
+        break;
+    case BuildError::CoverageHtmlGenerationLaunchFailed:
+        formatter.append("Coverage HTML generator could not be launched");
+        break;
+    case BuildError::CoverageHtmlGenerationExitedUnsuccessfully:
+        formatter.append("Coverage HTML generator exited unsuccessfully");
+        break;
+    case BuildError::CoverageReportLaunchFailed:
+        formatter.append("Coverage report generator could not be launched");
+        break;
+    case BuildError::CoverageReportExitedUnsuccessfully:
+        formatter.append("Coverage report generator exited unsuccessfully");
+        break;
+    case BuildError::CoveragePercentageInvalid: formatter.append("Coverage percentage is invalid"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -1181,8 +1181,10 @@ SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, c
         Process process;
         SC_TRY(process.setEnvironment("LLVM_PROFILE_FILE", "profile.profraw"));
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
-        SC_TRY_MSG(process.exec({executablePath.view()}), "Cannot find instrumented executable");
-        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing instrumented executable");
+        if (not process.exec({executablePath.view()}))
+            return Result::Error(BuildResultCategory, BuildError::CoverageExecutableLaunchFailed);
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::CoverageExecutableExitedUnsuccessfully);
     }
 
     // Merge coverage files
@@ -1201,7 +1203,8 @@ SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, c
         break;
     default: {
         String version;
-        SC_TRY_MSG(Process().exec({"clang", "--version"}, version), "Cannot run clang --version");
+        if (not Process().exec({"clang", "--version"}, version))
+            return Result::Error(BuildResultCategory, BuildError::CoverageCompilerVersionUnavailable);
         StringViewTokenizer tokenizer(version.view());
 
         int major = -1;
@@ -1237,8 +1240,10 @@ SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, c
         arguments[numArguments++] = "profile.profraw";   // 5
         arguments[numArguments++] = "-o";                // 6
         arguments[numArguments++] = "profile.profdata";  // 7
-        SC_TRY_MSG(process.exec({arguments, numArguments}), "llvm-profdata missing");
-        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-profdata");
+        if (not process.exec({arguments, numArguments}))
+            return Result::Error(BuildResultCategory, BuildError::CoverageProfileMergeLaunchFailed);
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::CoverageProfileMergeExitedUnsuccessfully);
     }
     // Generate HTML excluding all tests and SC::Tools
     {
@@ -1258,8 +1263,10 @@ SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, c
         arguments[numArguments++] = "coverage";                        // 8
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
         arguments[numArguments++] = executablePath.view();             // 10
-        SC_TRY_MSG(process.exec({arguments, numArguments}), "llvm-cov is missing");
-        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-cov show");
+        if (not process.exec({arguments, numArguments}))
+            return Result::Error(BuildResultCategory, BuildError::CoverageHtmlGenerationLaunchFailed);
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::CoverageHtmlGenerationExitedUnsuccessfully);
     }
     // Extract report data to generate badge
     {
@@ -1280,8 +1287,10 @@ SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, c
         arguments[numArguments++] = executablePath.view();             // 10
 
         String output;
-        SC_TRY_MSG(process.exec({arguments, numArguments}, output), "llvm-cov is missing");
-        SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-cov report");
+        if (not process.exec({arguments, numArguments}, output))
+            return Result::Error(BuildResultCategory, BuildError::CoverageReportLaunchFailed);
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::CoverageReportExitedUnsuccessfully);
 
         // Parse coverage report
         StringView totals;
@@ -1300,7 +1309,8 @@ SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, c
             // Define coverage badge color
             StringView coverageColor;
             float      coverageFloat;
-            SC_TRY_MSG(coverageString.parseFloat(coverageFloat), "Cannot parse coverage percentage");
+            if (not coverageString.parseFloat(coverageFloat))
+                return Result::Error(BuildResultCategory, BuildError::CoveragePercentageInvalid);
             if (coverageFloat < 80)
                 coverageColor = "e05d44"; // red
             else if (coverageFloat < 90)

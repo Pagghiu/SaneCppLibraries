@@ -37,6 +37,16 @@ enum class BuildError : uint32_t
     WorkspaceNotFound,
     GeneratorArchitectureUnsupported,
     NoWorkspacesDefined,
+    CoverageExecutableLaunchFailed,
+    CoverageExecutableExitedUnsuccessfully,
+    CoverageCompilerVersionUnavailable,
+    CoverageProfileMergeLaunchFailed,
+    CoverageProfileMergeExitedUnsuccessfully,
+    CoverageHtmlGenerationLaunchFailed,
+    CoverageHtmlGenerationExitedUnsuccessfully,
+    CoverageReportLaunchFailed,
+    CoverageReportExitedUnsuccessfully,
+    CoveragePercentageInvalid,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);
