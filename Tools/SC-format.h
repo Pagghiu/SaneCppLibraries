@@ -6,6 +6,7 @@
 #include "../Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "../Libraries/Process/Process.h"
 #include "Tools.h"
+#include "ToolsError.h"
 
 namespace SC
 {
@@ -105,7 +106,7 @@ struct ProcessLimiter
             processResult  = result.get(exitStatus);
             if (processResult and exitStatus != 0)
             {
-                processResult = Result::Error("ProcessLimiter::callback - returned non zero");
+                processResult = Result::Error(ToolsResultCategory, ToolsError::ChildProcessExitedNonzero);
             }
             // This child process has exited, let's make its slot available again
             availableProcessMonitors.queueBack(result.getAsync());

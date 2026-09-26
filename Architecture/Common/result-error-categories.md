@@ -8,3 +8,6 @@ Values from `0x80000000` through `0xffffffff` are reserved for applications and 
 categories must be appended to the JSON registry and must never be renumbered or reused. Run
 `python3 Support/Scripts/CheckResultErrorCategories.py` after adding or changing a category; CI verifies uniqueness,
 range, ordering, declaration paths, constant names, and header values.
+
+Project tools may own built-in categories as subsystems; their enum and optional formatter stay under `Tools/`, not in
+Common or a library header. The registry check scans both library and tool headers.

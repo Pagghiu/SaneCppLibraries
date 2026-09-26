@@ -124,6 +124,12 @@
       "owner": "StringSpan",
       "declaration": "Libraries/Common/StringSpan.h",
       "constant": "StringSpanResultCategory"
+    },
+    {
+      "value": 20,
+      "owner": "Tools",
+      "declaration": "Tools/ToolsError.h",
+      "constant": "ToolsResultCategory"
     }
   ]
 }

@@ -11,6 +11,7 @@
 #include "../SC.cpp"
 
 #include "Tools.h"
+#include "ToolsErrorFormatter.h"
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -122,6 +123,14 @@ int main(int argc, const char* argv[])
         if (result.hasMessage())
         {
             console.printLine(StringView::fromNullTerminated(result.message, StringEncoding::Ascii));
+        }
+        else if (result.category() == ToolsResultCategory)
+        {
+            char message[128];
+            if (formatToolsError(result, message))
+                console.printLine(StringView::fromNullTerminated(message, StringEncoding::Ascii));
+            else
+                console.print("Error category {}, code {}\n", result.category().value, result.errorValue());
         }
         else
         {

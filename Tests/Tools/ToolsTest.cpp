@@ -8,6 +8,7 @@
 #include "Tools/SC-build.h"
 #include "Tools/SC-build/BuildCLI.h"
 #include "Tools/SC-package.h"
+#include "Tools/ToolsErrorFormatter.h"
 
 extern SC::Console* globalConsole;
 namespace SC
@@ -192,6 +193,24 @@ struct SupportToolsTest : public TestCase
 
         const bool runHeavySections = shouldRunHeavySupportToolsTests();
         StringView args[10];
+        if (test_section("tool structured errors"))
+        {
+            static_assert(static_cast<uint32_t>(ToolsError::ChildProcessExitedNonzero) == 2,
+                          "Tool errors are append-only");
+            const Result unsupported = Result::Error(ToolsResultCategory, ToolsError::UnsupportedFormatAction);
+            SC_TEST_EXPECT(unsupported.isError(ToolsResultCategory, ToolsError::UnsupportedFormatAction));
+
+            char message[64];
+            SC_TEST_EXPECT(formatToolsError(unsupported, message));
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(message, StringEncoding::Ascii) ==
+                           "Format action must be execute or check");
+            SC_TEST_EXPECT(formatToolsError(Result(true), message).status == ResultErrorFormatStatus::NotAnError);
+            SC_TEST_EXPECT(
+                formatToolsError(Result::Error(ProcessResultCategory, ProcessError::LaunchFailed), message).status ==
+                ResultErrorFormatStatus::ForeignCategory);
+            SC_TEST_EXPECT(formatToolsError(Result::Error(ToolsResultCategory, 9999), message).status ==
+                           ResultErrorFormatStatus::UnknownError);
+        }
         if (test_section("build cli parses legacy positional arguments"))
         {
             arguments.tool      = "build";

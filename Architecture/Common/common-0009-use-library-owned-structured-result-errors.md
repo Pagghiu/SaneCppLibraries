@@ -25,6 +25,8 @@ A library's primary error enum describes failures at the portable public-API or 
 logical failures use the same primary error on every supported platform; native API names, backend implementation
 steps, and other platform-specific distinctions do not normally belong in the primary identity. This keeps code that
 branches on a plain `Result` independent of the backend that produced it.
+Project-tool failures are likewise owned by their tool subsystem, never added to a library's enum solely because tools
+use that library; see [TOOLS-0001](../Tools/tools-0001-own-tool-error-identities.md).
 
 `ResultCategory` is an open fixed-width value type defined in Common. Error categories and error enums are declared by
 the library that owns them, not collected in Common. Built-in category numbers are centrally assigned, append-only,

@@ -92,7 +92,7 @@ Result runFormatTool(Tool::Arguments& arguments)
     }
     else
     {
-        return Result::Error("SC-format unknown action (supported \"execute\" or \"check\")");
+        return Result::Error(ToolsResultCategory, ToolsError::UnsupportedFormatAction);
     }
 }
 #if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)

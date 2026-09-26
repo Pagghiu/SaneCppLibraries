@@ -8,6 +8,7 @@ ADRs use scoped identifiers so decisions can be referenced across libraries with
 - `COMMON-NNNN`: source-fragment decisions for `Libraries/Common`.
 - `FOUNDATION-NNNN`: Foundation library decisions.
 - Library scopes use the library directory name uppercased without separators, for example `MEMORY-NNNN`, `CONTAINERSREFLECTION-NNNN`, or `ASYNCSTREAMS-NNNN`.
+- `TOOLS-NNNN`: project-tool decisions whose error identities do not belong to a library (in `Tools` folder).
 
 ## ADR Format
 
