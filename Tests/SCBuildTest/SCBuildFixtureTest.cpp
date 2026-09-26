@@ -2502,6 +2502,13 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(fs.read("Tests/SCBuildTest/Fixture/TinyConsoleProgram/stdout.txt", expectedOutput));
             SC_TRUST_RESULT(normalizeConsoleOutput(expectedOutput));
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
+
+            Build::Action missingCustomRunner                = action;
+            missingCustomRunner.action                       = Build::Action::Run;
+            missingCustomRunner.parameters.runner.type       = Build::RunnerSpec::Custom;
+            missingCustomRunner.parameters.runner.executable = "";
+            SC_TEST_EXPECT(Build::Action::execute(missingCustomRunner, configureTinyConsoleProgram)
+                               .isError(BuildResultCategory, BuildError::CustomRunnerExecutableMissing));
         }
 
         const auto runExternalBuildFixture =

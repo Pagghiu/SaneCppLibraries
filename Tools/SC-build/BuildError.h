@@ -73,6 +73,17 @@ enum class BuildError : uint32_t
     CustomCompilerCMissing,
     CustomCompilerCppMissing,
     UnresolvedToolchain,
+    HostCommandUnavailable,
+    RunnerExecutableNotFound,
+    RunnerSysrootMissing,
+    RunnerDisabledForTarget,
+    RunnerHostUnsupported,
+    RunnerTargetUnsupported,
+    CustomRunnerExecutableMissing,
+    RunnerFailureReportingConfigurationFailed,
+    RunnerStartupHookConfigurationFailed,
+    DependencyFileMalformed,
+    CompilerExecutableMissing,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

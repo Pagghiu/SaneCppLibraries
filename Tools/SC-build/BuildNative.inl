@@ -3082,13 +3082,15 @@ struct SC::Build::NativeBuild
         case SC::Platform::Windows: SC_TRY(process.exec({"where", executable}, commandPath)); break;
         case SC::Platform::Apple:
         case SC::Platform::Linux: SC_TRY(process.exec({"which", executable}, commandPath)); break;
-        case SC::Platform::Emscripten: return Result::Error("Cannot resolve host command path");
+        case SC::Platform::Emscripten: return Result::Error(BuildResultCategory, BuildError::HostCommandUnavailable);
         }
-        SC_TRY_MSG(process.getExitStatus() == 0, "Cannot resolve host command path");
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::HostCommandUnavailable);
         StringView resolvedCommand = StringView(commandPath.view()).trimWhiteSpaces();
 #if SC_PLATFORM_WINDOWS
         StringViewTokenizer tokenizer(resolvedCommand);
-        SC_TRY_MSG(tokenizer.tokenizeNext({'\n'}), "Cannot resolve host command path");
+        if (not tokenizer.tokenizeNext({'\n'}))
+            return Result::Error(BuildResultCategory, BuildError::HostCommandUnavailable);
         resolvedCommand = tokenizer.component.trimWhiteSpaces();
 #endif
         SC_TRY(output.assign(resolvedCommand));
@@ -3173,8 +3175,7 @@ struct SC::Build::NativeBuild
                 }
                 return Result(true);
             }
-            return Result::Error("Cannot find a usable Windows ARM64 Wine runner. Install wine64/wine for Linux arm64, "
-                                 "or pass --runner-path with an ARM64-capable Wine wrapper.");
+            return Result::Error(BuildResultCategory, BuildError::RunnerExecutableNotFound);
         }
 
         if (parameters.hostMachine.architecture == Architecture::Arm64 and hasBox64)
@@ -3220,11 +3221,9 @@ struct SC::Build::NativeBuild
                 }
                 return Result(true);
             }
-            return Result::Error("Cannot find a usable Wine runner. Install wine64/wine, or install box64 plus "
-                                 "wine64/wine, or pass --runner-path with a wrapper path. Linux arm64 hosts need "
-                                 "a runner that can launch the Windows x64 tools and binaries.");
+            return Result::Error(BuildResultCategory, BuildError::RunnerExecutableNotFound);
         }
-        return Result::Error("Cannot find runner executable");
+        return Result::Error(BuildResultCategory, BuildError::RunnerExecutableNotFound);
     }
 
     static constexpr InstructionSet qemuRunnerInstructionSet(Architecture::Type architecture)
@@ -3284,8 +3283,7 @@ struct SC::Build::NativeBuild
                 return Result(true);
             }
         }
-        return Result::Error("Cannot find a usable QEMU runner. Install qemu on PATH or register one with "
-                             "SC-package install qemu [--import-directory <path>].");
+        return Result::Error(BuildResultCategory, BuildError::RunnerExecutableNotFound);
     }
 
     static Result resolveLinuxRunnerSysroot(const Parameters& parameters, const ResolvedTargetContext& targetContext,
@@ -3300,7 +3298,7 @@ struct SC::Build::NativeBuild
         {
             return resolvePackagedLinuxSysroot(parameters, targetContext, sysroot);
         }
-        return Result::Error("QEMU runner requires --sysroot for this host/target pair");
+        return Result::Error(BuildResultCategory, BuildError::RunnerSysrootMissing);
     }
 
     static Result resolveWrappedRunnerExecutable(StringView configured, StringView primaryFallback,
@@ -3321,7 +3319,7 @@ struct SC::Build::NativeBuild
             SC_TRY(output.assign(secondaryFallback));
             return Result(true);
         }
-        return Result::Error("Cannot find runner executable");
+        return Result::Error(BuildResultCategory, BuildError::RunnerExecutableNotFound);
     }
 
     static Result resolveAppleWineExecutable(const Parameters& parameters, StringView configured, String& output)
@@ -3365,8 +3363,8 @@ struct SC::Build::NativeBuild
         switch (runnerSpec.type)
         {
         case RunnerSpec::None:
-            SC_TRY_MSG(canRunDirectly(targetContext) or canRunThroughHostTranslation(parameters, targetContext),
-                       "Runner is disabled for foreign targets");
+            if (not canRunDirectly(targetContext) and not canRunThroughHostTranslation(parameters, targetContext))
+                return Result::Error(BuildResultCategory, BuildError::RunnerDisabledForTarget);
             runner.mode = ResolvedRunner::Direct;
             return Result(true);
         case RunnerSpec::Auto:
@@ -3377,9 +3375,9 @@ struct SC::Build::NativeBuild
             }
             if (isWineRunnableWindowsTarget(targetContext))
             {
-                SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
-                               targetContext.hostMachine.platform == Platform::Linux,
-                           "Wine auto-run is only supported on macOS and Linux hosts");
+                if (targetContext.hostMachine.platform != Platform::Apple and
+                    targetContext.hostMachine.platform != Platform::Linux)
+                    return Result::Error(BuildResultCategory, BuildError::RunnerHostUnsupported);
                 runner.mode = ResolvedRunner::Wrapped;
                 if (targetContext.hostMachine.platform == Platform::Apple)
                 {
@@ -3405,14 +3403,15 @@ struct SC::Build::NativeBuild
                 SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
                 return Result(true);
             }
-            return Result::Error("No auto runner is available for this host/target pair");
+            return Result::Error(BuildResultCategory, BuildError::RunnerUnavailableForTarget);
         case RunnerSpec::Wine:
-            SC_TRY_MSG(targetContext.targetMachine.platform == Platform::Windows,
-                       "Wine runner requires a Windows target");
-            SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
-                           targetContext.hostMachine.platform == Platform::Linux,
-                       "Wine runner is only supported on macOS and Linux hosts");
-            SC_TRY_MSG(isWineRunnableWindowsTarget(targetContext), "Wine runner requires a Windows GNU or MSVC target");
+            if (targetContext.targetMachine.platform != Platform::Windows)
+                return Result::Error(BuildResultCategory, BuildError::RunnerTargetUnsupported);
+            if (targetContext.hostMachine.platform != Platform::Apple and
+                targetContext.hostMachine.platform != Platform::Linux)
+                return Result::Error(BuildResultCategory, BuildError::RunnerHostUnsupported);
+            if (not isWineRunnableWindowsTarget(targetContext))
+                return Result::Error(BuildResultCategory, BuildError::RunnerTargetUnsupported);
             runner.mode = ResolvedRunner::Wrapped;
             if (targetContext.hostMachine.platform == Platform::Apple)
             {
@@ -3426,9 +3425,8 @@ struct SC::Build::NativeBuild
             SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
             return Result(true);
         case RunnerSpec::QEMU: {
-            SC_TRY_MSG(targetPlatform(targetContext) == Platform::Linux, "QEMU runner requires a Linux target");
-            SC_TRY_MSG(isQEMURunnableLinuxTarget(targetContext),
-                       "QEMU runner requires a foreign Linux target architecture or host platform");
+            if (targetPlatform(targetContext) != Platform::Linux or not isQEMURunnableLinuxTarget(targetContext))
+                return Result::Error(BuildResultCategory, BuildError::RunnerTargetUnsupported);
 
             String sysroot = StringEncoding::Utf8;
             runner.mode    = ResolvedRunner::Wrapped;
@@ -3441,7 +3439,8 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
         case RunnerSpec::Custom:
-            SC_TRY_MSG(not runnerSpec.executable.isEmpty(), "Custom runner requires executable");
+            if (runnerSpec.executable.view().isEmpty())
+                return Result::Error(BuildResultCategory, BuildError::CustomRunnerExecutableMissing);
             runner.mode = ResolvedRunner::Wrapped;
             SC_TRY(runner.executable.assign(runnerSpec.executable.view()));
             SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
@@ -3552,7 +3551,8 @@ struct SC::Build::NativeBuild
             "/f",
         };
         SC_TRY(process.exec(showCrashDialogArguments, stdOut, {}, stdErr));
-        SC_TRY_MSG(process.getExitStatus() == 0, "Failed configuring WineDbg crash dialog");
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::RunnerFailureReportingConfigurationFailed);
 
         Process process2;
         SC_TRY(configureWineProcess(process2, prefixDirectory, targetContext));
@@ -3572,7 +3572,8 @@ struct SC::Build::NativeBuild
         String stdOut2 = StringEncoding::Utf8;
         String stdErr2 = StringEncoding::Utf8;
         SC_TRY(process2.exec(breakOnFirstChanceArguments, stdOut2, {}, stdErr2));
-        SC_TRY_MSG(process2.getExitStatus() == 0, "Failed configuring WineDbg first-chance exceptions");
+        if (process2.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::RunnerFailureReportingConfigurationFailed);
 
         Process process3;
         SC_TRY(configureWineProcess(process3, prefixDirectory, targetContext));
@@ -3588,8 +3589,8 @@ struct SC::Build::NativeBuild
         String stdOut3 = StringEncoding::Utf8;
         String stdErr3 = StringEncoding::Utf8;
         SC_TRY(process3.exec(removeWinemenubuilderArguments, stdOut3, {}, stdErr3));
-        SC_TRY_MSG(process3.getExitStatus() == 0 or process3.getExitStatus() == 1,
-                   "Failed disabling Wine menu builder startup hook");
+        if (process3.getExitStatus() != 0 and process3.getExitStatus() != 1)
+            return Result::Error(BuildResultCategory, BuildError::RunnerStartupHookConfigurationFailed);
 
         Process process4;
         SC_TRY(configureWineProcess(process4, prefixDirectory, targetContext));
@@ -3605,8 +3606,8 @@ struct SC::Build::NativeBuild
         String stdOut4 = StringEncoding::Utf8;
         String stdErr4 = StringEncoding::Utf8;
         SC_TRY(process4.exec(removeWow64WinemenubuilderArguments, stdOut4, {}, stdErr4));
-        SC_TRY_MSG(process4.getExitStatus() == 0 or process4.getExitStatus() == 1,
-                   "Failed disabling Wine menu builder startup hook");
+        if (process4.getExitStatus() != 0 and process4.getExitStatus() != 1)
+            return Result::Error(BuildResultCategory, BuildError::RunnerStartupHookConfigurationFailed);
         return Result(true);
     }
 
@@ -3800,7 +3801,8 @@ struct SC::Build::NativeBuild
         SC_TRY(fs.read(dependencyPath, contents));
 
         StringView dependencyData;
-        SC_TRY_MSG(StringView(contents.view()).splitAfter(":", dependencyData), "Malformed dependency file");
+        if (not StringView(contents.view()).splitAfter(":", dependencyData))
+            return Result::Error(BuildResultCategory, BuildError::DependencyFileMalformed);
 
         const char*  dependencyBytes = dependencyData.bytesWithoutTerminator();
         const size_t dependencySize  = dependencyData.sizeInBytes();
@@ -4499,7 +4501,8 @@ struct SC::Build::NativeBuild
             SC_TRY(output.assign(configured));
             return Result(true);
         }
-        SC_TRY_MSG(not fallback.isEmpty(), "Missing compiler executable");
+        if (fallback.isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::CompilerExecutableMissing);
         SC_TRY(output.assign(fallback));
         return Result(true);
     }

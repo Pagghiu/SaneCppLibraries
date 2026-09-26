@@ -115,6 +115,21 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::CustomCompilerCMissing: formatter.append("Custom C compiler is missing"); break;
     case BuildError::CustomCompilerCppMissing: formatter.append("Custom C++ compiler is missing"); break;
     case BuildError::UnresolvedToolchain: formatter.append("Build toolchain was not resolved"); break;
+    case BuildError::HostCommandUnavailable: formatter.append("Host command could not be resolved"); break;
+    case BuildError::RunnerExecutableNotFound: formatter.append("No usable runner executable was found"); break;
+    case BuildError::RunnerSysrootMissing: formatter.append("Runner requires a target sysroot"); break;
+    case BuildError::RunnerDisabledForTarget: formatter.append("Runner is disabled for this target"); break;
+    case BuildError::RunnerHostUnsupported: formatter.append("Selected runner does not support this host"); break;
+    case BuildError::RunnerTargetUnsupported: formatter.append("Selected runner does not support this target"); break;
+    case BuildError::CustomRunnerExecutableMissing: formatter.append("Custom runner executable is missing"); break;
+    case BuildError::RunnerFailureReportingConfigurationFailed:
+        formatter.append("Runner failure reporting could not be configured");
+        break;
+    case BuildError::RunnerStartupHookConfigurationFailed:
+        formatter.append("Runner startup hooks could not be configured");
+        break;
+    case BuildError::DependencyFileMalformed: formatter.append("Build dependency file is malformed"); break;
+    case BuildError::CompilerExecutableMissing: formatter.append("Compiler executable is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
