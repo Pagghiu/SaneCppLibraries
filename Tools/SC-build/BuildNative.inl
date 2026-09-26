@@ -2019,7 +2019,7 @@ struct SC::Build::NativeBuild
 
             if (flags.enableCoverage)
             {
-                return Result::Error("Windows native coverage is not implemented yet");
+                return Result::Error(BuildResultCategory, BuildError::CoverageUnsupportedForToolchain);
             }
 
             switch (flags.optimizationLevel)
@@ -2399,7 +2399,8 @@ struct SC::Build::NativeBuild
         for (const Project* project : orderedProjects)
         {
             const Configuration* configuration = project->getConfiguration(action.configurationName);
-            SC_TRY_MSG(configuration != nullptr, "Cannot find requested configuration");
+            if (configuration == nullptr)
+                return Result::Error(BuildResultCategory, BuildError::ConfigurationNotFound);
             ResolvedProject resolvedProject;
             SC_TRY(resolveProject(action.parameters, workspace, *project, *configuration, filePathsResolver,
                                   resolvedProject));
@@ -2426,8 +2427,8 @@ struct SC::Build::NativeBuild
         {
             return Result(true);
         }
-        SC_TRY_MSG(not stack.find([&](const Project* item) { return item == &project; }, &index),
-                   "Native backend project dependency cycle detected");
+        if (stack.find([&](const Project* item) { return item == &project; }, &index))
+            return Result::Error(BuildResultCategory, BuildError::ProjectDependencyCycle);
         SC_TRY(stack.push_back(&project));
 
         Vector<const Project*> dependencies;
@@ -2446,7 +2447,8 @@ struct SC::Build::NativeBuild
                                             StringView configurationName, Vector<const Project*>& dependencies)
     {
         const Configuration* configuration = project.getConfiguration(configurationName);
-        SC_TRY_MSG(configuration != nullptr, "Configuration not found");
+        if (configuration == nullptr)
+            return Result::Error(BuildResultCategory, BuildError::ConfigurationNotFound);
 
         LinkFlags        mergedLinkFlags;
         const LinkFlags* linkOpinions[] = {&configuration->link, &project.link};
@@ -2488,7 +2490,8 @@ struct SC::Build::NativeBuild
                 Variables dependencyVariables;
 
                 const Configuration* dependencyConfiguration = dependency->getConfiguration(configuration.name.view());
-                SC_TRY_MSG(dependencyConfiguration != nullptr, "Dependency configuration not found");
+                if (dependencyConfiguration == nullptr)
+                    return Result::Error(BuildResultCategory, BuildError::ConfigurationNotFound);
                 SC_TRY(fillVariables(parameters, *dependency, *dependencyConfiguration, resolvedProject.targetContext,
                                      resolvedProject.adapter.displayName.view(), dependencyVariables));
                 SC_TRY(expandConfiguredPath(parameters.directories.outputsDirectory.view(),
@@ -4536,9 +4539,8 @@ struct SC::Build::NativeBuild
     static Result findWorkspace(const Definition& definition, StringView workspaceName, const Workspace*& workspace)
     {
         size_t index = 0;
-        SC_TRY_MSG(
-            definition.workspaces.find([&](const Workspace& item) { return item.name == workspaceName; }, &index),
-            "Workspace not found");
+        if (not definition.workspaces.find([&](const Workspace& item) { return item.name == workspaceName; }, &index))
+            return Result::Error(BuildResultCategory, BuildError::WorkspaceNotFound);
         workspace = &definition.workspaces[index];
         return Result(true);
     }
@@ -4548,11 +4550,12 @@ struct SC::Build::NativeBuild
                                            const Configuration*& configuration)
     {
         size_t index = 0;
-        SC_TRY_MSG(workspace.projects.find([&](const Project& item) { return item.name == projectName; }, &index),
-                   "Project not found");
+        if (not workspace.projects.find([&](const Project& item) { return item.name == projectName; }, &index))
+            return Result::Error(BuildResultCategory, BuildError::ProjectNotFound);
         project       = &workspace.projects[index];
         configuration = project->getConfiguration(configurationName);
-        SC_TRY_MSG(configuration != nullptr, "Configuration not found");
+        if (configuration == nullptr)
+            return Result::Error(BuildResultCategory, BuildError::ConfigurationNotFound);
         return Result(true);
     }
 

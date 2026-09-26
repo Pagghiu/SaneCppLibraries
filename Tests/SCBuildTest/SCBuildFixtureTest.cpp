@@ -915,6 +915,26 @@ static Result configureWorkspaceDependencyProgram(Build::Definition& definition,
     return Result(true);
 }
 
+static Result configureWorkspaceDependencyCycle(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    Build::Workspace workspace = {FixtureWorkspaceName};
+
+    Build::Project first = {"CycleLibraryA", Build::TargetType::StaticLibrary};
+    SC_TRY(first.setRootDirectory(DynamicFixtureProjectRoot));
+    SC_TRY(first.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(first.addLinkLibraries({"CycleLibraryB"}));
+
+    Build::Project second = {"CycleLibraryB", Build::TargetType::StaticLibrary};
+    SC_TRY(second.setRootDirectory(DynamicFixtureProjectRoot));
+    SC_TRY(second.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(second.addLinkLibraries({"CycleLibraryA"}));
+
+    SC_TRY(workspace.projects.push_back(move(first)));
+    SC_TRY(workspace.projects.push_back(move(second)));
+    SC_TRY(definition.workspaces.push_back(move(workspace)));
+    return Result(true);
+}
+
 static Result configureIndependentWorkspacePrograms(Build::Definition& definition, const Build::Parameters& parameters)
 {
     SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
@@ -4260,6 +4280,25 @@ struct SCBuildFixtureTest : public SC::TestCase
             String stdoutOutput = StringEncoding::Utf8;
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
             SC_TEST_EXPECT(stdoutOutput == "7\n");
+
+            Build::Action missingProject = action;
+            missingProject.projectName   = "MissingProject";
+            SC_TEST_EXPECT(Build::Action::execute(missingProject, configureWorkspaceDependencyProgram)
+                               .isError(BuildResultCategory, BuildError::ProjectNotFound));
+
+            Build::Action missingConfiguration     = action;
+            missingConfiguration.configurationName = "MissingConfiguration";
+            SC_TEST_EXPECT(Build::Action::execute(missingConfiguration, configureWorkspaceDependencyProgram)
+                               .isError(BuildResultCategory, BuildError::ConfigurationNotFound));
+
+            Build::Action missingWorkspace = action;
+            missingWorkspace.workspaceName = "MissingWorkspace";
+            SC_TEST_EXPECT(Build::Action::execute(missingWorkspace, configureWorkspaceDependencyProgram)
+                               .isError(BuildResultCategory, BuildError::WorkspaceNotFound));
+
+            Build::Action cycleAction = makeNativeCompileAction(directories, "CycleLibraryA");
+            SC_TEST_EXPECT(Build::Action::execute(cycleAction, configureWorkspaceDependencyCycle)
+                               .isError(BuildResultCategory, BuildError::ProjectDependencyCycle));
         }
 
         if (test_section("native backend builds independent workspace targets together"))

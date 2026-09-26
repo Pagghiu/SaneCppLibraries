@@ -61,6 +61,10 @@ enum class BuildError : uint32_t
     PrintRequiresSingleProject,
     RunnerUnavailableForTarget,
     RunnerCommandMissing,
+    CoverageUnsupportedForToolchain,
+    ConfigurationNotFound,
+    ProjectDependencyCycle,
+    ProjectNotFound,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

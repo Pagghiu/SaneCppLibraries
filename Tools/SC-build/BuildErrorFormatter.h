@@ -95,6 +95,12 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::PrintRequiresSingleProject: formatter.append("Print requires one project"); break;
     case BuildError::RunnerUnavailableForTarget: formatter.append("Runner cannot execute the selected target"); break;
     case BuildError::RunnerCommandMissing: formatter.append("Wrapped runner command is missing"); break;
+    case BuildError::CoverageUnsupportedForToolchain:
+        formatter.append("Coverage is unsupported by the selected toolchain");
+        break;
+    case BuildError::ConfigurationNotFound: formatter.append("Build configuration was not found"); break;
+    case BuildError::ProjectDependencyCycle: formatter.append("Build project dependencies contain a cycle"); break;
+    case BuildError::ProjectNotFound: formatter.append("Build project was not found"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
