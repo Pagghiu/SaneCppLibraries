@@ -38,6 +38,8 @@ static bool shouldRunHeavySupportToolsTests()
     return environment.get("SC_RUN_HEAVY_SUPPORT_TOOLS_TESTS", value) and not value.isEmpty() and value != "0";
 }
 
+static Result configureEmptyBuildDefinition(Build::Definition&, const Build::Parameters&) { return Result(true); }
+
 static Result installFakeRegistryPackage(StringView, StringView packagesInstallDirectory, Tools::Package& package,
                                          Span<const StringView>)
 {
@@ -282,6 +284,21 @@ struct SupportToolsTest : public TestCase
             char message[64];
             SC_TEST_EXPECT(formatBuildError(BuildError::ProjectNameMissing, message));
             SC_TEST_EXPECT(StringSpan::fromNullTerminated(message, StringEncoding::Ascii) == "Project name is missing");
+        }
+        if (test_section("build action validation identities"))
+        {
+            static_assert(static_cast<uint32_t>(BuildError::NoWorkspacesDefined) == 28, "Build errors are append-only");
+            Build::Action action;
+            SC_TEST_EXPECT(Build::Action::execute(action, configureEmptyBuildDefinition)
+                               .isError(BuildResultCategory, BuildError::NoWorkspacesDefined));
+
+            char message[80];
+            SC_TEST_EXPECT(formatBuildError(BuildError::GeneratorArchitectureUnsupported, message));
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(message, StringEncoding::Ascii) ==
+                           "Build generator does not support the requested architecture");
+            SC_TEST_EXPECT(formatBuildError(BuildError::WorkspaceNotFound, message));
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(message, StringEncoding::Ascii) ==
+                           "Build workspace was not found");
         }
         if (test_section("build cli parses legacy positional arguments"))
         {

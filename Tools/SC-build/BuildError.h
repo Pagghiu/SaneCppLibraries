@@ -34,6 +34,9 @@ enum class BuildError : uint32_t
     ConfigurationOutputPathMissing,
     ConfigurationIntermediatePathMissing,
     AbsoluteFileMaskUnsupported,
+    WorkspaceNotFound,
+    GeneratorArchitectureUnsupported,
+    NoWorkspacesDefined,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

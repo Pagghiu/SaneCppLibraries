@@ -46,6 +46,11 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
         formatter.append("Configuration intermediates path is missing");
         break;
     case BuildError::AbsoluteFileMaskUnsupported: formatter.append("File selection mask cannot be absolute"); break;
+    case BuildError::WorkspaceNotFound: formatter.append("Build workspace was not found"); break;
+    case BuildError::GeneratorArchitectureUnsupported:
+        formatter.append("Build generator does not support the requested architecture");
+        break;
+    case BuildError::NoWorkspacesDefined: formatter.append("Build definition has no workspaces"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

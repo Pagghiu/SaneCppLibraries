@@ -882,8 +882,8 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
     SC_TRY(fs.init(directories.projectsDirectory.view()));
 
     size_t idx = 0;
-    SC_TRY_MSG(definition.workspaces.find([&](const Workspace& it) { return it.name == workspaceName; }, &idx),
-               "Workspace not found in definition");
+    if (not definition.workspaces.find([&](const Workspace& it) { return it.name == workspaceName; }, &idx))
+        return Result::Error(BuildResultCategory, BuildError::WorkspaceNotFound);
 
     const Workspace& workspace = definition.workspaces[idx];
 
@@ -1060,7 +1060,7 @@ struct SC::Build::Action::Internal
         case Architecture::Any: break;
 
         case Architecture::Wasm: // Unsupported
-            return Result::Error("Unsupported architecture for Visual Studio");
+            return Result::Error(BuildResultCategory, BuildError::GeneratorArchitectureUnsupported);
         }
         return Result(true);
     }
@@ -1074,7 +1074,7 @@ struct SC::Build::Action::Internal
         case Architecture::Any: architecture = "arm64 x86_64"; break;
         case Architecture::Intel32: // Unsupported
         case Architecture::Wasm:    // Unsupported
-            return Result::Error("Unsupported architecture for XCode");
+            return Result::Error(BuildResultCategory, BuildError::GeneratorArchitectureUnsupported);
         }
         return Result(true);
     }
@@ -1088,7 +1088,7 @@ struct SC::Build::Action::Internal
         case Architecture::Any: break;
         case Architecture::Intel32: // Unsupported
         case Architecture::Wasm:    // Unsupported
-            return Result::Error("Unsupported architecture for make");
+            return Result::Error(BuildResultCategory, BuildError::GeneratorArchitectureUnsupported);
         }
         return Result(true);
     }
@@ -1104,7 +1104,8 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
 
     if (newAction.workspaceName.isEmpty())
     {
-        SC_TRY_MSG(not definition.workspaces.isEmpty(), "No workspaces defined");
+        if (definition.workspaces.isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::NoWorkspacesDefined);
         newAction.workspaceName = definition.workspaces[0].name.view();
     }
     if (newAction.projectName.isEmpty())
@@ -1128,7 +1129,7 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
     case Coverage: return Internal::coverage(definition, newAction);
     case Configure: return Internal::configure(definition, newAction);
     }
-    return Result::Error("Action::execute - unsupported action");
+    return Result::Error(BuildResultCategory, BuildError::UnsupportedAction);
 }
 
 SC::Result SC::Build::Action::Internal::configure(const Definition& definition, const Action& action)
