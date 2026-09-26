@@ -1358,7 +1358,8 @@ SC::Result SC::Build::Action::Internal::runExecutable(StringView executablePath,
     }
     globalConsole->flush();
     SC_TRY(runProcess.exec({arguments.data(), numArgs}));
-    SC_TRY_MSG(runProcess.getExitStatus() == 0, "Run exited with non zero status");
+    if (runProcess.getExitStatus() != 0)
+        return Result::Error(BuildResultCategory, BuildError::ExecutableExitedUnsuccessfully);
     return Result(true);
 }
 
@@ -1394,7 +1395,8 @@ static SC::Result extractLastNonEmptyOutputLine(SC::StringView output, SC::Strin
             lastNonEmptyLine = trimmedLine;
         }
     }
-    SC_TRY_MSG(not lastNonEmptyLine.isEmpty(), "Cannot extract non-empty output line");
+    if (lastNonEmptyLine.isEmpty())
+        return SC::Result::Error(SC::BuildResultCategory, SC::BuildError::ExecutablePathOutputMissing);
     line = lastNonEmptyLine;
     return SC::Result(true);
 }
@@ -1439,7 +1441,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
         case Action::Run:
             arguments[numArgs++] = "-showBuildSettings"; // 2
             break;
-        default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
+        default: return Result::Error(BuildResultCategory, BuildError::UnsupportedAction);
         }
         arguments[numArgs++] = "-configuration";         // 3
         arguments[numArgs++] = action.configurationName; // 4
@@ -1473,7 +1475,8 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
         {
             String output = StringEncoding::Utf8;
             SC_TRY(process.exec({arguments, numArgs}, output));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Run returned error");
+            if (process.getExitStatus() != 0)
+                return Result::Error(BuildResultCategory, BuildError::ExecutablePathQueryFailed);
             StringViewTokenizer tokenizer(output.view());
             StringView          path, targetName;
             while (tokenizer.tokenizeNextLine())
@@ -1495,7 +1498,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
 
             if (path.isEmpty() or targetName.isEmpty())
             {
-                return Result::Error("Cannot find TARGET_BUILD_DIR and EXECUTABLE_NAME");
+                return Result::Error(BuildResultCategory, BuildError::ExecutablePathUnavailable);
             }
             String userExecutable;
             SC_TRY(Path::join(userExecutable, {path, "/", targetName}));
@@ -1528,7 +1531,8 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             {
                 SC_TRY(process.exec({arguments, numArgs}));
             }
-            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+            if (process.getExitStatus() != 0)
+                return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
         }
     }
     break;
@@ -1573,13 +1577,15 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             {
                 SC_TRY(process.exec({arguments, numArgs}));
             }
-            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+            if (process.getExitStatus() != 0)
+                return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
             break;
         case Action::Print:
         case Action::Run: {
             String output = StringEncoding::Utf8; // TODO: Check encoding of Visual Studio Output.
             SC_TRY(process.exec({arguments, numArgs}, output));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+            if (process.getExitStatus() != 0)
+                return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
             StringViewTokenizer tokenizer(output.view());
             StringView          executablePath;
             while (tokenizer.tokenizeNextLine())
@@ -1590,7 +1596,8 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
                     break;
                 }
             }
-            SC_TRY_MSG(not executablePath.isEmpty(), "Cannot find executable path from .vcxproj");
+            if (executablePath.isEmpty())
+                return Result::Error(BuildResultCategory, BuildError::ExecutablePathUnavailable);
             if (action.action == Action::Run)
             {
                 SC_TRY(runExecutable(executablePath, arguments, action));
@@ -1604,7 +1611,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             }
         }
         break;
-        default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
+        default: return Result::Error(BuildResultCategory, BuildError::UnsupportedAction);
         }
     }
     break;
@@ -1614,11 +1621,12 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
         {
             const Workspace* workspace      = nullptr;
             size_t           workspaceIndex = 0;
-            SC_TRY_MSG(definition.workspaces.find([&](const Workspace& item)
-                                                  { return item.name == action.workspaceName; }, &workspaceIndex),
-                       "Cannot find requested workspace");
+            if (not definition.workspaces.find([&](const Workspace& item) { return item.name == action.workspaceName; },
+                                               &workspaceIndex))
+                return Result::Error(BuildResultCategory, BuildError::WorkspaceNotFound);
             workspace = &definition.workspaces[workspaceIndex];
-            SC_TRY_MSG(workspace->projects.size() == 1, "Run requires selecting a single project");
+            if (workspace->projects.size() != 1)
+                return Result::Error(BuildResultCategory, BuildError::RunRequiresSingleProject);
             makeTargetProjectName = workspace->projects[0].name.view();
         }
 
@@ -1632,9 +1640,9 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             {
                 (void)(workspace);
                 (void)(configuration);
-                SC_TRY_MSG(project->targetType == TargetType::ConsoleExecutable or
-                               project->targetType == TargetType::GUIApplication,
-                           "Run requires an executable target");
+                if (project->targetType != TargetType::ConsoleExecutable and
+                    project->targetType != TargetType::GUIApplication)
+                    return Result::Error(BuildResultCategory, BuildError::RunRequiresExecutableTarget);
             }
         }
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
@@ -1683,7 +1691,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", makeTargetProjectName));
         }
         break;
-        default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
+        default: return Result::Error(BuildResultCategory, BuildError::UnsupportedAction);
         }
 
         arguments[numArgs++] = targetName.view();            // 2
@@ -1755,9 +1763,9 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
                         return Result(true);
                     }
                 }
-                return Result::Error("Compile returned error");
+                return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
             }
-            return Result::Error("Compile returned error");
+            return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
         };
 
         if (action.action == Action::Print)
@@ -1778,7 +1786,8 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             SC_TRY(setMakeEnvironment(process));
             String executableName;
             SC_TRY(process.exec({arguments, numArgs}, executableName));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Print returned error");
+            if (process.getExitStatus() != 0)
+                return Result::Error(BuildResultCategory, BuildError::ExecutablePathQueryFailed);
             StringView executablePath;
             SC_TRY(extractLastNonEmptyOutputLine(executableName.view(), executablePath));
             SC_TRY(runExecutable(executablePath, arguments, action));

@@ -79,6 +79,13 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
         formatter.append("Coverage report generator exited unsuccessfully");
         break;
     case BuildError::CoveragePercentageInvalid: formatter.append("Coverage percentage is invalid"); break;
+    case BuildError::ExecutableExitedUnsuccessfully: formatter.append("Executable exited unsuccessfully"); break;
+    case BuildError::ExecutablePathOutputMissing: formatter.append("Executable path output is missing"); break;
+    case BuildError::ExecutablePathUnavailable: formatter.append("Build did not provide an executable path"); break;
+    case BuildError::BuildCommandExitedUnsuccessfully: formatter.append("Build command exited unsuccessfully"); break;
+    case BuildError::ExecutablePathQueryFailed: formatter.append("Executable path query failed"); break;
+    case BuildError::RunRequiresSingleProject: formatter.append("Run requires one project"); break;
+    case BuildError::RunRequiresExecutableTarget: formatter.append("Run requires an executable target"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -47,6 +47,13 @@ enum class BuildError : uint32_t
     CoverageReportLaunchFailed,
     CoverageReportExitedUnsuccessfully,
     CoveragePercentageInvalid,
+    ExecutableExitedUnsuccessfully,
+    ExecutablePathOutputMissing,
+    ExecutablePathUnavailable,
+    BuildCommandExitedUnsuccessfully,
+    ExecutablePathQueryFailed,
+    RunRequiresSingleProject,
+    RunRequiresExecutableTarget,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);
