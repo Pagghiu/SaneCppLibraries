@@ -86,6 +86,12 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::ExecutablePathQueryFailed: formatter.append("Executable path query failed"); break;
     case BuildError::RunRequiresSingleProject: formatter.append("Run requires one project"); break;
     case BuildError::RunRequiresExecutableTarget: formatter.append("Run requires an executable target"); break;
+    case BuildError::CommandArgumentLimitExceeded: formatter.append("Native command has too many arguments"); break;
+    case BuildError::ResolvedDependencyNotFound: formatter.append("Resolved build dependency was not found"); break;
+    case BuildError::StripUnsupported: formatter.append("Stripping is unsupported for this target"); break;
+    case BuildError::ExportedSymbolsUnsupported:
+        formatter.append("Preserving exported symbols is unsupported for this target");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

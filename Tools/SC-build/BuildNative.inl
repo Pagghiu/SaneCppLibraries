@@ -5,6 +5,7 @@
 #include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/Common/PlatformInstructionSet.h"
 #include "../../Libraries/Common/PlatformType.h"
+#include "../../Libraries/File/FileError.h"
 #include "BuildWriter.h"
 
 #include "../../Libraries/FileSystem/FileSystem.h"
@@ -166,7 +167,8 @@ struct SC::Build::NativeBuild
         template <size_t N>
         Result toViews(StringSpan (&views)[N], Span<const StringSpan>& outViews) const
         {
-            SC_TRY_MSG(arguments.size() <= N, "Command line exceeds internal argument limit");
+            if (arguments.size() > N)
+                return Result::Error(BuildResultCategory, BuildError::CommandArgumentLimitExceeded);
             for (size_t idx = 0; idx < arguments.size(); ++idx)
             {
                 views[idx] = arguments[idx].view();
@@ -397,8 +399,10 @@ struct SC::Build::NativeBuild
                 SC_TRY(slot.stdErrPipe.createPipe(pipeOptions));
                 SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(slot.stdOutPipe.readPipe));
                 SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(slot.stdErrPipe.readPipe));
-                SC_TRY(slot.stdOutPipe.readPipe.get(slot.asyncStdOut.handle, Result::Error("stdout handle")));
-                SC_TRY(slot.stdErrPipe.readPipe.get(slot.asyncStdErr.handle, Result::Error("stderr handle")));
+                SC_TRY(slot.stdOutPipe.readPipe.get(slot.asyncStdOut.handle,
+                                                    Result::Error(FileResultCategory, FileError::InvalidHandle)));
+                SC_TRY(slot.stdErrPipe.readPipe.get(slot.asyncStdErr.handle,
+                                                    Result::Error(FileResultCategory, FileError::InvalidHandle)));
                 slot.asyncStdOut.buffer   = slot.stdOutBuffer;
                 slot.asyncStdErr.buffer   = slot.stdErrBuffer;
                 slot.asyncStdOut.callback = [this, &slot](AsyncFileRead::Result& readResult)
@@ -495,9 +499,8 @@ struct SC::Build::NativeBuild
     static Result findResolvedProjectIndex(const Vector<ResolvedProject>& resolvedProjects, const Project& project,
                                            size_t& outIndex)
     {
-        SC_TRY_MSG(
-            resolvedProjects.find([&](const ResolvedProject& item) { return item.project == &project; }, &outIndex),
-            "Resolved dependency not found");
+        if (not resolvedProjects.find([&](const ResolvedProject& item) { return item.project == &project; }, &outIndex))
+            return Result::Error(BuildResultCategory, BuildError::ResolvedDependencyNotFound);
         return Result(true);
     }
 
@@ -630,7 +633,7 @@ struct SC::Build::NativeBuild
             break;
         case Platform::Unknown:
         case Platform::Windows:
-        case Platform::Wasm: return Result::Error("Strip command is unsupported on this platform");
+        case Platform::Wasm: return Result::Error(BuildResultCategory, BuildError::StripUnsupported);
         }
         SC_TRY(commandLine.append(resolvedProject.executablePath.view()));
         return Result(true);
@@ -678,7 +681,7 @@ struct SC::Build::NativeBuild
                 break;
             case Platform::Unknown:
             case Platform::Windows:
-            case Platform::Wasm: return Result::Error("Exported symbols preservation is unsupported on this platform");
+            case Platform::Wasm: return Result::Error(BuildResultCategory, BuildError::ExportedSymbolsUnsupported);
             }
             SC_TRY(nmCommand.append(source.objectPath.view()));
 
@@ -686,7 +689,8 @@ struct SC::Build::NativeBuild
             SC_TRY(initializeJobRecord(0, 0, NativeJobKind::Link, "NM"_a8, source.displayPath.view(), StringView(),
                                        StringView(), nmJob));
             SC_TRY(runCapturedCommand(fs, nmCommand, StringView(), resolvedProject.adapter, StringView(), nmJob));
-            SC_TRY_MSG(nmJob.status == NativeJobStatus::Succeeded, "Native backend command failed");
+            if (nmJob.status != NativeJobStatus::Succeeded)
+                return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
             SC_TRY(appendUniqueSymbolLines(nmJob.stdOut.view(), symbols));
         }
 
@@ -777,10 +781,9 @@ struct SC::Build::NativeBuild
         Process process;
         if (not commandWorkingDirectory.isEmpty())
         {
-            SC_TRY_MSG(process.setWorkingDirectory(commandWorkingDirectory),
-                       "Failed setting native command working directory");
+            SC_TRY(process.setWorkingDirectory(commandWorkingDirectory));
         }
-        SC_TRY_MSG(process.exec(args, job.stdOut, Process::StdIn(), job.stdErr), "Failed executing native command");
+        SC_TRY(process.exec(args, job.stdOut, Process::StdIn(), job.stdErr));
         job.exitStatus = process.getExitStatus();
         job.status     = job.exitStatus == 0 ? NativeJobStatus::Succeeded : NativeJobStatus::Failed;
         return Result(true);

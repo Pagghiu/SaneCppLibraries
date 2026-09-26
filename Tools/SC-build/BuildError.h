@@ -54,6 +54,10 @@ enum class BuildError : uint32_t
     ExecutablePathQueryFailed,
     RunRequiresSingleProject,
     RunRequiresExecutableTarget,
+    CommandArgumentLimitExceeded,
+    ResolvedDependencyNotFound,
+    StripUnsupported,
+    ExportedSymbolsUnsupported,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);
