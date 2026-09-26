@@ -26,6 +26,9 @@ Likewise, a POSIX-only failure while building an executable path during launch r
 
 Argument and environment capacity failures remain portable primary errors: `ArgumentCapacityExceeded` and
 `EnvironmentCapacityExceeded`.
+Setting a working directory reports portable path-capacity, absolute-base, malformed-path, or resolution identities
+instead of forwarding the private Windows path helper's uncategorized boolean conversion. Windows resolution retains
+its stage and native error number in `ResultProcess`; the POSIX caller-storage limit uses the same path-capacity code.
 The string arena is shared by argument and environment construction and is also reused by Plugin. Its caller supplies
 a structured capacity Result owned by the calling library, so exhaustion of its entry table or destination view never
 falls back to an embedded implementation-specific literal or silently takes Process ownership for Plugin failures.

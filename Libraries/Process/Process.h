@@ -45,6 +45,10 @@ enum class ProcessError : uint32_t
     WaitFailed,
     LaunchFailed,
     CloneFailed,
+    PathCapacityExceeded,
+    PathMustBeAbsolute,
+    InvalidPath,
+    PathResolutionFailed,
 };
 
 /// @brief Stable diagnostic stages for Process failures.
@@ -64,6 +68,7 @@ enum class ProcessErrorDetail : uint32_t
     WindowsCreateProcess,
     WindowsRtlCloneUserProcess,
     WindowsNtWaitForSingleObject,
+    WindowsResolveWorkingDirectory,
 };
 
 /// @brief Stable category assigned to errors owned by the Process library.

@@ -28,6 +28,9 @@ inline bool appendProcessErrorDetail(ResultErrorFormatter& formatter, ProcessErr
     case ProcessErrorDetail::WindowsCreateProcess: formatter.append("Windows create process"); break;
     case ProcessErrorDetail::WindowsRtlCloneUserProcess: formatter.append("Windows clone process"); break;
     case ProcessErrorDetail::WindowsNtWaitForSingleObject: formatter.append("Windows wait for child"); break;
+    case ProcessErrorDetail::WindowsResolveWorkingDirectory:
+        formatter.append("Windows resolve working directory");
+        break;
     default: return false;
     }
     return true;
@@ -52,6 +55,10 @@ inline ResultErrorFormat formatProcessErrorWithDetails(ProcessError error, Proce
     case ProcessError::WaitFailed: formatter.append("Failed to wait for process"); break;
     case ProcessError::LaunchFailed: formatter.append("Failed to launch process"); break;
     case ProcessError::CloneFailed: formatter.append("Failed to clone process"); break;
+    case ProcessError::PathCapacityExceeded: formatter.append("Process path capacity exceeded"); break;
+    case ProcessError::PathMustBeAbsolute: formatter.append("Process path must be absolute"); break;
+    case ProcessError::InvalidPath: formatter.append("Process path is invalid"); break;
+    case ProcessError::PathResolutionFailed: formatter.append("Failed to resolve process path"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 

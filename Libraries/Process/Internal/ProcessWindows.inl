@@ -18,10 +18,21 @@ namespace ProcessWindowsDetail
 {
 #include "../../Common/WindowsPath.inl"
 
-static Result makeWorkingDirectoryAbsolute(StringSpan processWorkingDirectory, StringSpan currentDirectory,
-                                           StringPath& absoluteWorkingDirectory)
+static ResultProcess makeWorkingDirectoryAbsolute(StringSpan processWorkingDirectory, StringSpan currentDirectory,
+                                                  StringPath& absoluteWorkingDirectory)
 {
-    return WindowsPath::makeAbsoluteLogicalPath(processWorkingDirectory, currentDirectory, absoluteWorkingDirectory);
+    const WindowsPathResult path =
+        WindowsPath::makeAbsoluteLogicalPath(processWorkingDirectory, currentDirectory, absoluteWorkingDirectory);
+    constexpr ProcessErrorDetail detail = ProcessErrorDetail::WindowsResolveWorkingDirectory;
+    switch (path.error)
+    {
+    case WindowsPathError::None: return ResultProcess(true);
+    case WindowsPathError::CapacityExceeded: return {ProcessError::PathCapacityExceeded, detail};
+    case WindowsPathError::BasePathNotAbsolute: return {ProcessError::PathMustBeAbsolute, detail};
+    case WindowsPathError::MalformedPath: return {ProcessError::InvalidPath, detail};
+    case WindowsPathError::NativeCallFailed: return {ProcessError::PathResolutionFailed, detail, path.nativeError};
+    }
+    return {ProcessError::InvalidPath, detail};
 }
 } // namespace ProcessWindowsDetail
 } // namespace SC

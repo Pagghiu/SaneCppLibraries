@@ -145,6 +145,10 @@ void SC::ProcessTest::processError()
 
 void SC::ProcessTest::structuredErrorsAndFormatter()
 {
+    static_assert(static_cast<uint32_t>(ProcessError::PathCapacityExceeded) == 12,
+                  "Process primary errors are append-only");
+    static_assert(static_cast<uint32_t>(ProcessErrorDetail::WindowsResolveWorkingDirectory) == 13,
+                  "Process details are append-only");
     static_assert(sizeof(Result) != 8 or sizeof(ResultProcess) == 16,
                   "ResultProcess must meet the final 16-byte enriched-result target");
     static_assert(sizeof(Result) != 16 or sizeof(ResultProcess) == 24,
@@ -168,6 +172,22 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
     }
     const ResultProcess environmentCapacity = environmentProcess.setEnvironment("A", "B");
     SC_TEST_EXPECT(environmentCapacity.isError(ProcessError::EnvironmentCapacityExceeded));
+
+    native_char_t oversizedPath[StringPath::MaxPath + 2] = {};
+    for (size_t index = 0; index < StringPath::MaxPath + 1; ++index)
+        oversizedPath[index] = static_cast<native_char_t>('x');
+    const StringSpan    oversizedPathView({oversizedPath, StringPath::MaxPath + 1}, false, StringEncoding::Native);
+    Process             pathProcess;
+    const ResultProcess pathCapacity = pathProcess.setWorkingDirectory(oversizedPathView);
+    SC_TEST_EXPECT(pathCapacity.isError(ProcessError::PathCapacityExceeded));
+    SC_TEST_EXPECT(pathCapacity.toResult().isError(ProcessResultCategory, ProcessError::PathCapacityExceeded));
+    SC_TEST_EXPECT(pathCapacity.detail == (HostPlatform == Platform::Windows
+                                               ? ProcessErrorDetail::WindowsResolveWorkingDirectory
+                                               : ProcessErrorDetail::None));
+    constexpr char pathCapacityMessage[] = "Process path capacity exceeded";
+    char           pathCapacityOutput[sizeof(pathCapacityMessage)];
+    SC_TEST_EXPECT(formatProcessError(ProcessError::PathCapacityExceeded, pathCapacityOutput));
+    SC_TEST_EXPECT(::memcmp(pathCapacityOutput, pathCapacityMessage, sizeof(pathCapacityMessage)) == 0);
 
     {
         native_char_t              storage[32] = {};

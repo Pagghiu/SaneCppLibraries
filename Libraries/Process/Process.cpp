@@ -278,7 +278,9 @@ SC::ResultProcess SC::Process::setWorkingDirectory(StringSpan processWorkingDire
     return ProcessWindowsDetail::makeWorkingDirectoryAbsolute(processWorkingDirectory, currentDirectory.view(),
                                                               currentDirectory);
 #else
-    return Result(currentDirectory.assign(processWorkingDirectory));
+    if (not currentDirectory.assign(processWorkingDirectory))
+        return ResultProcess(ProcessError::PathCapacityExceeded);
+    return ResultProcess(true);
 #endif
 }
 
