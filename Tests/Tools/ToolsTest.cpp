@@ -1204,7 +1204,27 @@ struct SupportToolsTest : public TestCase
             arguments.action    = "info";
             args[0]             = "no-such-package";
             arguments.arguments = {args, 1};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownPackage));
+        }
+        if (test_section("package registry enforces unique bounded entries"))
+        {
+            PackageRegistryEntry   storage[1];
+            PackageRegistryBuilder builder = {{storage, 1}};
+            PackageRegistryEntry   first   = {"first", "first", PackageKind::Tool, "fixture", "host", "test"};
+            SC_TEST_EXPECT(builder.add(first));
+            SC_TEST_EXPECT(builder.add(first).isError(PackageResultCategory, PackageError::DuplicateRegistryEntry));
+            first.name = "second";
+            SC_TEST_EXPECT(builder.add(first).isError(PackageResultCategory, PackageError::RegistryCapacityExceeded));
+        }
+        if (test_section("package cli reports required inputs and unsupported action"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "repair";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::PackageNameRequired));
+
+            arguments.action = "not-an-action";
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnsupportedAction));
         }
         if (test_section("package commands accept external registry"))
         {
@@ -1490,7 +1510,8 @@ struct SupportToolsTest : public TestCase
             const PackageRegistry      badRecipeRegistry = {{&badRecipeEntry, 1}};
             args[0]                                      = "copy-fake-bad";
             arguments.action                             = "install";
-            SC_TEST_EXPECT(not runPackageTool(arguments, badRecipeRegistry, &package));
+            SC_TEST_EXPECT(runPackageTool(arguments, badRecipeRegistry, &package)
+                               .isError(PackageResultCategory, PackageError::RecipePhaseUnknown));
         }
         if (test_section("package receipt resolves exports and capabilities"))
         {

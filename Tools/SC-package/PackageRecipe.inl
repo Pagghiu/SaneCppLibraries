@@ -3,8 +3,10 @@
 
 static Result copyPackageRecipeDirectory(const PackageRecipe& recipe, Package& package)
 {
-    SC_TRY_MSG(not recipe.copySourceDirectory.isEmpty(), "Package copy recipe is missing source directory");
-    SC_TRY_MSG(not package.installDirectoryLink.isEmpty(), "Package copy recipe is missing install directory");
+    if (recipe.copySourceDirectory.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::CopySourceDirectoryMissing);
+    if (package.installDirectoryLink.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::InstallDirectoryMissing);
 
     FileSystem fs;
     SC_TRY(fs.init("."));
@@ -39,8 +41,10 @@ static Result runPackageRecipePhases(const PackageRecipe& recipe, Package& packa
     for (StringView phaseName : recipe.phases)
     {
         const PackagePhaseRegistryEntry* phase = phaseRegistry.find(phaseName);
-        SC_TRY_MSG(phase != nullptr, "Unknown package recipe phase");
-        SC_TRY_MSG(phase->handler != nullptr, "Package recipe phase is missing handler");
+        if (phase == nullptr)
+            return Result::Error(PackageResultCategory, PackageError::RecipePhaseUnknown);
+        if (phase->handler == nullptr)
+            return Result::Error(PackageResultCategory, PackageError::RecipePhaseHandlerMissing);
         SC_TRY(phase->handler(recipe, package));
     }
     return Result(true);

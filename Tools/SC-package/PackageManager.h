@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Tools.h"
+#include "PackageError.h"
 
 #include "../../Libraries/Common/Function.h"
 #include "../../Libraries/Common/PlatformInstructionSet.h"
@@ -230,8 +231,10 @@ struct PackageRegistryBuilder
 
     [[nodiscard]] Result add(const PackageRegistryEntry& entry)
     {
-        SC_TRY_MSG(registry().find(entry.name) == nullptr, "Duplicate package registry entry");
-        SC_TRY_MSG(size < entries.sizeInElements(), "Package registry storage exhausted");
+        if (registry().find(entry.name) != nullptr)
+            return Result::Error(PackageResultCategory, PackageError::DuplicateRegistryEntry);
+        if (size >= entries.sizeInElements())
+            return Result::Error(PackageResultCategory, PackageError::RegistryCapacityExceeded);
         entries[size] = entry;
         size += 1;
         return Result(true);

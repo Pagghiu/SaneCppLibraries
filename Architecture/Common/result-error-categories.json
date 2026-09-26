@@ -136,6 +136,12 @@
       "owner": "Build",
       "declaration": "Tools/SC-build/BuildError.h",
       "constant": "BuildResultCategory"
+    },
+    {
+      "value": 22,
+      "owner": "Package",
+      "declaration": "Tools/SC-package/PackageError.h",
+      "constant": "PackageResultCategory"
     }
   ]
 }

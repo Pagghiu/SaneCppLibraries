@@ -11,6 +11,7 @@
 #include "../SC.cpp"
 
 #include "SC-build/BuildErrorFormatter.h"
+#include "SC-package/PackageErrorFormatter.h"
 #include "Tools.h"
 #include "ToolsErrorFormatter.h"
 
@@ -125,12 +126,14 @@ int main(int argc, const char* argv[])
         {
             console.printLine(StringView::fromNullTerminated(result.message, StringEncoding::Ascii));
         }
-        else if (result.category() == ToolsResultCategory or result.category() == BuildResultCategory)
+        else if (result.category() == ToolsResultCategory or result.category() == BuildResultCategory or
+                 result.category() == PackageResultCategory)
         {
             char                    message[128];
-            const ResultErrorFormat formatted = result.category() == ToolsResultCategory
-                                                    ? formatToolsError(result, message)
-                                                    : formatBuildError(result, message);
+            const ResultErrorFormat formatted =
+                result.category() == ToolsResultCategory   ? formatToolsError(result, message)
+                : result.category() == BuildResultCategory ? formatBuildError(result, message)
+                                                           : formatPackageError(result, message);
             if (formatted)
                 console.printLine(StringView::fromNullTerminated(message, StringEncoding::Ascii));
             else

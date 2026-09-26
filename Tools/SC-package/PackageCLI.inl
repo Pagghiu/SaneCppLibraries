@@ -97,7 +97,7 @@ static Result printUnknownPackageError(Console& console, PackageRegistry registr
         console.print(registry.entries[idx].name);
     }
     console.printLine(""_a8);
-    return Result::Error("Invalid package name");
+    return Result::Error(PackageResultCategory, PackageError::UnknownPackage);
 }
 
 Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tools::Package* package)
@@ -171,7 +171,7 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
         }
         else
         {
-            return Result::Error("Package registry entry is missing install handler or recipe");
+            return Result::Error(PackageResultCategory, PackageError::InstallHandlerMissing);
         }
     }
     else if (arguments.action == "list")
@@ -226,7 +226,8 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
         {
             console.print("not installed: ");
             console.printLine(entry->name);
-            return arguments.action == "verify" ? Result::Error("Package receipt not found") : Result(true);
+            return arguments.action == "verify" ? Result::Error(PackageResultCategory, PackageError::ReceiptNotFound)
+                                                : Result(true);
         }
         if (arguments.action == "verify")
         {
@@ -264,7 +265,8 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
     }
     else if (arguments.action == "repair")
     {
-        SC_TRY_MSG(not arguments.arguments.empty(), "Package repair requires a package name");
+        if (arguments.arguments.empty())
+            return Result::Error(PackageResultCategory, PackageError::PackageNameRequired);
         const StringView            packageName = packageNameFromArguments();
         const PackageRegistryEntry* entry       = registry.find(packageName);
         if (entry == nullptr)
@@ -305,7 +307,7 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
     {
         SC_TRY(StringBuilder::format(buffer, "SC-package no action named \"{}\" exists", arguments.action));
         console.printLine(buffer.view());
-        return Result::Error("SC-package error executing action");
+        return Result::Error(PackageResultCategory, PackageError::UnsupportedAction);
     }
     return Result(true);
 }
