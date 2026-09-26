@@ -130,6 +130,12 @@
       "owner": "Tools",
       "declaration": "Tools/ToolsError.h",
       "constant": "ToolsResultCategory"
+    },
+    {
+      "value": 21,
+      "owner": "Build",
+      "declaration": "Tools/SC-build/BuildError.h",
+      "constant": "BuildResultCategory"
     }
   ]
 }

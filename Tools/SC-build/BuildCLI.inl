@@ -26,7 +26,8 @@ static Result appendHelpLine(StringFormatOutput& output, StringView format, Type
 {
     String line = StringEncoding::Utf8;
     SC_TRY(StringBuilder::format(line, format, forward<Types>(types)...));
-    SC_TRY_MSG(output.append(line.view()), "Failed writing SC-build help");
+    if (not output.append(line.view()))
+        return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
     return Result(true);
 }
 
@@ -58,8 +59,8 @@ static constexpr StringView helpArchitectureName(Build::Architecture::Type archi
 
 static Result appendNativeBackendSupportHelp(StringFormatOutput& output)
 {
-    SC_TRY_MSG(output.append("\nCurrent native-backend support matrix:\n"),
-               "Failed writing SC-build support matrix help");
+    if (not output.append("\nCurrent native-backend support matrix:\n"))
+        return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
     for (const Build::SupportMatrixEntry& entry : Build::getNativeBackendSupportMatrix())
     {
         SC_TRY(appendHelpLine(output, "  - {} -> {}-{}: build={}, run={}, runner={}, tier={}\n",
@@ -77,66 +78,67 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
 {
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
     {
-        SC_TRY_MSG(output.append("\nTarget profiles:\n"
-                                 "  - host / native: build for the current host machine\n"
-                                 "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
-                                 "  - linux-glibc-x86_64: Linux glibc target profile\n"
-                                 "  - linux-glibc-arm64: Linux glibc arm64 target profile\n"
-                                 "  - linux-musl-x86_64: Linux musl target profile\n"
-                                 "  - linux-musl-arm64: Linux musl arm64 target profile\n"
-                                 "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
-                                 "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
-                                 "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"),
-                   "Failed writing SC-build help");
-        SC_TRY_MSG(output.append("\nToolchain values:\n"
-                                 "  - default / host-default: host-default compiler family\n"
-                                 "  - clang: explicit clang-family driver\n"
-                                 "  - gcc: explicit GCC-family driver\n"
-                                 "  - msvc: explicit MSVC toolchain family\n"
-                                 "  - clang-cl: explicit clang-cl toolchain family\n"
-                                 "  - llvm-mingw: packaged Windows GNU cross-toolchain\n"
-                                 "  - filc: experimental Linux-only Fil-C compiler track\n"),
-                   "Failed writing SC-build help");
+        if (not output.append("\nTarget profiles:\n"
+                              "  - host / native: build for the current host machine\n"
+                              "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
+                              "  - linux-glibc-x86_64: Linux glibc target profile\n"
+                              "  - linux-glibc-arm64: Linux glibc arm64 target profile\n"
+                              "  - linux-musl-x86_64: Linux musl target profile\n"
+                              "  - linux-musl-arm64: Linux musl arm64 target profile\n"
+                              "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
+                              "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
+                              "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"))
+            return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
+        if (not output.append("\nToolchain values:\n"
+                              "  - default / host-default: host-default compiler family\n"
+                              "  - clang: explicit clang-family driver\n"
+                              "  - gcc: explicit GCC-family driver\n"
+                              "  - msvc: explicit MSVC toolchain family\n"
+                              "  - clang-cl: explicit clang-cl toolchain family\n"
+                              "  - llvm-mingw: packaged Windows GNU cross-toolchain\n"
+                              "  - filc: experimental Linux-only Fil-C compiler track\n"))
+            return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
         SC_TRY(appendNativeBackendSupportHelp(output));
-        SC_TRY_MSG(output.append("\nExperimental compiler track:\n"
-                                 "  - Linux hosts can experiment with Fil-C through --toolchain filc for native "
-                                 "x86_64 Linux builds\n"
-                                 "  - Fil-C is toolchain-only for now; no linux-filc-* target profile exists\n"),
-                   "Failed writing SC-build help");
-        SC_TRY_MSG(output.append(
-                       "\nRaw override escape hatches:\n"
-                       "  - --abi is reserved for a future public ABI selector; use --target for glibc/musl/GNU/MSVC "
-                       "selection today\n"
-                       "  - --triple overrides the resolved compiler target triple\n"
-                       "  - --sysroot overrides the resolved toolchain sysroot\n"
-                       "  - --windows-long-path-aware selects the default Windows runtime long-path policy "
-                       "(default/on/off)\n"
-                       "  - raw overrides apply after --target and therefore take precedence over friendly profiles\n"),
-                   "Failed writing SC-build help");
+        if (not output.append("\nExperimental compiler track:\n"
+                              "  - Linux hosts can experiment with Fil-C through --toolchain filc for native "
+                              "x86_64 Linux builds\n"
+                              "  - Fil-C is toolchain-only for now; no linux-filc-* target profile exists\n"))
+            return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
+        if (not output.append(
+                "\nRaw override escape hatches:\n"
+                "  - --abi is reserved for a future public ABI selector; use --target for glibc/musl/GNU/MSVC "
+                "selection today\n"
+                "  - --triple overrides the resolved compiler target triple\n"
+                "  - --sysroot overrides the resolved toolchain sysroot\n"
+                "  - --windows-long-path-aware selects the default Windows runtime long-path policy "
+                "(default/on/off)\n"
+                "  - raw overrides apply after --target and therefore take precedence over friendly profiles\n"))
+            return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
     }
 
     if (actionType == Build::Action::Run)
     {
-        SC_TRY_MSG(output.append("\nRunner values:\n"
-                                 "  - auto: use a host-specific runner when the host/target pair supports it\n"
-                                 "  - none: disable foreign-runner wrapping\n"
-                                 "  - wine: force Wine for Windows GNU targets\n"
-                                 "  - qemu: wrap foreign Linux targets through qemu-user\n"
-                                 "  - custom: wrap execution with a custom executable\n"),
-                   "Failed writing SC-build help");
-        SC_TRY_MSG(output.append("\nArguments after -- are forwarded to the built executable.\n"),
-                   "Failed writing SC-build help");
+        if (not output.append("\nRunner values:\n"
+                              "  - auto: use a host-specific runner when the host/target pair supports it\n"
+                              "  - none: disable foreign-runner wrapping\n"
+                              "  - wine: force Wine for Windows GNU targets\n"
+                              "  - qemu: wrap foreign Linux targets through qemu-user\n"
+                              "  - custom: wrap execution with a custom executable\n"))
+            return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
+        if (not output.append("\nArguments after -- are forwarded to the built executable.\n"))
+            return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
     }
-    SC_TRY_MSG(output.append("\nLegacy compatibility: after <target> you can still pass up to four positional "
-                             "values in this order: <config> <generator> <arch> <output>.\n"),
-               "Failed writing SC-build help");
+    if (not output.append("\nLegacy compatibility: after <target> you can still pass up to four positional "
+                          "values in this order: <config> <generator> <arch> <output>.\n"))
+        return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
     return Result(true);
 }
 
 static Result printBuildActionHelp(const CommandLineSpec& spec, Build::Action::Type actionType, Console& console)
 {
     StringFormatOutput output(StringEncoding::Utf8, console, true);
-    SC_TRY_MSG(spec.writeHelp(output), "Failed writing SC-build help");
+    if (not spec.writeHelp(output))
+        return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
     SC_TRY(appendBuildActionHelpAddendum(output, actionType));
     console.flush();
     return Result(true);
@@ -148,13 +150,14 @@ static Result printBuildActionParseError(const CommandLineSpec& spec, const Comm
     StringFormatOutput output(StringEncoding::Utf8, console, false);
     if (parseResult.error == CommandLineParseResult::Error::InsufficientPositionalStorage)
     {
-        SC_TRY_MSG(output.append("Too many legacy positional arguments after <target>. Supported order is: <config> "
-                                 "<generator> <arch> <output>.\nUse --help to show usage.\n"),
-                   "Failed writing SC-build parse error");
+        if (not output.append("Too many legacy positional arguments after <target>. Supported order is: <config> "
+                              "<generator> <arch> <output>.\nUse --help to show usage.\n"))
+            return Result::Error(BuildResultCategory, BuildError::ParseErrorOutputFailed);
     }
     else
     {
-        SC_TRY_MSG(spec.writeError(parseResult, output), "Failed writing SC-build parse error");
+        if (not spec.writeError(parseResult, output))
+            return Result::Error(BuildResultCategory, BuildError::ParseErrorOutputFailed);
     }
     console.flushStdErr();
     return Result(true);
@@ -164,7 +167,7 @@ static Result printBuildActionValueError(Console& console, StringView optionName
 {
     console.printError("{} {}: {}\n", message, optionName, value);
     console.flushStdErr();
-    return Result::Error("Invalid SC-build option value");
+    return Result::Error(BuildResultCategory, BuildError::InvalidOptionValue);
 }
 
 static Result markBuildCLIValueError(Result result, BuildCLIStatus& status)
@@ -194,7 +197,7 @@ static Result printBuildActionAmbiguity(Console& console, StringView optionName,
     builder.finalize();
     console.printError(details.view());
     console.flushStdErr();
-    return Result::Error("Ambiguous SC-build option value");
+    return Result::Error(BuildResultCategory, BuildError::AmbiguousOptionValue);
 }
 
 static Result splitBuildArgumentsAtTerminator(Span<const StringView>  arguments,
@@ -687,7 +690,7 @@ static Result printBuildActionCombinationError(Console& console, StringView mess
 {
     console.printError("{}\n", message);
     console.flushStdErr();
-    return Result::Error("Invalid SC-build option combination");
+    return Result::Error(BuildResultCategory, BuildError::InvalidOptionCombination);
 }
 
 static Result resolveBuildGeneratorKeyword(StringView value, StringView& resolved, Console& console)
@@ -1044,7 +1047,7 @@ static Result scanNamedOutputMode(Span<const StringView> arguments, Build::Outpu
                 case 'o':
                     if (shortGroup.sizeInBytes() != 1)
                     {
-                        return Result::Error("Invalid short option group");
+                        return Result::Error(BuildResultCategory, BuildError::InvalidShortOptionGroup);
                     }
                     SC_TRY(resolveOutputModeValue(
                         idx + 1 < arguments.sizeInElements() ? arguments[idx + 1] : StringView(), outputMode, console));
@@ -1085,7 +1088,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     case Platform::Windows:
     case Platform::Apple:
     case Platform::Linux: applyHostDefaultBuildParameters(action); break;
-    default: return Result::Error("Unsupported platform for compile");
+    default: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     }
 
     Span<const StringView> preArguments;
@@ -1238,7 +1241,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     {
         SC_TRY(printBuildActionParseError(spec, parseResult, arguments.console));
         status = BuildCLIStatus::Error;
-        return Result::Error("Invalid SC-build arguments");
+        return Result::Error(BuildResultCategory, BuildError::InvalidArguments);
     }
 
     if (actionType != Build::Action::Run and postArguments.sizeInElements() > 0)
@@ -1246,7 +1249,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
         arguments.console.printError("Arguments after -- are only supported by \"build run\".\n");
         arguments.console.flushStdErr();
         status = BuildCLIStatus::Error;
-        return Result::Error("Unexpected arguments after --");
+        return Result::Error(BuildResultCategory, BuildError::UnexpectedForwardedArguments);
     }
     action.additionalArguments = postArguments;
 
@@ -1388,15 +1391,15 @@ static Result prepareConfigureActionArguments(Tool::Arguments& arguments, Build:
             {
                 if (value.isEmpty())
                 {
-                    SC_TRY_MSG(idx + 1 < arguments.arguments.sizeInElements(),
-                               "Missing value for --windows-long-path-aware");
+                    if (idx + 1 >= arguments.arguments.sizeInElements())
+                        return Result::Error(BuildResultCategory, BuildError::MissingLongPathPolicyValue);
                     value = arguments.arguments[idx + 1];
                     idx += 1;
                 }
                 SC_TRY(detail::applyWindowsLongPathAwareValue(action, value, arguments.console));
                 continue;
             }
-            return Result::Error("Unknown SC-build configure option");
+            return Result::Error(BuildResultCategory, BuildError::UnknownConfigureOption);
         }
 
         if (not targetSet)
@@ -1464,7 +1467,7 @@ static Result runBuildAction(Build::Action::Type actionType, Tool::Arguments& ar
     }
     if (status == detail::BuildCLIStatus::Error)
     {
-        return Result::Error("Invalid SC-build arguments");
+        return Result::Error(BuildResultCategory, BuildError::InvalidArguments);
     }
 
     SC_TRY(runBuildValidate(arguments, action.parameters.directories));
@@ -1496,10 +1499,11 @@ static Result runBuildDocumentation(StringView doxygenExecutable, Tool::Argument
     case Platform::Apple: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "macos")); break;
     case Platform::Linux: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "linux")); break;
     case Platform::Windows: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "windows")); break;
-    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    case Platform::Emscripten: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     }
     SC_TRY(process.exec({doxygenExecutable}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Build documentation failed");
+    if (process.getExitStatus() != 0)
+        return Result::Error(BuildResultCategory, BuildError::DocumentationCommandFailed);
 
     SC_TRY(Path::join(outputDirectory, {arguments.toolDestination.view(), "_Documentation", "docs"}));
     {
@@ -1550,8 +1554,7 @@ Result runBuildTool(Tool::Arguments& arguments)
 #endif
     else
     {
-        return Result::Error("SC-build unknown action (supported \"configure\", \"compile\", \"run\", \"coverage\", or "
-                             "\"documentation\")");
+        return Result::Error(BuildResultCategory, BuildError::UnsupportedAction);
     }
 }
 } // namespace Tools

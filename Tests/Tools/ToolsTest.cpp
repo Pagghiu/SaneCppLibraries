@@ -7,6 +7,7 @@
 #include "Libraries/Testing/Testing.h"
 #include "Tools/SC-build.h"
 #include "Tools/SC-build/BuildCLI.h"
+#include "Tools/SC-build/BuildErrorFormatter.h"
 #include "Tools/SC-package.h"
 #include "Tools/ToolsErrorFormatter.h"
 
@@ -210,6 +211,22 @@ struct SupportToolsTest : public TestCase
                 ResultErrorFormatStatus::ForeignCategory);
             SC_TEST_EXPECT(formatToolsError(Result::Error(ToolsResultCategory, 9999), message).status ==
                            ResultErrorFormatStatus::UnknownError);
+        }
+        if (test_section("build cli structured errors"))
+        {
+            static_assert(static_cast<uint32_t>(BuildError::UnsupportedAction) == 13, "Build errors are append-only");
+            arguments.tool           = "build";
+            arguments.action         = "unknown";
+            const Result unsupported = runBuildTool(arguments);
+            SC_TEST_EXPECT(unsupported.isError(BuildResultCategory, BuildError::UnsupportedAction));
+
+            char message[64];
+            SC_TEST_EXPECT(formatBuildError(unsupported, message));
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(message, StringEncoding::Ascii) ==
+                           "Build action is unsupported");
+            SC_TEST_EXPECT(
+                formatBuildError(Result::Error(ToolsResultCategory, ToolsError::UnsupportedFormatAction), message)
+                    .status == ResultErrorFormatStatus::ForeignCategory);
         }
         if (test_section("build cli parses legacy positional arguments"))
         {
@@ -915,7 +932,9 @@ struct SupportToolsTest : public TestCase
             Build::Action           action;
             BuildCLIResolvedStorage storage;
             BuildCLIStatus          status = BuildCLIStatus::Ready;
-            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            const Result            invalidArguments =
+                prepareBuildAction(Build::Action::Compile, arguments, action, storage, status);
+            SC_TEST_EXPECT(invalidArguments.isError(BuildResultCategory, BuildError::InvalidArguments));
             SC_TEST_EXPECT(status == BuildCLIStatus::Error);
         }
         if (test_section("build cli passes configuration names through unchanged"))

@@ -12,8 +12,8 @@ Putting tool failures in Common or in an unrelated library would make library er
 ## Decision
 
 Tools own built-in Result categories as subsystems, registered in the same append-only category registry as libraries.
-The common tool runner and formatter own `ToolsResultCategory` and `ToolsError` under `Tools/`. More complex build and
-package tools may add separate tool-owned categories so one enum need not cover every tool. Tool error enums are
+The common tool runner and formatter own `ToolsResultCategory` and `ToolsError` under `Tools/`. SC-build owns a separate
+`BuildResultCategory` and `BuildError`; SC-package may likewise add its own category. Tool error enums are
 mandatory only for the owning tool; canonical English formatters remain optional, write into caller-owned storage,
 and are invoked by the command-line entry point that presents diagnostics. Foreign library Results propagate with
 their original category and code.

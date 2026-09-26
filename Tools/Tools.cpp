@@ -10,6 +10,7 @@
 
 #include "../SC.cpp"
 
+#include "SC-build/BuildErrorFormatter.h"
 #include "Tools.h"
 #include "ToolsErrorFormatter.h"
 
@@ -124,10 +125,13 @@ int main(int argc, const char* argv[])
         {
             console.printLine(StringView::fromNullTerminated(result.message, StringEncoding::Ascii));
         }
-        else if (result.category() == ToolsResultCategory)
+        else if (result.category() == ToolsResultCategory or result.category() == BuildResultCategory)
         {
-            char message[128];
-            if (formatToolsError(result, message))
+            char                    message[128];
+            const ResultErrorFormat formatted = result.category() == ToolsResultCategory
+                                                    ? formatToolsError(result, message)
+                                                    : formatBuildError(result, message);
+            if (formatted)
                 console.printLine(StringView::fromNullTerminated(message, StringEncoding::Ascii));
             else
                 console.print("Error category {}, code {}\n", result.category().value, result.errorValue());

@@ -5,6 +5,7 @@
 #include "../../Libraries/Containers/Vector.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/StringView.h"
+#include "BuildError.h"
 
 namespace SC
 {
