@@ -92,6 +92,9 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::ExportedSymbolsUnsupported:
         formatter.append("Preserving exported symbols is unsupported for this target");
         break;
+    case BuildError::PrintRequiresSingleProject: formatter.append("Print requires one project"); break;
+    case BuildError::RunnerUnavailableForTarget: formatter.append("Runner cannot execute the selected target"); break;
+    case BuildError::RunnerCommandMissing: formatter.append("Wrapped runner command is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

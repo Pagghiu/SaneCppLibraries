@@ -58,6 +58,9 @@ enum class BuildError : uint32_t
     ResolvedDependencyNotFound,
     StripUnsupported,
     ExportedSymbolsUnsupported,
+    PrintRequiresSingleProject,
+    RunnerUnavailableForTarget,
+    RunnerCommandMissing,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

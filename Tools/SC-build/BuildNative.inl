@@ -888,23 +888,21 @@ struct SC::Build::NativeBuild
             SC_TRY(reporter.printRebuildTrace(finalJob.stepName.view(), finalJob.label.view(),
                                               finalJob.rebuildReason.view()));
             SC_TRY(reporter.printStepStarted(finalJob));
-            SC_TRY_MSG(makeParentDirectory(fs, resolvedProject.executablePath.view()),
-                       "Failed creating parent directory for native final artifact");
+            SC_TRY(makeParentDirectory(fs, resolvedProject.executablePath.view()));
             if (resourceCommand.size() > 0)
             {
-                SC_TRY_MSG(makeParentDirectory(fs, resolvedProject.windowsLongPathResourcePath.view()),
-                           "Failed creating parent directory for native manifest resource");
+                SC_TRY(makeParentDirectory(fs, resolvedProject.windowsLongPathResourcePath.view()));
                 SC_TRY(runCapturedCommand(fs, resourceCommand, StringView(), resolvedProject.adapter,
                                           resolvedProject.commandWorkingDirectory.view(), finalJob));
                 if (finalJob.status != NativeJobStatus::Succeeded)
                 {
-                    SC_TRY_MSG(reporter.recordCompleted(finalJob), "Failed recording final job completion");
+                    SC_TRY(reporter.recordCompleted(finalJob));
                     return Result(true);
                 }
             }
             SC_TRY(runCapturedCommand(fs, finalCommand, finalResponsePath(resolvedProject), resolvedProject.adapter,
                                       resolvedProject.commandWorkingDirectory.view(), finalJob));
-            SC_TRY_MSG(reporter.recordCompleted(finalJob), "Failed recording final job completion");
+            SC_TRY(reporter.recordCompleted(finalJob));
             if (reporter.shouldStopScheduling())
             {
                 return Result(true);
@@ -924,8 +922,7 @@ struct SC::Build::NativeBuild
                     return Result(true);
                 }
             }
-            SC_TRY_MSG(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()),
-                       "Failed writing final link command file");
+            SC_TRY(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()));
         }
         else
         {
@@ -1106,7 +1103,7 @@ struct SC::Build::NativeBuild
             SC_TRY(reporter.printFinalSummary());
             if (reporter.shouldStopScheduling())
             {
-                return Result::Error("Native backend command failed");
+                return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
             }
             return Result(true);
         }
@@ -1156,7 +1153,7 @@ struct SC::Build::NativeBuild
         SC_TRY(reporter.printFinalSummary());
         if (reporter.shouldStopScheduling())
         {
-            return Result::Error("Native backend command failed");
+            return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
         }
         return Result(true);
     }
@@ -1174,7 +1171,8 @@ struct SC::Build::NativeBuild
 
         if (action.action == Action::Print)
         {
-            SC_TRY_MSG(resolvedProjects.size() == 1, "Print requires selecting a single project");
+            if (resolvedProjects.size() != 1)
+                return Result::Error(BuildResultCategory, BuildError::PrintRequiresSingleProject);
             SC_TRY(outputExecutable != nullptr);
             return Result(outputExecutable->assign(resolvedProjects[0].executablePath.view()));
         }
@@ -1195,17 +1193,17 @@ struct SC::Build::NativeBuild
 
         if (not workspaceCompileCommands.isEmpty())
         {
-            SC_TRY_MSG(writeCompileCommandsArray(fs, resolvedProjects[0].workspaceCompileCommandsPath.view(),
-                                                 workspaceCompileCommands.toSpanConst()),
-                       "Failed writing workspace compile_commands.json");
+            SC_TRY(writeCompileCommandsArray(fs, resolvedProjects[0].workspaceCompileCommandsPath.view(),
+                                             workspaceCompileCommands.toSpanConst()));
         }
 
         if (action.action == Action::Run)
         {
-            SC_TRY_MSG(resolvedProjects.size() == 1, "Run requires selecting a single project");
-            SC_TRY_MSG(resolvedProjects[0].project->targetType == TargetType::ConsoleExecutable or
-                           resolvedProjects[0].project->targetType == TargetType::GUIApplication,
-                       "Run requires an executable target");
+            if (resolvedProjects.size() != 1)
+                return Result::Error(BuildResultCategory, BuildError::RunRequiresSingleProject);
+            if (resolvedProjects[0].project->targetType != TargetType::ConsoleExecutable and
+                resolvedProjects[0].project->targetType != TargetType::GUIApplication)
+                return Result::Error(BuildResultCategory, BuildError::RunRequiresExecutableTarget);
             SC_TRY(runExecutable(resolvedProjects[0].executablePath.view(), action,
                                  resolvedProjects[0].project->targetType));
         }
@@ -1383,15 +1381,7 @@ struct SC::Build::NativeBuild
         {
             if (not bundledWineHasWindowsLoader(runner.executable.view(), targetArchitecture(targetContext)))
             {
-                if (targetContext.hostMachine.platform == Platform::Apple and
-                    targetArchitecture(targetContext) == Architecture::Arm64)
-                {
-                    return Result::Error(
-                        "Wine runner does not provide an ARM64 Windows loader; macOS Windows ARM64 run support is "
-                        "not yet available with the packaged Wine runner");
-                }
-                return Result::Error("Wine runner does not provide a Windows loader for the selected target "
-                                     "architecture");
+                return Result::Error(BuildResultCategory, BuildError::RunnerUnavailableForTarget);
             }
             String     prefixDirectory = StringEncoding::Utf8;
             StringView architectureName;
@@ -1438,7 +1428,8 @@ struct SC::Build::NativeBuild
         {
             if (runner.executable.isEmpty())
             {
-                SC_TRY_MSG(not runner.arguments.isEmpty(), "Missing wrapped runner command");
+                if (runner.arguments.isEmpty())
+                    return Result::Error(BuildResultCategory, BuildError::RunnerCommandMissing);
                 arguments[numArguments] = runner.arguments[0].view();
                 numArguments++;
                 for (size_t idx = 1; idx < runner.arguments.size(); ++idx)
@@ -1535,7 +1526,8 @@ struct SC::Build::NativeBuild
         }
         globalConsole->flush();
         SC_TRY(process.exec({arguments, numArguments}));
-        SC_TRY_MSG(process.getExitStatus() == 0, "Run exited with non zero status");
+        if (process.getExitStatus() != 0)
+            return Result::Error(BuildResultCategory, BuildError::ExecutableExitedUnsuccessfully);
         return Result(true);
     }
 
