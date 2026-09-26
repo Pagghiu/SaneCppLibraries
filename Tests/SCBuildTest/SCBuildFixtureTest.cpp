@@ -4299,6 +4299,16 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action cycleAction = makeNativeCompileAction(directories, "CycleLibraryA");
             SC_TEST_EXPECT(Build::Action::execute(cycleAction, configureWorkspaceDependencyCycle)
                                .isError(BuildResultCategory, BuildError::ProjectDependencyCycle));
+
+            Build::Action missingCCompiler               = action;
+            missingCCompiler.parameters.toolchain.family = Build::Toolchain::CustomDriver;
+            SC_TEST_EXPECT(Build::Action::execute(missingCCompiler, configureWorkspaceDependencyProgram)
+                               .isError(BuildResultCategory, BuildError::CustomCompilerCMissing));
+
+            Build::Action missingCppCompiler                  = missingCCompiler;
+            missingCppCompiler.parameters.toolchain.compilerC = "cc";
+            SC_TEST_EXPECT(Build::Action::execute(missingCppCompiler, configureWorkspaceDependencyProgram)
+                               .isError(BuildResultCategory, BuildError::CustomCompilerCppMissing));
         }
 
         if (test_section("native backend builds independent workspace targets together"))

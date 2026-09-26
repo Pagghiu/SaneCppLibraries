@@ -2889,7 +2889,7 @@ struct SC::Build::NativeBuild
         case TargetEnvironment::Native:
         case TargetEnvironment::WindowsGNU:
         case TargetEnvironment::WindowsMSVC:
-            return Result::Error("Packaged Linux sysroots require a Linux glibc or musl target");
+            return Result::Error(BuildResultCategory, BuildError::SysrootTargetUnsupported);
         }
 
         switch (targetArchitecture(context))
@@ -2898,7 +2898,7 @@ struct SC::Build::NativeBuild
         case Architecture::Arm64: spec.architecture = InstructionSet::ARM64; break;
         case Architecture::Intel32:
         case Architecture::Any:
-        case Architecture::Wasm: return Result::Error("Packaged Linux sysroots only support x86_64 and arm64");
+        case Architecture::Wasm: return Result::Error(BuildResultCategory, BuildError::SysrootTargetUnsupported);
         }
 
         Tools::Package sysrootPackage;
@@ -2921,7 +2921,7 @@ struct SC::Build::NativeBuild
         case Architecture::Arm64: directoryName = "arm64"; return Result(true);
         case Architecture::Intel32:
         case Architecture::Any:
-        case Architecture::Wasm: return Result::Error("Portable MSVC only supports x86_64 and arm64 targets");
+        case Architecture::Wasm: return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
         }
         Assert::unreachable();
     }
@@ -3628,7 +3628,7 @@ struct SC::Build::NativeBuild
             }
             if (not resolvedProject.resolvedSysroot.view().isEmpty())
             {
-                return Result::Error("Windows native sysroot selection is not implemented yet");
+                return Result::Error(BuildResultCategory, BuildError::SysrootUnsupportedForToolchain);
             }
             if (not targetTriple.isEmpty())
             {
@@ -3640,7 +3640,7 @@ struct SC::Build::NativeBuild
                 }
                 else
                 {
-                    return Result::Error("MSVC native target triple selection is not implemented yet");
+                    return Result::Error(BuildResultCategory, BuildError::TargetTripleUnsupportedForToolchain);
                 }
             }
             (void)(forCompiler);
@@ -4079,12 +4079,13 @@ struct SC::Build::NativeBuild
             SC_TRY(adapter.displayName.assign("clang"));
             break;
         case Toolchain::FilC:
-            SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Linux, "Fil-C is only supported on Linux hosts");
-            SC_TRY_MSG(targetPlatform(targetContext) == Platform::Linux and
-                           targetContext.targetMachine.environment == TargetEnvironment::Native,
-                       "Fil-C currently only supports native Linux targets");
-            SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
-                       "Fil-C currently only supports x86_64 Linux output");
+            if (targetContext.hostMachine.platform != Platform::Linux)
+                return Result::Error(BuildResultCategory, BuildError::ToolchainHostUnsupported);
+            if (targetPlatform(targetContext) != Platform::Linux or
+                targetContext.targetMachine.environment != TargetEnvironment::Native)
+                return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
+            if (targetArchitecture(targetContext) != Architecture::Intel64)
+                return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
             SC_TRY(resolvePackagedFilCToolchain(parameters, adapter));
             SC_TRY(adapter.displayName.assign("filc"));
             break;
@@ -4097,10 +4098,11 @@ struct SC::Build::NativeBuild
             SC_TRY(adapter.displayName.assign("gcc"));
             break;
         case Toolchain::LLVMMingw: {
-            SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
-                           targetContext.hostMachine.platform == Platform::Linux,
-                       "llvm-mingw cross compilation is only supported on macOS and Linux hosts");
-            SC_TRY_MSG(isWindowsGNUTarget(targetContext), "llvm-mingw requires a Windows GNU target");
+            if (targetContext.hostMachine.platform != Platform::Apple and
+                targetContext.hostMachine.platform != Platform::Linux)
+                return Result::Error(BuildResultCategory, BuildError::ToolchainHostUnsupported);
+            if (not isWindowsGNUTarget(targetContext))
+                return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
 
             Tools::Package llvmMingwPackage;
             SC_TRY(Tools::installLLVMMingwToolchain(parameters.directories.packagesCacheDirectory.view(),
@@ -4114,8 +4116,7 @@ struct SC::Build::NativeBuild
             case Architecture::Arm64: compilerPrefix = "aarch64-w64-mingw32"; break;
             case Architecture::Intel32:
             case Architecture::Any:
-            case Architecture::Wasm:
-                return Result::Error("llvm-mingw only supports x86_64 and arm64 Windows GNU targets");
+            case Architecture::Wasm: return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
             }
 
             const bool targetIntel64      = targetArchitecture(targetContext) == Architecture::Intel64;
@@ -4155,8 +4156,10 @@ struct SC::Build::NativeBuild
             break;
         }
         case Toolchain::CustomDriver:
-            SC_TRY_MSG(not toolchain.compilerC.isEmpty(), "CustomDriver requires compilerC");
-            SC_TRY_MSG(not toolchain.compilerCpp.isEmpty(), "CustomDriver requires compilerCpp");
+            if (toolchain.compilerC.view().isEmpty())
+                return Result::Error(BuildResultCategory, BuildError::CustomCompilerCMissing);
+            if (toolchain.compilerCpp.view().isEmpty())
+                return Result::Error(BuildResultCategory, BuildError::CustomCompilerCppMissing);
             SC_TRY(resolveExecutable(toolchain.compilerC.view(), StringView(), adapter.executableC));
             SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), StringView(), adapter.executableCpp));
             SC_TRY(resolveExecutable(toolchain.linker.view(), adapter.executableCpp.view(), adapter.executableLink));
@@ -4166,9 +4169,9 @@ struct SC::Build::NativeBuild
         case Toolchain::MSVC:
             if (targetContext.hostMachine.platform != Platform::Windows and isWindowsMSVCTarget(targetContext))
             {
-                SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
-                               targetContext.hostMachine.platform == Platform::Linux,
-                           "Portable MSVC cross compilation is only supported on macOS and Linux hosts");
+                if (targetContext.hostMachine.platform != Platform::Apple and
+                    targetContext.hostMachine.platform != Platform::Linux)
+                    return Result::Error(BuildResultCategory, BuildError::ToolchainHostUnsupported);
 
                 Tools::Package msvcPackage;
                 SC_TRY(Tools::installMSVCToolchain(parameters.directories.packagesCacheDirectory.view(),
@@ -4235,7 +4238,7 @@ struct SC::Build::NativeBuild
             SC_TRY(resolveExecutable(toolchain.archiver.view(), "lib", adapter.executableArchive));
             SC_TRY(adapter.displayName.assign("clang-cl"));
             break;
-        case Toolchain::HostDefault: return Result::Error("Unexpected HostDefault toolchain");
+        case Toolchain::HostDefault: return Result::Error(BuildResultCategory, BuildError::UnresolvedToolchain);
         }
         return configureLinuxCrossLinkerDirectory(parameters, targetContext, adapter);
     }

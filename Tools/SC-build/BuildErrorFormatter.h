@@ -101,6 +101,20 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::ConfigurationNotFound: formatter.append("Build configuration was not found"); break;
     case BuildError::ProjectDependencyCycle: formatter.append("Build project dependencies contain a cycle"); break;
     case BuildError::ProjectNotFound: formatter.append("Build project was not found"); break;
+    case BuildError::SysrootTargetUnsupported: formatter.append("Sysroot does not support the selected target"); break;
+    case BuildError::ToolchainTargetUnsupported:
+        formatter.append("Toolchain does not support the selected target");
+        break;
+    case BuildError::ToolchainHostUnsupported: formatter.append("Toolchain does not support this host"); break;
+    case BuildError::SysrootUnsupportedForToolchain:
+        formatter.append("Toolchain does not support the selected sysroot");
+        break;
+    case BuildError::TargetTripleUnsupportedForToolchain:
+        formatter.append("Toolchain does not support an explicit target triple");
+        break;
+    case BuildError::CustomCompilerCMissing: formatter.append("Custom C compiler is missing"); break;
+    case BuildError::CustomCompilerCppMissing: formatter.append("Custom C++ compiler is missing"); break;
+    case BuildError::UnresolvedToolchain: formatter.append("Build toolchain was not resolved"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

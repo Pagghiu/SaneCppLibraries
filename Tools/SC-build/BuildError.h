@@ -65,6 +65,14 @@ enum class BuildError : uint32_t
     ConfigurationNotFound,
     ProjectDependencyCycle,
     ProjectNotFound,
+    SysrootTargetUnsupported,
+    ToolchainTargetUnsupported,
+    ToolchainHostUnsupported,
+    SysrootUnsupportedForToolchain,
+    TargetTripleUnsupportedForToolchain,
+    CustomCompilerCMissing,
+    CustomCompilerCppMissing,
+    UnresolvedToolchain,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);
