@@ -28,6 +28,24 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::UnknownConfigureOption: formatter.append("Build configure option is unknown"); break;
     case BuildError::DocumentationCommandFailed: formatter.append("Documentation command exited unsuccessfully"); break;
     case BuildError::UnsupportedAction: formatter.append("Build action is unsupported"); break;
+    case BuildError::RuntimeShimLinkConflict:
+        formatter.append("C++ runtime shims conflict with standard C++ runtime linking");
+        break;
+    case BuildError::ProjectRootMissing: formatter.append("Project root directory is missing"); break;
+    case BuildError::LibraryDirectoryMissing: formatter.append("Sane C++ library directory is missing"); break;
+    case BuildError::ProjectNameMissing: formatter.append("Project name is missing"); break;
+    case BuildError::ProjectTargetNameMissing: formatter.append("Project target name is missing"); break;
+    case BuildError::ProjectDirectoryMissing: formatter.append("Project directory is missing"); break;
+    case BuildError::ProjectConfigurationMissing: formatter.append("Project has no configuration"); break;
+    case BuildError::LongPathPolicyUnsupportedTarget:
+        formatter.append("Long-path policy requires a runtime target");
+        break;
+    case BuildError::ConfigurationNameMissing: formatter.append("Configuration name is missing"); break;
+    case BuildError::ConfigurationOutputPathMissing: formatter.append("Configuration output path is missing"); break;
+    case BuildError::ConfigurationIntermediatePathMissing:
+        formatter.append("Configuration intermediates path is missing");
+        break;
+    case BuildError::AbsoluteFileMaskUnsupported: formatter.append("File selection mask cannot be absolute"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -228,6 +228,61 @@ struct SupportToolsTest : public TestCase
                 formatBuildError(Result::Error(ToolsResultCategory, ToolsError::UnsupportedFormatAction), message)
                     .status == ResultErrorFormatStatus::ForeignCategory);
         }
+        if (test_section("build project validation identities"))
+        {
+            static_assert(static_cast<uint32_t>(BuildError::AbsoluteFileMaskUnsupported) == 25,
+                          "Build errors are append-only");
+            Build::Project project;
+            SC_TEST_EXPECT(project.validate().isError(BuildResultCategory, BuildError::ProjectNameMissing));
+            project.name = "fixture";
+            SC_TEST_EXPECT(project.validate().isError(BuildResultCategory, BuildError::ProjectTargetNameMissing));
+            project.targetName = "fixture";
+            SC_TEST_EXPECT(project.validate().isError(BuildResultCategory, BuildError::ProjectDirectoryMissing));
+            project.rootDirectory = ".";
+            SC_TEST_EXPECT(project.validate().isError(BuildResultCategory, BuildError::ProjectConfigurationMissing));
+
+            Build::Configuration config;
+            SC_TEST_EXPECT(project.configurations.push_back(config));
+            SC_TEST_EXPECT(project.validate().isError(BuildResultCategory, BuildError::ConfigurationNameMissing));
+            project.configurations[0].name       = "Debug";
+            project.configurations[0].outputPath = "";
+            SC_TEST_EXPECT(project.validate().isError(BuildResultCategory, BuildError::ConfigurationOutputPathMissing));
+            project.configurations[0].outputPath        = "output";
+            project.configurations[0].intermediatesPath = "";
+            SC_TEST_EXPECT(
+                project.validate().isError(BuildResultCategory, BuildError::ConfigurationIntermediatePathMissing));
+            project.configurations[0].intermediatesPath = "intermediates";
+            SC_TEST_EXPECT(project.validate());
+
+            project.targetType            = Build::TargetType::StaticLibrary;
+            project.windows.longPathAware = true;
+            SC_TEST_EXPECT(
+                project.validate().isError(BuildResultCategory, BuildError::LongPathPolicyUnsupportedTarget));
+            project.windows.longPathAware                   = false;
+            project.configurations[0].windows.longPathAware = true;
+            SC_TEST_EXPECT(
+                project.validate().isError(BuildResultCategory, BuildError::LongPathPolicyUnsupportedTarget));
+
+            Build::SaneCppFlags saneCpp;
+            saneCpp.enabled                = true;
+            saneCpp.provideCppRuntimeShims = true;
+            Build::CompileFlags compileFlags;
+            Build::LinkFlags    linkFlags;
+            SC_TEST_EXPECT(saneCpp.applyTo(compileFlags, linkFlags)
+                               .isError(BuildResultCategory, BuildError::RuntimeShimLinkConflict));
+
+            Build::Project    libraryProject;
+            Build::Parameters parameters;
+            SC_TEST_EXPECT(addSaneCppLibraries(libraryProject, parameters)
+                               .isError(BuildResultCategory, BuildError::ProjectRootMissing));
+            parameters.directories.projectDirectory = ".";
+            SC_TEST_EXPECT(addSaneCppLibraries(libraryProject, parameters)
+                               .isError(BuildResultCategory, BuildError::LibraryDirectoryMissing));
+
+            char message[64];
+            SC_TEST_EXPECT(formatBuildError(BuildError::ProjectNameMissing, message));
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(message, StringEncoding::Ascii) == "Project name is missing");
+        }
         if (test_section("build cli parses legacy positional arguments"))
         {
             arguments.tool      = "build";

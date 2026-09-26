@@ -81,7 +81,7 @@ SC::Result SC::Build::SaneCppFlags::applyTo(CompileFlags& flags, const LinkFlags
     }
     if (provideCppRuntimeShims and linkFlags.linkStdCpp)
     {
-        return Result::Error("saneCpp.provideCppRuntimeShims=true conflicts with link.linkStdCpp=true");
+        return Result::Error(BuildResultCategory, BuildError::RuntimeShimLinkConflict);
     }
     const StringView includeStdCppDefine = flags.includeStdCpp ? "SC_INCLUDE_STD_CPP=1" : "SC_INCLUDE_STD_CPP=0";
     const StringView runtimeShimsDefine =
@@ -315,8 +315,10 @@ SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& pa
 
     StringView projectRoot =
         project.rootDirectory.isEmpty() ? parameters.directories.projectDirectory.view() : project.rootDirectory.view();
-    SC_TRY_MSG(not projectRoot.isEmpty(), "Project root directory must be set before adding Sane C++ Libraries");
-    SC_TRY_MSG(not parameters.directories.libraryDirectory.isEmpty(), "Sane C++ library directory is not configured");
+    if (projectRoot.isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ProjectRootMissing);
+    if (parameters.directories.libraryDirectory.view().isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::LibraryDirectoryMissing);
 
     String publicIncludes = StringEncoding::Utf8;
     SC_TRY(Path::join(publicIncludes, {parameters.directories.libraryDirectory.view(), "Includes"}));
@@ -518,21 +520,28 @@ bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
 
 SC::Result SC::Build::Project::validate() const
 {
-    SC_TRY_MSG(not name.isEmpty(), "Project needs name");
-    SC_TRY_MSG(not targetName.isEmpty(), "Project needs targetName");
-    SC_TRY_MSG(not rootDirectory.isEmpty(), "Project needs targetName");
-    SC_TRY_MSG(configurations.size() > 0, "Project needs at least one configuration");
-    SC_TRY_MSG(not((windows.longPathAware.hasBeenSet() and windows.longPathAware) and
-                   not buildSupportsWindowsLongPathAwareTargets(targetType)),
-               "Windows long-path awareness is only valid for runtime targets");
+    if (name.view().isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ProjectNameMissing);
+    if (targetName.view().isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ProjectTargetNameMissing);
+    if (rootDirectory.view().isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ProjectDirectoryMissing);
+    if (configurations.isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ProjectConfigurationMissing);
+    if ((windows.longPathAware.hasBeenSet() and windows.longPathAware) and
+        not buildSupportsWindowsLongPathAwareTargets(targetType))
+        return Result::Error(BuildResultCategory, BuildError::LongPathPolicyUnsupportedTarget);
     for (const Configuration& config : configurations)
     {
-        SC_TRY_MSG(not config.name.isEmpty(), "Configuration needs a name");
-        SC_TRY_MSG(not config.outputPath.isEmpty(), "Configuration needs an output path");
-        SC_TRY_MSG(not config.intermediatesPath.isEmpty(), "Configuration needs an intermediates path");
-        SC_TRY_MSG(not((config.windows.longPathAware.hasBeenSet() and config.windows.longPathAware) and
-                       not buildSupportsWindowsLongPathAwareTargets(targetType)),
-                   "Windows long-path awareness is only valid for runtime targets");
+        if (config.name.view().isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ConfigurationNameMissing);
+        if (config.outputPath.view().isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ConfigurationOutputPathMissing);
+        if (config.intermediatesPath.view().isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ConfigurationIntermediatePathMissing);
+        if ((config.windows.longPathAware.hasBeenSet() and config.windows.longPathAware) and
+            not buildSupportsWindowsLongPathAwareTargets(targetType))
+            return Result::Error(BuildResultCategory, BuildError::LongPathPolicyUnsupportedTarget);
     }
     return Result(true);
 }
@@ -798,7 +807,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
         {
             if (Path::isAbsolute(file.mask.view(), Path::AsNative))
             {
-                return Result::Error("Absolute path detected");
+                return Result::Error(BuildResultCategory, BuildError::AbsoluteFileMaskUnsupported);
             }
             SC_TRY(Path::append(buffer, {file.mask.view()}, Path::AsPosix));
             SC_TRY(normalizeLookupPath(normalizedPath, buffer.view()));

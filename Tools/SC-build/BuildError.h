@@ -22,6 +22,18 @@ enum class BuildError : uint32_t
     UnknownConfigureOption,
     DocumentationCommandFailed,
     UnsupportedAction,
+    RuntimeShimLinkConflict,
+    ProjectRootMissing,
+    LibraryDirectoryMissing,
+    ProjectNameMissing,
+    ProjectTargetNameMissing,
+    ProjectDirectoryMissing,
+    ProjectConfigurationMissing,
+    LongPathPolicyUnsupportedTarget,
+    ConfigurationNameMissing,
+    ConfigurationOutputPathMissing,
+    ConfigurationIntermediatePathMissing,
+    AbsoluteFileMaskUnsupported,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);
