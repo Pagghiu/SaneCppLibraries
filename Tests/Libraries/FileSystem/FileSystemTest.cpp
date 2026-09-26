@@ -951,23 +951,26 @@ void SC::FileSystemTest::windowsLongPathHelper()
     using Helper = FileSystemTestWindowsDetail::WindowsPath;
 
     StringPath logicalPath;
-    SC_TEST_EXPECT(Helper::makeLogicalPath("\\\\?\\C:\\alpha\\beta"_a8, logicalPath));
+    SC_TEST_EXPECT(static_cast<bool>(Helper::makeLogicalPath("\\\\?\\C:\\alpha\\beta"_a8, logicalPath)));
     SC_TEST_EXPECT(logicalPath.view() == "C:\\alpha\\beta"_a8);
 
-    SC_TEST_EXPECT(Helper::makeLogicalPath("\\\\?\\UNC\\server\\share\\folder"_a8, logicalPath));
+    SC_TEST_EXPECT(static_cast<bool>(Helper::makeLogicalPath("\\\\?\\UNC\\server\\share\\folder"_a8, logicalPath)));
     SC_TEST_EXPECT(logicalPath.view() == "\\\\server\\share\\folder"_a8);
 
     SC_TEST_EXPECT(not Helper::makeLogicalPath("\\\\?\\relative\\folder"_a8, logicalPath));
     SC_TEST_EXPECT(not Helper::makeLogicalPath("\\\\?\\C:folder"_a8, logicalPath));
 
-    SC_TEST_EXPECT(Helper::makeAbsoluteLogicalPath("child\\leaf.txt"_a8, "C:\\base\\dir"_a8, logicalPath));
+    SC_TEST_EXPECT(
+        static_cast<bool>(Helper::makeAbsoluteLogicalPath("child\\leaf.txt"_a8, "C:\\base\\dir"_a8, logicalPath)));
     SC_TEST_EXPECT(logicalPath.view() == "C:\\base\\dir\\child\\leaf.txt"_a8);
 
-    SC_TEST_EXPECT(Helper::makeAbsoluteLogicalPath("C:\\base\\dir\\..\\leaf.txt"_a8, {}, logicalPath));
+    SC_TEST_EXPECT(
+        static_cast<bool>(Helper::makeAbsoluteLogicalPath("C:\\base\\dir\\..\\leaf.txt"_a8, {}, logicalPath)));
     SC_TEST_EXPECT(logicalPath.view() == "C:\\base\\dir\\..\\leaf.txt"_a8);
 
     Helper::TransportString transportPath;
-    SC_TEST_EXPECT(Helper::makeTransportPath("\\\\?\\C:\\base\\dir\\file.txt"_a8, {}, logicalPath, transportPath));
+    SC_TEST_EXPECT(static_cast<bool>(
+        Helper::makeTransportPath("\\\\?\\C:\\base\\dir\\file.txt"_a8, {}, logicalPath, transportPath)));
     SC_TEST_EXPECT(logicalPath.view() == "C:\\base\\dir\\file.txt"_a8);
     SC_TEST_EXPECT(transportPath.view() == "C:\\base\\dir\\file.txt"_a8);
 
@@ -985,9 +988,10 @@ void SC::FileSystemTest::windowsLongPathHelper()
     auto prefixedDriveBuilder = StringBuilder::createForAppendingTo(prefixedDriveAtCap);
     SC_TEST_EXPECT(prefixedDriveBuilder.append(driveLogicalAtCap.view()));
     prefixedDriveBuilder.finalize();
-    SC_TEST_EXPECT(Helper::makeLogicalPath(prefixedDriveAtCap.view(), logicalPath));
+    SC_TEST_EXPECT(static_cast<bool>(Helper::makeLogicalPath(prefixedDriveAtCap.view(), logicalPath)));
     SC_TEST_EXPECT(logicalPath.view() == driveLogicalAtCap.view());
-    SC_TEST_EXPECT(Helper::makeTransportPath(driveLogicalAtCap.view(), {}, logicalPath, transportPath));
+    SC_TEST_EXPECT(
+        static_cast<bool>(Helper::makeTransportPath(driveLogicalAtCap.view(), {}, logicalPath, transportPath)));
     SC_TEST_EXPECT(StringView(transportPath.view()).startsWith("\\\\?\\"_a8));
 
     String uncLogicalAtCap = StringEncoding::Utf8;
@@ -1007,7 +1011,7 @@ void SC::FileSystemTest::windowsLongPathHelper()
         SC_TEST_EXPECT(prefixedUNCBuilder.append("a"_a8));
     }
     prefixedUNCBuilder.finalize();
-    SC_TEST_EXPECT(Helper::makeLogicalPath(prefixedUNCAtCap.view(), logicalPath));
+    SC_TEST_EXPECT(static_cast<bool>(Helper::makeLogicalPath(prefixedUNCAtCap.view(), logicalPath)));
     SC_TEST_EXPECT(logicalPath.view() == uncLogicalAtCap.view());
 
     String overCap = StringEncoding::Utf8;

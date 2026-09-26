@@ -7,7 +7,7 @@
 //
 // Include from inside a unique private namespace.
 // Required includes before this file: Windows.h, string.h, wchar.h, wctype.h.
-// Required SC types: Result, StringPath, StringSpan, StringNativeBuffer.
+// Required SC types: StringPath, StringSpan, StringNativeBuffer.
 
 enum class WindowsPathError : uint8_t
 {
@@ -29,8 +29,6 @@ struct WindowsPathResult
     {}
 
     explicit constexpr operator bool() const { return error == WindowsPathError::None; }
-    constexpr          operator Result() const { return Result(error == WindowsPathError::None); }
-    constexpr Result   toResult() const { return Result(error == WindowsPathError::None); }
 };
 
 struct WindowsPath

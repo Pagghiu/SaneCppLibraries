@@ -18,12 +18,8 @@ namespace ProcessWindowsDetail
 {
 #include "../../Common/WindowsPath.inl"
 
-static ResultProcess makeWorkingDirectoryAbsolute(StringSpan processWorkingDirectory, StringSpan currentDirectory,
-                                                  StringPath& absoluteWorkingDirectory)
+static ResultProcess translateWindowsPathError(WindowsPathResult path, ProcessErrorDetail detail)
 {
-    const WindowsPathResult path =
-        WindowsPath::makeAbsoluteLogicalPath(processWorkingDirectory, currentDirectory, absoluteWorkingDirectory);
-    constexpr ProcessErrorDetail detail = ProcessErrorDetail::WindowsResolveWorkingDirectory;
     switch (path.error)
     {
     case WindowsPathError::None: return ResultProcess(true);
@@ -33,6 +29,21 @@ static ResultProcess makeWorkingDirectoryAbsolute(StringSpan processWorkingDirec
     case WindowsPathError::NativeCallFailed: return {ProcessError::PathResolutionFailed, detail, path.nativeError};
     }
     return {ProcessError::InvalidPath, detail};
+}
+
+static ResultProcess translateWindowsLaunchPathError(WindowsPathResult path, ProcessErrorDetail detail)
+{
+    if (path)
+        return ResultProcess(true);
+    return {ProcessError::LaunchFailed, detail, path.nativeError};
+}
+
+static ResultProcess makeWorkingDirectoryAbsolute(StringSpan processWorkingDirectory, StringSpan currentDirectory,
+                                                  StringPath& absoluteWorkingDirectory)
+{
+    const WindowsPathResult path =
+        WindowsPath::makeAbsoluteLogicalPath(processWorkingDirectory, currentDirectory, absoluteWorkingDirectory);
+    return translateWindowsPathError(path, ProcessErrorDetail::WindowsResolveWorkingDirectory);
 }
 } // namespace ProcessWindowsDetail
 } // namespace SC
@@ -175,9 +186,11 @@ SC::ResultProcess SC::Process::launchImplementation()
     {
         if (processNeedsWindowsLongPathTransport(executablePathForLaunch.view()))
         {
-            SC_TRY(ProcessWindowsDetail::WindowsPath::makeTransportPath(
-                executablePathForLaunch.view(), currentDirectory.view(), executablePathForLaunch,
-                executableTransportPath));
+            SC_TRY(ProcessWindowsDetail::translateWindowsLaunchPathError(
+                ProcessWindowsDetail::WindowsPath::makeTransportPath(executablePathForLaunch.view(),
+                                                                     currentDirectory.view(), executablePathForLaunch,
+                                                                     executableTransportPath),
+                ProcessErrorDetail::WindowsPrepareExecutableTransportPath));
             wideApplication = executableTransportPath.view().getNullTerminatedNative();
         }
         else
@@ -198,8 +211,10 @@ SC::ResultProcess SC::Process::launchImplementation()
     {
         if (processNeedsWindowsLongPathTransport(currentDirectory.view()))
         {
-            SC_TRY(ProcessWindowsDetail::WindowsPath::makeTransportPath(currentDirectory.view(), {}, currentDirectory,
-                                                                        workingDirectoryPath));
+            SC_TRY(ProcessWindowsDetail::translateWindowsLaunchPathError(
+                ProcessWindowsDetail::WindowsPath::makeTransportPath(currentDirectory.view(), {}, currentDirectory,
+                                                                     workingDirectoryPath),
+                ProcessErrorDetail::WindowsPrepareWorkingDirectoryTransportPath));
             wideDir = workingDirectoryPath.view().getNullTerminatedNative();
         }
         else
@@ -277,7 +292,9 @@ SC::ResultProcess SC::Process::formatArguments(Span<const StringSpan> params)
             executablePathLooksLikeFile = ProcessWindowsDetail::WindowsPath::looksLikeFilesystemPath(param);
             if (executablePathLooksLikeFile)
             {
-                SC_TRY(ProcessWindowsDetail::WindowsPath::makeLogicalPath(param, executablePathForLaunch));
+                SC_TRY(ProcessWindowsDetail::translateWindowsPathError(
+                    ProcessWindowsDetail::WindowsPath::makeLogicalPath(param, executablePathForLaunch),
+                    ProcessErrorDetail::WindowsNormalizeExecutablePath));
             }
         }
 #endif

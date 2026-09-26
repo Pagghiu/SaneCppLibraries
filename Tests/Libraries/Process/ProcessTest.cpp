@@ -149,6 +149,8 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
                   "Process primary errors are append-only");
     static_assert(static_cast<uint32_t>(ProcessErrorDetail::WindowsResolveWorkingDirectory) == 13,
                   "Process details are append-only");
+    static_assert(static_cast<uint32_t>(ProcessErrorDetail::WindowsNormalizeExecutablePath) == 16,
+                  "Process details are append-only");
     static_assert(sizeof(Result) != 8 or sizeof(ResultProcess) == 16,
                   "ResultProcess must meet the final 16-byte enriched-result target");
     static_assert(sizeof(Result) != 16 or sizeof(ResultProcess) == 24,
@@ -188,6 +190,24 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
     char           pathCapacityOutput[sizeof(pathCapacityMessage)];
     SC_TEST_EXPECT(formatProcessError(ProcessError::PathCapacityExceeded, pathCapacityOutput));
     SC_TEST_EXPECT(::memcmp(pathCapacityOutput, pathCapacityMessage, sizeof(pathCapacityMessage)) == 0);
+
+#if SC_PLATFORM_WINDOWS
+    wchar_t longWorkingDirectory[602] = L"C:\\";
+    for (size_t index = 3; index < 600; ++index)
+        longWorkingDirectory[index] = L'a';
+    wchar_t longExecutable[509] = L"subdir\\";
+    for (size_t index = 7; index < 507; ++index)
+        longExecutable[index] = L'b';
+
+    Process launchPathProcess(commandArena.toSpan(), environmentArena.toSpan());
+    SC_TEST_EXPECT(
+        launchPathProcess.setWorkingDirectory(StringSpan({longWorkingDirectory, 600}, true, StringEncoding::Native)));
+    const ResultProcess launchPath =
+        launchPathProcess.launch({StringSpan({longExecutable, 507}, true, StringEncoding::Native)});
+    SC_TEST_EXPECT(launchPath.isError(ProcessError::LaunchFailed));
+    SC_TEST_EXPECT(launchPath.detail == ProcessErrorDetail::WindowsPrepareExecutableTransportPath);
+    SC_TEST_EXPECT(launchPath.toResult().isError(ProcessResultCategory, ProcessError::LaunchFailed));
+#endif
 
     {
         native_char_t              storage[32] = {};

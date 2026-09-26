@@ -69,6 +69,9 @@ enum class ProcessErrorDetail : uint32_t
     WindowsRtlCloneUserProcess,
     WindowsNtWaitForSingleObject,
     WindowsResolveWorkingDirectory,
+    WindowsPrepareExecutableTransportPath,
+    WindowsPrepareWorkingDirectoryTransportPath,
+    WindowsNormalizeExecutablePath,
 };
 
 /// @brief Stable category assigned to errors owned by the Process library.

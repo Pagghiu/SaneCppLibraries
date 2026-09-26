@@ -31,6 +31,15 @@ inline bool appendProcessErrorDetail(ResultErrorFormatter& formatter, ProcessErr
     case ProcessErrorDetail::WindowsResolveWorkingDirectory:
         formatter.append("Windows resolve working directory");
         break;
+    case ProcessErrorDetail::WindowsPrepareExecutableTransportPath:
+        formatter.append("Windows prepare executable path for launch");
+        break;
+    case ProcessErrorDetail::WindowsPrepareWorkingDirectoryTransportPath:
+        formatter.append("Windows prepare working directory for launch");
+        break;
+    case ProcessErrorDetail::WindowsNormalizeExecutablePath:
+        formatter.append("Windows normalize executable path");
+        break;
     default: return false;
     }
     return true;
