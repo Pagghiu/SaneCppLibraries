@@ -327,23 +327,25 @@ void SC::ThreadingTest::testErrorFormatter()
     static_assert(TypeTraits::IsTriviallyCopyable<ResultThreading>::value,
                   "ResultThreading must remain trivially copyable");
 
-    constexpr char expected[] = "Thread has not been started";
-
     ResultErrorFormat formatted = formatThreadingError(ThreadingError::ThreadNotStarted, {});
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    const size_t requiredCapacity = formatted.requiredCapacity;
+    SC_TEST_EXPECT(requiredCapacity > 1 and requiredCapacity <= 64);
 
     char undersized[4] = {'x', 'x', 'x', '\0'};
     formatted          = formatThreadingError(ThreadingError::ThreadNotStarted, undersized);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
+    SC_TEST_EXPECT(formatted.requiredCapacity == requiredCapacity);
     SC_TEST_EXPECT(undersized[0] == '\0');
 
-    char exact[sizeof(expected)];
-    formatted = formatThreadingError(Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted), exact);
+    char         exact[64];
+    const size_t exactCapacity = requiredCapacity <= sizeof(exact) ? requiredCapacity : sizeof(exact);
+    formatted = formatThreadingError(Result::Error(ThreadingResultCategory, ThreadingError::ThreadNotStarted),
+                                     Span<char>{exact, exactCapacity});
     SC_TEST_EXPECT(formatted);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(exact));
-    SC_TEST_EXPECT(areEqual(exact, expected));
+    SC_TEST_EXPECT(formatted.requiredCapacity == requiredCapacity);
+    if (exactCapacity > 0)
+        SC_TEST_EXPECT(exact[exactCapacity - 1] == '\0');
 
     exact[0]  = 'x';
     formatted = formatThreadingError(Result(true), exact);

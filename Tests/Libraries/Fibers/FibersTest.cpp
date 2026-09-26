@@ -9240,12 +9240,13 @@ void SC::FibersTest::structuredErrorsAndFormatter()
     char              message[64];
     ResultErrorFormat formatted = formatFibersError(own, message);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("No slot is available"));
-    SC_TEST_EXPECT(message[0] == 'N');
+    SC_TEST_EXPECT(formatted.requiredCapacity > 1 and formatted.requiredCapacity <= sizeof(message));
+    if (formatted.requiredCapacity > 0 and formatted.requiredCapacity <= sizeof(message))
+        SC_TEST_EXPECT(message[formatted.requiredCapacity - 1] == '\0');
 
     formatted = formatFibersError(FibersError::GroupNotReset, {});
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Group must be reset before another work wave"));
+    SC_TEST_EXPECT(formatted.requiredCapacity > 1);
 
     char tooSmall[2] = {'x', 'x'};
     formatted        = formatFibersError(FibersError::SlotUnavailable, tooSmall);

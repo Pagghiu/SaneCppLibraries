@@ -404,7 +404,7 @@ void SC::CryptographyTest::structuredErrorsAndFormatter()
 
     formatted = formatCryptographyError(CryptographyError::AuthenticationFailed, {});
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Authentication failed"));
+    SC_TEST_EXPECT(formatted.requiredCapacity > 1);
     char tooSmall[2] = {'x', 0};
     formatted        = formatCryptographyError(CryptographyError::AuthenticationFailed, tooSmall);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);

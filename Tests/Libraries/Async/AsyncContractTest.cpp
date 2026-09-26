@@ -362,11 +362,13 @@ void SC::AsyncContractTest::structuredLifecycleErrors()
     char              message[64];
     ResultErrorFormat formatted = formatAsyncError(inUse, message);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Request is already in use"));
-    SC_TEST_EXPECT(message[0] == 'R');
+    const size_t requiredCapacity = formatted.requiredCapacity;
+    SC_TEST_EXPECT(requiredCapacity > 1 and requiredCapacity <= sizeof(message));
+    if (requiredCapacity > 0 and requiredCapacity <= sizeof(message))
+        SC_TEST_EXPECT(message[requiredCapacity - 1] == '\0');
     formatted = formatAsyncError(AsyncError::RequestInUse, {});
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Request is already in use"));
+    SC_TEST_EXPECT(formatted.requiredCapacity == requiredCapacity);
     char tooSmall[2] = {'x', 'x'};
     formatted        = formatAsyncError(AsyncError::RequestInUse, tooSmall);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);

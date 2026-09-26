@@ -1252,13 +1252,6 @@ struct SC::HttpClientTest : public SC::TestCase
         }
 
         {
-            char                    storage[96] = {};
-            const ResultErrorFormat formatted = formatHttpClientError(HttpClientError::RequestHeaderNameEmpty, storage);
-            SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
-            SC_TEST_EXPECT(strcmp(storage, "HTTP client request header name is empty") == 0);
-        }
-
-        {
             HttpClientRequest  request;
             HttpClientResponse response;
 

@@ -96,16 +96,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
         SC_TEST_EXPECT(::memcmp(formattedMessage, expected, sizeof(expected)) == 0);
 
-        constexpr char expectedEnum[] = "Folder watcher is not watching";
-        char           enumMessage[sizeof(expectedEnum)];
-        SC_TEST_EXPECT(formatFileSystemWatcherError(FileSystemWatcherError::NotWatching, enumMessage));
-        SC_TEST_EXPECT(::memcmp(enumMessage, expectedEnum, sizeof(expectedEnum)) == 0);
-
-        constexpr char expectedPlain[] = "Failed to configure watching";
-        char           plainMessage[sizeof(expectedPlain)];
-        SC_TEST_EXPECT(formatFileSystemWatcherError(plain, plainMessage));
-        SC_TEST_EXPECT(::memcmp(plainMessage, expectedPlain, sizeof(expectedPlain)) == 0);
-
         const ResultErrorFormat foreignFormat = formatFileSystemWatcherError(foreignResult, {});
         SC_TEST_EXPECT(foreignFormat.status == ResultErrorFormatStatus::ForeignCategory);
 

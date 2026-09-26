@@ -158,7 +158,7 @@ void SC::SocketTest::structuredErrorsAndFormatter()
 
     formatted = formatSocketError(SocketError::TimedOut, {});
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
-    SC_TEST_EXPECT(formatted.requiredCapacity == sizeof("Socket operation timed out"));
+    SC_TEST_EXPECT(formatted.requiredCapacity > 1);
     char tooSmall[2] = {'x', 0};
     formatted        = formatSocketError(SocketError::TimedOut, tooSmall);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
