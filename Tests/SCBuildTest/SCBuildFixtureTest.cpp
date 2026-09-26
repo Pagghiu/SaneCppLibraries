@@ -10,6 +10,7 @@
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
+#include "Tools/SC-build.h"
 #include "Tools/SC-build/Build.h"
 #include "Tools/SC-package.h"
 #include <stdlib.h>
@@ -498,6 +499,7 @@ static Result createFakePackagedLinuxWineRunner(FileSystem& fs, StringView runne
     return Result(true);
 }
 #endif
+#endif
 
 struct ScopedEnvironmentVariable
 {
@@ -532,22 +534,17 @@ static Result setScopedEnvironmentVariable(StringView name, StringView value, Sc
 {
     SC_TRY(scoped.name.assign(name));
     scoped.restoreValue = true;
-#if SC_PLATFORM_WINDOWS
-    const char* existing = ::getenv(scoped.name.bytesIncludingTerminator());
-    if (existing)
+    ProcessEnvironment environment;
+    StringSpan         existing;
+    if (environment.get(name, existing))
     {
         scoped.hadPrevious = true;
-        SC_TRY(scoped.previous.assign(StringView::fromNullTerminated(existing, StringEncoding::Native)));
+        SC_TRY(scoped.previous.assign(existing));
     }
+#if SC_PLATFORM_WINDOWS
     SC_TRY_MSG(::SetEnvironmentVariableA(scoped.name.bytesIncludingTerminator(), value.bytesIncludingTerminator()) != 0,
                "Failed setting environment variable");
 #else
-    const char* existing = ::getenv(scoped.name.bytesIncludingTerminator());
-    if (existing)
-    {
-        scoped.hadPrevious = true;
-        SC_TRY(scoped.previous.assign(StringView::fromNullTerminated(existing, StringEncoding::Native)));
-    }
     SC_TRY_MSG(::setenv(scoped.name.bytesIncludingTerminator(), value.bytesIncludingTerminator(), 1) == 0,
                "Failed setting environment variable");
 #endif
@@ -589,6 +586,7 @@ static bool isEnvironmentFlagEnabled(const char* name)
 }
 #endif
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Result writeFakeMSVCWineScript(FileSystem& fs, StringView scriptPath, StringView logPath)
 {
     String scriptContents = StringEncoding::Utf8;
@@ -2493,6 +2491,38 @@ struct SCBuildFixtureTest : public SC::TestCase
                 Build::Architecture::Wasm;
             SC_TEST_EXPECT(unsupportedArchitecture.configure(FixtureWorkspaceName, parameters)
                                .isError(BuildResultCategory, BuildError::GeneratorArchitectureUnsupported));
+        }
+
+        if (test_section("build configuration requires external directories"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            ScopedEnvironmentVariable sourceVariable;
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_ZLIB_FILC_SOURCE_DIR", report.libraryRootDirectory.view(),
+                                                         sourceVariable));
+
+            Build::Parameters parameters;
+            parameters.directories = directories;
+            {
+                ScopedEnvironmentVariable outputVariable;
+                SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_ZLIB_FILC_OUTPUT_DIR", "", outputVariable));
+                Build::Definition definition;
+                SC_TEST_EXPECT(Build::configure(definition, parameters)
+                                   .isError(BuildResultCategory, BuildError::ExternalOutputDirectoryMissing));
+            }
+            {
+                ScopedEnvironmentVariable outputVariable;
+                ScopedEnvironmentVariable intermediateVariable;
+                SC_TRUST_RESULT(
+                    setScopedEnvironmentVariable("SC_ZLIB_FILC_OUTPUT_DIR", buildRoot.view(), outputVariable));
+                SC_TRUST_RESULT(
+                    setScopedEnvironmentVariable("SC_ZLIB_FILC_INTERMEDIATE_DIR", "", intermediateVariable));
+                Build::Definition definition;
+                SC_TEST_EXPECT(Build::configure(definition, parameters)
+                                   .isError(BuildResultCategory, BuildError::ExternalIntermediateDirectoryMissing));
+            }
         }
 
         if (test_section("native backend builds and runs fixture"))

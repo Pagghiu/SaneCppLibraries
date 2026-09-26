@@ -140,6 +140,15 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
         break;
     case BuildError::GeneratedResourceMissing: formatter.append("Generated build resource is missing"); break;
     case BuildError::ResourceCompilerMissing: formatter.append("Resource compiler is missing"); break;
+    case BuildError::ExternalOutputDirectoryMissing:
+        formatter.append("External project output directory is missing");
+        break;
+    case BuildError::ExternalIntermediateDirectoryMissing:
+        formatter.append("External project intermediate directory is missing");
+        break;
+    case BuildError::ExportLibrariesConfigurationFailed:
+        formatter.append("Exported libraries could not be configured");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

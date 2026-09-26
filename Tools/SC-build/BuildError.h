@@ -90,6 +90,9 @@ enum class BuildError : uint32_t
     ResourceEmbeddingUnsupported,
     GeneratedResourceMissing,
     ResourceCompilerMissing,
+    ExternalOutputDirectoryMissing,
+    ExternalIntermediateDirectoryMissing,
+    ExportLibrariesConfigurationFailed,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

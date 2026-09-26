@@ -354,11 +354,10 @@ static Result configureZLibFilC(const Parameters& parameters, Workspace& workspa
     {
         return Result(true);
     }
-    SC_TRY_MSG(environment.get("SC_ZLIB_FILC_OUTPUT_DIR", outputDirectory) and not outputDirectory.isEmpty(),
-               "SC_ZLIB_FILC_OUTPUT_DIR is required when SC_ZLIB_FILC_SOURCE_DIR is set");
-    SC_TRY_MSG(environment.get("SC_ZLIB_FILC_INTERMEDIATE_DIR", intermediateDirectory) and
-                   not intermediateDirectory.isEmpty(),
-               "SC_ZLIB_FILC_INTERMEDIATE_DIR is required when SC_ZLIB_FILC_SOURCE_DIR is set");
+    if (not environment.get("SC_ZLIB_FILC_OUTPUT_DIR", outputDirectory) or outputDirectory.isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ExternalOutputDirectoryMissing);
+    if (not environment.get("SC_ZLIB_FILC_INTERMEDIATE_DIR", intermediateDirectory) or intermediateDirectory.isEmpty())
+        return Result::Error(BuildResultCategory, BuildError::ExternalIntermediateDirectoryMissing);
 
     Project project = {ZLIB_FILC_PROJECT_NAME, TargetType::SharedLibrary};
     project.setRootDirectory(sourceDirectory);
@@ -445,7 +444,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
 
     if (not project.addExportLibraries({"Foundation", "Memory", "Strings", "Containers"}))
     {
-        return Result::Error("Failed to configure exported SCTest libraries");
+        return Result::Error(BuildResultCategory, BuildError::ExportLibrariesConfigurationFailed);
     }
     project.link.preserveExportedSymbols = true;
 
@@ -574,7 +573,8 @@ Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspa
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
     SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
-    SC_TRY_MSG(project.addExportAllLibraries(), "Failed to configure exported Sane C++ libraries");
+    if (not project.addExportAllLibraries())
+        return Result::Error(BuildResultCategory, BuildError::ExportLibrariesConfigurationFailed);
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
@@ -704,7 +704,7 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
                                         "Foundation", "Http", "Memory", "Plugin", "Process", "Reflection",
                                         "SerializationBinary", "SerializationText", "Socket", "Strings", "Threading"}))
     {
-        return Result::Error("Failed to configure exported SCExample libraries");
+        return Result::Error(BuildResultCategory, BuildError::ExportLibrariesConfigurationFailed);
     }
 
     if (isWindowsGNUTarget)
@@ -799,7 +799,8 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         {
             // Fibers maintainer targets must remain symbolized for optimized Instruments captures.
             Configuration* releaseConfiguration = project.getConfiguration("Release");
-            SC_TRY_MSG(releaseConfiguration != nullptr, "Fibers benchmark Release configuration is missing");
+            if (releaseConfiguration == nullptr)
+                return Result::Error(BuildResultCategory, BuildError::ConfigurationNotFound);
             releaseConfiguration->link.enableDeadCodeStripping = false;
         }
         SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
@@ -819,7 +820,7 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
     String path;
     SC_TRY(Path::join(path, {parameters.directories.projectDirectory.view(), "_Build", "_SingleFileLibrariesTest"}));
 
-    SC_TRY_MSG(fsi.init(path.view(), entries), "Cannot access _Build/_SingleFileLibrariesTest");
+    SC_TRY(fsi.init(path.view(), entries));
 
     while (fsi.enumerateNext())
     {
