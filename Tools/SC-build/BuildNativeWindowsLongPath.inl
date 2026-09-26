@@ -306,11 +306,11 @@ class NativeBuildWindowsLongPath
         }
         if (resolvedProject.adapter.family != Toolchain::LLVMMingw)
         {
-            return Result::Error("Windows long-path-aware manifests require an MSVC-style or llvm-mingw linker");
+            return Result::Error(BuildResultCategory, BuildError::ResourceEmbeddingUnsupported);
         }
 
-        SC_TRY_MSG(not resolvedProject.windowsLongPathResourcePath.isEmpty(),
-                   "Missing llvm-mingw Windows manifest resource path");
+        if (resolvedProject.windowsLongPathResourcePath.view().isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::GeneratedResourceMissing);
         SC_TRY(commandLine.append(resolvedProject.windowsLongPathResourcePath.view()));
         return Result(true);
     }
@@ -323,8 +323,8 @@ class NativeBuildWindowsLongPath
         {
             return Result(true);
         }
-        SC_TRY_MSG(not resolvedProject.adapter.executableResourceCompiler.isEmpty(),
-                   "Missing llvm-mingw resource compiler");
+        if (resolvedProject.adapter.executableResourceCompiler.view().isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ResourceCompilerMissing);
         SC_TRY(commandLine.append(resolvedProject.adapter.executableResourceCompiler.view()));
         SC_TRY(commandLine.append(resolvedProject.windowsLongPathResourceScriptPath.view()));
         SC_TRY(commandLine.append("-O"));

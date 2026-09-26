@@ -276,7 +276,7 @@ struct SC::Build::WriterInternal
             const Vector<String>* res = filePathsResolver.resolvedPaths.get(normalizedRenderedFile.view());
             if (res == nullptr)
             {
-                return Result::Error("BuildWriter::getPathsRelativeTo - Cannot find path");
+                return Result::Error(BuildResultCategory, BuildError::SourceSelectionUnresolved);
             }
             for (const String& it : *res)
             {

@@ -84,6 +84,12 @@ enum class BuildError : uint32_t
     RunnerStartupHookConfigurationFailed,
     DependencyFileMalformed,
     CompilerExecutableMissing,
+    SourceSelectionUnresolved,
+    ProjectNameSanitizationFailed,
+    DebugVisualizerLimitExceeded,
+    ResourceEmbeddingUnsupported,
+    GeneratedResourceMissing,
+    ResourceCompilerMissing,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

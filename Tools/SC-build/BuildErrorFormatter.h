@@ -130,6 +130,16 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
         break;
     case BuildError::DependencyFileMalformed: formatter.append("Build dependency file is malformed"); break;
     case BuildError::CompilerExecutableMissing: formatter.append("Compiler executable is missing"); break;
+    case BuildError::SourceSelectionUnresolved: formatter.append("Selected source path could not be resolved"); break;
+    case BuildError::ProjectNameSanitizationFailed: formatter.append("Project name could not be sanitized"); break;
+    case BuildError::DebugVisualizerLimitExceeded:
+        formatter.append("Only one debug visualizer file is supported");
+        break;
+    case BuildError::ResourceEmbeddingUnsupported:
+        formatter.append("Selected linker cannot embed the required resource");
+        break;
+    case BuildError::GeneratedResourceMissing: formatter.append("Generated build resource is missing"); break;
+    case BuildError::ResourceCompilerMissing: formatter.append("Resource compiler is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

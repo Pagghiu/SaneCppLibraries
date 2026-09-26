@@ -2476,6 +2476,25 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(projectView.containsString("DestinationFiles=\"$(SCBuildLongPathManifestPath)\""));
         }
 
+        if (test_section("Visual Studio writer rejects unsupported project architecture"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Parameters parameters;
+            parameters.directories = directories;
+            parameters.generator   = Build::Generator::VisualStudio2022;
+            parameters.platform    = Build::Platform::Windows;
+            Build::Definition unsupportedArchitecture;
+            SC_TRUST_RESULT(configureTinyConsoleProgram(unsupportedArchitecture, parameters));
+            SC_TRUST_RESULT(unsupportedArchitecture.enforceDefaults(parameters));
+            unsupportedArchitecture.workspaces[0].projects[0].configurations[0].architecture =
+                Build::Architecture::Wasm;
+            SC_TEST_EXPECT(unsupportedArchitecture.configure(FixtureWorkspaceName, parameters)
+                               .isError(BuildResultCategory, BuildError::GeneratorArchitectureUnsupported));
+        }
+
         if (test_section("native backend builds and runs fixture"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());

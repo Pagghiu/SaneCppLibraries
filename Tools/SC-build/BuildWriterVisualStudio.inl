@@ -148,7 +148,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 break;
             }
             case Architecture::Wasm: {
-                return Result::Error("Visual Studio: Unsupported Wasm configuration");
+                return Result::Error(BuildResultCategory, BuildError::GeneratorArchitectureUnsupported);
             }
             }
         }

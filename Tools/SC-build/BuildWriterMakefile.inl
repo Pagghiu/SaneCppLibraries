@@ -185,7 +185,8 @@ endif
 
         SC_TRY(writeTargetRule(builder, project, makeTarget.view()));
 
-        SC_TRY_MSG(not project.configurations.isEmpty(), "Needs at least one configuration");
+        if (project.configurations.isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ProjectConfigurationMissing);
         bool first = true;
         for (const Configuration& configuration : project.configurations)
         {
@@ -265,11 +266,12 @@ endif # $(CONFIG)
 
     Result sanitizeName(StringView input, String& output)
     {
-        SC_TRY_MSG(not input.isEmpty(), "Project name is empty");
+        if (input.isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ProjectNameMissing);
         // TODO: Actually implement name sanitization
         if (not StringBuilder::create(output).appendReplaceAll(input, ".", "_"))
         {
-            return Result::Error("sanitizeName");
+            return Result::Error(BuildResultCategory, BuildError::ProjectNameSanitizationFailed);
         }
         return Result(true);
     }

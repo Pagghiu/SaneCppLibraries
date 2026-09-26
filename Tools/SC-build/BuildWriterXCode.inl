@@ -1154,7 +1154,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 }
                 else
                 {
-                    return Result::Error("XCode: only a single lldbinit file is supported");
+                    return Result::Error(BuildResultCategory, BuildError::DebugVisualizerLimitExceeded);
                 }
             }
         }
