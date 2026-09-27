@@ -66,6 +66,23 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::RunnerPathValueMissing: formatter.append("Runner path value is missing"); break;
     case PackageError::UnknownInstallOption: formatter.append("Package install option is unknown"); break;
     case PackageError::UnexpectedInstallArgument: formatter.append("Package install argument is unexpected"); break;
+    case PackageError::PackageDirectoryMissing: formatter.append("Package directory was not found"); break;
+    case PackageError::VersionDirectoryMissing: formatter.append("Package version directory was not found"); break;
+    case PackageError::HostCommandUnavailable: formatter.append("Host command could not be resolved"); break;
+    case PackageError::ArchiveContainerExtractionFailed:
+        formatter.append("Package archive container could not be extracted");
+        break;
+    case PackageError::ArchivePayloadExtractionFailed:
+        formatter.append("Package archive payload could not be extracted");
+        break;
+    case PackageError::ArchivePayloadUnsupported: formatter.append("Package archive payload is unsupported"); break;
+    case PackageError::MetadataDownloadFailed: formatter.append("Package metadata could not be downloaded"); break;
+    case PackageError::MetadataDecompressionFailed:
+        formatter.append("Package metadata could not be decompressed");
+        break;
+    case PackageError::PackageIndexFieldMissing: formatter.append("Package index field is missing"); break;
+    case PackageError::PackageMetadataNotFound: formatter.append("Package metadata was not found"); break;
+    case PackageError::PackageMetadataHashMissing: formatter.append("Package metadata hash is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

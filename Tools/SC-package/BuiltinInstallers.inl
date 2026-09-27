@@ -16,7 +16,7 @@ static Result findFirstSubdirectory(StringView directory, String& output)
         }
     }
     SC_TRY(iterator.checkErrors());
-    return Result::Error("Missing package directory");
+    return Result::Error(PackageResultCategory, PackageError::PackageDirectoryMissing);
 }
 
 static Result tryFindFirstSubdirectory(StringView directory, String& output, bool& found)
@@ -57,7 +57,8 @@ static Result resolveMSVCVersions(StringView packageRoot, String& msvcVersion, S
     {
         SC_TRY(tryFindFirstSubdirectory(sdkLibDirectory.view(), sdkVersion, hasSDKVersion));
     }
-    SC_TRY_MSG(hasSDKVersion, "Missing Windows SDK directory");
+    if (not hasSDKVersion)
+        return Result::Error(PackageResultCategory, PackageError::VersionDirectoryMissing);
     return Result(true);
 }
 
@@ -100,13 +101,15 @@ static Result resolveHostCommandPath(StringView executable, String& output)
     case Platform::Windows: SC_TRY(process.exec({"where", executable}, commandPath)); break;
     case Platform::Apple:
     case Platform::Linux: SC_TRY(process.exec({"which", executable}, commandPath)); break;
-    case Platform::Emscripten: return Result::Error("Cannot resolve host command path");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::HostCommandUnavailable);
     }
-    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot resolve host command path");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::HostCommandUnavailable);
     StringView resolvedCommand = StringView(commandPath.view()).trimWhiteSpaces();
 #if SC_PLATFORM_WINDOWS
     StringViewTokenizer tokenizer(resolvedCommand);
-    SC_TRY_MSG(tokenizer.tokenizeNext({'\n'}), "Cannot resolve host command path");
+    if (not tokenizer.tokenizeNext({'\n'}))
+        return Result::Error(PackageResultCategory, PackageError::HostCommandUnavailable);
     resolvedCommand = tokenizer.component.trimWhiteSpaces();
 #endif
     SC_TRY(output.assign(resolvedCommand));
@@ -173,12 +176,14 @@ static Result extractDebArchive(StringView sourceFile, StringView destinationDir
 #if SC_PLATFORM_WINDOWS
     Process process;
     SC_TRY(process.exec({"tar", "-xf", sourceFile, "-C", extractDirectory.view()}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb ar archive");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveContainerExtractionFailed);
 #else
     Process process;
     SC_TRY(process.setWorkingDirectory(extractDirectory.view()));
     SC_TRY(process.exec({"ar", "-x", sourceFile}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb ar archive");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveContainerExtractionFailed);
 #endif
 
     String archivePath   = StringEncoding::Utf8;
@@ -193,7 +198,8 @@ static Result extractDebArchive(StringView sourceFile, StringView destinationDir
 
         Process tarProcess;
         SC_TRY(tarProcess.exec({"tar", "-xf", archivePath.view(), "-C", destinationDirectory}));
-        SC_TRY_MSG(tarProcess.getExitStatus() == 0, "Failed extracting .deb payload");
+        if (tarProcess.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::ArchivePayloadExtractionFailed);
         expanded = true;
         return Result(true);
     };
@@ -212,7 +218,8 @@ static Result extractDebArchive(StringView sourceFile, StringView destinationDir
     {
         SC_TRY(expandArchive("data.tar", expanded));
     }
-    SC_TRY_MSG(expanded, "Unsupported .deb payload archive");
+    if (not expanded)
+        return Result::Error(PackageResultCategory, PackageError::ArchivePayloadUnsupported);
     SC_TRY(fs.removeDirectoriesRecursive(extractDirectory.view()));
     return Result(true);
 }
@@ -221,7 +228,8 @@ static Result extractApkArchive(StringView sourceFile, StringView destinationDir
 {
     Process process;
     SC_TRY(process.exec({"tar", "-xzf", sourceFile, "-C", destinationDirectory}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .apk archive");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveExtractionFailed);
     return Result(true);
 }
 
@@ -230,7 +238,8 @@ static Result downloadTextFile(StringView url, StringView destinationFile)
     Process process;
     String  stdErr = StringEncoding::Utf8;
     SC_TRY(process.exec({"curl", "-L", "-o", destinationFile, url}, {}, {}, stdErr));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed downloading text file");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::MetadataDownloadFailed);
     return Result(true);
 }
 
@@ -254,13 +263,15 @@ static Result decompressGzipTextFile(StringView compressedPath, StringView desti
         "} finally { $input.Dispose() }";
     SC_TRY(process.exec({"powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script}, {}, {},
                         stdErr));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed decompressing gzip metadata");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::MetadataDecompressionFailed);
     return Result(true);
 #else
     Process process;
     String  output = StringEncoding::Utf8;
     SC_TRY(process.exec({"gzip", "-dc", compressedPath}, output));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed decompressing gzip metadata");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::MetadataDecompressionFailed);
 
     FileSystem fs;
     SC_TRY(fs.init("."));
@@ -314,7 +325,7 @@ static Result extractPackageIndexField(StringView stanza, StringView fieldName, 
         }
         searchIndex = lineEnd + 1;
     }
-    return Result::Error("Missing package index field");
+    return Result::Error(PackageResultCategory, PackageError::PackageIndexFieldMissing);
 }
 
 struct UbuntuPackageMetadata
@@ -354,7 +365,7 @@ static Result resolveUbuntuPackageMetadata(StringView packageIndex, StringView p
         }
         stanzaPos = stanzaEnd + 2;
     }
-    return Result::Error("Cannot resolve Ubuntu package metadata");
+    return Result::Error(PackageResultCategory, PackageError::PackageMetadataNotFound);
 }
 
 struct AlpinePackageMetadata
@@ -415,7 +426,7 @@ static Result resolveAlpinePackageMetadata(StringView packageIndex, StringView p
 
         recordPos = recordEnd + 2;
     }
-    return Result::Error("Cannot resolve Alpine package metadata");
+    return Result::Error(PackageResultCategory, PackageError::PackageMetadataNotFound);
 }
 
 #if SC_PLATFORM_LINUX
@@ -491,8 +502,10 @@ static Result resolveLinuxBox64PackageMetadata(StringView downloadsDirectory, Li
         stanzaPos = stanzaEnd + 2;
     }
 
-    SC_TRY_MSG(not metadata.url.isEmpty(), "Cannot resolve Linux ARM64 Box64 package metadata");
-    SC_TRY_MSG(not metadata.sha256.isEmpty(), "Cannot resolve Linux ARM64 Box64 package hash");
+    if (metadata.url.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::PackageMetadataNotFound);
+    if (metadata.sha256.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::PackageMetadataHashMissing);
     return Result(true);
 }
 

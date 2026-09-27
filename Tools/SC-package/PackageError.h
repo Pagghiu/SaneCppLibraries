@@ -58,6 +58,17 @@ enum class PackageError : uint32_t
     RunnerPathValueMissing,
     UnknownInstallOption,
     UnexpectedInstallArgument,
+    PackageDirectoryMissing,
+    VersionDirectoryMissing,
+    HostCommandUnavailable,
+    ArchiveContainerExtractionFailed,
+    ArchivePayloadExtractionFailed,
+    ArchivePayloadUnsupported,
+    MetadataDownloadFailed,
+    MetadataDecompressionFailed,
+    PackageIndexFieldMissing,
+    PackageMetadataNotFound,
+    PackageMetadataHashMissing,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);
