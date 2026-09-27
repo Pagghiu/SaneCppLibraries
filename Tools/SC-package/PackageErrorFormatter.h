@@ -129,6 +129,12 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::RunnerVersionMismatch: formatter.append("Package runner version does not match"); break;
     case PackageError::PackageCopyFailed: formatter.append("Package copy failed"); break;
     case PackageError::PackageDownloadFailed: formatter.append("Package download failed"); break;
+    case PackageError::HostCommandFailed: formatter.append("Required host command failed"); break;
+    case PackageError::SourceHashMismatch: formatter.append("Package source hash does not match"); break;
+    case PackageError::DownloadVersionMissing: formatter.append("Package download version is missing"); break;
+    case PackageError::DownloadPlatformMissing: formatter.append("Package download platform is missing"); break;
+    case PackageError::DownloadURLMissing: formatter.append("Package download URL is missing"); break;
+    case PackageError::DownloadHashMissing: formatter.append("Package download hash is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

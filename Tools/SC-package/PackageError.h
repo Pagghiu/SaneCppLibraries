@@ -103,6 +103,12 @@ enum class PackageError : uint32_t
     RunnerVersionMismatch,
     PackageCopyFailed,
     PackageDownloadFailed,
+    HostCommandFailed,
+    SourceHashMismatch,
+    DownloadVersionMissing,
+    DownloadPlatformMissing,
+    DownloadURLMissing,
+    DownloadHashMissing,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

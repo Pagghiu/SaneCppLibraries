@@ -1235,6 +1235,38 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(installLinuxSysroot(outputDirectory.view(), outputDirectory.view(), spec, package)
                                .isError(PackageResultCategory, PackageError::InstallerArchitectureUnsupported));
         }
+        if (test_section("package download validates required inputs"))
+        {
+            Download        download;
+            Package         package;
+            CustomFunctions functions;
+            SC_TEST_EXPECT(packageInstall(download, package, functions)
+                               .isError(PackageResultCategory, PackageError::PackageNameRequired));
+            download.packageName = "fixture";
+            SC_TEST_EXPECT(packageInstall(download, package, functions)
+                               .isError(PackageResultCategory, PackageError::DownloadVersionMissing));
+            download.packageVersion  = "1";
+            download.packagePlatform = SmallString<255>();
+            SC_TEST_EXPECT(download.packagePlatform.isEmpty());
+            SC_TEST_EXPECT(packageInstall(download, package, functions)
+                               .isError(PackageResultCategory, PackageError::DownloadPlatformMissing));
+            download.packagePlatform = "test";
+            SC_TEST_EXPECT(packageInstall(download, package, functions)
+                               .isError(PackageResultCategory, PackageError::DownloadURLMissing));
+            download.url = "unused";
+            SC_TEST_EXPECT(packageInstall(download, package, functions)
+                               .isError(PackageResultCategory, PackageError::DownloadHashMissing));
+        }
+        if (test_section("package source hash mismatch has identity"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            String sourcePath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(sourcePath, {outputDirectory.view(), "hash-fixture.txt"}));
+            SC_TEST_EXPECT(fs.writeString(sourcePath.view(), "fixture"));
+            SC_TEST_EXPECT(checkFileHash(sourcePath.view(), Hashing::TypeSHA256, "invalid")
+                               .isError(PackageResultCategory, PackageError::SourceHashMismatch));
+        }
 #if !SC_PLATFORM_LINUX
         if (test_section("linux wine installers reject unsupported host"))
         {

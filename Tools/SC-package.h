@@ -33,7 +33,8 @@ namespace Tools
     {
     case Platform::Apple:
         SC_TRY(process.exec({"xattr", "-r", "-d", "com.apple.quarantine", directory}));
-        SC_TRY_MSG(process.getExitStatus() == 0, "xattr failed");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::HostCommandFailed);
         break;
     case Platform::Linux:
     case Platform::Windows:
@@ -77,7 +78,8 @@ namespace Tools
             SC_TRY(hashing.getHash(res));
             SmallString<64> result;
             SC_TRY(StringBuilder::create(result).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::LowerCase));
-            SC_TRY_MSG(result.view() == wantedHash, "Package hash doesn't match");
+            if (result.view() != wantedHash)
+                return Result::Error(PackageResultCategory, PackageError::SourceHashMismatch);
             return Result(true);
         }
     }
@@ -95,7 +97,8 @@ namespace Tools
         Result  res = process.exec({"curl", "-L", "-o", localFile, remoteURL}, output);
         if (res)
         {
-            SC_TRY_MSG(process.getExitStatus() == 0, "Cannot download file");
+            if (process.getExitStatus() != 0)
+                return Result::Error(PackageResultCategory, PackageError::PackageDownloadFailed);
         }
         Process process2;
         if (not res)
@@ -103,12 +106,13 @@ namespace Tools
             res = process2.exec({"wget", "-O", localFile, remoteURL}, output);
             if (res)
             {
-                SC_TRY_MSG(process2.getExitStatus() == 0, "Cannot download file");
+                if (process2.getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::PackageDownloadFailed);
             }
         }
         if (not res)
         {
-            return Result::Error("Cannot find neither curl nor wget");
+            return Result::Error(PackageResultCategory, PackageError::HostCommandUnavailable);
         }
         SC_TRY(checkFileHash(localFile, hashType, expectedHash));
     }
@@ -189,7 +193,9 @@ namespace Tools
     SmallString<255> stripString;
     SC_TRY(StringBuilder::format(stripString, "--strip-components={}", stripComponents));
     SC_TRY(process.exec({"tar", "-xf", fileName, "-C", directory, stripString.view()}));
-    return Result(process.getExitStatus() == 0);
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveExtractionFailed);
+    return Result(true);
 }
 
 [[nodiscard]] inline Result tarExpandSingleFileTo(StringView fileName, StringView directory, StringView singleFilePath,
@@ -199,18 +205,25 @@ namespace Tools
     SmallString<255> stripString;
     SC_TRY(StringBuilder::format(stripString, "--strip-components={}", stripComponents));
     SC_TRY(process.exec({"tar", "-xf", fileName, "-C", directory, stripString.view(), singleFilePath}));
-    return Result(process.getExitStatus() == 0);
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveExtractionFailed);
+    return Result(true);
 }
 
 [[nodiscard]] inline Result packageInstall(const Download& download, Package& package, CustomFunctions functions)
 {
-    SC_TRY_MSG(not download.packageName.isEmpty(), "Missing packageName");
-    SC_TRY_MSG(not download.packageVersion.isEmpty(), "Missing packageVersion");
-    SC_TRY_MSG(not download.packagePlatform.isEmpty(), "Missing packagePlatform");
-    SC_TRY_MSG(not download.url.isEmpty(), "Missing url");
+    if (download.packageName.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::PackageNameRequired);
+    if (download.packageVersion.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::DownloadVersionMissing);
+    if (download.packagePlatform.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::DownloadPlatformMissing);
+    if (download.url.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::DownloadURLMissing);
     if (not download.isGitClone)
     {
-        SC_TRY_MSG(not download.expectedHash.isEmpty(), "Missing expectedHash");
+        if (download.expectedHash.isEmpty())
+            return Result::Error(PackageResultCategory, PackageError::DownloadHashMissing);
     }
     FileSystem fs;
     package.packageFullName =
