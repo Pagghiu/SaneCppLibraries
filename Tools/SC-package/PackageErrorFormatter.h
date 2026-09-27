@@ -26,6 +26,21 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::InstallDirectoryMissing: formatter.append("Package install directory is missing"); break;
     case PackageError::RecipePhaseUnknown: formatter.append("Package recipe phase is unknown"); break;
     case PackageError::RecipePhaseHandlerMissing: formatter.append("Package recipe phase handler is missing"); break;
+    case PackageError::ExportPathMissing: formatter.append("Package export path is missing"); break;
+    case PackageError::ExportPathAbsolute: formatter.append("Package export path must be relative"); break;
+    case PackageError::ExportPathEscapesRoot: formatter.append("Package export path escapes the package root"); break;
+    case PackageError::ExportPathTooDeep: formatter.append("Package export path has too many components"); break;
+    case PackageError::SourceHashMalformed: formatter.append("Package source hash is malformed"); break;
+    case PackageError::SourceHashAlgorithmUnsupported:
+        formatter.append("Package source hash algorithm is unsupported");
+        break;
+    case PackageError::SourceHashDigestMissing: formatter.append("Package source hash digest is missing"); break;
+    case PackageError::ReceiptEncodingFailed: formatter.append("Package receipt could not be encoded"); break;
+    case PackageError::ReceiptMalformed: formatter.append("Package receipt is malformed"); break;
+    case PackageError::ReceiptSchemaUnsupported: formatter.append("Package receipt schema is unsupported"); break;
+    case PackageError::ReceiptNameMissing: formatter.append("Package receipt name is missing"); break;
+    case PackageError::DuplicateExport: formatter.append("Package receipt export is duplicated"); break;
+    case PackageError::ExportNotFound: formatter.append("Package export was not found"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -1713,10 +1713,12 @@ struct SupportToolsTest : public TestCase
             info.source         = "test";
             info.sourceHash     = "sha512:abc";
             info.validation     = "passed";
-            SC_TEST_EXPECT(not writePackageReceipt(package, info));
+            SC_TEST_EXPECT(writePackageReceipt(package, info)
+                               .isError(PackageResultCategory, PackageError::SourceHashAlgorithmUnsupported));
 
             info.sourceHash = "sha256";
-            SC_TEST_EXPECT(not writePackageReceipt(package, info));
+            SC_TEST_EXPECT(
+                writePackageReceipt(package, info).isError(PackageResultCategory, PackageError::SourceHashMalformed));
         }
         if (test_section("package receipt parses multiline exports"))
         {
@@ -1777,7 +1779,8 @@ struct SupportToolsTest : public TestCase
                 R"({"schema":1,"name":"fake","version":"1","source":"test","installRoot":"test","validation":"passed","exports":[{"kind":"capability","name":"tool.fake","path":"../escaped"}]})"_a8));
 
             String resolved = StringEncoding::Utf8;
-            SC_TEST_EXPECT(not resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved)
+                               .isError(PackageResultCategory, PackageError::ExportPathEscapesRoot));
         }
         if (test_section("package receipt rejects unsupported schema during export lookup"))
         {
@@ -1803,7 +1806,8 @@ struct SupportToolsTest : public TestCase
                 R"({"schema":99,"name":"fake","exports":[{"kind":"capability","name":"tool.fake","path":"bin/fake-tool"}]})"_a8));
 
             String resolved = StringEncoding::Utf8;
-            SC_TEST_EXPECT(not resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved)
+                               .isError(PackageResultCategory, PackageError::ReceiptSchemaUnsupported));
         }
         if (test_section("package receipt rejects duplicate exports during lookup"))
         {
@@ -1832,7 +1836,8 @@ struct SupportToolsTest : public TestCase
                 R"({"schema":1,"name":"fake","exports":[{"kind":"capability","name":"tool.fake","path":"bin/first-tool"},{"kind":"capability","name":"tool.fake","path":"bin/second-tool"}]})"_a8));
 
             String resolved = StringEncoding::Utf8;
-            SC_TEST_EXPECT(not resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved)
+                               .isError(PackageResultCategory, PackageError::DuplicateExport));
         }
         if (test_section("package status can scan registry"))
         {

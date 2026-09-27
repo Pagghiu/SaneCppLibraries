@@ -22,6 +22,19 @@ enum class PackageError : uint32_t
     InstallDirectoryMissing,
     RecipePhaseUnknown,
     RecipePhaseHandlerMissing,
+    ExportPathMissing,
+    ExportPathAbsolute,
+    ExportPathEscapesRoot,
+    ExportPathTooDeep,
+    SourceHashMalformed,
+    SourceHashAlgorithmUnsupported,
+    SourceHashDigestMissing,
+    ReceiptEncodingFailed,
+    ReceiptMalformed,
+    ReceiptSchemaUnsupported,
+    ReceiptNameMissing,
+    DuplicateExport,
+    ExportNotFound,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

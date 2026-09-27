@@ -138,18 +138,20 @@ static Result appendJSONExport(Vector<PackageReceiptExportJSON>& output, StringV
 
 static Result validatePackageReceiptExportPath(StringView path)
 {
-    SC_TRY_MSG(not path.isEmpty(), "Package receipt export is missing path");
+    if (path.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::ExportPathMissing);
     if (path == "."_a8)
     {
         return Result(true);
     }
-    SC_TRY_MSG(not Path::isAbsolute(path, Path::AsPosix) and not Path::isAbsolute(path, Path::AsWindows),
-               "Package receipt export path must be relative");
+    if (Path::isAbsolute(path, Path::AsPosix) or Path::isAbsolute(path, Path::AsWindows))
+        return Result::Error(PackageResultCategory, PackageError::ExportPathAbsolute);
 
     StringViewTokenizer tokenizer(path);
     while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::SkipEmpty))
     {
-        SC_TRY_MSG(tokenizer.component != ".."_a8, "Package receipt export path cannot escape package root");
+        if (tokenizer.component == ".."_a8)
+            return Result::Error(PackageResultCategory, PackageError::ExportPathEscapesRoot);
     }
     return Result(true);
 }
@@ -167,15 +169,14 @@ static Result resolvePackageReceiptExportNativePath(StringView packageRoot, Stri
     StringViewTokenizer tokenizer(exportPath);
     while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::SkipEmpty))
     {
-        SC_TRY_MSG(numComponents < sizeof(components) / sizeof(components[0]),
-                   "Package receipt export path has too many components");
+        if (numComponents >= sizeof(components) / sizeof(components[0]))
+            return Result::Error(PackageResultCategory, PackageError::ExportPathTooDeep);
         components[numComponents] = tokenizer.component;
         numComponents += 1;
     }
 
     SC_TRY(output.assign(packageRoot));
-    SC_TRY_MSG(Path::append(output, {components, numComponents}, Path::AsNative),
-               "Failed resolving package receipt export path");
+    SC_TRY(Path::append(output, {components, numComponents}, Path::AsNative));
     return Result(true);
 }
 
@@ -187,11 +188,12 @@ static Result validatePackageReceiptSourceHash(StringView sourceHash)
     }
     StringView algorithm;
     StringView digest;
-    SC_TRY_MSG(sourceHash.splitBefore(":"_a8, algorithm) and sourceHash.splitAfter(":"_a8, digest),
-               "Package receipt source hash is missing algorithm");
-    SC_TRY_MSG(algorithm == "md5"_a8 or algorithm == "sha1"_a8 or algorithm == "sha256"_a8,
-               "Package receipt source hash has an unsupported algorithm");
-    SC_TRY_MSG(not digest.isEmpty(), "Package receipt source hash is missing digest");
+    if (not sourceHash.splitBefore(":"_a8, algorithm) or not sourceHash.splitAfter(":"_a8, digest))
+        return Result::Error(PackageResultCategory, PackageError::SourceHashMalformed);
+    if (algorithm != "md5"_a8 and algorithm != "sha1"_a8 and algorithm != "sha256"_a8)
+        return Result::Error(PackageResultCategory, PackageError::SourceHashAlgorithmUnsupported);
+    if (digest.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::SourceHashDigestMissing);
     return Result(true);
 }
 
@@ -216,7 +218,8 @@ static Result packageReceiptPath(StringView packageRoot, String& output)
 Result writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
                            Span<const PackageReceiptExport> exports)
 {
-    SC_TRY_MSG(not package.installDirectoryLink.isEmpty(), "Cannot write package receipt without install root");
+    if (package.installDirectoryLink.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::InstallDirectoryMissing);
 
     String receiptPath = StringEncoding::Utf8;
     SC_TRY(packageReceiptPath(package.installDirectoryLink.view(), receiptPath));
@@ -251,7 +254,8 @@ Result writePackageReceipt(const Package& package, const PackageReceiptInfo& inf
     }
 
     String receipt = StringEncoding::Utf8;
-    SC_TRY_MSG(SerializationJson::write(receiptJSON, receipt), "Failed writing package receipt JSON");
+    if (not SerializationJson::write(receiptJSON, receipt))
+        return Result::Error(PackageResultCategory, PackageError::ReceiptEncodingFailed);
 
     FileSystem fs;
     SC_TRY(fs.init("."));
@@ -306,14 +310,17 @@ static Result writeManualPackageReceipt(const Package& package, StringView name,
 
 static Result readPackageReceiptJSON(StringView receipt, PackageReceiptJSON& output)
 {
-    SC_TRY_MSG(SerializationJson::loadVersioned(output, receipt), "Malformed package receipt JSON");
+    if (not SerializationJson::loadVersioned(output, receipt))
+        return Result::Error(PackageResultCategory, PackageError::ReceiptMalformed);
     return Result(true);
 }
 
 static Result validatePackageReceiptHeader(const PackageReceiptJSON& receiptJSON)
 {
-    SC_TRY_MSG(receiptJSON.schema == 1, "Package receipt schema is unsupported");
-    SC_TRY_MSG(not receiptJSON.name.isEmpty(), "Package receipt is missing package name");
+    if (receiptJSON.schema != 1)
+        return Result::Error(PackageResultCategory, PackageError::ReceiptSchemaUnsupported);
+    if (receiptJSON.name.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::ReceiptNameMissing);
     return Result(true);
 }
 
@@ -346,14 +353,15 @@ static Result resolvePackageReceiptExportPath(StringView packageRoot, StringView
         {
             if ((exportKind.isEmpty() or exportView.kind.view() == exportKind) and exportView.name.view() == exportName)
             {
-                SC_TRY_MSG(not found, "Package receipt export is duplicated");
+                if (found)
+                    return Result::Error(PackageResultCategory, PackageError::DuplicateExport);
                 SC_TRY(validatePackageReceiptExportPath(exportView.path.view()));
                 SC_TRY(resolvePackageReceiptExportNativePath(packageRoot, exportView.path.view(), output));
                 found = true;
             }
             return Result(true);
         }));
-    return found ? Result(true) : Result::Error("Package export not found");
+    return found ? Result(true) : Result::Error(PackageResultCategory, PackageError::ExportNotFound);
 }
 
 Result resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output)
