@@ -1267,6 +1267,22 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(checkFileHash(sourcePath.view(), Hashing::TypeSHA256, "invalid")
                                .isError(PackageResultCategory, PackageError::SourceHashMismatch));
         }
+#if SC_PLATFORM_APPLE
+        if (test_section("package source revision mismatch has identity"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            String gitPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(gitPath, {report.libraryRootDirectory.view(), ".git"}));
+            if (fs.exists(gitPath.view()))
+            {
+                Download download;
+                download.packageVersion = "nonmatching-revision";
+                SC_TEST_EXPECT(verifyGitCommitForDirectory(download, report.libraryRootDirectory.view())
+                                   .isError(PackageResultCategory, PackageError::SourceRevisionMismatch));
+            }
+        }
+#endif
 #if !SC_PLATFORM_LINUX
         if (test_section("linux wine installers reject unsupported host"))
         {

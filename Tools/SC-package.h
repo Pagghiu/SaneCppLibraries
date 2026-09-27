@@ -306,14 +306,15 @@ namespace Tools
 
             if (download.shallowClone.isEmpty())
             {
-                SC_TRY_MSG(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}),
-                           "git is missing");
-                SC_TRY_MSG(process[0].getExitStatus() == 0, "git clone failed");
+                SC_TRY(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}));
+                if (process[0].getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::SourceCloneFailed);
                 SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
 
                 SC_TRY(process[3].setWorkingDirectory(package.packageLocalDirectory.view()));
                 SC_TRY(process[3].exec({"git", "checkout", download.packageVersion.view()}));
-                SC_TRY_MSG(process[3].getExitStatus() == 0, "git checkout failed");
+                if (process[3].getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::SourceRevisionCheckoutFailed);
             }
             else
             {
@@ -323,8 +324,9 @@ namespace Tools
                 // git fetch --depth 1 origin <sha1>
                 // git checkout FETCH_HEAD
                 SC_TRY(process[0].setWorkingDirectory(package.packageLocalDirectory.view()));
-                SC_TRY_MSG(process[0].exec({"git", "init"}), "git is missing");
-                SC_TRY_MSG(process[0].getExitStatus() == 0, "git init failed");
+                SC_TRY(process[0].exec({"git", "init"}));
+                if (process[0].getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::SourceRepositoryInitFailed);
                 numParams           = 0;
                 params[numParams++] = "git";
                 params[numParams++] = "remote";
@@ -332,8 +334,9 @@ namespace Tools
                 params[numParams++] = "origin";
                 params[numParams++] = download.url.view();
                 SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
-                SC_TRY_MSG(process[1].exec({params, numParams}), "git is missing");
-                SC_TRY_MSG(process[1].getExitStatus() == 0, "git remote add failed");
+                SC_TRY(process[1].exec({params, numParams}));
+                if (process[1].getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::SourceRemoteConfigurationFailed);
 
                 numParams           = 0;
                 params[numParams++] = "git";
@@ -342,12 +345,14 @@ namespace Tools
                 params[numParams++] = "origin";
                 params[numParams++] = download.shallowClone.view(); // Needs the entire Hash
                 SC_TRY(process[2].setWorkingDirectory(package.packageLocalDirectory.view()));
-                SC_TRY_MSG(process[2].exec({params, numParams}), "git is missing");
-                SC_TRY_MSG(process[2].getExitStatus() == 0, "git fetch failed");
+                SC_TRY(process[2].exec({params, numParams}));
+                if (process[2].getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::SourceFetchFailed);
 
                 SC_TRY(process[3].setWorkingDirectory(package.packageLocalDirectory.view()));
                 SC_TRY(process[3].exec({"git", "checkout", "FETCH_HEAD"}));
-                SC_TRY_MSG(process[3].getExitStatus() == 0, "git checkout failed");
+                if (process[3].getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::SourceRevisionCheckoutFailed);
             }
         }
         else
@@ -406,15 +411,12 @@ inline Result verifyGitCommitForDirectory(const Download& download, StringView s
     String  result;
     Process process;
     SC_TRY(process.setWorkingDirectory(sourceDirectory));
-    SC_TRY_MSG(process.exec(
-                   {
-                       "git",
-                       "rev-parse",
-                       "HEAD",
-                   },
-                   result),
-               "git not installed on current system");
-    return Result(StringView(result.view()).startsWith(download.packageVersion.view()));
+    SC_TRY(process.exec({"git", "rev-parse", "HEAD"}, result).toResult());
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::SourceRevisionProbeFailed);
+    if (not StringView(result.view()).startsWith(download.packageVersion.view()))
+        return Result::Error(PackageResultCategory, PackageError::SourceRevisionMismatch);
+    return Result(true);
 }
 
 inline Result verifyGitCommitHashCache(const Download& download, const Package& package)

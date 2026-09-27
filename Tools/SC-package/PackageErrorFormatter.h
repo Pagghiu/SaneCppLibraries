@@ -135,6 +135,15 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::DownloadPlatformMissing: formatter.append("Package download platform is missing"); break;
     case PackageError::DownloadURLMissing: formatter.append("Package download URL is missing"); break;
     case PackageError::DownloadHashMissing: formatter.append("Package download hash is missing"); break;
+    case PackageError::SourceCloneFailed: formatter.append("Package source clone failed"); break;
+    case PackageError::SourceRepositoryInitFailed: formatter.append("Package source repository setup failed"); break;
+    case PackageError::SourceRemoteConfigurationFailed:
+        formatter.append("Package source remote configuration failed");
+        break;
+    case PackageError::SourceFetchFailed: formatter.append("Package source fetch failed"); break;
+    case PackageError::SourceRevisionCheckoutFailed: formatter.append("Package source revision checkout failed"); break;
+    case PackageError::SourceRevisionProbeFailed: formatter.append("Package source revision probe failed"); break;
+    case PackageError::SourceRevisionMismatch: formatter.append("Package source revision does not match"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

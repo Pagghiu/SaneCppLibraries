@@ -109,6 +109,13 @@ enum class PackageError : uint32_t
     DownloadPlatformMissing,
     DownloadURLMissing,
     DownloadHashMissing,
+    SourceCloneFailed,
+    SourceRepositoryInitFailed,
+    SourceRemoteConfigurationFailed,
+    SourceFetchFailed,
+    SourceRevisionCheckoutFailed,
+    SourceRevisionProbeFailed,
+    SourceRevisionMismatch,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);
