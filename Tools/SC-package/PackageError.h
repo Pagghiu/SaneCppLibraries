@@ -54,6 +54,10 @@ enum class PackageError : uint32_t
     ArchiveRootMissing,
     ArchiveExtractionFailed,
     ExtractedRootMissing,
+    ImportDirectoryValueMissing,
+    RunnerPathValueMissing,
+    UnknownInstallOption,
+    UnexpectedInstallArgument,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

@@ -1148,12 +1148,13 @@ static Result parseQEMUPackageInstallOptions(Span<const StringView> arguments, Q
         const StringView argument = arguments[idx];
         if (argument == "--import-directory")
         {
-            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            if (idx + 1 >= arguments.sizeInElements())
+                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryValueMissing);
             options.importDirectory = arguments[++idx];
         }
         else if (argument.startsWith("--"))
         {
-            return Result::Error("Unknown option for SC-package install qemu");
+            return Result::Error(PackageResultCategory, PackageError::UnknownInstallOption);
         }
         else if (options.importDirectory.isEmpty())
         {
@@ -1161,7 +1162,7 @@ static Result parseQEMUPackageInstallOptions(Span<const StringView> arguments, Q
         }
         else
         {
-            return Result::Error("Unexpected extra argument for SC-package install qemu");
+            return Result::Error(PackageResultCategory, PackageError::UnexpectedInstallArgument);
         }
     }
     return Result(true);
@@ -1180,12 +1181,13 @@ static Result parseFilCPackageInstallOptions(Span<const StringView> arguments, F
         const StringView argument = arguments[idx];
         if (argument == "--import-directory")
         {
-            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            if (idx + 1 >= arguments.sizeInElements())
+                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryValueMissing);
             options.importDirectory = arguments[++idx];
         }
         else if (argument.startsWith("--"))
         {
-            return Result::Error("Unknown option for SC-package install filc");
+            return Result::Error(PackageResultCategory, PackageError::UnknownInstallOption);
         }
         else if (options.importDirectory.isEmpty())
         {
@@ -1193,7 +1195,7 @@ static Result parseFilCPackageInstallOptions(Span<const StringView> arguments, F
         }
         else
         {
-            return Result::Error("Unexpected extra argument for SC-package install filc");
+            return Result::Error(PackageResultCategory, PackageError::UnexpectedInstallArgument);
         }
     }
     return Result(true);
@@ -1213,12 +1215,13 @@ static Result parseZLibFilCPackageInstallOptions(Span<const StringView>         
         const StringView argument = arguments[idx];
         if (argument == "--import-directory")
         {
-            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            if (idx + 1 >= arguments.sizeInElements())
+                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryValueMissing);
             options.importDirectory = arguments[++idx];
         }
         else if (argument.startsWith("--"))
         {
-            return Result::Error("Unknown option for SC-package install zlib-filc");
+            return Result::Error(PackageResultCategory, PackageError::UnknownInstallOption);
         }
         else if (options.importDirectory.isEmpty())
         {
@@ -1226,7 +1229,7 @@ static Result parseZLibFilCPackageInstallOptions(Span<const StringView>         
         }
         else
         {
-            return Result::Error("Unexpected extra argument for SC-package install zlib-filc");
+            return Result::Error(PackageResultCategory, PackageError::UnexpectedInstallArgument);
         }
     }
     return Result(true);
@@ -1245,17 +1248,19 @@ static Result parseMSVCPackageInstallOptions(Span<const StringView> arguments, M
         const StringView argument = arguments[idx];
         if (argument == "--import-directory")
         {
-            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            if (idx + 1 >= arguments.sizeInElements())
+                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryValueMissing);
             options.importDirectory = arguments[++idx];
         }
         else if (argument == "--wine")
         {
-            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --wine");
+            if (idx + 1 >= arguments.sizeInElements())
+                return Result::Error(PackageResultCategory, PackageError::RunnerPathValueMissing);
             options.wineExecutable = arguments[++idx];
         }
         else if (argument.startsWith("--"))
         {
-            return Result::Error("Unknown option for SC-package install msvc");
+            return Result::Error(PackageResultCategory, PackageError::UnknownInstallOption);
         }
         else if (options.importDirectory.isEmpty())
         {
@@ -1264,7 +1269,7 @@ static Result parseMSVCPackageInstallOptions(Span<const StringView> arguments, M
         }
         else
         {
-            return Result::Error("Unexpected extra argument for SC-package install msvc");
+            return Result::Error(PackageResultCategory, PackageError::UnexpectedInstallArgument);
         }
     }
     return Result(true);

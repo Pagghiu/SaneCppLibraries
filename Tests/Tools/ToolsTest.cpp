@@ -1076,7 +1076,8 @@ struct SupportToolsTest : public TestCase
             args[0]             = "filc";
             args[1]             = "--import-directory";
             arguments.arguments = {args, 2};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryValueMissing));
         }
         if (test_section("install filc rejects unknown option"))
         {
@@ -1086,7 +1087,8 @@ struct SupportToolsTest : public TestCase
             args[1]             = "--unknown";
             args[2]             = "value";
             arguments.arguments = {args, 3};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
         }
         if (test_section("install zlib-filc rejects missing import-directory value"))
         {
@@ -1095,7 +1097,8 @@ struct SupportToolsTest : public TestCase
             args[0]             = "zlib-filc";
             args[1]             = "--import-directory";
             arguments.arguments = {args, 2};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryValueMissing));
         }
         if (test_section("install zlib-filc rejects unknown option"))
         {
@@ -1105,7 +1108,8 @@ struct SupportToolsTest : public TestCase
             args[1]             = "--unknown";
             args[2]             = "value";
             arguments.arguments = {args, 3};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
         }
         if (test_section("install msvc rejects missing wine option value"))
         {
@@ -1114,7 +1118,8 @@ struct SupportToolsTest : public TestCase
             args[0]             = "msvc";
             args[1]             = "--wine";
             arguments.arguments = {args, 2};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::RunnerPathValueMissing));
         }
         if (test_section("install msvc rejects unknown option"))
         {
@@ -1124,7 +1129,8 @@ struct SupportToolsTest : public TestCase
             args[1]             = "--unknown";
             args[2]             = "value";
             arguments.arguments = {args, 3};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
         }
         if (test_section("install qemu rejects missing import-directory value"))
         {
@@ -1133,7 +1139,8 @@ struct SupportToolsTest : public TestCase
             args[0]             = "qemu";
             args[1]             = "--import-directory";
             arguments.arguments = {args, 2};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryValueMissing));
         }
         if (test_section("install qemu rejects unknown option"))
         {
@@ -1143,7 +1150,19 @@ struct SupportToolsTest : public TestCase
             args[1]             = "--unknown";
             args[2]             = "value";
             arguments.arguments = {args, 3};
-            SC_TEST_EXPECT(not runPackageTool(arguments));
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
+        }
+        if (test_section("install qemu rejects extra positional argument"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "qemu";
+            args[1]             = "first-import";
+            args[2]             = "second-import";
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnexpectedInstallArgument));
         }
         if (test_section("package list is available"))
         {

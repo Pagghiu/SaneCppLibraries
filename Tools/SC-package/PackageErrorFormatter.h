@@ -62,6 +62,10 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::ArchiveRootMissing: formatter.append("Package archive root is missing"); break;
     case PackageError::ArchiveExtractionFailed: formatter.append("Package archive could not be extracted"); break;
     case PackageError::ExtractedRootMissing: formatter.append("Extracted package root was not found"); break;
+    case PackageError::ImportDirectoryValueMissing: formatter.append("Import directory value is missing"); break;
+    case PackageError::RunnerPathValueMissing: formatter.append("Runner path value is missing"); break;
+    case PackageError::UnknownInstallOption: formatter.append("Package install option is unknown"); break;
+    case PackageError::UnexpectedInstallArgument: formatter.append("Package install argument is unexpected"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
