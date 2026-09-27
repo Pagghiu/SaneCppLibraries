@@ -2227,9 +2227,12 @@ static Result probeFilCCompiler(StringView compilerPath, String& versionOutput)
     Process process;
     SC_TRY(process.setWorkingDirectory(compilerDirectory.view()));
     SC_TRY(process.exec({compilerPath, "--version"}, versionOutput));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C compiler returned error");
-    SC_TRY_MSG(StringView(versionOutput.view()).containsString("Fil-C"), "Fil-C compiler marker missing");
-    SC_TRY_MSG(StringView(versionOutput.view()).containsString("Target:"), "Fil-C target triple missing");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolProbeFailed);
+    if (not StringView(versionOutput.view()).containsString("Fil-C"))
+        return Result::Error(PackageResultCategory, PackageError::ToolIdentityMismatch);
+    if (not StringView(versionOutput.view()).containsString("Target:"))
+        return Result::Error(PackageResultCategory, PackageError::ToolMetadataMissing);
     return Result(true);
 }
 
@@ -2245,7 +2248,7 @@ static Result extractVersionLineSuffix(StringView versionOutput, StringView pref
             return Result(true);
         }
     }
-    return Result::Error("Missing Fil-C metadata line");
+    return Result::Error(PackageResultCategory, PackageError::ToolMetadataMissing);
 }
 
 static Result writeFilCPackageMetadata(StringView packageRoot, StringView version, StringView flavor,
@@ -2344,13 +2347,16 @@ static Result ensureFilCPackagePrepared(StringView packageRoot)
 
     String setupPath = StringEncoding::Utf8;
     SC_TRY(Path::join(setupPath, {packageRoot, "setup.sh"}));
-    SC_TRY_MSG(fs.existsAndIsFile(setupPath.view()), "Fil-C package is missing setup.sh");
+    if (not fs.existsAndIsFile(setupPath.view()))
+        return Result::Error(PackageResultCategory, PackageError::PackageLayoutIncomplete);
 
     Process process;
     SC_TRY(process.setWorkingDirectory(packageRoot));
     SC_TRY(process.exec({"sh", "./setup.sh"}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C setup.sh failed");
-    SC_TRY_MSG(fs.existsAndIsFile(compilerCpp.view()), "Fil-C setup did not produce build/bin/clang++");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::PackageSetupFailed);
+    if (not fs.existsAndIsFile(compilerCpp.view()))
+        return Result::Error(PackageResultCategory, PackageError::ToolchainExecutableMissing);
     return Result(true);
 }
 
@@ -2367,17 +2373,20 @@ static Result testFilCToolchain(const Package& package, String* detectedVersion 
     SC_TRY(probeFilCCompiler(compilerCpp.view(), versionOut));
     SC_TRY(extractVersionLineSuffix(versionOut.view(), "Fil-C "_a8, version));
     SC_TRY(extractVersionLineSuffix(versionOut.view(), "Target:"_a8, targetTriple));
-    SC_TRY_MSG(targetTriple == "x86_64-unknown-linux-gnu",
-               "Fil-C package target triple is unsupported; expected x86_64-unknown-linux-gnu");
+    if (targetTriple != "x86_64-unknown-linux-gnu")
+        return Result::Error(PackageResultCategory, PackageError::ToolTargetUnsupported);
 
     Process process;
     String  cVersionOut   = StringEncoding::Utf8;
     String  cTargetTriple = StringEncoding::Utf8;
     SC_TRY(process.exec({compilerC.view(), "--version"}, cVersionOut));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C C compiler returned error");
-    SC_TRY_MSG(StringView(cVersionOut.view()).containsString("Fil-C"), "Fil-C C compiler marker missing");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolProbeFailed);
+    if (not StringView(cVersionOut.view()).containsString("Fil-C"))
+        return Result::Error(PackageResultCategory, PackageError::ToolIdentityMismatch);
     SC_TRY(extractVersionLineSuffix(cVersionOut.view(), "Target:"_a8, cTargetTriple));
-    SC_TRY_MSG(cTargetTriple == targetTriple, "Fil-C C and C++ compiler target triples do not match");
+    if (cTargetTriple != targetTriple)
+        return Result::Error(PackageResultCategory, PackageError::ToolTargetMismatch);
 
     if (detectedVersion)
     {
@@ -2445,7 +2454,7 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
 
     if (not importDirectory.isEmpty() and not fs.existsAndIsDirectory(resolvedImportDirectory.view()))
     {
-        return Result::Error("Imported Fil-C toolchain directory does not exist");
+        return Result::Error(PackageResultCategory, PackageError::ImportDirectoryMissing);
     }
     if (importDirectory.isEmpty() and not resolvedImportDirectory.isEmpty() and
         not fs.existsAndIsDirectory(resolvedImportDirectory.view()))
@@ -2520,8 +2529,8 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
 
         if (importing)
         {
-            SC_TRY_MSG(fs.existsAndIsDirectory(resolvedImportDirectory.view()),
-                       "Imported Fil-C toolchain directory does not exist");
+            if (not fs.existsAndIsDirectory(resolvedImportDirectory.view()))
+                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryMissing);
         }
         else
         {
@@ -2591,7 +2600,7 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
 #else
 Result installFilCToolchain(StringView, StringView, Package&, StringView)
 {
-    return Result::Error("Fil-C package install is only supported on Linux hosts");
+    return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 }
 #endif
 
@@ -2607,7 +2616,8 @@ static Result validateZLibSourceDirectory(StringView sourceDirectory)
     {
         String path = StringEncoding::Utf8;
         SC_TRY(Path::join(path, {sourceDirectory, requiredFile}));
-        SC_TRY_MSG(fs.existsAndIsFile(path.view()), "zlib source directory is missing required files");
+        if (not fs.existsAndIsFile(path.view()))
+            return Result::Error(PackageResultCategory, PackageError::RequiredSourceMissing);
     }
     return Result(true);
 }
@@ -2637,7 +2647,8 @@ static Result runZLibFilCBuild(StringView repositoryRoot, StringView sourceDirec
     SC_TRY(process.setEnvironment("SC_ZLIB_FILC_INTERMEDIATE_DIR", intermediateDirectory));
     SC_TRY(process.exec(
         {scriptPath.view(), "build", "compile", "ZLibFilC", "Release", "--toolchain", "filc", "--output", "quiet"}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "SC::Build zlib-filc build failed");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildFailed);
     return Result(true);
 }
 
@@ -2746,12 +2757,14 @@ int main(void)
 
     Process compile;
     SC_TRY(compile.exec({compiler, smokeSource.view(), includeFlag.view(), "-ldl", "-o", smokeBinary.view()}));
-    SC_TRY_MSG(compile.getExitStatus() == 0, "zlib-filc smoke compile failed");
+    if (compile.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolchainCompileFailed);
 
     Process run;
     SC_TRY(run.setEnvironment("LD_LIBRARY_PATH", libraryDirectory));
     SC_TRY(run.exec({smokeBinary.view()}));
-    SC_TRY_MSG(run.getExitStatus() == 0, "zlib-filc smoke run failed");
+    if (run.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolchainRunFailed);
     return Result(true);
 }
 
@@ -2831,7 +2844,8 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
     SC_TRY(Path::join(builtLibrary, {outputDir.view(), "libz.so"}));
     SC_TRY(Path::join(libzSo1, {libDir.view(), "libz.so.1"}));
     SC_TRY(Path::join(libzSo, {libDir.view(), "libz.so"}));
-    SC_TRY_MSG(fs.existsAndIsFile(builtLibrary.view()), "zlib-filc build did not produce libz.so");
+    if (not fs.existsAndIsFile(builtLibrary.view()))
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildArtifactMissing);
     SC_TRY(fs.copyFile(builtLibrary.view(), libzSo1.view(), FileSystem::CopyFlags().setOverwrite(true)));
     SC_TRY(fs.removeLinkIfExists(libzSo.view()));
     SC_TRY(fs.createSymbolicLink("libz.so.1", libzSo.view()));
@@ -2885,7 +2899,7 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
 #else
 Result installZLibFilC(StringView, StringView, Package&, StringView)
 {
-    return Result::Error("zlib-filc package install is only supported on Linux hosts");
+    return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 }
 #endif
 

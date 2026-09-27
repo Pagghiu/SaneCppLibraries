@@ -92,6 +92,14 @@ enum class PackageError : uint32_t
     HostToolUnavailable,
     ToolProbeFailed,
     ArchiverProbeFailed,
+    ToolMetadataMissing,
+    ToolTargetUnsupported,
+    ToolTargetMismatch,
+    PackageSetupFailed,
+    RequiredSourceMissing,
+    PackageBuildFailed,
+    ToolchainRunFailed,
+    PackageBuildArtifactMissing,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

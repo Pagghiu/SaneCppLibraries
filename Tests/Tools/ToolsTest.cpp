@@ -1091,6 +1091,40 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryValueMissing));
         }
+#if SC_PLATFORM_LINUX
+        if (test_section("install filc reports missing imported directory"))
+        {
+            String missingDirectory = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(missingDirectory, {outputDirectory.view(), "missing-filc-import"}));
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "filc";
+            args[1]             = "--import-directory";
+            args[2]             = missingDirectory.view();
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryMissing));
+        }
+#else
+        if (test_section("install filc reports unsupported host"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "filc";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+        }
+        if (test_section("install zlib-filc reports unsupported host"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "zlib-filc";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+        }
+#endif
         if (test_section("install filc rejects unknown option"))
         {
             arguments.tool      = "package";

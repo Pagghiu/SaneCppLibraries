@@ -118,6 +118,14 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::HostToolUnavailable: formatter.append("Matching host tool is unavailable"); break;
     case PackageError::ToolProbeFailed: formatter.append("Package tool probe failed"); break;
     case PackageError::ArchiverProbeFailed: formatter.append("Package archiver probe failed"); break;
+    case PackageError::ToolMetadataMissing: formatter.append("Package tool metadata is missing"); break;
+    case PackageError::ToolTargetUnsupported: formatter.append("Package tool target is unsupported"); break;
+    case PackageError::ToolTargetMismatch: formatter.append("Package tool targets do not match"); break;
+    case PackageError::PackageSetupFailed: formatter.append("Package setup failed"); break;
+    case PackageError::RequiredSourceMissing: formatter.append("Required package source file is missing"); break;
+    case PackageError::PackageBuildFailed: formatter.append("Package build failed"); break;
+    case PackageError::ToolchainRunFailed: formatter.append("Package toolchain smoke run failed"); break;
+    case PackageError::PackageBuildArtifactMissing: formatter.append("Package build artifact is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
