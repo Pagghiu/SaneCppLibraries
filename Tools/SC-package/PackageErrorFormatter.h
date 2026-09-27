@@ -106,6 +106,18 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::ToolchainExecutableMissing:
         formatter.append("Package toolchain smoke executable is missing");
         break;
+    case PackageError::InstallerArchitectureUnsupported:
+        formatter.append("Package installer does not support this architecture");
+        break;
+    case PackageError::PackageArchiveUnavailable:
+        formatter.append("Package archive is unavailable for this host");
+        break;
+    case PackageError::ToolVersionMalformed: formatter.append("Package tool version output is malformed"); break;
+    case PackageError::ToolVersionMismatch: formatter.append("Package tool version does not match"); break;
+    case PackageError::ToolIdentityMismatch: formatter.append("Package tool identity could not be verified"); break;
+    case PackageError::HostToolUnavailable: formatter.append("Matching host tool is unavailable"); break;
+    case PackageError::ToolProbeFailed: formatter.append("Package tool probe failed"); break;
+    case PackageError::ArchiverProbeFailed: formatter.append("Package archiver probe failed"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

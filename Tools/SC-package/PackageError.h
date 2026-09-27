@@ -84,6 +84,14 @@ enum class PackageError : uint32_t
     ToolchainObjectMissing,
     ToolchainLinkFailed,
     ToolchainExecutableMissing,
+    InstallerArchitectureUnsupported,
+    PackageArchiveUnavailable,
+    ToolVersionMalformed,
+    ToolVersionMismatch,
+    ToolIdentityMismatch,
+    HostToolUnavailable,
+    ToolProbeFailed,
+    ArchiverProbeFailed,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

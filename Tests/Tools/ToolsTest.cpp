@@ -1061,6 +1061,18 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
         }
+#if SC_PLATFORM_LINUX
+        if (HostInstructionSet == InstructionSet::ARM64 and
+            test_section("install doxygen rejects unsupported architecture"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "doxygen";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory,
+                                                             PackageError::InstallerArchitectureUnsupported));
+        }
+#endif
         if (runHeavySections and test_section("install clang"))
         {
             arguments.tool      = "package";

@@ -1762,7 +1762,8 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     case Platform::Linux: {
         switch (HostInstructionSet)
         {
-        case InstructionSet::ARM64: return Result::Error("Doxygen: Unsupported architecture ARM64");
+        case InstructionSet::ARM64:
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         default: break;
         }
         auto sb = StringBuilder::createForAppendingTo(recipe.download.url);
@@ -1784,7 +1785,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
         recipe.package.packageBaseName  = format("doxygen-{0}.windows.x64.bin.zip", recipe.download.packageVersion);
     }
     break;
-    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
 
     recipe.functions.testFunction = [](const Download& download, const Package& package)
@@ -1799,10 +1800,12 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
             path = format("{0}/doxygen", package.installDirectoryLink);
             break;
         case Platform::Windows: path = format("{0}/doxygen.exe", package.installDirectoryLink); break;
-        case Platform::Emscripten: return Result::Error("Unsupported platform");
+        case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
         }
-        SC_TRY_MSG(Process().exec({path.view(), "-v"}, result), "Cannot run doxygen executable");
-        return Result(StringView(result.view()).startsWith(testVersion));
+        SC_TRY(Process().exec({path.view(), "-v"}, result).toResult());
+        if (not StringView(result.view()).startsWith(testVersion))
+            return Result::Error(PackageResultCategory, PackageError::ToolVersionMismatch);
+        return Result(true);
     };
     const PackageReceiptExport exports[] = {
         {PackageExportKind::Tool, "doxygen", HostPlatform == Platform::Windows ? "doxygen.exe"_a8 : "doxygen"_a8},
@@ -1875,11 +1878,16 @@ Result installTaskflowBenchmarks(StringView packagesCacheDirectory, StringView p
 Result clangFormatMatchesVersion(StringView versionString, StringView wantedVersion)
 {
     StringViewTokenizer tokenizer(versionString);
-    SC_TRY_MSG(tokenizer.tokenizeNext({'-'}), "clang-format tokenize error"); // component = "clang-"
-    SC_TRY_MSG(tokenizer.tokenizeNext({' '}), "clang-format tokenize error"); // component = "format"
-    SC_TRY_MSG(tokenizer.tokenizeNext({' '}), "clang-format tokenize error"); // component = "version"
-    SC_TRY_MSG(tokenizer.tokenizeNext({' '}), "clang-format tokenize error"); // component = "x.y.z"
-    SC_TRY_MSG(tokenizer.component.trimAnyOf({'\n', '\r'}) == wantedVersion, "clang-format version doesn't match");
+    if (not tokenizer.tokenizeNext({'-'})) // component = "clang-"
+        return Result::Error(PackageResultCategory, PackageError::ToolVersionMalformed);
+    if (not tokenizer.tokenizeNext({' '})) // component = "format"
+        return Result::Error(PackageResultCategory, PackageError::ToolVersionMalformed);
+    if (not tokenizer.tokenizeNext({' '})) // component = "version"
+        return Result::Error(PackageResultCategory, PackageError::ToolVersionMalformed);
+    if (not tokenizer.tokenizeNext({' '})) // component = "x.y.z"
+        return Result::Error(PackageResultCategory, PackageError::ToolVersionMalformed);
+    if (tokenizer.component.trimAnyOf({'\n', '\r'}) != wantedVersion)
+        return Result::Error(PackageResultCategory, PackageError::ToolVersionMismatch);
     return Result(true);
 }
 
@@ -1896,7 +1904,7 @@ Result findExecutablePath(StringView executableName, String& foundPath)
     break;
     case Platform::Apple:
     case Platform::Linux: SC_TRY(Process().exec({"which", executableName}, foundPath)); break;
-    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
     SC_TRY(foundPath.assign(StringView(foundPath.view()).trimAnyOf({'\n', '\r'})));
     return Result(true);
@@ -1959,7 +1967,7 @@ Result findSystemClangFormat(Console& console, StringView wantedVersion, String&
         return Result(true);
     }
 
-    return Result::Error("No matching system clang-format found");
+    return Result::Error(PackageResultCategory, PackageError::HostToolUnavailable);
 }
 
 static constexpr StringView hostLLVMExecutableName(StringView baseName);
@@ -1991,7 +1999,8 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
         SC_TRY(Path::join(formatExecutable,
                           {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang-format"_a8)}));
         SC_TRY(process.exec({formatExecutable.view(), "--version"}, result).toResult());
-        SC_TRY_MSG(process.getExitStatus() == 0, "clang-format returned error");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::ToolProbeFailed);
         return clangFormatMatchesVersion(result.view(), wantedVersion);
     };
     String clangFormat = StringEncoding::Utf8;
@@ -2062,9 +2071,9 @@ static Result resolveHostLLVMArchive(StringView packageName, StringView packages
             archiveRoot              = "LLVM-20.1.8-macOS-ARM64";
             return Result(true);
         case InstructionSet::Intel64:
-            return Result::Error("Automatic LLVM install is unavailable on Intel macOS because recent official LLVM "
-                                 "releases no longer ship Intel macOS archives. Install llvm@20 with Homebrew.");
-        case InstructionSet::Intel32: return Result::Error("Unsupported platform");
+            return Result::Error(PackageResultCategory, PackageError::PackageArchiveUnavailable);
+        case InstructionSet::Intel32:
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         }
         break;
     }
@@ -2087,7 +2096,8 @@ static Result resolveHostLLVMArchive(StringView packageName, StringView packages
             package.packageBaseName  = "LLVM-20.1.8-Linux-X64.tar.xz";
             archiveRoot              = "LLVM-20.1.8-Linux-X64";
             return Result(true);
-        case InstructionSet::Intel32: return Result::Error("Unsupported platform");
+        case InstructionSet::Intel32:
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         }
         break;
     }
@@ -2110,11 +2120,12 @@ static Result resolveHostLLVMArchive(StringView packageName, StringView packages
             package.packageBaseName  = "clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz";
             archiveRoot              = "clang+llvm-20.1.8-x86_64-pc-windows-msvc";
             return Result(true);
-        case InstructionSet::Intel32: return Result::Error("Unsupported platform");
+        case InstructionSet::Intel32:
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         }
         break;
     }
-    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
     Assert::unreachable();
 }
@@ -2140,16 +2151,20 @@ Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packag
         SC_TRY(Path::join(clangExecutable,
                           {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang"_a8)}));
         SC_TRY(process.exec({clangExecutable.view(), "--version"}, result).toResult());
-        SC_TRY_MSG(process.getExitStatus() == 0, "LLVM clang returned error");
-        SC_TRY_MSG(StringView(result.view()).containsString("clang version"), "LLVM clang version missing");
-        SC_TRY_MSG(StringView(result.view()).containsString(wantedVersion), "LLVM clang version doesn't match");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::ToolProbeFailed);
+        if (not StringView(result.view()).containsString("clang version"))
+            return Result::Error(PackageResultCategory, PackageError::ToolIdentityMismatch);
+        if (not StringView(result.view()).containsString(wantedVersion))
+            return Result::Error(PackageResultCategory, PackageError::ToolVersionMismatch);
 
         result = "";
         Process process2;
         SC_TRY(Path::join(llvmArExecutable,
                           {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("llvm-ar"_a8)}));
         SC_TRY(process2.exec({llvmArExecutable.view(), "--version"}, result).toResult());
-        SC_TRY_MSG(process2.getExitStatus() == 0, "LLVM archiver returned error");
+        if (process2.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::ArchiverProbeFailed);
         return Result(true);
     };
     String clang   = StringEncoding::Utf8;
