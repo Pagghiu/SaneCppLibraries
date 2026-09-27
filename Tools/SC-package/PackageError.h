@@ -35,6 +35,20 @@ enum class PackageError : uint32_t
     ReceiptNameMissing,
     DuplicateExport,
     ExportNotFound,
+    RepairUnsupportedOnHost,
+    RepairRootMissing,
+    PackageLayoutIncomplete,
+    RepairUnsupported,
+    ReceiptVersionMissing,
+    ReceiptSourceMissing,
+    ReceiptInstallRootMissing,
+    ReceiptValidationFailed,
+    ExportKindMissing,
+    ExportNameMissing,
+    ExportFileMissing,
+    RegistryExportMissing,
+    ReceiptIdentityMismatch,
+    LockEncodingFailed,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

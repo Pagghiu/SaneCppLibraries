@@ -41,6 +41,22 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::ReceiptNameMissing: formatter.append("Package receipt name is missing"); break;
     case PackageError::DuplicateExport: formatter.append("Package receipt export is duplicated"); break;
     case PackageError::ExportNotFound: formatter.append("Package export was not found"); break;
+    case PackageError::RepairUnsupportedOnHost: formatter.append("Package repair is unsupported on this host"); break;
+    case PackageError::RepairRootMissing: formatter.append("Package repair root was not found"); break;
+    case PackageError::PackageLayoutIncomplete: formatter.append("Package layout is incomplete"); break;
+    case PackageError::RepairUnsupported: formatter.append("Package repair is unsupported"); break;
+    case PackageError::ReceiptVersionMissing: formatter.append("Package receipt version is missing"); break;
+    case PackageError::ReceiptSourceMissing: formatter.append("Package receipt source is missing"); break;
+    case PackageError::ReceiptInstallRootMissing: formatter.append("Package receipt install root is missing"); break;
+    case PackageError::ReceiptValidationFailed: formatter.append("Package receipt validation did not pass"); break;
+    case PackageError::ExportKindMissing: formatter.append("Package receipt export kind is missing"); break;
+    case PackageError::ExportNameMissing: formatter.append("Package receipt export name is missing"); break;
+    case PackageError::ExportFileMissing: formatter.append("Package receipt export file is missing"); break;
+    case PackageError::RegistryExportMissing: formatter.append("Package receipt is missing a registry export"); break;
+    case PackageError::ReceiptIdentityMismatch:
+        formatter.append("Package receipt identity does not match registry");
+        break;
+    case PackageError::LockEncodingFailed: formatter.append("Package lock could not be encoded"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

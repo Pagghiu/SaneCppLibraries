@@ -66,7 +66,8 @@ static Result expectedPackageRepairRoot(StringView packagesInstallDirectory, con
     if (entry.name == "qemu"_a8)
     {
         const StringView installLeaf = qemuRunnerInstallLeafName();
-        SC_TRY_MSG(not installLeaf.isEmpty(), "QEMU package repair is not supported on this host");
+        if (installLeaf.isEmpty())
+            return Result::Error(PackageResultCategory, PackageError::RepairUnsupportedOnHost);
         SC_TRY(StringBuilder::format(packageRoot, "{}/qemu_{}", packagesInstallDirectory, installLeaf));
         return Result(true);
     }
@@ -88,7 +89,8 @@ static Result findPackageRepairRoot(StringView packagesInstallDirectory, const P
     SC_TRY(expectedPackageRepairRoot(packagesInstallDirectory, entry, packageRoot));
     FileSystem fs;
     SC_TRY(fs.init("."));
-    SC_TRY_MSG(fs.existsAndIsDirectory(packageRoot.view()), "Package repair root not found");
+    if (not fs.existsAndIsDirectory(packageRoot.view()))
+        return Result::Error(PackageResultCategory, PackageError::RepairRootMissing);
     return Result(true);
 }
 
@@ -158,7 +160,8 @@ static Result validateLLVMMingwPackageRoot(StringView packageRoot, Span<const Pa
         }
         String path = StringEncoding::Utf8;
         SC_TRY(Path::join(path, {packageRoot, packageExport.relativePath}));
-        SC_TRY_MSG(fs.exists(path.view()), "llvm-mingw package is incomplete");
+        if (not fs.exists(path.view()))
+            return Result::Error(PackageResultCategory, PackageError::PackageLayoutIncomplete);
     }
     return Result(true);
 }
@@ -222,7 +225,7 @@ static Result repairPackageReceipt(Console& console, StringView packagesInstallD
     {
         return repairLLVMMingwPackageReceipt(console, packagesInstallDirectory, entry);
     }
-    return Result::Error("Package repair is not implemented for this package");
+    return Result::Error(PackageResultCategory, PackageError::RepairUnsupported);
 }
 
 static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoot)
@@ -234,18 +237,24 @@ static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoo
     SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
 
     SC_TRY(validatePackageReceiptHeader(receiptJSON));
-    SC_TRY_MSG(not receiptJSON.version.isEmpty(), "Package receipt is missing package version");
-    SC_TRY_MSG(not receiptJSON.source.isEmpty(), "Package receipt is missing source");
-    SC_TRY_MSG(not receiptJSON.installRoot.isEmpty(), "Package receipt is missing install root");
-    SC_TRY_MSG(receiptJSON.validation.view() == "passed"_a8, "Package receipt validation did not pass");
+    if (receiptJSON.version.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::ReceiptVersionMissing);
+    if (receiptJSON.source.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::ReceiptSourceMissing);
+    if (receiptJSON.installRoot.view().isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::ReceiptInstallRootMissing);
+    if (receiptJSON.validation.view() != "passed"_a8)
+        return Result::Error(PackageResultCategory, PackageError::ReceiptValidationFailed);
     SC_TRY(validatePackageReceiptSourceHash(receiptJSON.sourceHash.view()));
 
     FileSystem fs;
     SC_TRY(fs.init("."));
     for (PackageReceiptExportJSON& exportView : receiptJSON.exports)
     {
-        SC_TRY_MSG(not exportView.kind.isEmpty(), "Package receipt export is missing kind");
-        SC_TRY_MSG(not exportView.name.isEmpty(), "Package receipt export is missing name");
+        if (exportView.kind.view().isEmpty())
+            return Result::Error(PackageResultCategory, PackageError::ExportKindMissing);
+        if (exportView.name.view().isEmpty())
+            return Result::Error(PackageResultCategory, PackageError::ExportNameMissing);
         SC_TRY(validatePackageReceiptExportPath(exportView.path.view()));
         if (exportView.path.view() == "."_a8)
         {
@@ -253,7 +262,8 @@ static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoo
         }
         String exportedPath = StringEncoding::Utf8;
         SC_TRY(Path::join(exportedPath, {packageRoot, exportView.path.view()}));
-        SC_TRY_MSG(fs.exists(exportedPath.view()), "Package receipt export is missing");
+        if (not fs.exists(exportedPath.view()))
+            return Result::Error(PackageResultCategory, PackageError::ExportFileMissing);
     }
     return Result(true);
 }
@@ -277,7 +287,8 @@ static Result verifyPackageReceiptMatchesRegistryExports(const PackageRegistryEn
                 break;
             }
         }
-        SC_TRY_MSG(found, "Package receipt is missing registry export");
+        if (not found)
+            return Result::Error(PackageResultCategory, PackageError::RegistryExportMissing);
     }
     return Result(true);
 }
@@ -290,8 +301,8 @@ static Result verifyPackageReceiptForEntry(const PackageRegistryEntry& entry, St
     SC_TRY(readFileIntoString(receiptPath, receipt));
     PackageReceiptJSON receiptJSON;
     SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
-    SC_TRY_MSG(receiptJSON.name.view() == entry.installedName,
-               "Package receipt identity does not match registry entry");
+    if (receiptJSON.name.view() != entry.installedName)
+        return Result::Error(PackageResultCategory, PackageError::ReceiptIdentityMismatch);
     SC_TRY(verifyPackageReceiptMatchesRegistryExports(entry, receiptJSON));
     return Result(true);
 }
@@ -451,7 +462,7 @@ static Result printPackageReceipt(Console& console, StringView packagesInstallDi
     {
         console.print("not installed: ");
         console.printLine(entry.name);
-        return Result::Error("Package receipt not found");
+        return Result::Error(PackageResultCategory, PackageError::ReceiptNotFound);
     }
 
     String receipt = StringEncoding::Utf8;
@@ -476,7 +487,7 @@ static Result printPackageExports(Console& console, StringView packagesInstallDi
     {
         console.print("not installed: ");
         console.printLine(entry.name);
-        return Result::Error("Package receipt not found");
+        return Result::Error(PackageResultCategory, PackageError::ReceiptNotFound);
     }
 
     String receipt = StringEncoding::Utf8;
@@ -615,6 +626,7 @@ static Result lockInstalledPackages(StringView packagesInstallDirectory, StringV
 
     sortPackageLock(lockJSON);
     String lock = StringEncoding::Utf8;
-    SC_TRY_MSG(SerializationJson::write(lockJSON, lock), "Failed writing package lock JSON");
+    if (not SerializationJson::write(lockJSON, lock))
+        return Result::Error(PackageResultCategory, PackageError::LockEncodingFailed);
     return fs.writeString(lockPath, lock.view());
 }

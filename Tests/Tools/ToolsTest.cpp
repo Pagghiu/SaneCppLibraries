@@ -1305,7 +1305,13 @@ struct SupportToolsTest : public TestCase
                                                       installFakeRegistryPackage};
             const PackageRegistry      badRegistry = {{&badEntry, 1}};
             args[0]                                = "fake-missing";
-            SC_TEST_EXPECT(not runPackageTool(arguments, badRegistry));
+            SC_TEST_EXPECT(runPackageTool(arguments, badRegistry)
+                               .isError(PackageResultCategory, PackageError::RegistryExportMissing));
+
+            arguments.action = "repair";
+            args[0]          = "fake";
+            SC_TEST_EXPECT(
+                runPackageTool(arguments, registry).isError(PackageResultCategory, PackageError::RepairUnsupported));
 
             arguments.action = "doctor";
             args[0]          = "fake";
