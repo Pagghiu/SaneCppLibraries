@@ -99,6 +99,13 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::RunnerSetMissing: formatter.append("Package runner set is missing"); break;
     case PackageError::Intel64RunnerMissing: formatter.append("Intel64 package runner is missing"); break;
     case PackageError::Arm64RunnerMissing: formatter.append("ARM64 package runner is missing"); break;
+    case PackageError::ImportDirectoryMissing: formatter.append("Imported package directory does not exist"); break;
+    case PackageError::ToolchainCompileFailed: formatter.append("Package toolchain smoke compile failed"); break;
+    case PackageError::ToolchainObjectMissing: formatter.append("Package toolchain smoke object is missing"); break;
+    case PackageError::ToolchainLinkFailed: formatter.append("Package toolchain smoke link failed"); break;
+    case PackageError::ToolchainExecutableMissing:
+        formatter.append("Package toolchain smoke executable is missing");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

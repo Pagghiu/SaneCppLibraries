@@ -1142,6 +1142,19 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryValueMissing));
         }
+        if (test_section("install qemu reports missing imported directory"))
+        {
+            String missingDirectory = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(missingDirectory, {outputDirectory.view(), "missing-qemu-import"}));
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "qemu";
+            args[1]             = "--import-directory";
+            args[2]             = missingDirectory.view();
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryMissing));
+        }
         if (test_section("install qemu rejects unknown option"))
         {
             arguments.tool      = "package";

@@ -1489,8 +1489,8 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
 {
     const StringView cacheLeaf   = qemuRunnerCacheLeafName();
     const StringView installLeaf = qemuRunnerInstallLeafName();
-    SC_TRY_MSG(not cacheLeaf.isEmpty() and not installLeaf.isEmpty(),
-               "QEMU package install is not supported on this host");
+    if (cacheLeaf.isEmpty() or installLeaf.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 
     package.packageFullName       = format("qemu-{}", cacheLeaf);
     package.packageLocalDirectory = format("{}/qemu/{}", packagesCacheDirectory, cacheLeaf);
@@ -1546,9 +1546,10 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
         }
     }
 
-    SC_TRY_MSG(hasSourceRoot, "Cannot find a reusable QEMU runner. Install qemu on PATH or run SC-package install qemu "
-                              "--import-directory <path>.");
-    SC_TRY_MSG(fs.existsAndIsDirectory(sourceRoot.view()), "Imported QEMU runner directory does not exist");
+    if (not hasSourceRoot)
+        return Result::Error(PackageResultCategory, PackageError::RunnerUnavailable);
+    if (not fs.existsAndIsDirectory(sourceRoot.view()))
+        return Result::Error(PackageResultCategory, PackageError::ImportDirectoryMissing);
 
     SC_TRY(finalizeInstalledPackageFromRoot(sourceRoot.view(), package));
 
@@ -1626,9 +1627,11 @@ static Result testMSVCToolchain(const Package& package)
             SC_TRY(process.exec({compilerWrapper.view(), "/nologo", "/EHsc", "/MTd", "/Z7", "/c", sourcePath.view(),
                                  format("/Fo{}", objectPath.view()).view()},
                                 output, Process::StdIn(), errors));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Portable MSVC compile smoke test failed");
+            if (process.getExitStatus() != 0)
+                return Result::Error(PackageResultCategory, PackageError::ToolchainCompileFailed);
         }
-        SC_TRY_MSG(fs.existsAndIsFile(objectPath.view()), "Portable MSVC compile smoke output is missing");
+        if (not fs.existsAndIsFile(objectPath.view()))
+            return Result::Error(PackageResultCategory, PackageError::ToolchainObjectMissing);
 
         {
             String  output = StringEncoding::Utf8;
@@ -1637,9 +1640,11 @@ static Result testMSVCToolchain(const Package& package)
             SC_TRY(process.exec({linkerWrapper.view(), "/nologo", objectPath.view(), "Ws2_32.lib",
                                  format("/OUT:{}", outputPath.view()).view()},
                                 output, Process::StdIn(), errors));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Portable MSVC link smoke test failed");
+            if (process.getExitStatus() != 0)
+                return Result::Error(PackageResultCategory, PackageError::ToolchainLinkFailed);
         }
-        SC_TRY_MSG(fs.existsAndIsFile(outputPath.view()), "Portable MSVC link smoke output is missing");
+        if (not fs.existsAndIsFile(outputPath.view()))
+            return Result::Error(PackageResultCategory, PackageError::ToolchainExecutableMissing);
     }
     return Result(true);
 }

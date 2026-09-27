@@ -79,6 +79,11 @@ enum class PackageError : uint32_t
     RunnerSetMissing,
     Intel64RunnerMissing,
     Arm64RunnerMissing,
+    ImportDirectoryMissing,
+    ToolchainCompileFailed,
+    ToolchainObjectMissing,
+    ToolchainLinkFailed,
+    ToolchainExecutableMissing,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);
