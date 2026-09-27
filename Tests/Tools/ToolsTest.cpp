@@ -1223,6 +1223,29 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnexpectedInstallArgument));
         }
+        if (test_section("linux sysroot installers reject unsupported architecture"))
+        {
+            Package          package;
+            LinuxSysrootSpec spec;
+            spec.architecture = InstructionSet::Intel32;
+            spec.environment  = LinuxSysrootSpec::Glibc;
+            SC_TEST_EXPECT(installLinuxSysroot(outputDirectory.view(), outputDirectory.view(), spec, package)
+                               .isError(PackageResultCategory, PackageError::InstallerArchitectureUnsupported));
+            spec.environment = LinuxSysrootSpec::Musl;
+            SC_TEST_EXPECT(installLinuxSysroot(outputDirectory.view(), outputDirectory.view(), spec, package)
+                               .isError(PackageResultCategory, PackageError::InstallerArchitectureUnsupported));
+        }
+#if SC_PLATFORM_WINDOWS
+        if (test_section("install llvm-mingw reports unsupported host"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "llvm-mingw";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+        }
+#endif
         if (test_section("package list is available"))
         {
             arguments.tool      = "package";

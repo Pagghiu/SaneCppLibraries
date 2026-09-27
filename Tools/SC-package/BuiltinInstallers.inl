@@ -2943,11 +2943,12 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
             recipe.download.expectedHash    = "f92b02c4f835470deb5ac5fb92ddb458239e80ddff9ce8867155679ee5f57ffc";
             recipe.package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
             break;
-        case InstructionSet::Intel32: return Result::Error("Unsupported platform");
+        case InstructionSet::Intel32:
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         }
         break;
-    case Platform::Windows: return Result::Error("Automatic llvm-mingw install is not supported on Windows hosts yet");
-    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    case Platform::Windows:
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
 
     recipe.functions.extractFunction = [](StringView sourceFile, StringView destinationDirectory)
@@ -2960,9 +2961,12 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
         Process process;
         compilerExecutable = format("{}/bin/x86_64-w64-mingw32-clang++", package.installDirectoryLink);
         SC_TRY(process.exec({compilerExecutable.view(), "--version"}, result).toResult());
-        SC_TRY_MSG(process.getExitStatus() == 0, "llvm-mingw compiler returned error");
-        SC_TRY_MSG(StringView(result.view()).containsString("clang version"), "llvm-mingw compiler version missing");
-        SC_TRY_MSG(StringView(result.view()).containsString(llvmVersion), "llvm-mingw compiler version doesn't match");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::ToolProbeFailed);
+        if (not StringView(result.view()).containsString("clang version"))
+            return Result::Error(PackageResultCategory, PackageError::ToolIdentityMismatch);
+        if (not StringView(result.view()).containsString(llvmVersion))
+            return Result::Error(PackageResultCategory, PackageError::ToolVersionMismatch);
         return Result(true);
     };
 
@@ -3024,7 +3028,8 @@ static Result linuxSysrootPackagePathExists(StringView packageRoot, StringView r
     SC_TRY(fs.init("."));
     String absolutePath = StringEncoding::Utf8;
     SC_TRY(Path::join(absolutePath, {packageRoot, relativePath}));
-    SC_TRY_MSG(fs.exists(absolutePath.view()), "Linux sysroot package is incomplete");
+    if (not fs.exists(absolutePath.view()))
+        return Result::Error(PackageResultCategory, PackageError::PackageLayoutIncomplete);
     return Result(true);
 }
 
@@ -3087,7 +3092,7 @@ static Result validateLinuxSysrootPackage(StringView packageRoot, const Tools::L
         }
         else
         {
-            return Result::Error("Unsupported Linux glibc sysroot architecture");
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         }
         break;
     case Tools::LinuxSysrootSpec::Musl:
@@ -3113,7 +3118,7 @@ static Result validateLinuxSysrootPackage(StringView packageRoot, const Tools::L
         }
         else
         {
-            return Result::Error("Unsupported Linux musl sysroot architecture");
+            return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
         }
         break;
     }
@@ -3179,7 +3184,8 @@ static Result resolveAlpinePackagesIndex(StringView downloadsDirectory, StringVi
     Process process;
     String  indexContents = StringEncoding::Utf8;
     SC_TRY(process.exec({"tar", "-xOzf", indexPath.view(), "APKINDEX"}, indexContents));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting Alpine APKINDEX");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveExtractionFailed);
     SC_TRY(output.assign(indexContents.view()));
     return Result(true);
 }
@@ -3187,10 +3193,10 @@ static Result resolveAlpinePackagesIndex(StringView downloadsDirectory, StringVi
 static Result installLinuxGlibcSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                        const Tools::LinuxSysrootSpec& spec, Package& package)
 {
-    SC_TRY_MSG(spec.architecture == InstructionSet::Intel64 or spec.architecture == InstructionSet::ARM64,
-               "Linux glibc sysroots only support x86_64 and arm64");
-    SC_TRY_MSG(supportsAutomaticLinuxSysrootInstall(),
-               "Automatic Linux glibc sysroot install is only supported on macOS and Linux hosts");
+    if (spec.architecture != InstructionSet::Intel64 and spec.architecture != InstructionSet::ARM64)
+        return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
+    if (not supportsAutomaticLinuxSysrootInstall())
+        return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 
     const StringView targetArchitecture = linuxSysrootArchitectureName(spec.architecture);
     package.packageFullName             = format("linux-sysroot-glibc-{}", targetArchitecture);
@@ -3303,10 +3309,10 @@ static Result installLinuxGlibcSysroot(StringView packagesCacheDirectory, String
 static Result installLinuxMuslSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                       const Tools::LinuxSysrootSpec& spec, Package& package)
 {
-    SC_TRY_MSG(spec.architecture == InstructionSet::Intel64 or spec.architecture == InstructionSet::ARM64,
-               "Linux musl sysroots only support x86_64 and arm64");
-    SC_TRY_MSG(supportsAutomaticLinuxSysrootInstall(),
-               "Automatic Linux musl sysroot install is only supported on macOS and Linux hosts");
+    if (spec.architecture != InstructionSet::Intel64 and spec.architecture != InstructionSet::ARM64)
+        return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
+    if (not supportsAutomaticLinuxSysrootInstall())
+        return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 
     const StringView targetArchitecture = linuxSysrootArchitectureName(spec.architecture);
     const StringView alpineArchitecture = linuxSysrootAlpineArchitectureName(spec.architecture);
