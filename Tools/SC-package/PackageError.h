@@ -100,6 +100,9 @@ enum class PackageError : uint32_t
     PackageBuildFailed,
     ToolchainRunFailed,
     PackageBuildArtifactMissing,
+    RunnerVersionMismatch,
+    PackageCopyFailed,
+    PackageDownloadFailed,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

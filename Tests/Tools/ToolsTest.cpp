@@ -1235,7 +1235,23 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(installLinuxSysroot(outputDirectory.view(), outputDirectory.view(), spec, package)
                                .isError(PackageResultCategory, PackageError::InstallerArchitectureUnsupported));
         }
+#if !SC_PLATFORM_LINUX
+        if (test_section("linux wine installers reject unsupported host"))
+        {
+            Package package;
+            SC_TEST_EXPECT(installLinuxWineRunner(outputDirectory.view(), outputDirectory.view(), package)
+                               .isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+            SC_TEST_EXPECT(installLinuxNativeArm64WineRunner(outputDirectory.view(), outputDirectory.view(), package)
+                               .isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+        }
+#endif
 #if SC_PLATFORM_WINDOWS
+        if (test_section("wine installer rejects unsupported host"))
+        {
+            Package package;
+            SC_TEST_EXPECT(installWineStableRunner(outputDirectory.view(), outputDirectory.view(), package)
+                               .isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+        }
         if (test_section("install llvm-mingw reports unsupported host"))
         {
             arguments.tool      = "package";

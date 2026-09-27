@@ -126,6 +126,9 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::PackageBuildFailed: formatter.append("Package build failed"); break;
     case PackageError::ToolchainRunFailed: formatter.append("Package toolchain smoke run failed"); break;
     case PackageError::PackageBuildArtifactMissing: formatter.append("Package build artifact is missing"); break;
+    case PackageError::RunnerVersionMismatch: formatter.append("Package runner version does not match"); break;
+    case PackageError::PackageCopyFailed: formatter.append("Package copy failed"); break;
+    case PackageError::PackageDownloadFailed: formatter.append("Package download failed"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

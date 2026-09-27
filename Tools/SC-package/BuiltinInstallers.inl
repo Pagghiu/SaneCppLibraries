@@ -3434,9 +3434,10 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     case Platform::Linux: break;
     case Platform::Apple:
     case Platform::Windows:
-    case Platform::Emscripten: return Result::Error("Automatic Linux Wine install is only supported on Linux hosts");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
-    SC_TRY_MSG(isArm64HostInstructionSet(), "Automatic Linux Wine install is only supported on Linux ARM64 hosts");
+    if (not isArm64HostInstructionSet())
+        return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
 
     package.packageFullName       = "wine-stable-linux-arm64-box64";
     package.packageLocalDirectory = format("{}/wine-stable/linux-arm64-box64", packagesCacheDirectory);
@@ -3464,8 +3465,10 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
         SC_TRY(Path::join(executable, {installedPackage.installDirectoryLink.view(), "bin", "wine"}));
         Process process;
         SC_TRY(process.exec({executable.view(), "--version"}, version).toResult());
-        SC_TRY_MSG(process.getExitStatus() == 0, "Linux Wine runner returned error");
-        SC_TRY_MSG(StringView(version.view()).containsString("wine-11.0"), "Linux Wine runner version doesn't match");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::RunnerProbeFailed);
+        if (not StringView(version.view()).containsString("wine-11.0"))
+            return Result::Error(PackageResultCategory, PackageError::RunnerVersionMismatch);
         return Result(true);
     };
 
@@ -3560,7 +3563,7 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     (void)packagesCacheDirectory;
     (void)packagesInstallDirectory;
     (void)package;
-    return Result::Error("Automatic Linux Wine install is only supported on Linux hosts");
+    return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 #endif
 }
 
@@ -3587,11 +3590,10 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
     case Platform::Linux: break;
     case Platform::Apple:
     case Platform::Windows:
-    case Platform::Emscripten:
-        return Result::Error("Automatic Linux ARM64 Wine install is only supported on Linux hosts");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
-    SC_TRY_MSG(isArm64HostInstructionSet(),
-               "Automatic Linux ARM64 Wine install is only supported on Linux ARM64 hosts");
+    if (not isArm64HostInstructionSet())
+        return Result::Error(PackageResultCategory, PackageError::InstallerArchitectureUnsupported);
 
     package.packageFullName       = "wine-stable-linux-arm64-native";
     package.packageLocalDirectory = format("{}/wine-stable/linux-arm64-native", packagesCacheDirectory);
@@ -3619,9 +3621,10 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
         SC_TRY(Path::join(executable, {installedPackage.installDirectoryLink.view(), "bin", "wine"}));
         Process process;
         SC_TRY(process.exec({executable.view(), "--version"}, version).toResult());
-        SC_TRY_MSG(process.getExitStatus() == 0, "Linux ARM64 Wine runner returned error");
-        SC_TRY_MSG(StringView(version.view()).containsString("wine-6.0"),
-                   "Linux ARM64 Wine runner version doesn't match");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::RunnerProbeFailed);
+        if (not StringView(version.view()).containsString("wine-6.0"))
+            return Result::Error(PackageResultCategory, PackageError::RunnerVersionMismatch);
         return Result(true);
     };
 
@@ -3706,7 +3709,7 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
     (void)packagesCacheDirectory;
     (void)packagesInstallDirectory;
     (void)package;
-    return Result::Error("Automatic Linux ARM64 Wine install is only supported on Linux hosts");
+    return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
 #endif
 }
 
@@ -3722,7 +3725,7 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
     case Platform::Apple: break;
     case Platform::Linux: return installLinuxWineRunner(packagesCacheDirectory, packagesInstallDirectory, package);
     case Platform::Windows:
-    case Platform::Emscripten: return Result::Error("Automatic Wine install is only supported on macOS hosts yet");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
 
     Download download;
@@ -3746,8 +3749,10 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
 
         Process process;
         SC_TRY(process.exec({executable.view(), "--version"}, version).toResult());
-        SC_TRY_MSG(process.getExitStatus() == 0, "Wine runner returned error");
-        SC_TRY_MSG(StringView(version.view()).containsString("wine-11.0"), "Wine runner version doesn't match");
+        if (process.getExitStatus() != 0)
+            return Result::Error(PackageResultCategory, PackageError::RunnerProbeFailed);
+        if (not StringView(version.view()).containsString("wine-11.0"))
+            return Result::Error(PackageResultCategory, PackageError::RunnerVersionMismatch);
         return Result(true);
     };
 
@@ -3833,7 +3838,8 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
                 Process copyProcess;
                 SC_TRY(copyProcess.exec(
                     {"cp", "-R", resolvedImportDirectory.view(), package.packageLocalDirectory.view()}));
-                SC_TRY_MSG(copyProcess.getExitStatus() == 0, "Failed copying imported MSVC toolchain");
+                if (copyProcess.getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::PackageCopyFailed);
                 SC_TRY(repairMSVCPackageLayout(package.packageLocalDirectory.view(), resolvedWine.view()));
             }
             else
@@ -3852,7 +3858,8 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
                 SC_TRY(process.exec({"python3", downloaderScript.view(), "--dest", package.packageLocalDirectory.view(),
                                      "--cache-dir", downloadCache.view(), "--wine", resolvedWine.view(),
                                      "--wine-prefix", winePrefix.view(), "--accept-license"}));
-                SC_TRY_MSG(process.getExitStatus() == 0, "Portable MSVC download failed");
+                if (process.getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::PackageDownloadFailed);
 
                 String packageWinePrefix = StringEncoding::Utf8;
                 SC_TRY(Path::join(packageWinePrefix, {package.packageLocalDirectory.view(), ".wine-prefix"}));
@@ -3862,7 +3869,8 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
                 }
                 Process copyPrefixProcess;
                 SC_TRY(copyPrefixProcess.exec({"cp", "-R", winePrefix.view(), packageWinePrefix.view()}));
-                SC_TRY_MSG(copyPrefixProcess.getExitStatus() == 0, "Failed seeding portable MSVC Wine prefix");
+                if (copyPrefixProcess.getExitStatus() != 0)
+                    return Result::Error(PackageResultCategory, PackageError::PackageSetupFailed);
             }
 
             SC_TRY(writeMSVCWrapperScripts(package.packageLocalDirectory.view()));
