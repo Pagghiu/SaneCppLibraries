@@ -122,12 +122,8 @@ int main(int argc, const char* argv[])
     console.print(gFormatString.view());
     if (not result)
     {
-        if (result.hasMessage())
-        {
-            console.printLine(StringView::fromNullTerminated(result.message, StringEncoding::Ascii));
-        }
-        else if (result.category() == ToolsResultCategory or result.category() == BuildResultCategory or
-                 result.category() == PackageResultCategory)
+        if (result.category() == ToolsResultCategory or result.category() == BuildResultCategory or
+            result.category() == PackageResultCategory)
         {
             char                    message[128];
             const ResultErrorFormat formatted =

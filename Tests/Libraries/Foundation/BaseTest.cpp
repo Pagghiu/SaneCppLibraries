@@ -133,7 +133,9 @@ struct SC::BaseTest : public SC::TestCase
         }
         if (test_section("Assert::printBacktrace"))
         {
-            Assert::printBacktrace("a!=b", Result::Error("Test"), SC_NATIVE_STR("FileName.cpp"), "Function", 12);
+            Assert::printBacktrace("a!=b",
+                                   Result::Error(ResultTestDomainA::category(), ResultTestDomainA::Error::InvalidValue),
+                                   SC_NATIVE_STR("FileName.cpp"), "Function", 12);
         }
 
         if (test_section("Result structured error bridge"))

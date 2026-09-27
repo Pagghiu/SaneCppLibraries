@@ -782,12 +782,6 @@ bool SC::TestCase::recordExpectation(StringSpan expression, bool status, StringS
 
 bool SC::TestCase::recordExpectation(StringSpan expression, Result status)
 {
-    if (status.hasMessage())
-    {
-        return recordExpectation(expression, status,
-                                 StringSpan({status.message, ::strlen(status.message)}, true, StringEncoding::Ascii));
-    }
-
     char      errorIdentity[64];
     const int length =
         ::snprintf(errorIdentity, sizeof(errorIdentity), "Error category %u, code %u",

@@ -391,9 +391,14 @@ static Result printPackageDoctorForEntry(Console& console, StringView packagesIn
     console.print("  receipt: ");
     console.printLine(receiptPath.view());
     console.print("  reason: ");
-    if (validation.hasMessage())
+    if (validation.category() == PackageResultCategory)
     {
-        console.printLine(StringView::fromNullTerminated(validation.message, StringEncoding::Ascii));
+        char                    message[128];
+        const ResultErrorFormat formatted = formatPackageError(validation, message);
+        if (formatted)
+            console.printLine(StringView::fromNullTerminated(message, StringEncoding::Ascii));
+        else
+            console.print("Error category {}, code {}\n", validation.category().value, validation.errorValue());
     }
     else
     {

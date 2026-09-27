@@ -9,6 +9,7 @@
 #include "../Libraries/Memory/String.h"
 #include "../Libraries/SerializationText/SerializationJson.h"
 #include "../Libraries/Time/Time.h"
+#include "SC-package/PackageErrorFormatter.h"
 #include <stdlib.h>
 namespace SC
 {

@@ -2296,17 +2296,8 @@ SC::Result SC::AsyncEventLoop::Internal::completeAsync(AsyncEventLoop& eventLoop
     }
     else
     {
-        if (returnCode.hasMessage())
-        {
-            SC_LOG_MESSAGE("{} {} COMPLETE (Error = \"{}\")\n", async.debugName, AsyncRequest::TypeToString(async.type),
-                           returnCode.message);
-        }
-        else
-        {
-            SC_LOG_MESSAGE("{} {} COMPLETE (Error category = {}, code = {})\n", async.debugName,
-                           AsyncRequest::TypeToString(async.type), returnCode.category().value,
-                           returnCode.errorValue());
-        }
+        SC_LOG_MESSAGE("{} {} COMPLETE (Error category = {}, code = {})\n", async.debugName,
+                       AsyncRequest::TypeToString(async.type), returnCode.category().value, returnCode.errorValue());
     }
     return Internal::applyOnAsync(
         async, CompleteAsyncPhase(eventIndex, eventLoop, kernelEvents, returnCode, hasBeenReactivated));
