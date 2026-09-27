@@ -19,10 +19,12 @@ static Result extractTarArchiveFlatteningRoot(StringView sourceFile, StringView 
     String  archiveListing;
     Process listProcess;
     SC_TRY(listProcess.exec({"tar", "-tf", sourceFile}, archiveListing));
-    SC_TRY_MSG(listProcess.getExitStatus() == 0, "tar listing failed");
+    if (listProcess.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveListingFailed);
 
     StringViewTokenizer tokenizer(archiveListing.view());
-    SC_TRY_MSG(tokenizer.tokenizeNext({'\n'}), "tar archive is empty");
+    if (not tokenizer.tokenizeNext({'\n'}))
+        return Result::Error(PackageResultCategory, PackageError::ArchiveEmpty);
 
     StringView rootDirectory = tokenizer.component.trimAnyOf({'\r', '\n', '/'});
     StringView nestedPath;
@@ -30,7 +32,8 @@ static Result extractTarArchiveFlatteningRoot(StringView sourceFile, StringView 
     {
         rootDirectory = nestedPath;
     }
-    SC_TRY_MSG(not rootDirectory.isEmpty(), "tar archive root directory is empty");
+    if (rootDirectory.isEmpty())
+        return Result::Error(PackageResultCategory, PackageError::ArchiveRootMissing);
 
     String     tempDirectory = format("{}-extracting", destinationDirectory);
     String     extractedRoot = format("{}/{}", tempDirectory.view(), rootDirectory);
@@ -44,8 +47,10 @@ static Result extractTarArchiveFlatteningRoot(StringView sourceFile, StringView 
 
     Process extractProcess;
     SC_TRY(extractProcess.exec({"tar", "-xf", sourceFile, "-C", tempDirectory.view()}));
-    SC_TRY_MSG(extractProcess.getExitStatus() == 0, "tar extraction failed");
-    SC_TRY_MSG(fs.existsAndIsDirectory(extractedRoot.view()), "tar extraction root directory missing");
+    if (extractProcess.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ArchiveExtractionFailed);
+    if (not fs.existsAndIsDirectory(extractedRoot.view()))
+        return Result::Error(PackageResultCategory, PackageError::ExtractedRootMissing);
 
     if (fs.existsAndIsDirectory(destinationDirectory))
     {

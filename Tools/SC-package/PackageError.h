@@ -49,6 +49,11 @@ enum class PackageError : uint32_t
     RegistryExportMissing,
     ReceiptIdentityMismatch,
     LockEncodingFailed,
+    ArchiveListingFailed,
+    ArchiveEmpty,
+    ArchiveRootMissing,
+    ArchiveExtractionFailed,
+    ExtractedRootMissing,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

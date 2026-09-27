@@ -57,6 +57,11 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
         formatter.append("Package receipt identity does not match registry");
         break;
     case PackageError::LockEncodingFailed: formatter.append("Package lock could not be encoded"); break;
+    case PackageError::ArchiveListingFailed: formatter.append("Package archive could not be listed"); break;
+    case PackageError::ArchiveEmpty: formatter.append("Package archive is empty"); break;
+    case PackageError::ArchiveRootMissing: formatter.append("Package archive root is missing"); break;
+    case PackageError::ArchiveExtractionFailed: formatter.append("Package archive could not be extracted"); break;
+    case PackageError::ExtractedRootMissing: formatter.append("Extracted package root was not found"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();
