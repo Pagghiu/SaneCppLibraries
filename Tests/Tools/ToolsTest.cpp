@@ -1359,13 +1359,16 @@ struct SupportToolsTest : public TestCase
                 SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
             }
             SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
-            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuX86_64.view(), "qemu-x86_64"));
-            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuArm64.view(), "qemu-aarch64"));
 
             arguments.tool      = "package";
             arguments.action    = "repair";
             args[0]             = "qemu";
             arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::RunnerSetMissing));
+
+            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuX86_64.view(), "qemu-x86_64"));
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::Arm64RunnerMissing));
+            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuArm64.view(), "qemu-aarch64"));
             SC_TEST_EXPECT(runPackageTool(arguments));
 
             String resolved = StringEncoding::Utf8;

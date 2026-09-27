@@ -83,6 +83,22 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::PackageIndexFieldMissing: formatter.append("Package index field is missing"); break;
     case PackageError::PackageMetadataNotFound: formatter.append("Package metadata was not found"); break;
     case PackageError::PackageMetadataHashMissing: formatter.append("Package metadata hash is missing"); break;
+    case PackageError::RunnerUnavailable: formatter.append("Required package runner is unavailable"); break;
+    case PackageError::EnvironmentVariableNameNotTerminated:
+        formatter.append("Environment variable name is not null terminated");
+        break;
+    case PackageError::InstallerHostUnsupported:
+        formatter.append("Package installer does not support this host");
+        break;
+    case PackageError::RunnerArchitectureUnsupported:
+        formatter.append("Package runner does not support the requested architecture");
+        break;
+    case PackageError::RunnerExecutableMissing: formatter.append("Package runner executable is missing"); break;
+    case PackageError::RunnerProbeFailed: formatter.append("Package runner probe failed"); break;
+    case PackageError::RunnerIdentityMismatch: formatter.append("Package runner identity could not be verified"); break;
+    case PackageError::RunnerSetMissing: formatter.append("Package runner set is missing"); break;
+    case PackageError::Intel64RunnerMissing: formatter.append("Intel64 package runner is missing"); break;
+    case PackageError::Arm64RunnerMissing: formatter.append("ARM64 package runner is missing"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

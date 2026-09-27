@@ -69,6 +69,16 @@ enum class PackageError : uint32_t
     PackageIndexFieldMissing,
     PackageMetadataNotFound,
     PackageMetadataHashMissing,
+    RunnerUnavailable,
+    EnvironmentVariableNameNotTerminated,
+    InstallerHostUnsupported,
+    RunnerArchitectureUnsupported,
+    RunnerExecutableMissing,
+    RunnerProbeFailed,
+    RunnerIdentityMismatch,
+    RunnerSetMissing,
+    Intel64RunnerMissing,
+    Arm64RunnerMissing,
 };
 
 static constexpr ResultCategory PackageResultCategory = ResultCategory(22);

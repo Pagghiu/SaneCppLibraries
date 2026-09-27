@@ -589,7 +589,8 @@ static Result patchLinuxNativeWineserverScript(StringView packageRoot)
 
     String wineserverPath = StringEncoding::Utf8;
     SC_TRY(Path::join(wineserverPath, {packageRoot, "root", "usr", "lib", "wine", "wineserver"}));
-    SC_TRY_MSG(fs.existsAndIsFile(wineserverPath.view()), "Missing native Wine wineserver script");
+    if (not fs.existsAndIsFile(wineserverPath.view()))
+        return Result::Error(PackageResultCategory, PackageError::PackageLayoutIncomplete);
 
     String scriptContents = StringEncoding::Utf8;
     auto   builder        = StringBuilder::create(scriptContents);
@@ -685,12 +686,9 @@ static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, Stri
             SC_TRY(Path::join(output, {winePackage.installDirectoryLink.view(), "bin", "wine"}));
             return Result(true);
         }
-        return Result::Error("Cannot find a usable Wine runner. Install wine64/wine, or install box64 plus "
-                             "wine64/wine, or pass --wine/SC_MSVC_WINE with a wrapper path. Linux arm64 hosts need "
-                             "a runner that can launch the Windows x64 MSVC tools.");
+        return Result::Error(PackageResultCategory, PackageError::RunnerUnavailable);
     }
-    return Result::Error(
-        "Cannot find wine executable. Install wine64/wine or pass --wine/SC_MSVC_WINE with a Wine wrapper path.");
+    return Result::Error(PackageResultCategory, PackageError::RunnerUnavailable);
 }
 
 static Result readEnvironmentVariable(StringView name, String& value, bool& found)
@@ -699,7 +697,7 @@ static Result readEnvironmentVariable(StringView name, String& value, bool& foun
 #if SC_PLATFORM_WINDOWS
     if (not name.isNullTerminated())
     {
-        return Result::Error("Environment variable name must be null terminated");
+        return Result::Error(PackageResultCategory, PackageError::EnvironmentVariableNameNotTerminated);
     }
 
     char*   variableValue = nullptr;
@@ -718,7 +716,7 @@ static Result readEnvironmentVariable(StringView name, String& value, bool& foun
 #else
     if (not name.isNullTerminated())
     {
-        return Result::Error("Environment variable name must be null terminated");
+        return Result::Error(PackageResultCategory, PackageError::EnvironmentVariableNameNotTerminated);
     }
 
     if (const char* variableValue = ::getenv(name.bytesWithoutTerminator()))
@@ -828,7 +826,7 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
     case Platform::Linux:
         return resolveLinuxWineExecutable(packagesCacheDirectory, packagesInstallDirectory, wineExecutable);
     case Platform::Windows:
-    case Platform::Emscripten: return Result::Error("Portable MSVC is only supported on macOS and Linux hosts");
+    case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
     Assert::unreachable();
 }
@@ -960,7 +958,7 @@ static Result resolveImportedQEMURootFromPATH(String& root)
             return Result(true);
         }
     }
-    return Result::Error("Cannot find QEMU runner executable");
+    return Result::Error(PackageResultCategory, PackageError::RunnerExecutableMissing);
 }
 
 static Result qemuRunnerExecutableCandidates(InstructionSet architecture, Span<const StringView>& candidates)
@@ -980,7 +978,8 @@ static Result qemuRunnerExecutableCandidates(InstructionSet architecture, Span<c
     case InstructionSet::ARM64:
         candidates = {arm64Candidates, sizeof(arm64Candidates) / sizeof(arm64Candidates[0])};
         return Result(true);
-    case InstructionSet::Intel32: return Result::Error("Unsupported QEMU runner architecture");
+    case InstructionSet::Intel32:
+        return Result::Error(PackageResultCategory, PackageError::RunnerArchitectureUnsupported);
     }
     Assert::unreachable();
 }
@@ -1014,9 +1013,10 @@ Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet archit
 
     switch (architecture)
     {
-    case InstructionSet::Intel64: return Result::Error("QEMU package is missing qemu-x86_64 runner executable");
-    case InstructionSet::ARM64: return Result::Error("QEMU package is missing qemu-aarch64 runner executable");
-    case InstructionSet::Intel32: return Result::Error("Unsupported QEMU runner architecture");
+    case InstructionSet::Intel64:
+    case InstructionSet::ARM64: return Result::Error(PackageResultCategory, PackageError::RunnerExecutableMissing);
+    case InstructionSet::Intel32:
+        return Result::Error(PackageResultCategory, PackageError::RunnerArchitectureUnsupported);
     }
     Assert::unreachable();
 }
@@ -1050,9 +1050,10 @@ static Result resolveQEMURunnerExecutableExport(StringView packageRoot, Instruct
 
     switch (architecture)
     {
-    case InstructionSet::Intel64: return Result::Error("QEMU package is missing qemu-x86_64 runner executable");
-    case InstructionSet::ARM64: return Result::Error("QEMU package is missing qemu-aarch64 runner executable");
-    case InstructionSet::Intel32: return Result::Error("Unsupported QEMU runner architecture");
+    case InstructionSet::Intel64:
+    case InstructionSet::ARM64: return Result::Error(PackageResultCategory, PackageError::RunnerExecutableMissing);
+    case InstructionSet::Intel32:
+        return Result::Error(PackageResultCategory, PackageError::RunnerArchitectureUnsupported);
     }
     Assert::unreachable();
 }
@@ -1062,7 +1063,8 @@ static Result testQEMURunnerExecutable(StringView executable, String* versionLin
     Process process;
     String  output = StringEncoding::Utf8;
     SC_TRY(process.exec({executable, "--version"}, output));
-    SC_TRY_MSG(process.getExitStatus() == 0, "QEMU runner returned error");
+    if (process.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::RunnerProbeFailed);
 
     StringView          firstLine = StringView(output.view()).trimWhiteSpaces();
     StringViewTokenizer tokenizer(firstLine);
@@ -1071,8 +1073,8 @@ static Result testQEMURunnerExecutable(StringView executable, String* versionLin
         firstLine = tokenizer.component.trimWhiteSpaces();
     }
 
-    SC_TRY_MSG(firstLine.containsString("qemu") or firstLine.containsString("QEMU"),
-               "QEMU runner version output is missing the qemu banner");
+    if (not firstLine.containsString("qemu") and not firstLine.containsString("QEMU"))
+        return Result::Error(PackageResultCategory, PackageError::RunnerIdentityMismatch);
     if (versionLine != nullptr)
     {
         SC_TRY(versionLine->assign(firstLine));
@@ -1110,15 +1112,15 @@ static Result testQEMUPackageRoot(StringView packageRoot, String* detectedTarget
 
     if (not foundX86_64 and not foundArm64)
     {
-        return Result::Error("QEMU package must provide qemu-x86_64 and qemu-aarch64");
+        return Result::Error(PackageResultCategory, PackageError::RunnerSetMissing);
     }
     if (not foundX86_64)
     {
-        return Result::Error("QEMU package is missing qemu-x86_64");
+        return Result::Error(PackageResultCategory, PackageError::Intel64RunnerMissing);
     }
     if (not foundArm64)
     {
-        return Result::Error("QEMU package is missing qemu-aarch64");
+        return Result::Error(PackageResultCategory, PackageError::Arm64RunnerMissing);
     }
     if (detectedTargets != nullptr)
     {
