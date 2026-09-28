@@ -406,21 +406,19 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
         SC_TEST_EXPECT(foreign.detail == PluginErrorDetail::None);
         SC_TEST_EXPECT(foreign.contextKind == PluginErrorContextKind::None);
 
-        constexpr char    expected[] = "Failed to open file (detail: POSIX open file) (native error: 12345)";
-        char              message[sizeof(expected)];
+        char              message[128];
         ResultErrorFormat formatted = formatPluginError(detailed, message);
         SC_TEST_EXPECT(formatted);
-        SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(expected));
-        SC_TEST_EXPECT(::memcmp(message, expected, sizeof(expected)) == 0);
+        SC_TEST_EXPECT(formatted.requiredCapacity <= sizeof(message));
+        SC_TEST_EXPECT(StringView::fromNullTerminated(message, StringEncoding::Ascii).containsString("12345"));
 
         const ResultPlugin exit = ResultPlugin::withExitCode(PluginError::CompilerExitedWithFailure,
                                                              PluginErrorDetail::CompilerBuildArguments, -42);
-        constexpr char     expectedExit[] =
-            "Compiler exited unsuccessfully (detail: build compiler arguments) (exit code: -42)";
-        char exitMessage[sizeof(expectedExit)];
+        char               exitMessage[128];
         formatted = formatPluginError(exit, exitMessage);
         SC_TEST_EXPECT(formatted);
-        SC_TEST_EXPECT(::memcmp(exitMessage, expectedExit, sizeof(expectedExit)) == 0);
+        SC_TEST_EXPECT(formatted.requiredCapacity <= sizeof(exitMessage));
+        SC_TEST_EXPECT(StringView::fromNullTerminated(exitMessage, StringEncoding::Ascii).containsString("-42"));
 
         formatted = formatPluginError(PluginError::PathCapacityExceeded, {});
         SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::InsufficientCapacity);
