@@ -34,7 +34,7 @@ static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<c
     {
         SC::Span<char> readData;
         SC_TRY(descriptor.read({destination.data() + totalRead, destination.sizeInBytes() - totalRead}, readData));
-        SC_TRY_MSG(not readData.empty(), "readExactDescriptor - Unexpected EOF");
+        SC_TRY(SC::Result(not readData.empty()));
         totalRead += readData.sizeInBytes();
     }
     return SC::Result(true);
@@ -165,18 +165,18 @@ struct PosixPTYPair
         {
             masterFd = ::posix_openpt(openFlags);
         } while (masterFd == -1 and errno == EINTR);
-        SC_TRY_MSG(masterFd != -1, "PosixPTYPair - posix_openpt failed");
+        SC_TRY(SC::Result(masterFd != -1));
 
         if (::grantpt(masterFd) != 0 or ::unlockpt(masterFd) != 0)
         {
             (void)::close(masterFd);
-            return SC::Result::Error("PosixPTYPair - grantpt/unlockpt failed");
+            return SC::Result(false);
         }
         const char* slaveName = ::ptsname(masterFd);
         if (slaveName == nullptr)
         {
             (void)::close(masterFd);
-            return SC::Result::Error("PosixPTYPair - ptsname failed");
+            return SC::Result(false);
         }
         SC_TRY(master.assign(masterFd));
         SC_TRY(slavePath.assign(SC::StringSpan::fromNullTerminated(slaveName, SC::StringEncoding::Native)));
@@ -292,7 +292,7 @@ void SC::SerialPortTest::nonSerialHandleContract()
     SC_TEST_EXPECT(fileDescriptor.open(filePath.view(), FileOpen::WriteRead));
 
     FileDescriptor::Handle nativeHandle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fileDescriptor.get(nativeHandle, Result::Error("nativeHandle")));
+    SC_TEST_EXPECT(fileDescriptor.get(nativeHandle, Result::Error(FileResultCategory, FileError::InvalidHandle)));
     fileDescriptor.detach();
 
     SerialDescriptor serial;

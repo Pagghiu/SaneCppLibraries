@@ -142,7 +142,7 @@ static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot
         {
         case InstructionSet::ARM64: leaf = "macos_arm64"; break;
         case InstructionSet::Intel64: leaf = "macos_intel64"; break;
-        case InstructionSet::Intel32: return Result::Error("Unsupported QEMU test host");
+        case InstructionSet::Intel32: return Result(false);
         }
         break;
     case Platform::Linux:
@@ -150,7 +150,7 @@ static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot
         {
         case InstructionSet::ARM64: leaf = "linux_arm64"; break;
         case InstructionSet::Intel64: leaf = "linux_intel64"; break;
-        case InstructionSet::Intel32: return Result::Error("Unsupported QEMU test host");
+        case InstructionSet::Intel32: return Result(false);
         }
         break;
     case Platform::Windows:
@@ -158,10 +158,10 @@ static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot
         {
         case InstructionSet::ARM64: leaf = "windows_arm64"; break;
         case InstructionSet::Intel64: leaf = "windows_intel64"; break;
-        case InstructionSet::Intel32: return Result::Error("Unsupported QEMU test host");
+        case InstructionSet::Intel32: return Result(false);
         }
         break;
-    case Platform::Emscripten: return Result::Error("Unsupported QEMU test host");
+    case Platform::Emscripten: return Result(false);
     }
     SC_TRY(StringBuilder::format(packageRoot, "{}/qemu_{}", packagesRoot, leaf));
     return Result(true);
