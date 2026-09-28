@@ -34,7 +34,7 @@ struct AsyncResponseCollector
         Span<const char> data;
         if (not operation->getResponseBodyStream().getBuffersPool().getReadableData(bufferID, data))
         {
-            error     = Result::Error("Failed to read response buffer");
+            error     = Result(false);
             completed = true;
             (void)operation->cancel();
             return;
@@ -42,7 +42,7 @@ struct AsyncResponseCollector
 
         if (body.sizeInBytes() - bodyLength < data.sizeInBytes())
         {
-            error     = Result::Error("Response body buffer too small");
+            error     = Result(false);
             completed = true;
             (void)operation->cancel();
             return;
@@ -70,7 +70,7 @@ Result saneMain(Span<StringSpan> args)
     {
         console.print("Usage: HttpClientAsyncGet <url>\n");
         console.print("  Example: HttpClientAsyncGet https://example.com\n");
-        return Result::Error("Missing URL argument");
+        return Result(false);
     }
 
     AsyncEventLoop loop;
@@ -126,7 +126,7 @@ Result saneMain(Span<StringSpan> args)
     const bool errorAdded =
         operation.getResponseBodyStream()
             .eventError.addListener<AsyncResponseCollector, &AsyncResponseCollector::onError>(collector);
-    SC_TRY_MSG(dataAdded and endAdded and errorAdded, "Failed to register async response listeners");
+    SC_TRY(Result(dataAdded and endAdded and errorAdded));
 
     SC_TRY(operation.start(request, response));
     while (not collector.completed)

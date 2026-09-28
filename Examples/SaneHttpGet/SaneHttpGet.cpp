@@ -28,7 +28,7 @@ Result saneMain(Span<StringSpan> args)
     {
         console.print("Usage: SaneHttpGet <url>\n");
         console.print("  Example: SaneHttpGet https://example.com\n");
-        return Result::Error("Missing URL argument");
+        return Result(false);
     }
 
     const StringSpan urlArg = args[0];

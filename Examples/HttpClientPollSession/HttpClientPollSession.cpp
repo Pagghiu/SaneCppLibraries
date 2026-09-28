@@ -30,7 +30,7 @@ struct ResponseCollector final : public HttpClientOperationListener
     {
         if (body.sizeInBytes() - bodyLength < data.sizeInBytes())
         {
-            error = Result::Error("Response body buffer too small");
+            error = Result(false);
             return;
         }
         memcpy(body.data() + bodyLength, data.data(), data.sizeInBytes());
@@ -50,7 +50,7 @@ Result saneMain(Span<StringSpan> args)
     {
         console.print("Usage: HttpClientPollSession <url>\n");
         console.print("  Example: HttpClientPollSession https://example.com\n");
-        return Result::Error("Missing URL argument");
+        return Result(false);
     }
 
     //! [HttpClientPollRequestSnippet]
@@ -125,7 +125,7 @@ Result saneMain(Span<StringSpan> args)
     //! [HttpClientPollRequestSnippet]
 
     SC_TRY(collector.error);
-    SC_TRY_MSG(collector.completed, "Response did not complete");
+    SC_TRY(Result(collector.completed));
     SC_TRY(session.captureResponse(preparedRequest, response));
 
     console.print("Status: {}\n", response.statusCode);
