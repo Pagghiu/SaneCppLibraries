@@ -41,15 +41,14 @@ struct StressWritableStream : public SC::AsyncWritableStream
     {
         SC::Span<const char> frame;
         SC_TRY(getBuffersPool().getReadableData(bufferID, frame));
-        SC_TRY_MSG(frame.sizeInBytes() >= 2, "HttpStressTest websocket frame too small");
-        SC_TRY_MSG((frame[0] & 0x80) != 0, "HttpStressTest websocket frame not final");
-        SC_TRY_MSG((frame[0] & 0x0F) == static_cast<SC::uint8_t>(SC::HttpWebSocketOpcode::Text),
-                   "HttpStressTest websocket frame opcode mismatch");
-        SC_TRY_MSG((frame[1] & 0x80) == 0, "HttpStressTest server broadcast must be unmasked");
+        SC_TRY(SC::Result(frame.sizeInBytes() >= 2));
+        SC_TRY(SC::Result((frame[0] & 0x80) != 0));
+        SC_TRY(SC::Result((frame[0] & 0x0F) == static_cast<SC::uint8_t>(SC::HttpWebSocketOpcode::Text)));
+        SC_TRY(SC::Result((frame[1] & 0x80) == 0));
 
         const SC::size_t payloadLength = static_cast<SC::size_t>(frame[1] & 0x7F);
-        SC_TRY_MSG(payloadLength < 126, "HttpStressTest payload unexpectedly uses extended length");
-        SC_TRY_MSG(frame.sizeInBytes() == payloadLength + 2, "HttpStressTest websocket frame length mismatch");
+        SC_TRY(SC::Result(payloadLength < 126));
+        SC_TRY(SC::Result(frame.sizeInBytes() == payloadLength + 2));
 
         writes++;
         payloadBytes += payloadLength;

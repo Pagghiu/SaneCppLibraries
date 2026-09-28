@@ -13,7 +13,8 @@ SC::Result SC::HttpTestClient::get(AsyncEventLoop& loop, StringSpan url, bool ke
     // Parse URL
     HttpURLParser urlParser;
     SC_TRY(urlParser.parse(url));
-    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    if (urlParser.protocol != "http")
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
 
     // Reset state for new request
     parser            = {};
@@ -75,7 +76,8 @@ SC::Result SC::HttpTestClient::head(AsyncEventLoop& loop, StringSpan url)
 
     HttpURLParser urlParser;
     SC_TRY(urlParser.parse(url));
-    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    if (urlParser.protocol != "http")
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
 
     parser            = {};
     parser.type       = HttpParser::Type::Response;
@@ -122,7 +124,8 @@ SC::Result SC::HttpTestClient::put(AsyncEventLoop& loop, StringSpan url, StringS
     uint16_t      port;
     HttpURLParser urlParser;
     SC_TRY(urlParser.parse(url));
-    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    if (urlParser.protocol != "http")
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
     // TODO: Make DNS Resolution asynchronous
     char       buffer[256];
     Span<char> ipAddress = {buffer};
@@ -169,7 +172,8 @@ SC::Result SC::HttpTestClient::postMultipart(AsyncEventLoop& loop, StringSpan ur
     uint16_t      port;
     HttpURLParser urlParser;
     SC_TRY(urlParser.parse(url));
-    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    if (urlParser.protocol != "http")
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
     // TODO: Make DNS Resolution asynchronous
     char       buffer[256];
     Span<char> ipAddress = {buffer};
@@ -257,7 +261,8 @@ SC::Result SC::HttpTestClient::sendRaw(AsyncEventLoop& loop, StringSpan url, Str
     uint16_t      port;
     HttpURLParser urlParser;
     SC_TRY(urlParser.parse(url));
-    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    if (urlParser.protocol != "http")
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
     char       buffer[256];
     Span<char> ipAddress = {buffer};
     SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
