@@ -29,7 +29,66 @@
 namespace SC
 {
 struct FibersTest;
+
+static constexpr ResultCategory FibersTestResultCategory = ResultCategory(0x80000004u);
+enum class FibersTestFailure : uint32_t
+{
+    ExpectedJobFailure = 1,
+    ExistingResultReplaced,
+    GroupRequiresReset,
+    ChildDidNotCompleteBeforeParent,
+    ExpectedTaskFailure,
+    CurrentTaskUnavailable,
+    TaskUserDataUnavailable,
+    BatchWaitResumedEarly,
+    ExpectedTaskGroupFailure,
+    ExpectedRetainedError,
+    PoolInitiallyUnavailable,
+    PoolExpectedFull,
+    PoolSlotCountMismatch,
+    PoolWaitNotCancelled,
+
+    WorkerWaitersNotEntered,
+    ActiveFibersRemain,
+    TaskSlotsNotRecycled,
+    CancelledTasksCompleted,
+    WaitersNotCancelled,
+    TasksNotCompleted,
+    TasksUnexpectedlyCancelled,
+    ExternalAnchorNotCompleted,
+    ImmediateParkingIgnored,
+    ExternalTaskResultMismatch,
+
+    ConcurrentProducerFailed,
+    ConcurrentTasksNotWaiting,
+    ConcurrentCancellationNotObserved,
+    ConcurrentTaskExecutionIncomplete,
+    ConcurrentTaskResultMismatch,
+
+    MixedTasksNotWaiting,
+    OwnerBacklogNotReady,
+    CompletedCountMismatch,
+    CancellationCountMismatch,
+    ContinuationStepMismatch,
+    WorkNotStolen,
+    MixedTaskResultMismatch,
+    CounterNotDrained,
+    PeerDidNotStealAll,
+
+    ExpectedCancellation,
+    NestedFaultAccountingResetFailed,
+};
+
+static constexpr Result fibersTestFailure(FibersTestFailure failure)
+{
+    return Result::Error(FibersTestResultCategory, failure);
 }
+
+static constexpr Result fibersTestCheck(bool condition, FibersTestFailure failure)
+{
+    return condition ? Result(true) : fibersTestFailure(failure);
+}
+} // namespace SC
 
 struct SC::FibersTest : public SC::TestCase
 {
@@ -520,7 +579,7 @@ struct SC::FibersTest : public SC::TestCase
                                                    [&state](FiberJobContext&)
                                                    {
                                                        state.order[state.orderSize++] = 2;
-                                                       return Result::Error("Expected FiberJob failure");
+                                                       return fibersTestFailure(FibersTestFailure::ExpectedJobFailure);
                                                    })));
         SC_TEST_EXPECT(scheduler.spawn(child, FiberJob::Procedure([](FiberJobContext&) { return Result(true); }))
                            .isError(FibersResultCategory, FibersError::QueueUnavailable));
@@ -810,16 +869,18 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(group.reset().isError(FibersResultCategory, FibersError::InvalidState));
         SC_TEST_EXPECT(not pool.release(*first));
         SC_TEST_EXPECT(not scheduler.spawn(
-            *first, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Must not replace result"); })));
+            *first, FiberJob::Procedure([](FiberJobContext&)
+                                        { return fibersTestFailure(FibersTestFailure::ExistingResultReplaced); })));
 
         SC_TEST_EXPECT(group.run());
         SC_TEST_EXPECT(completed == 1);
         SC_TEST_EXPECT(group.pendingCount() == 0);
         SC_TEST_EXPECT(group.countErrors() == 1);
-        SC_TEST_EXPECT(group
-                           .spawn(pool, FiberJob::Procedure([](FiberJobContext&)
-                                                            { return Result::Error("Group requires reset"); }))
-                           .isError(FibersResultCategory, FibersError::GroupNotReset));
+        SC_TEST_EXPECT(
+            group
+                .spawn(pool, FiberJob::Procedure([](FiberJobContext&)
+                                                 { return fibersTestFailure(FibersTestFailure::GroupRequiresReset); }))
+                .isError(FibersResultCategory, FibersError::GroupNotReset));
 
         FiberJobGroupError errors[1];
         size_t             numErrors = 0;
@@ -2522,27 +2583,27 @@ struct SC::FibersTest : public SC::TestCase
         state.childTask  = &childTask;
         state.childStack = &childStack;
 
-        SC_TEST_EXPECT(scheduler.spawn(parentTask, parentStack,
-                                       FiberTask::Procedure(
-                                           [&state](FiberScheduler& scheduler)
-                                           {
-                                               FiberCounter childCounter;
-                                               SC_TRY(scheduler.spawn(*state.childTask, *state.childStack,
-                                                                      FiberTask::Procedure(
-                                                                          [&state](FiberScheduler&)
-                                                                          {
-                                                                              state.step = 2;
-                                                                              return Result(true);
-                                                                          }),
-                                                                      &childCounter));
-                                               state.step = 1;
-                                               SC_TRY(scheduler.wait(childCounter));
-                                               SC_TRY_MSG(state.step == 2,
-                                                          "Child fiber did not complete before parent resumed");
-                                               state.step = 3;
-                                               return Result(true);
-                                           }),
-                                       &rootCounter));
+        SC_TEST_EXPECT(scheduler.spawn(
+            parentTask, parentStack,
+            FiberTask::Procedure(
+                [&state](FiberScheduler& scheduler)
+                {
+                    FiberCounter childCounter;
+                    SC_TRY(scheduler.spawn(*state.childTask, *state.childStack,
+                                           FiberTask::Procedure(
+                                               [&state](FiberScheduler&)
+                                               {
+                                                   state.step = 2;
+                                                   return Result(true);
+                                               }),
+                                           &childCounter));
+                    state.step = 1;
+                    SC_TRY(scheduler.wait(childCounter));
+                    SC_TRY(fibersTestCheck(state.step == 2, FibersTestFailure::ChildDidNotCompleteBeforeParent));
+                    state.step = 3;
+                    return Result(true);
+                }),
+            &rootCounter));
 
         SC_TEST_EXPECT(rootCounter.value() == 1);
         SC_TEST_EXPECT(scheduler.wait(rootCounter));
@@ -2564,7 +2625,8 @@ struct SC::FibersTest : public SC::TestCase
 
         SC_TEST_EXPECT(scheduler.spawn(
             task, stack,
-            FiberTask::Procedure([](FiberScheduler&) { return Result::Error("Expected fiber failure"); })));
+            FiberTask::Procedure([](FiberScheduler&)
+                                 { return fibersTestFailure(FibersTestFailure::ExpectedTaskFailure); })));
         SC_TEST_EXPECT(scheduler.run());
         SC_TEST_EXPECT(task.isCompleted());
         SC_TEST_EXPECT(not task.result());
@@ -2598,12 +2660,12 @@ struct SC::FibersTest : public SC::TestCase
                                                FiberTask* current = scheduler.currentTask();
                                                if (current == nullptr)
                                                {
-                                                   return Result::Error("Expected current fiber task");
+                                                   return fibersTestFailure(FibersTestFailure::CurrentTaskUnavailable);
                                                }
                                                State* state = static_cast<State*>(current->userData());
                                                if (state == nullptr)
                                                {
-                                                   return Result::Error("Expected task user data");
+                                                   return fibersTestFailure(FibersTestFailure::TaskUserDataUnavailable);
                                                }
                                                state->sawCurrent = current == state->task;
                                                state->value += 1;
@@ -2637,12 +2699,12 @@ struct SC::FibersTest : public SC::TestCase
                                           FiberTask* current = scheduler.currentTask();
                                           if (current == nullptr)
                                           {
-                                              return Result::Error("Expected current fiber task");
+                                              return fibersTestFailure(FibersTestFailure::CurrentTaskUnavailable);
                                           }
                                           State* state = static_cast<State*>(current->userData());
                                           if (state == nullptr)
                                           {
-                                              return Result::Error("Expected task user data");
+                                              return fibersTestFailure(FibersTestFailure::TaskUserDataUnavailable);
                                           }
                                           state->sawPooled = current == state->task;
                                           state->value += 1;
@@ -3001,7 +3063,7 @@ struct SC::FibersTest : public SC::TestCase
                                                SC_TRY(state.pool->waitForAvailableTasks(currentScheduler, 2));
                                                if (state.completed != 2)
                                                {
-                                                   return Result::Error("FiberTaskPool batch wait resumed too early");
+                                                   return fibersTestFailure(FibersTestFailure::BatchWaitResumedEarly);
                                                }
                                                return state.pool->spawn(currentScheduler, FiberTask::Procedure(
                                                                                               [&state](FiberScheduler&)
@@ -3614,26 +3676,26 @@ struct SC::FibersTest : public SC::TestCase
             FiberTaskSpawnOptions options;
             options.userData    = &optionsState;
             options.setUserData = true;
-            SC_TEST_EXPECT(optionsGroup.spawn(optionsTask, optionsStack,
-                                              FiberTask::Procedure(
-                                                  [](FiberScheduler& scheduler)
-                                                  {
-                                                      FiberTask* current = scheduler.currentTask();
-                                                      if (current == nullptr)
-                                                      {
-                                                          return Result::Error("Expected current fiber task");
-                                                      }
-                                                      GroupOptionsState* state =
-                                                          static_cast<GroupOptionsState*>(current->userData());
-                                                      if (state == nullptr)
-                                                      {
-                                                          return Result::Error("Expected task user data");
-                                                      }
-                                                      state->sawTask = current == state->task;
-                                                      state->completed++;
-                                                      return Result(true);
-                                                  }),
-                                              options));
+            SC_TEST_EXPECT(optionsGroup.spawn(
+                optionsTask, optionsStack,
+                FiberTask::Procedure(
+                    [](FiberScheduler& scheduler)
+                    {
+                        FiberTask* current = scheduler.currentTask();
+                        if (current == nullptr)
+                        {
+                            return fibersTestFailure(FibersTestFailure::CurrentTaskUnavailable);
+                        }
+                        GroupOptionsState* state = static_cast<GroupOptionsState*>(current->userData());
+                        if (state == nullptr)
+                        {
+                            return fibersTestFailure(FibersTestFailure::TaskUserDataUnavailable);
+                        }
+                        state->sawTask = current == state->task;
+                        state->completed++;
+                        return Result(true);
+                    }),
+                options));
             optionsState.task = &optionsTask;
             SC_TEST_EXPECT(optionsTask.userData() == &optionsState);
             SC_TEST_EXPECT(optionsGroup.waitAll());
@@ -3646,26 +3708,26 @@ struct SC::FibersTest : public SC::TestCase
             char          poolStackMemory[64 * 1024] = {};
             FiberTaskPool pool({poolTasks, 1}, {poolStackMemory, sizeof(poolStackMemory)}, 64 * 1024);
             FiberTask*    spawnedTask = nullptr;
-            SC_TEST_EXPECT(optionsGroup.spawn(pool,
-                                              FiberTask::Procedure(
-                                                  [](FiberScheduler& scheduler)
-                                                  {
-                                                      FiberTask* current = scheduler.currentTask();
-                                                      if (current == nullptr)
-                                                      {
-                                                          return Result::Error("Expected current fiber task");
-                                                      }
-                                                      GroupOptionsState* state =
-                                                          static_cast<GroupOptionsState*>(current->userData());
-                                                      if (state == nullptr)
-                                                      {
-                                                          return Result::Error("Expected task user data");
-                                                      }
-                                                      state->sawTask = current == state->task;
-                                                      state->completed++;
-                                                      return Result(true);
-                                                  }),
-                                              options, &spawnedTask));
+            SC_TEST_EXPECT(optionsGroup.spawn(
+                pool,
+                FiberTask::Procedure(
+                    [](FiberScheduler& scheduler)
+                    {
+                        FiberTask* current = scheduler.currentTask();
+                        if (current == nullptr)
+                        {
+                            return fibersTestFailure(FibersTestFailure::CurrentTaskUnavailable);
+                        }
+                        GroupOptionsState* state = static_cast<GroupOptionsState*>(current->userData());
+                        if (state == nullptr)
+                        {
+                            return fibersTestFailure(FibersTestFailure::TaskUserDataUnavailable);
+                        }
+                        state->sawTask = current == state->task;
+                        state->completed++;
+                        return Result(true);
+                    }),
+                options, &spawnedTask));
             optionsState.task = spawnedTask;
             SC_TEST_EXPECT(spawnedTask != nullptr);
             if (spawnedTask != nullptr)
@@ -3791,7 +3853,7 @@ struct SC::FibersTest : public SC::TestCase
                                            [](FiberScheduler& scheduler)
                                            {
                                                SC_TRY(scheduler.yield());
-                                               return Result::Error("Expected task group failure");
+                                               return fibersTestFailure(FibersTestFailure::ExpectedTaskGroupFailure);
                                            })));
 
             Result firstError(true);
@@ -3910,7 +3972,9 @@ struct SC::FibersTest : public SC::TestCase
 
             FiberTask* firstTask = nullptr;
             SC_TEST_EXPECT(group.spawn(
-                pool, FiberTask::Procedure([](FiberScheduler&) { return Result::Error("Expected retained error"); }),
+                pool,
+                FiberTask::Procedure([](FiberScheduler&)
+                                     { return fibersTestFailure(FibersTestFailure::ExpectedRetainedError); }),
                 &firstTask));
             SC_TEST_EXPECT(firstTask == &task);
             SC_TEST_EXPECT(group.reset().isError(FibersResultCategory, FibersError::InvalidState));
@@ -4089,7 +4153,8 @@ struct SC::FibersTest : public SC::TestCase
                                            {
                                                if (not pool.hasAvailableTask())
                                                {
-                                                   return Result::Error("FiberTaskPool should start available");
+                                                   return fibersTestFailure(
+                                                       FibersTestFailure::PoolInitiallyUnavailable);
                                                }
                                                for (size_t idx = 0; idx < 2; ++idx)
                                                {
@@ -4102,14 +4167,13 @@ struct SC::FibersTest : public SC::TestCase
                                                }
                                                if (pool.hasAvailableTask())
                                                {
-                                                   return Result::Error("FiberTaskPool should be full");
+                                                   return fibersTestFailure(FibersTestFailure::PoolExpectedFull);
                                                }
 
                                                SC_TRY(pool.waitForAvailableTasks(scheduler, 2));
                                                if (pool.availableCount() != 2 or state.completed != 2)
                                                {
-                                                   return Result::Error(
-                                                       "FiberTaskPool should have the requested slots");
+                                                   return fibersTestFailure(FibersTestFailure::PoolSlotCountMismatch);
                                                }
                                                state.waited++;
                                                SC_TRY(pool.spawn(scheduler, FiberTask::Procedure(
@@ -4183,13 +4247,13 @@ struct SC::FibersTest : public SC::TestCase
                                                               })));
                     if (context.pool->hasAvailableTask())
                     {
-                        return Result::Error("FiberTaskPool should be full");
+                        return fibersTestFailure(FibersTestFailure::PoolExpectedFull);
                     }
 
                     Result waitResult = context.pool->waitForAvailableTasks(scheduler, 2);
                     if (waitResult)
                     {
-                        return Result::Error("FiberTaskPool wait should be cancelled");
+                        return fibersTestFailure(FibersTestFailure::PoolWaitNotCancelled);
                     }
                     context.state->producerCancelled++;
                     return Result(true);
@@ -5381,22 +5445,22 @@ struct SC::FibersTest : public SC::TestCase
 
             SC_TRY(workerPool.join());
             SC_TRY(releaseResult);
-            SC_TRY_MSG(allWaitersEntered, "Worker stress test did not enter every wait");
-            SC_TRY_MSG(not scheduler.hasActiveFibers(), "Worker stress test left active fibers");
-            SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Worker stress test did not recycle every task slot");
+            SC_TRY(fibersTestCheck(allWaitersEntered, FibersTestFailure::WorkerWaitersNotEntered));
+            SC_TRY(fibersTestCheck(not scheduler.hasActiveFibers(), FibersTestFailure::ActiveFibersRemain));
+            SC_TRY(fibersTestCheck(taskPool.availableCount() == NumTasks, FibersTestFailure::TaskSlotsNotRecycled));
             if (cancelWaiters)
             {
-                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
-                           "Cancelled worker stress tasks completed normally");
-                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-                           "Worker stress test did not cancel every waiter");
+                SC_TRY(fibersTestCheck(state.completed.load(memory_order_relaxed) == 0,
+                                       FibersTestFailure::CancelledTasksCompleted));
+                SC_TRY(fibersTestCheck(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                                       FibersTestFailure::WaitersNotCancelled));
             }
             else
             {
-                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-                           "Worker stress test did not complete every task");
-                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == 0,
-                           "Worker stress test unexpectedly cancelled a task");
+                SC_TRY(fibersTestCheck(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                                       FibersTestFailure::TasksNotCompleted));
+                SC_TRY(fibersTestCheck(state.cancelled.load(memory_order_relaxed) == 0,
+                                       FibersTestFailure::TasksUnexpectedlyCancelled));
             }
             return allocator.close();
         };
@@ -5521,29 +5585,29 @@ struct SC::FibersTest : public SC::TestCase
             scheduler.workerDiagnostics({workers, NumWorkers}, workerDiagnostics);
             SC_TRY(cancellationResult);
             SC_TRY(releaseResult);
-            SC_TRY_MSG(allWaitersEntered, "External spawn stress test did not enter every wait");
-            SC_TRY_MSG(anchor.result(), "External spawn stress anchor did not complete");
-            SC_TRY_MSG(not scheduler.hasActiveFibers(), "External spawn stress test left active fibers");
-            SC_TRY_MSG(workerDiagnostics.idleSpinIterations == 0,
-                       "External spawn stress test ignored the immediate-parking option");
+            SC_TRY(fibersTestCheck(allWaitersEntered, FibersTestFailure::WorkerWaitersNotEntered));
+            SC_TRY(fibersTestCheck(anchor.result(), FibersTestFailure::ExternalAnchorNotCompleted));
+            SC_TRY(fibersTestCheck(not scheduler.hasActiveFibers(), FibersTestFailure::ActiveFibersRemain));
+            SC_TRY(
+                fibersTestCheck(workerDiagnostics.idleSpinIterations == 0, FibersTestFailure::ImmediateParkingIgnored));
             if (cancelWaiters)
             {
-                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
-                           "Cancelled external spawn stress tasks completed normally");
-                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-                           "External spawn stress test did not cancel every task");
+                SC_TRY(fibersTestCheck(state.completed.load(memory_order_relaxed) == 0,
+                                       FibersTestFailure::CancelledTasksCompleted));
+                SC_TRY(fibersTestCheck(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                                       FibersTestFailure::WaitersNotCancelled));
             }
             else
             {
-                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-                           "External spawn stress test did not complete every task");
-                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == 0,
-                           "External spawn stress test unexpectedly cancelled a task");
+                SC_TRY(fibersTestCheck(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                                       FibersTestFailure::TasksNotCompleted));
+                SC_TRY(fibersTestCheck(state.cancelled.load(memory_order_relaxed) == 0,
+                                       FibersTestFailure::TasksUnexpectedlyCancelled));
             }
             for (FiberTask& task : tasks)
             {
-                SC_TRY_MSG(cancelWaiters ? not task.result() : task.result(),
-                           "External spawn stress task result did not match the round");
+                SC_TRY(fibersTestCheck(cancelWaiters ? not task.result() : task.result(),
+                                       FibersTestFailure::ExternalTaskResultMismatch));
             }
             return allocator.close();
         };
@@ -5689,7 +5753,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 SC_TRY(scheduler.requestCancelAll());
                 SC_TRY(workerPool.join());
-                return Result::Error("Concurrent external stress producer failed");
+                return fibersTestFailure(FibersTestFailure::ConcurrentProducerFailed);
             }
 
             for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
@@ -5700,7 +5764,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 SC_TRY(scheduler.requestCancelAll());
                 SC_TRY(workerPool.join());
-                return Result::Error("Concurrent external stress tasks did not enter their waits");
+                return fibersTestFailure(FibersTestFailure::ConcurrentTasksNotWaiting);
             }
 
             SC_TRY(scheduler.requestCancel(cancellationSource));
@@ -5713,7 +5777,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 SC_TRY(scheduler.requestCancelAll());
                 SC_TRY(workerPool.join());
-                return Result::Error("Concurrent external stress tasks did not observe cancellation");
+                return fibersTestFailure(FibersTestFailure::ConcurrentCancellationNotObserved);
             }
 
             SC_TRY(scheduler.done(gate));
@@ -5721,19 +5785,21 @@ struct SC::FibersTest : public SC::TestCase
 
             FiberWorkerDiagnostics workerDiagnostics;
             scheduler.workerDiagnostics({workers, NumWorkers}, workerDiagnostics);
-            SC_TRY_MSG(anchor.result(), "Concurrent external stress anchor did not complete");
-            SC_TRY_MSG(not scheduler.hasActiveFibers(), "Concurrent external stress left active fibers");
-            SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks - NumCancelledTasks),
-                       "Concurrent external stress did not complete every non-cancelled task");
-            SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumCancelledTasks),
-                       "Concurrent external stress did not cancel every selected task");
-            SC_TRY_MSG(workerDiagnostics.executedFibers >= NumTasks + 1,
-                       "Concurrent external stress did not execute every externally submitted task");
+            SC_TRY(fibersTestCheck(anchor.result(), FibersTestFailure::ExternalAnchorNotCompleted));
+            SC_TRY(fibersTestCheck(not scheduler.hasActiveFibers(), FibersTestFailure::ActiveFibersRemain));
+            SC_TRY(fibersTestCheck(state.completed.load(memory_order_relaxed) ==
+                                       static_cast<int32_t>(NumTasks - NumCancelledTasks),
+                                   FibersTestFailure::TasksNotCompleted));
+            SC_TRY(
+                fibersTestCheck(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumCancelledTasks),
+                                FibersTestFailure::WaitersNotCancelled));
+            SC_TRY(fibersTestCheck(workerDiagnostics.executedFibers >= NumTasks + 1,
+                                   FibersTestFailure::ConcurrentTaskExecutionIncomplete));
             for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
             {
                 const bool shouldBeCancelled = (taskIndex / NumTasksPerProducer) % 2 != 0;
-                SC_TRY_MSG(shouldBeCancelled ? not tasks[taskIndex].result() : tasks[taskIndex].result(),
-                           "Concurrent external stress task result did not match its producer policy");
+                SC_TRY(fibersTestCheck(shouldBeCancelled ? not tasks[taskIndex].result() : tasks[taskIndex].result(),
+                                       FibersTestFailure::ConcurrentTaskResultMismatch));
             }
             return allocator.close();
         };
@@ -5937,8 +6003,8 @@ struct SC::FibersTest : public SC::TestCase
                                             return Result(true);
                                         })));
                 SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
-                SC_TRY_MSG(tasks[taskIndex].status() == FiberTaskStatus::Waiting,
-                           "Mixed transition stress task did not reach its wait");
+                SC_TRY(fibersTestCheck(tasks[taskIndex].status() == FiberTaskStatus::Waiting,
+                                       FibersTestFailure::MixedTasksNotWaiting));
             }
 
             for (size_t index = NumTasks; index > 1; --index)
@@ -5974,8 +6040,8 @@ struct SC::FibersTest : public SC::TestCase
                                        })));
             SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
             SC_TRY(releaseTask.result());
-            SC_TRY_MSG(scheduler.readyFiberCount(workers[0]) == NumTasks,
-                       "Mixed transition stress did not prepare the owner backlog");
+            SC_TRY(fibersTestCheck(scheduler.readyFiberCount(workers[0]) == NumTasks,
+                                   FibersTestFailure::OwnerBacklogNotReady));
 
             SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {workerThreads, NumWorkers}));
             bool observedSteal = false;
@@ -5998,20 +6064,23 @@ struct SC::FibersTest : public SC::TestCase
             scheduler.workerDiagnostics({workers, NumWorkers}, diagnostics);
             scheduler.releaseWorkerDeques({workers, NumWorkers});
             SC_TRY(allocator.close());
-            SC_TRY_MSG(not scheduler.hasActiveFibers(), "Mixed transition stress left active fibers");
-            SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(expectedCompleted),
-                       "Mixed transition stress completed count mismatch");
-            SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(expectedCancelled),
-                       "Mixed transition stress cancellation count mismatch");
-            SC_TRY_MSG(state.deterministicSteps.load(memory_order_relaxed) == static_cast<int32_t>(expectedSteps),
-                       "Mixed transition stress lost or duplicated a yielded continuation");
-            SC_TRY_MSG(observedSteal and diagnostics.stolenFibers > 0,
-                       "Mixed transition stress did not steal owner work");
+            SC_TRY(fibersTestCheck(not scheduler.hasActiveFibers(), FibersTestFailure::ActiveFibersRemain));
+            SC_TRY(
+                fibersTestCheck(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(expectedCompleted),
+                                FibersTestFailure::CompletedCountMismatch));
+            SC_TRY(
+                fibersTestCheck(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(expectedCancelled),
+                                FibersTestFailure::CancellationCountMismatch));
+            SC_TRY(fibersTestCheck(state.deterministicSteps.load(memory_order_relaxed) ==
+                                       static_cast<int32_t>(expectedSteps),
+                                   FibersTestFailure::ContinuationStepMismatch));
+            SC_TRY(fibersTestCheck(observedSteal and diagnostics.stolenFibers > 0, FibersTestFailure::WorkNotStolen));
             for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
             {
-                SC_TRY_MSG(cancelTask[taskIndex] ? not tasks[taskIndex].result() : tasks[taskIndex].result(),
-                           "Mixed transition stress task result mismatch");
-                SC_TRY_MSG(counters[taskIndex].value() == 0, "Mixed transition stress counter did not drain");
+                SC_TRY(
+                    fibersTestCheck(cancelTask[taskIndex] ? not tasks[taskIndex].result() : tasks[taskIndex].result(),
+                                    FibersTestFailure::MixedTaskResultMismatch));
+                SC_TRY(fibersTestCheck(counters[taskIndex].value() == 0, FibersTestFailure::CounterNotDrained));
             }
             return Result(true);
         };
@@ -6368,7 +6437,7 @@ struct SC::FibersTest : public SC::TestCase
                             // Keep the producer's worker occupied so the peer must steal its owner-local children.
                             Thread::Sleep(1);
                         }
-                        return Result::Error("Peer worker did not steal all owner tasks");
+                        return fibersTestFailure(FibersTestFailure::PeerDidNotStealAll);
                     })));
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, 2}, {threads, 2}, options));
 
@@ -7304,22 +7373,22 @@ struct SC::FibersTest : public SC::TestCase
                             {
                                 FiberTaskSpawnOptions spawnOptions;
                                 spawnOptions.cancellationToken = state.cancelledToken;
-                                spawnResult =
-                                    scheduler.spawn(state.children[childIndex], childStack,
-                                                    FiberTask::Procedure(
-                                                        [&state](FiberScheduler& scheduler)
-                                                        {
-                                                            Result result =
-                                                                scheduler.isCurrentTaskCancellationRequested()
-                                                                    ? Result::Error("FiberTask cancelled")
-                                                                    : Result(true);
-                                                            if (not result)
-                                                            {
-                                                                state.cancelled.fetch_add(1, memory_order_relaxed);
-                                                            }
-                                                            return result;
-                                                        }),
-                                                    spawnOptions);
+                                spawnResult                    = scheduler.spawn(
+                                    state.children[childIndex], childStack,
+                                    FiberTask::Procedure(
+                                        [&state](FiberScheduler& scheduler)
+                                        {
+                                            Result result =
+                                                scheduler.isCurrentTaskCancellationRequested()
+                                                                       ? fibersTestFailure(FibersTestFailure::ExpectedCancellation)
+                                                                       : Result(true);
+                                            if (not result)
+                                            {
+                                                state.cancelled.fetch_add(1, memory_order_relaxed);
+                                            }
+                                            return result;
+                                        }),
+                                    spawnOptions);
                             }
                             else
                             {
@@ -8390,14 +8459,15 @@ struct SC::FibersTest : public SC::TestCase
 
         FiberScheduler scheduler;
         size_t         checksum = 0;
-        SC_TEST_EXPECT(pool.spawn(scheduler, FiberTask::Procedure(
-                                                 [file, &checksum](FiberScheduler&)
-                                                 {
-                                                     SC_TRY_MSG(ftruncate(file, 0) == 0,
-                                                                "Could not invalidate nested-fault accounting");
-                                                     consumeIncrementalStack(24, checksum);
-                                                     return Result(true);
-                                                 })));
+        SC_TEST_EXPECT(
+            pool.spawn(scheduler, FiberTask::Procedure(
+                                      [file, &checksum](FiberScheduler&)
+                                      {
+                                          SC_TRY(fibersTestCheck(ftruncate(file, 0) == 0,
+                                                                 FibersTestFailure::NestedFaultAccountingResetFailed));
+                                          consumeIncrementalStack(24, checksum);
+                                          return Result(true);
+                                      })));
         SC_TEST_EXPECT(not scheduler.run());
     }
 #endif
