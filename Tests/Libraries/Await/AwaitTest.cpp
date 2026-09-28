@@ -37,6 +37,97 @@ static bool isDebuggerAttached()
     return (info.kp_proc.p_flag & P_TRACED) != 0;
 }
 #endif
+// Test-owned failures keep coroutine assertion sites distinguishable without embedding diagnostic strings.
+static constexpr SC::ResultCategory AwaitTestResultCategory = SC::ResultCategory(0x80000001u);
+enum class AwaitTestFailure : SC::uint32_t
+{
+    WakeUpDidNotDeliver             = 1,
+    SendWroteUnexpectedByteCount    = 2,
+    ReceiveReadUnexpectedData       = 3,
+    SendAllWroteUnexpectedByteCount = 4,
+    SendAllReceiveLengthMismatch    = 5,
+    SendAllReceiveDataMismatch      = 6,
+    ReceiveExactDataMismatch        = 7,
+    ReceiveLineDataMismatch         = 8,
+
+    TcpScatterGatherSendAllFailed         = 9,
+    TcpScatterGatherSendByteCountMismatch = 10,
+    TcpScatterGatherReceiveSliceFailed    = 11,
+    TcpScatterGatherReceiveFailed         = 12,
+    TcpScatterGatherReceiveDataMismatch   = 13,
+    UdpScatterGatherSendToFailed          = 14,
+    UdpScatterGatherSendByteCountMismatch = 15,
+    UdpScatterGatherReceiveDataMismatch   = 16,
+
+    SendToWroteUnexpectedByteCount = 17,
+    ReceiveFromResultMismatch      = 18,
+    ReceiveFromDataMismatch        = 19,
+    UnixReceiveFromDataMismatch    = 20,
+    UnixReceiveFromSourceMismatch  = 21,
+
+    FileWriteByteCountMismatch              = 22,
+    FileScatterGatherWriteFailed            = 23,
+    FileScatterGatherWriteByteCountMismatch = 24,
+    FileOffsetWriteByteCountMismatch        = 25,
+    FileSendTransferMismatch                = 26,
+    FileSendReceiveLengthMismatch           = 27,
+    FileSendReceiveDataMismatch             = 28,
+
+    FsOpenReadTextMismatch              = 29,
+    FsCloseLeftDescriptorValid          = 30,
+    FsReadDataMismatch                  = 31,
+    FsWriteByteCountMismatch            = 32,
+    FsOpenCloseChildLeftDescriptorValid = 33,
+
+    ReceiveExpectedOnceSliceFailed          = 34,
+    ReceiveExpectedOnceDidNotReceiveData    = 35,
+    ReceiveExpectedOnceLengthMismatch       = 36,
+    ReceiveExpectedOnceDataMismatch         = 37,
+    OpenFileAndSendToSocketTransferMismatch = 38,
+    FilePollUnexpectedlySucceeded           = 39,
+
+    RegistryWaitAllUnexpectedlySucceeded      = 40,
+    RegistryWaitAnyResultMismatch             = 41,
+    RegistryFailingWaitAnyResultMismatch      = 42,
+    RegistryLeaveRunningWaitAnyResultMismatch = 43,
+    RegistryEmptyWaitAnyResultMismatch        = 44,
+
+    TaskGroupInitialCapacityMismatch      = 45,
+    TaskGroupPartialCapacityMismatch      = 46,
+    TaskGroupSizeMismatch                 = 47,
+    TaskGroupWaitAllUnexpectedlySucceeded = 48,
+
+    TaskGroupShortCollectUnexpectedlySucceeded = 49,
+    TaskGroupCollectedResultMismatch           = 50,
+    TaskGroupSummaryResultMismatch             = 51,
+
+    TaskGroupSpawnAllUnexpectedlyIgnoredCapacity    = 52,
+    TaskGroupSpawnAllCapacityFailureMutatedGroup    = 53,
+    TaskGroupSpawnAllUnexpectedlyIgnoredInvalidTask = 54,
+    TaskGroupSpawnAllInvalidFailureMutatedGroup     = 55,
+
+    CancellableTaskGroupUnexpectedlySucceeded = 56,
+
+    TaskGroupWaitAnyResultMismatch             = 57,
+    EmptyTaskGroupWaitAnyResultMismatch        = 58,
+    CompletedTaskGroupWaitAnyResultMismatch    = 59,
+    FailingTaskGroupWaitAnyResultMismatch      = 60,
+    LeaveRunningTaskGroupWaitAnyResultMismatch = 61,
+    CancellableTaskGroupWaitAnyResultMismatch  = 62,
+
+    LeaveChildrenRunningTaskGroupUnexpectedlySucceeded = 63,
+    NestedCancellableTaskGroupUnexpectedlySucceeded    = 64,
+    OuterCancellableTaskGroupUnexpectedlySucceeded     = 65,
+
+    WaitForCompletedChildTimedOut      = 66,
+    WaitForTimedOutChildResultMismatch = 67,
+    CancellableWaitForResultMismatch   = 68,
+};
+
+static constexpr SC::Result awaitTestFailure(AwaitTestFailure failure)
+{
+    return SC::Result::Error(AwaitTestResultCategory, failure);
+}
 } // namespace
 
 namespace SC
@@ -357,7 +448,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.wakeUp(wakeUp, result));
         if (result.deliveryCount < 1)
         {
-            co_return Result::Error("Await wakeUp did not deliver");
+            co_return awaitTestFailure(AwaitTestFailure::WakeUpDidNotDeliver);
         }
         co_return Result(true);
     }
@@ -391,7 +482,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.send(sender, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
         if (sendResult.numBytes != sizeof(sendBuffer))
         {
-            co_return Result::Error("Await send wrote unexpected byte count");
+            co_return awaitTestFailure(AwaitTestFailure::SendWroteUnexpectedByteCount);
         }
 
         AwaitSocketReceiveResult receiveResult;
@@ -400,7 +491,7 @@ struct SC::AwaitTest : public SC::TestCase
             receiveResult.data.data()[0] != sendBuffer[0] or receiveResult.data.data()[1] != sendBuffer[1] or
             receiveResult.data.data()[2] != sendBuffer[2])
         {
-            co_return Result::Error("Await receive read unexpected data");
+            co_return awaitTestFailure(AwaitTestFailure::ReceiveReadUnexpectedData);
         }
 
         co_return Result(true);
@@ -416,20 +507,20 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.sendAll(sender, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
         if (sendResult.numBytes != sizeof(sendBuffer))
         {
-            co_return Result::Error("Await sendAll wrote unexpected byte count");
+            co_return awaitTestFailure(AwaitTestFailure::SendAllWroteUnexpectedByteCount);
         }
 
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
         if (receiveResult.disconnected or receiveResult.data.sizeInBytes() != sizeof(sendBuffer))
         {
-            co_return Result::Error("Await sendAll receive length mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::SendAllReceiveLengthMismatch);
         }
         for (size_t idx = 0; idx < sizeof(sendBuffer); ++idx)
         {
             if (receiveResult.data.data()[idx] != sendBuffer[idx])
             {
-                co_return Result::Error("Await sendAll receive data mismatch");
+                co_return awaitTestFailure(AwaitTestFailure::SendAllReceiveDataMismatch);
             }
         }
 
@@ -456,7 +547,7 @@ struct SC::AwaitTest : public SC::TestCase
             StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false, StringEncoding::Ascii) !=
                 "hello")
         {
-            co_return Result::Error("Await receiveExact data mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::ReceiveExactDataMismatch);
         }
 
         co_return Result(true);
@@ -505,7 +596,7 @@ struct SC::AwaitTest : public SC::TestCase
             StringView({lineResult.line.data(), lineResult.line.sizeInBytes()}, false, StringEncoding::Ascii) !=
                 "hello")
         {
-            co_return Result::Error("Await receiveLine data mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::ReceiveLineDataMismatch);
         }
 
         co_return Result(true);
@@ -545,11 +636,11 @@ struct SC::AwaitTest : public SC::TestCase
         Result                sendOperationResult = co_await await.sendAll(sender, buffers, &sendResult);
         if (not sendOperationResult)
         {
-            co_return Result::Error("TCP scatter/gather sendAll failed");
+            co_return awaitTestFailure(AwaitTestFailure::TcpScatterGatherSendAllFailed);
         }
         if (sendResult.numBytes != sizeof(first) + sizeof(second))
         {
-            co_return Result::Error("TCP scatter/gather send byte count mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TcpScatterGatherSendByteCountMismatch);
         }
 
         char   receiveBuffer[16] = {};
@@ -560,21 +651,21 @@ struct SC::AwaitTest : public SC::TestCase
             Span<char> remaining;
             if (not receiveStorage.sliceStart(receivedBytes, remaining))
             {
-                co_return Result::Error("TCP scatter/gather receive slice failed");
+                co_return awaitTestFailure(AwaitTestFailure::TcpScatterGatherReceiveSliceFailed);
             }
 
             AwaitSocketReceiveResult receiveResult;
             SC_CO_TRY(co_await await.receive(receiver, remaining, receiveResult));
             if (receiveResult.disconnected or receiveResult.data.empty())
             {
-                co_return Result::Error("TCP scatter/gather receive failed");
+                co_return awaitTestFailure(AwaitTestFailure::TcpScatterGatherReceiveFailed);
             }
             receivedBytes += receiveResult.data.sizeInBytes();
         }
         if (receivedBytes != sizeof(first) + sizeof(second) or
             StringView({receiveBuffer, receivedBytes}, false, StringEncoding::Ascii) != "Await SG")
         {
-            co_return Result::Error("TCP scatter/gather receive data mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TcpScatterGatherReceiveDataMismatch);
         }
 
         co_return Result(true);
@@ -603,11 +694,11 @@ struct SC::AwaitTest : public SC::TestCase
         Result sendOperationResult = co_await await.sendTo(sender, receiverAddress, buffers, &sendResult);
         if (not sendOperationResult)
         {
-            co_return Result::Error("UDP scatter/gather sendTo failed");
+            co_return awaitTestFailure(AwaitTestFailure::UdpScatterGatherSendToFailed);
         }
         if (sendResult.numBytes != sizeof(first) + sizeof(second))
         {
-            co_return Result::Error("UDP scatter/gather send byte count mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::UdpScatterGatherSendByteCountMismatch);
         }
 
         char                         receiveBuffer[16] = {};
@@ -617,7 +708,7 @@ struct SC::AwaitTest : public SC::TestCase
             StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false, StringEncoding::Ascii) !=
                 "UDP SG")
         {
-            co_return Result::Error("UDP scatter/gather receive data mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::UdpScatterGatherReceiveDataMismatch);
         }
 
         co_return Result(true);
@@ -693,7 +784,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.sendTo(sender, receiverAddress, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
         if (sendResult.numBytes != sizeof(sendBuffer))
         {
-            co_return Result::Error("Await sendTo wrote unexpected byte count");
+            co_return awaitTestFailure(AwaitTestFailure::SendToWroteUnexpectedByteCount);
         }
 
         AwaitSocketReceiveFromResult receiveResult;
@@ -701,13 +792,13 @@ struct SC::AwaitTest : public SC::TestCase
         if (receiveResult.disconnected or not receiveResult.sourceAddress.isValid() or
             receiveResult.data.sizeInBytes() != sizeof(sendBuffer))
         {
-            co_return Result::Error("Await receiveFrom result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::ReceiveFromResultMismatch);
         }
         for (size_t idx = 0; idx < sizeof(sendBuffer); ++idx)
         {
             if (receiveResult.data.data()[idx] != sendBuffer[idx])
             {
-                co_return Result::Error("Await receiveFrom data mismatch");
+                co_return awaitTestFailure(AwaitTestFailure::ReceiveFromDataMismatch);
             }
         }
 
@@ -726,7 +817,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.receiveFrom(receiver, receiveBuffer, receiveResult));
         if (receiveResult.data.sizeInBytes() != 1 or receiveResult.data[0] != payload)
         {
-            co_return Result::Error("Await Unix receiveFrom data mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::UnixReceiveFromDataMismatch);
         }
 
         Span<const char>             sourceName;
@@ -735,7 +826,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (sourceNamespace != SocketAddress::UnixNamespace::Pathname or
             StringView(sourceName, false, StringEncoding::Native) != expectedSenderPath)
         {
-            co_return Result::Error("Await Unix receiveFrom source mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::UnixReceiveFromSourceMismatch);
         }
         co_return Result(true);
     }
@@ -747,7 +838,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult));
         if (writeResult.numBytes != sizeof(writeBuffer))
         {
-            co_return Result::Error("Await file write byte count mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FileWriteByteCountMismatch);
         }
         co_return Result(true);
     }
@@ -762,11 +853,11 @@ struct SC::AwaitTest : public SC::TestCase
         Result               writeOperationResult = co_await await.fileWrite(file, buffers, &writeResult);
         if (not writeOperationResult)
         {
-            co_return Result::Error("file scatter/gather write failed");
+            co_return awaitTestFailure(AwaitTestFailure::FileScatterGatherWriteFailed);
         }
         if (writeResult.numBytes != sizeof(first) + sizeof(second))
         {
-            co_return Result::Error("Await file scatter/gather write byte count mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FileScatterGatherWriteByteCountMismatch);
         }
         co_return Result(true);
     }
@@ -799,7 +890,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult, options));
         if (writeResult.numBytes != sizeof(writeBuffer))
         {
-            co_return Result::Error("Await file offset write byte count mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FileOffsetWriteByteCountMismatch);
         }
         co_return Result(true);
     }
@@ -834,20 +925,20 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.fileSend(file, sender, sendResult, sendOptions));
         if (sendResult.bytesTransferred != expected.sizeInBytes() or not sendResult.complete)
         {
-            co_return Result::Error("Await fileSend transfer mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FileSendTransferMismatch);
         }
 
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
         if (receiveResult.disconnected or receiveResult.data.sizeInBytes() != expected.sizeInBytes())
         {
-            co_return Result::Error("Await fileSend receive length mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FileSendReceiveLengthMismatch);
         }
         for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
         {
             if (receiveResult.data.data()[idx] != expected.data()[idx])
             {
-                co_return Result::Error("Await fileSend receive data mismatch");
+                co_return awaitTestFailure(AwaitTestFailure::FileSendReceiveDataMismatch);
             }
         }
 
@@ -866,12 +957,12 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(openedFile.readUntilEOF(text));
         if (text.view() != "AwaitFileSystemOperations")
         {
-            co_return Result::Error("Await fsOpen read text mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FsOpenReadTextMismatch);
         }
         SC_CO_TRY(co_await await.fsClose(threadPool, openedFile));
         if (openedFile.isValid())
         {
-            co_return Result::Error("Await fsClose left descriptor valid");
+            co_return awaitTestFailure(AwaitTestFailure::FsCloseLeftDescriptorValid);
         }
 
         SC_CO_TRY(co_await await.fsCopyFile(threadPool, sourcePath, copyPath));
@@ -898,7 +989,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (readResult.data.sizeInBytes() != 6 or readResult.data.data()[0] != 'a' or
             readResult.data.data()[1] != 'b' or readResult.data.data()[2] != 'c')
         {
-            co_return Result::Error("Await fsRead data mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FsReadDataMismatch);
         }
 
         const char           writeBuffer[] = {'X', 'Y', 'Z'};
@@ -906,13 +997,13 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.fsWrite(threadPool, file, {writeBuffer, sizeof(writeBuffer)}, &writeResult, 3));
         if (writeResult.numBytes != sizeof(writeBuffer))
         {
-            co_return Result::Error("Await fsWrite byte count mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FsWriteByteCountMismatch);
         }
 
         SC_CO_TRY(co_await await.fsClose(threadPool, file));
         if (file.isValid())
         {
-            co_return Result::Error("Await fsClose left descriptor valid");
+            co_return awaitTestFailure(AwaitTestFailure::FsCloseLeftDescriptorValid);
         }
 
         co_return Result(true);
@@ -942,7 +1033,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.fsClose(threadPool, file));
         if (file.isValid())
         {
-            co_return Result::Error("Await fsOpenCloseChild left descriptor valid");
+            co_return awaitTestFailure(AwaitTestFailure::FsOpenCloseChildLeftDescriptorValid);
         }
         co_return Result(true);
     }
@@ -992,27 +1083,27 @@ struct SC::AwaitTest : public SC::TestCase
             Span<char> remaining;
             if (not receiveBuffer.sliceStart(receivedBytes, remaining))
             {
-                co_return Result::Error("Await receiveExpectedOnce slice failed");
+                co_return awaitTestFailure(AwaitTestFailure::ReceiveExpectedOnceSliceFailed);
             }
 
             AwaitSocketReceiveResult receiveResult;
             SC_CO_TRY(co_await await.receive(receiver, remaining, receiveResult));
             if (receiveResult.disconnected or receiveResult.data.empty())
             {
-                co_return Result::Error("Await receiveExpectedOnce did not receive data");
+                co_return awaitTestFailure(AwaitTestFailure::ReceiveExpectedOnceDidNotReceiveData);
             }
             receivedBytes += receiveResult.data.sizeInBytes();
         }
 
         if (receivedBytes != expected.sizeInBytes())
         {
-            co_return Result::Error("Await receiveExpectedOnce length mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::ReceiveExpectedOnceLengthMismatch);
         }
         for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
         {
             if (receiveBuffer.data()[idx] != expected.data()[idx])
             {
-                co_return Result::Error("Await receiveExpectedOnce data mismatch");
+                co_return awaitTestFailure(AwaitTestFailure::ReceiveExpectedOnceDataMismatch);
             }
         }
 
@@ -1041,7 +1132,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(closeStatus);
         if (sendResult.bytesTransferred != expected.sizeInBytes() or not sendResult.complete)
         {
-            co_return Result::Error("Await openFileAndSendToSocket transfer mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::OpenFileAndSendToSocketTransferMismatch);
         }
         SC_CO_TRY(co_await receiveTask);
 
@@ -1082,7 +1173,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result pollResult = co_await await.filePoll(file);
         if (pollResult)
         {
-            co_return Result::Error("Await filePoll unexpectedly succeeded on Windows");
+            co_return awaitTestFailure(AwaitTestFailure::FilePollUnexpectedlySucceeded);
         }
 #else
         SC_CO_TRY(co_await await.filePoll(file));
@@ -1152,7 +1243,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result result = co_await registry.waitAll();
         if (result)
         {
-            co_return Result::Error("Await registry waitAll unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::RegistryWaitAllUnexpectedlySucceeded);
         }
         co_return Result(true);
     }
@@ -1182,7 +1273,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (waitAnyResult.index != 0 or waitAnyResult.task != registry.taskAt(0) or not waitAnyResult.task->result() or
             not registry.taskAt(1)->isCompleted() or not AwaitIsCancelled(registry.taskAt(1)->result()))
         {
-            co_return Result::Error("Await registry waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::RegistryWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1200,7 +1291,7 @@ struct SC::AwaitTest : public SC::TestCase
             not waitAnyResult.task->result().isError(ResultCategory(0x7ffffffdu), 43) or
             not registry.taskAt(1)->isCompleted() or not AwaitIsCancelled(registry.taskAt(1)->result()))
         {
-            co_return Result::Error("Await registry failing waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::RegistryFailingWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1216,7 +1307,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (waitAnyResult.index != 0 or waitAnyResult.task != registry.taskAt(0) or not waitAnyResult.task->result() or
             not registry.taskAt(1)->isActive())
         {
-            co_return Result::Error("Await registry leave-running waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::RegistryLeaveRunningWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1229,7 +1320,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result                         waitResult = co_await registry.waitAny(waitAnyResult);
         if (not waitResult.isError(AwaitResultCategory, AwaitError::RegistryEmpty) or waitAnyResult.task != nullptr)
         {
-            co_return Result::Error("Await registry empty waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::RegistryEmptyWaitAnyResultMismatch);
         }
         co_return Result(true);
     }
@@ -1259,17 +1350,17 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTaskGroup group(await, groupStorage);
         if (not group.isEmpty() or group.isFull() or group.remainingCapacity() != 2)
         {
-            co_return Result::Error("Await task group initial capacity mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupInitialCapacityMismatch);
         }
         SC_CO_TRY(group.spawn(childA));
         if (group.isEmpty() or group.isFull() or group.remainingCapacity() != 1)
         {
-            co_return Result::Error("Await task group partial capacity mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupPartialCapacityMismatch);
         }
         SC_CO_TRY(group.spawn(childB));
         if (group.size() != 2 or group.remainingCapacity() != 0 or not group.isFull())
         {
-            co_return Result::Error("Await task group size mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupSizeMismatch);
         }
         SC_CO_TRY(co_await group.waitAll());
         SC_CO_TRY(childA.result());
@@ -1290,14 +1381,14 @@ struct SC::AwaitTest : public SC::TestCase
         Result waitResult = co_await group.waitAll();
         if (waitResult)
         {
-            co_return Result::Error("Await task group waitAll unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupWaitAllUnexpectedlySucceeded);
         }
 
         Result shortResults[1] = {Result(true)};
         if (not group.collectResults(shortResults)
                     .isError(AwaitResultCategory, AwaitError::TaskGroupResultStorageTooSmall))
         {
-            co_return Result::Error("Await task group short collect unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupShortCollectUnexpectedlySucceeded);
         }
 
         Result                      results[2] = {Result(true), Result(true)};
@@ -1309,7 +1400,7 @@ struct SC::AwaitTest : public SC::TestCase
             summary.firstFailureIndex != 1 or summary.firstFailureTask != &childB or
             not summary.firstFailure.isError(ResultCategory(0x7ffffffdu), 43))
         {
-            co_return Result::Error("Await task group collected result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupCollectedResultMismatch);
         }
 
         AwaitTaskGroupResultSummary summaryOnly;
@@ -1319,7 +1410,7 @@ struct SC::AwaitTest : public SC::TestCase
             summaryOnly.firstFailureIndex != 1 or summaryOnly.firstFailureTask != &childB or
             not summaryOnly.firstFailure.isError(ResultCategory(0x7ffffffdu), 43))
         {
-            co_return Result::Error("Await task group summary result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupSummaryResultMismatch);
         }
 
         co_return Result(true);
@@ -1335,21 +1426,21 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTask* tooManyChildren[3] = {&child, &child, &child};
         if (not group.spawnAll(tooManyChildren).isError(AwaitResultCategory, AwaitError::TaskGroupStorageFull))
         {
-            co_return Result::Error("Await task group spawnAll unexpectedly ignored capacity");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupSpawnAllUnexpectedlyIgnoredCapacity);
         }
         if (group.size() != 0)
         {
-            co_return Result::Error("Await task group spawnAll capacity failure mutated group");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupSpawnAllCapacityFailureMutatedGroup);
         }
 
         AwaitTask* invalidChildren[1] = {};
         if (not group.spawnAll(invalidChildren).isError(AwaitResultCategory, AwaitError::TaskGroupInvalidTask))
         {
-            co_return Result::Error("Await task group spawnAll unexpectedly ignored invalid task");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupSpawnAllUnexpectedlyIgnoredInvalidTask);
         }
         if (group.size() != 0)
         {
-            co_return Result::Error("Await task group spawnAll invalid failure mutated group");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupSpawnAllInvalidFailureMutatedGroup);
         }
 
         co_return Result(true);
@@ -1368,7 +1459,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result groupResult = co_await group.waitAll();
         if (groupResult)
         {
-            co_return Result::Error("Await cancellable task group unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::CancellableTaskGroupUnexpectedlySucceeded);
         }
 
         co_return groupResult;
@@ -1389,7 +1480,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (waitAnyResult.index != 0 or waitAnyResult.task != &fastChild or not fastChild.result() or
             not slowChild.isCompleted() or slowChild.result())
         {
-            co_return Result::Error("Await task group waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::TaskGroupWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1403,7 +1494,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result                      waitResult = co_await group.waitAny(waitAnyResult);
         if (not waitResult.isError(AwaitResultCategory, AwaitError::TaskGroupEmpty) or waitAnyResult.task != nullptr)
         {
-            co_return Result::Error("Await empty task group waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::EmptyTaskGroupWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1424,7 +1515,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (waitAnyResult.index != 0 or waitAnyResult.task != &completed or not completed.result() or
             not slow.isCompleted() or slow.result())
         {
-            co_return Result::Error("Await completed task group waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::CompletedTaskGroupWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1445,7 +1536,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (waitResult or waitAnyResult.index != 0 or waitAnyResult.task != &failing or not failing.isCompleted() or
             failing.result() or not slowChild.isCompleted() or slowChild.result())
         {
-            co_return Result::Error("Await failing task group waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::FailingTaskGroupWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1466,7 +1557,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (waitAnyResult.index != 0 or waitAnyResult.task != &fastChild or not fastChild.result() or
             not slowChild.isActive())
         {
-            co_return Result::Error("Await leave-running task group waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::LeaveRunningTaskGroupWaitAnyResultMismatch);
         }
 
         co_return Result(true);
@@ -1486,7 +1577,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result                      waitResult = co_await group.waitAny(waitAnyResult);
         if (waitResult or waitAnyResult.task != nullptr)
         {
-            co_return Result::Error("Await cancellable task group waitAny result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::CancellableTaskGroupWaitAnyResultMismatch);
         }
 
         co_return waitResult;
@@ -1503,7 +1594,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result groupResult = co_await group.waitAll();
         if (groupResult)
         {
-            co_return Result::Error("Await leave-children-running task group unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::LeaveChildrenRunningTaskGroupUnexpectedlySucceeded);
         }
 
         co_return groupResult;
@@ -1522,7 +1613,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result groupResult = co_await group.waitAll();
         if (groupResult)
         {
-            co_return Result::Error("Await nested cancellable task group unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::NestedCancellableTaskGroupUnexpectedlySucceeded);
         }
 
         co_return groupResult;
@@ -1542,7 +1633,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result groupResult = co_await group.waitAll();
         if (groupResult)
         {
-            co_return Result::Error("Await outer cancellable task group unexpectedly succeeded");
+            co_return awaitTestFailure(AwaitTestFailure::OuterCancellableTaskGroupUnexpectedlySucceeded);
         }
 
         co_return groupResult;
@@ -1557,7 +1648,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(co_await await.waitFor(child, 100_ms, &timeoutResult));
         if (timeoutResult.timedOut)
         {
-            co_return Result::Error("Await waitFor completed child timed out");
+            co_return awaitTestFailure(AwaitTestFailure::WaitForCompletedChildTimedOut);
         }
         SC_CO_TRY(child.result());
 
@@ -1574,7 +1665,7 @@ struct SC::AwaitTest : public SC::TestCase
         if (not waitResult.isError(AwaitResultCategory, AwaitError::TaskTimedOut) or not timeoutResult.timedOut or
             not child.isCompleted() or not AwaitIsCancelled(child.result()))
         {
-            co_return Result::Error("Await waitFor timed-out child result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::WaitForTimedOutChildResultMismatch);
         }
 
         co_return Result(true);
@@ -1588,7 +1679,7 @@ struct SC::AwaitTest : public SC::TestCase
         Result waitResult = co_await await.waitFor(child, 10000_ms, &timeoutResult);
         if (waitResult or timeoutResult.timedOut)
         {
-            co_return Result::Error("Await cancellable waitFor result mismatch");
+            co_return awaitTestFailure(AwaitTestFailure::CancellableWaitForResultMismatch);
         }
 
         co_return waitResult;
