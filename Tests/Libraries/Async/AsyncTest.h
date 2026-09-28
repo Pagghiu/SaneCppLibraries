@@ -7,7 +7,32 @@
 namespace SC
 {
 struct AsyncTest;
+
+// Test-owned identities for fixture failures; these are not Async library errors.
+static constexpr ResultCategory AsyncTestResultCategory = ResultCategory(0x80000002u);
+enum class AsyncTestFailure : uint32_t
+{
+    DescriptorUnavailable = 1,
+    ReadPipeUnavailable,
+    ProcessOutputUnavailable,
+    PeerAcceptNotCompleted,
+    ServerReadPipeUnavailable,
+    ClientWritePipeUnavailable,
+    UnexpectedEndOfFile,
+
+    VirtualEndpointNameInvalid,
+    VirtualEndpointCreateFailed,
+    VirtualEndpointPeerOpenFailed,
+    VirtualEndpointConnectFailed,
+    VirtualEndpointPrepareFailed,
+    VirtualEndpointNameUnavailable,
+};
+
+static constexpr Result asyncTestFailure(AsyncTestFailure failure)
+{
+    return Result::Error(AsyncTestResultCategory, failure);
 }
+} // namespace SC
 
 struct SC::AsyncTest : public SC::TestCase
 {

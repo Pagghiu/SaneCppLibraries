@@ -26,7 +26,8 @@ static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<c
     {
         SC::Span<char> readData;
         SC_TRY(descriptor.read({destination.data() + totalRead, destination.sizeInBytes() - totalRead}, readData));
-        SC_TRY_MSG(not readData.empty(), "readExactDescriptor - Unexpected EOF");
+        if (readData.empty())
+            return SC::asyncTestFailure(SC::AsyncTestFailure::UnexpectedEndOfFile);
         totalRead += readData.sizeInBytes();
     }
     return SC::Result(true);
@@ -150,26 +151,28 @@ struct AsyncSerialVirtualEndpoint
         const int charsWritten  = ::swprintf(
             pipeName, sizeof(pipeName) / sizeof(pipeName[0]), L"\\\\.\\pipe\\SCAsyncSerial_%lu_%llu",
             static_cast<unsigned long>(::GetCurrentProcessId()), static_cast<unsigned long long>(::GetTickCount64()));
-        SC_TRY_MSG(charsWritten > 0, "AsyncSerialVirtualEndpoint - Invalid pipe name");
+        if (charsWritten <= 0)
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointNameInvalid);
 
         HANDLE serialSide =
             ::CreateNamedPipeW(pipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
                                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0, nullptr);
-        SC_TRY_MSG(serialSide != INVALID_HANDLE_VALUE, "AsyncSerialVirtualEndpoint - CreateNamedPipeW failed");
+        if (serialSide == INVALID_HANDLE_VALUE)
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointCreateFailed);
 
         HANDLE peerSide = ::CreateFileW(pipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
                                         FILE_ATTRIBUTE_NORMAL, nullptr);
         if (peerSide == INVALID_HANDLE_VALUE)
         {
             (void)::CloseHandle(serialSide);
-            return SC::Result::Error("AsyncSerialVirtualEndpoint - CreateFileW failed");
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointPeerOpenFailed);
         }
 
         if (::ConnectNamedPipe(serialSide, nullptr) == FALSE and ::GetLastError() != ERROR_PIPE_CONNECTED)
         {
             (void)::CloseHandle(serialSide);
             (void)::CloseHandle(peerSide);
-            return SC::Result::Error("AsyncSerialVirtualEndpoint - ConnectNamedPipe failed");
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointConnectFailed);
         }
 
         const SC::Result serialAssigned = SC::Result(serial.assign(serialSide));
@@ -196,18 +199,19 @@ struct AsyncSerialVirtualEndpoint
         {
             masterFd = ::posix_openpt(openFlags);
         } while (masterFd == -1 and errno == EINTR);
-        SC_TRY_MSG(masterFd != -1, "AsyncSerialVirtualEndpoint - posix_openpt failed");
+        if (masterFd == -1)
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointCreateFailed);
 
         if (::grantpt(masterFd) != 0 or ::unlockpt(masterFd) != 0)
         {
             (void)::close(masterFd);
-            return SC::Result::Error("AsyncSerialVirtualEndpoint - grantpt/unlockpt failed");
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointPrepareFailed);
         }
         const char* slavePath = ::ptsname(masterFd);
         if (slavePath == nullptr)
         {
             (void)::close(masterFd);
-            return SC::Result::Error("AsyncSerialVirtualEndpoint - ptsname failed");
+            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointNameUnavailable);
         }
 
         SC_TRY(peer.assign(masterFd));

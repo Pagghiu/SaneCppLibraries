@@ -182,7 +182,8 @@ void SC::AsyncTest::processInputOutput(bool useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(processStdOut.readPipe));
     }
-    SC_TEST_EXPECT(processStdOut.readPipe.get(asyncRead.handle, Result::Error("handle")));
+    SC_TEST_EXPECT(
+        processStdOut.readPipe.get(asyncRead.handle, asyncTestFailure(AsyncTestFailure::ProcessOutputUnavailable)));
     char myBuffer[4]; // just enough to hold "asdf";
     asyncRead.buffer = myBuffer;
     SC_TEST_EXPECT(asyncRead.start(eventLoop));
@@ -223,7 +224,7 @@ void SC::AsyncTest::namedPipeInputOutput(bool useThreadPool)
 
     PipeDescriptor serverConnection;
     EventObject    acceptedEvent;
-    Result         acceptResult = Result::Error("NamedPipe accept not completed");
+    Result         acceptResult = asyncTestFailure(AsyncTestFailure::PeerAcceptNotCompleted);
 
     struct AcceptContext
     {
@@ -271,8 +272,10 @@ void SC::AsyncTest::namedPipeInputOutput(bool useThreadPool)
         SC_TEST_EXPECT(asyncWrite.executeOn(writeTask, threadPool));
     }
 
-    SC_TEST_EXPECT(serverConnection.readPipe.get(asyncRead.handle, Result::Error("server read handle")));
-    SC_TEST_EXPECT(clientConnection.writePipe.get(asyncWrite.handle, Result::Error("client write handle")));
+    SC_TEST_EXPECT(
+        serverConnection.readPipe.get(asyncRead.handle, asyncTestFailure(AsyncTestFailure::ServerReadPipeUnavailable)));
+    SC_TEST_EXPECT(clientConnection.writePipe.get(asyncWrite.handle,
+                                                  asyncTestFailure(AsyncTestFailure::ClientWritePipeUnavailable)));
 
     char readBuffer[4];
     asyncRead.buffer = {readBuffer, sizeof(readBuffer)};

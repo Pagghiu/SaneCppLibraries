@@ -128,7 +128,7 @@ void SC::AsyncTest::fileSystemOperationClose()
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationClose.txt"}));
     SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Read));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
     fd.detach();
     SC_TEST_EXPECT(asyncFileSystemOperation.close(eventLoop, handle));
     SC_TEST_EXPECT(eventLoop.run());
@@ -163,7 +163,7 @@ void SC::AsyncTest::fileSystemOperationRead()
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationRead.txt"}));
     SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Read));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
     fd.detach();
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -208,7 +208,7 @@ void SC::AsyncTest::fileSystemOperationWrite()
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationWrite.txt"}));
     SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Write));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
     fd.detach();
 
     AsyncFileSystemOperation asyncFileSystemOperation;

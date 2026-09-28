@@ -43,7 +43,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     }
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
 
     // 5. Create and start the write operation
     AsyncFileWrite    asyncWriteFile;
@@ -77,7 +77,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
     }
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
 
     // 8. Create and run the read task, reading a single byte at every reactivation
     struct Params
@@ -173,7 +173,7 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
     }
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
 
     struct Context
     {
@@ -270,7 +270,7 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     }
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("handle")));
+    SC_TEST_EXPECT(fd.get(handle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
 
     // 5. Write the file using two requests on the same sequence (that ensures ordering)
     AsyncFileWrite    fileWrite[2];
@@ -333,7 +333,7 @@ void SC::AsyncTest::fileReadiness()
     SC_TEST_EXPECT(eventLoop.create(options));
 
     FileDescriptor::Handle readHandle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, Result::Error("read handle")));
+    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, asyncTestFailure(AsyncTestFailure::ReadPipeUnavailable)));
 
     int                pollCount = 0;
     AsyncFileReadiness poll;
@@ -376,7 +376,7 @@ void SC::AsyncTest::fileReadinessCancel()
     SC_TEST_EXPECT(eventLoop.create(options));
 
     FileDescriptor::Handle readHandle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, Result::Error("read handle")));
+    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, asyncTestFailure(AsyncTestFailure::ReadPipeUnavailable)));
 
     int                pollCount       = 0;
     int                afterStopCalled = 0;
