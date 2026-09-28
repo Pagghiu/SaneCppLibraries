@@ -27,6 +27,55 @@ namespace SC
 {
 namespace
 {
+static constexpr ResultCategory BuildFixtureResultCategory = ResultCategory(0x80000003u);
+enum class BuildFixtureFailure : uint32_t
+{
+    UnsupportedHost = 1,
+    HostToolUnavailable,
+    BundledToolUnavailable,
+    EnvironmentSetFailed,
+    EnvironmentClearFailed,
+    FixtureRootUninitialized,
+    LinkedLibraryPathUninitialized,
+    UnsupportedPlatform,
+    UnsupportedArchitecture,
+    UnsupportedTargetEnvironment,
+
+    CapturedOutputHandleUnavailable,
+    CapturedErrorHandleUnavailable,
+    OutputRedirectFailed,
+    ErrorRedirectFailed,
+    CaptureRedirectFailed,
+    OutputRestoreFailed,
+    ErrorRestoreFailed,
+    OutputCaptureOpenFailed,
+    ErrorCaptureOpenFailed,
+
+    ProcessArgumentCapacityExceeded,
+    CaptureDirectoryUnavailable,
+    BootstrapProbeFailed,
+    BootstrapProbeNotRun,
+    BootstrapProbeToolMismatch,
+    BootstrapProbeActionMismatch,
+    BootstrapProbeRootMissing,
+    BootstrapProbeArgumentMissing,
+    FixtureProgramFailed,
+    ImportLibraryPathUnavailable,
+    UnexpectedImportLibrary,
+    ExportInspectionFailed,
+    UnexpectedExport,
+};
+
+static constexpr Result fixtureFailure(BuildFixtureFailure failure)
+{
+    return Result::Error(BuildFixtureResultCategory, failure);
+}
+
+static constexpr Result fixtureCheck(bool condition, BuildFixtureFailure failure)
+{
+    return condition ? Result(true) : fixtureFailure(failure);
+}
+
 static constexpr StringView FixtureWorkspaceName           = "SCBuildFixtures";
 static constexpr StringView FixtureProjectName             = "TinyConsoleProgram";
 static constexpr StringView SmallFixtureProjectName        = "SmallSCProgram";
@@ -82,7 +131,7 @@ static Result verifyNativeBackendHostSupport()
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX or SC_PLATFORM_WINDOWS
     return Result(true);
 #else
-    return Result::Error("Native backend fixture test is not supported on this host yet");
+    return fixtureFailure(BuildFixtureFailure::UnsupportedHost);
 #endif
 }
 
@@ -216,7 +265,7 @@ static Result resolveHostToolPath(StringView toolName, String& toolPath)
     Process process;
     String  output = StringEncoding::Utf8;
     SC_TRY(process.exec({"which", toolName}, output));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot locate host tool");
+    SC_TRY(fixtureCheck(process.getExitStatus() == 0, BuildFixtureFailure::HostToolUnavailable));
     SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
     return Result(true);
 }
@@ -542,11 +591,12 @@ static Result setScopedEnvironmentVariable(StringView name, StringView value, Sc
         SC_TRY(scoped.previous.assign(existing));
     }
 #if SC_PLATFORM_WINDOWS
-    SC_TRY_MSG(::SetEnvironmentVariableA(scoped.name.bytesIncludingTerminator(), value.bytesIncludingTerminator()) != 0,
-               "Failed setting environment variable");
+    SC_TRY(fixtureCheck(
+        ::SetEnvironmentVariableA(scoped.name.bytesIncludingTerminator(), value.bytesIncludingTerminator()) != 0,
+        BuildFixtureFailure::EnvironmentSetFailed));
 #else
-    SC_TRY_MSG(::setenv(scoped.name.bytesIncludingTerminator(), value.bytesIncludingTerminator(), 1) == 0,
-               "Failed setting environment variable");
+    SC_TRY(fixtureCheck(::setenv(scoped.name.bytesIncludingTerminator(), value.bytesIncludingTerminator(), 1) == 0,
+                        BuildFixtureFailure::EnvironmentSetFailed));
 #endif
     return Result(true);
 }
@@ -563,8 +613,8 @@ static Result unsetScopedEnvironmentVariable(StringView name, ScopedEnvironmentV
         scoped.hadPrevious = true;
         SC_TRY(scoped.previous.assign(StringView::fromNullTerminated(existing, StringEncoding::Native)));
     }
-    SC_TRY_MSG(::SetEnvironmentVariableA(scoped.name.bytesIncludingTerminator(), nullptr) != 0,
-               "Failed clearing environment variable");
+    SC_TRY(fixtureCheck(::SetEnvironmentVariableA(scoped.name.bytesIncludingTerminator(), nullptr) != 0,
+                        BuildFixtureFailure::EnvironmentClearFailed));
 #else
     const char* existing = ::getenv(scoped.name.bytesIncludingTerminator());
     if (existing)
@@ -572,7 +622,8 @@ static Result unsetScopedEnvironmentVariable(StringView name, ScopedEnvironmentV
         scoped.hadPrevious = true;
         SC_TRY(scoped.previous.assign(StringView::fromNullTerminated(existing, StringEncoding::Native)));
     }
-    SC_TRY_MSG(::unsetenv(scoped.name.bytesIncludingTerminator()) == 0, "Failed clearing environment variable");
+    SC_TRY(fixtureCheck(::unsetenv(scoped.name.bytesIncludingTerminator()) == 0,
+                        BuildFixtureFailure::EnvironmentClearFailed));
 #endif
     return Result(true);
 }
@@ -778,7 +829,7 @@ static Result resolveVisualStudioLLVMToolPath(StringView executableName, String&
 
     String vswherePath = StringEncoding::Utf8;
     SC_TRY(vswherePath.assign("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe"));
-    SC_TRY_MSG(fs.existsAndIsFile(vswherePath.view()), "Cannot locate vswhere.exe");
+    SC_TRY(fixtureCheck(fs.existsAndIsFile(vswherePath.view()), BuildFixtureFailure::BundledToolUnavailable));
 
     String findPattern = StringEncoding::Utf8;
     SC_TRY(StringBuilder::format(findPattern, "VC\\Tools\\Llvm\\x64\\bin\\{}", executableName));
@@ -786,9 +837,9 @@ static Result resolveVisualStudioLLVMToolPath(StringView executableName, String&
     Process process;
     String  output = StringEncoding::Utf8;
     SC_TRY(process.exec({vswherePath.view(), "-latest", "-find", findPattern.view()}, output));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot locate Visual Studio bundled LLVM tool");
+    SC_TRY(fixtureCheck(process.getExitStatus() == 0, BuildFixtureFailure::BundledToolUnavailable));
     SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
-    SC_TRY_MSG(fs.existsAndIsFile(toolPath.view()), "Bundled LLVM tool is missing");
+    SC_TRY(fixtureCheck(fs.existsAndIsFile(toolPath.view()), BuildFixtureFailure::BundledToolUnavailable));
     return Result(true);
 }
 #endif
@@ -866,8 +917,8 @@ static Result configureStaticLibraryProgram(Build::Definition& definition, const
 
 static Result configureStaticLibraryConsumerProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
-    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
-    SC_TRY_MSG(not DynamicLinkedLibraryPath.isEmpty(), "Static library path is not initialized");
+    SC_TRY(fixtureCheck(not DynamicFixtureProjectRoot.isEmpty(), BuildFixtureFailure::FixtureRootUninitialized));
+    SC_TRY(fixtureCheck(not DynamicLinkedLibraryPath.isEmpty(), BuildFixtureFailure::LinkedLibraryPathUninitialized));
 
     Build::Workspace workspace = {FixtureWorkspaceName};
     Build::Project   project   = {StaticLibraryConsumerName, Build::TargetType::ConsoleExecutable};
@@ -885,7 +936,7 @@ static Result configureStaticLibraryConsumerProgram(Build::Definition& definitio
 
 static Result configureWorkspaceDependencyProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
-    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+    SC_TRY(fixtureCheck(not DynamicFixtureProjectRoot.isEmpty(), BuildFixtureFailure::FixtureRootUninitialized));
 
     Build::Workspace workspace = {FixtureWorkspaceName};
 
@@ -935,7 +986,7 @@ static Result configureWorkspaceDependencyCycle(Build::Definition& definition, c
 
 static Result configureIndependentWorkspacePrograms(Build::Definition& definition, const Build::Parameters& parameters)
 {
-    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+    SC_TRY(fixtureCheck(not DynamicFixtureProjectRoot.isEmpty(), BuildFixtureFailure::FixtureRootUninitialized));
 
     Build::Workspace workspace = {FixtureWorkspaceName};
 
@@ -965,7 +1016,7 @@ static Result configureIndependentWorkspacePrograms(Build::Definition& definitio
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Result configureCustomDriverDependencyProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
-    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+    SC_TRY(fixtureCheck(not DynamicFixtureProjectRoot.isEmpty(), BuildFixtureFailure::FixtureRootUninitialized));
 
     Build::Workspace workspace = {FixtureWorkspaceName};
 
@@ -998,7 +1049,7 @@ static Result configureCustomDriverDependencyProgram(Build::Definition& definiti
 static Result configureDynamicFixtureProgram(Build::Definition& definition, const Build::Parameters& parameters,
                                              Build::TargetType::Type targetType, StringView projectName)
 {
-    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+    SC_TRY(fixtureCheck(not DynamicFixtureProjectRoot.isEmpty(), BuildFixtureFailure::FixtureRootUninitialized));
 
     Build::Workspace workspace = {FixtureWorkspaceName};
     Build::Project   project   = {projectName, targetType};
@@ -1035,7 +1086,7 @@ static Result computeBuildDirectoryName(const Build::Action& action, String& bui
         break;
     case Build::Platform::Windows: targetOS = "windows"; break;
     case Build::Platform::Wasm: targetOS = "wasm"; break;
-    case Build::Platform::Unknown: return Result::Error("Unknown platform");
+    case Build::Platform::Unknown: return fixtureFailure(BuildFixtureFailure::UnsupportedPlatform);
     }
 
     StringView targetArchitecture;
@@ -1171,10 +1222,12 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
 
     void* stdoutHandle = nullptr;
     void* stderrHandle = nullptr;
-    SC_TRY(stdoutFile.get(stdoutHandle, Result::Error("Captured stdout handle is invalid")));
-    SC_TRY(stderrFile.get(stderrHandle, Result::Error("Captured stderr handle is invalid")));
-    SC_TRY_MSG(::SetStdHandle(STD_OUTPUT_HANDLE, stdoutHandle) == TRUE, "SetStdHandle(stdout) failed");
-    SC_TRY_MSG(::SetStdHandle(STD_ERROR_HANDLE, stderrHandle) == TRUE, "SetStdHandle(stderr) failed");
+    SC_TRY(stdoutFile.get(stdoutHandle, fixtureFailure(BuildFixtureFailure::CapturedOutputHandleUnavailable)));
+    SC_TRY(stderrFile.get(stderrHandle, fixtureFailure(BuildFixtureFailure::CapturedErrorHandleUnavailable)));
+    SC_TRY(fixtureCheck(::SetStdHandle(STD_OUTPUT_HANDLE, stdoutHandle) == TRUE,
+                        BuildFixtureFailure::OutputRedirectFailed));
+    SC_TRY(
+        fixtureCheck(::SetStdHandle(STD_ERROR_HANDLE, stderrHandle) == TRUE, BuildFixtureFailure::ErrorRedirectFailed));
 
     Console windowsRedirectedConsole;
     globalConsole = &windowsRedirectedConsole;
@@ -1183,8 +1236,9 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     globalConsole->flushStdErr();
 
     globalConsole = previousConsole;
-    SC_TRY_MSG(::SetStdHandle(STD_OUTPUT_HANDLE, oldStdOut) == TRUE, "Restore stdout handle failed");
-    SC_TRY_MSG(::SetStdHandle(STD_ERROR_HANDLE, oldStdErr) == TRUE, "Restore stderr handle failed");
+    SC_TRY(
+        fixtureCheck(::SetStdHandle(STD_OUTPUT_HANDLE, oldStdOut) == TRUE, BuildFixtureFailure::OutputRestoreFailed));
+    SC_TRY(fixtureCheck(::SetStdHandle(STD_ERROR_HANDLE, oldStdErr) == TRUE, BuildFixtureFailure::ErrorRestoreFailed));
 
     SC_TRY(stdoutFile.seek(FileDescriptor::SeekStart, 0));
     SC_TRY(stderrFile.seek(FileDescriptor::SeekStart, 0));
@@ -1192,12 +1246,12 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     SC_TRY(stderrFile.readUntilEOF(capturedOutput.stdErr));
 #else
     const int oldStdOut = ::dup(STDOUT_FILENO);
-    SC_TRY_MSG(oldStdOut != -1, "dup(stdout) failed");
+    SC_TRY(fixtureCheck(oldStdOut != -1, BuildFixtureFailure::OutputRedirectFailed));
     const int oldStdErr = ::dup(STDERR_FILENO);
     if (oldStdErr == -1)
     {
         (void)::close(oldStdOut);
-        return Result::Error("dup(stderr) failed");
+        return fixtureFailure(BuildFixtureFailure::ErrorRedirectFailed);
     }
 
     const int stdoutDescriptor = ::open(stdoutPath.view().getNullTerminatedNative(), O_CREAT | O_TRUNC | O_RDWR, 0600);
@@ -1205,7 +1259,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     {
         (void)::close(oldStdOut);
         (void)::close(oldStdErr);
-        return Result::Error("open(stdout capture) failed");
+        return fixtureFailure(BuildFixtureFailure::OutputCaptureOpenFailed);
     }
     const int stderrDescriptor = ::open(stderrPath.view().getNullTerminatedNative(), O_CREAT | O_TRUNC | O_RDWR, 0600);
     if (stderrDescriptor == -1)
@@ -1213,7 +1267,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
         (void)::close(stdoutDescriptor);
         (void)::close(oldStdOut);
         (void)::close(oldStdErr);
-        return Result::Error("open(stderr capture) failed");
+        return fixtureFailure(BuildFixtureFailure::ErrorCaptureOpenFailed);
     }
 
     if (::dup2(stdoutDescriptor, STDOUT_FILENO) == -1 or ::dup2(stderrDescriptor, STDERR_FILENO) == -1)
@@ -1222,7 +1276,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
         (void)::close(stderrDescriptor);
         (void)::close(oldStdOut);
         (void)::close(oldStdErr);
-        return Result::Error("dup2 capture redirect failed");
+        return fixtureFailure(BuildFixtureFailure::CaptureRedirectFailed);
     }
     (void)::close(stdoutDescriptor);
     (void)::close(stderrDescriptor);
@@ -1236,7 +1290,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     const int restoreStdErr = ::dup2(oldStdErr, STDERR_FILENO);
     (void)::close(oldStdOut);
     (void)::close(oldStdErr);
-    SC_TRY_MSG(restoreStdOut != -1 and restoreStdErr != -1, "dup2 restore failed");
+    SC_TRY(fixtureCheck(restoreStdOut != -1 and restoreStdErr != -1, BuildFixtureFailure::OutputRestoreFailed));
 
     SC_TRY(fs.read(stdoutPath.view(), capturedOutput.stdOut));
     SC_TRY(fs.read(stderrPath.view(), capturedOutput.stdErr));
@@ -1259,7 +1313,8 @@ static Result captureRepositoryBuildCommand(TestReport& report, Span<const Strin
     processArguments[numArguments++] = scriptPath.view();
     for (const StringSpan argument : arguments)
     {
-        SC_TRY_MSG(numArguments < sizeof(processArguments) / sizeof(processArguments[0]), "Too many process arguments");
+        SC_TRY(fixtureCheck(numArguments < sizeof(processArguments) / sizeof(processArguments[0]),
+                            BuildFixtureFailure::ProcessArgumentCapacityExceeded));
         processArguments[numArguments++] = argument;
     }
 
@@ -1302,7 +1357,8 @@ static Result captureExternalBuildCommand(TestReport& report, StringView working
 #endif
     for (const StringSpan argument : arguments)
     {
-        SC_TRY_MSG(numArguments < sizeof(processArguments) / sizeof(processArguments[0]), "Too many process arguments");
+        SC_TRY(fixtureCheck(numArguments < sizeof(processArguments) / sizeof(processArguments[0]),
+                            BuildFixtureFailure::ProcessArgumentCapacityExceeded));
         processArguments[numArguments++] = argument;
     }
 
@@ -1582,7 +1638,8 @@ static Result captureBootstrapScriptCommand(const BootstrapSyntheticCheckout& ch
 #if !SC_PLATFORM_WINDOWS
     for (const StringSpan argument : arguments)
     {
-        SC_TRY_MSG(numArguments < sizeof(processArguments) / sizeof(processArguments[0]), "Too many bootstrap args");
+        SC_TRY(fixtureCheck(numArguments < sizeof(processArguments) / sizeof(processArguments[0]),
+                            BuildFixtureFailure::ProcessArgumentCapacityExceeded));
         processArguments[numArguments++] = argument;
     }
 #endif
@@ -1593,8 +1650,8 @@ static Result captureBootstrapScriptCommand(const BootstrapSyntheticCheckout& ch
     SC_TRY(fs.init(checkout.root.view()));
     wchar_t     temporaryDirectoryBuffer[MAX_PATH + 1];
     const DWORD temporaryDirectoryLength = ::GetTempPathW(MAX_PATH + 1, temporaryDirectoryBuffer);
-    SC_TRY_MSG(temporaryDirectoryLength > 0 and temporaryDirectoryLength <= MAX_PATH,
-               "GetTempPathW for bootstrap capture failed");
+    SC_TRY(fixtureCheck(temporaryDirectoryLength > 0 and temporaryDirectoryLength <= MAX_PATH,
+                        BuildFixtureFailure::CaptureDirectoryUnavailable));
     String temporaryDirectory = StringEncoding::Utf8;
     SC_TRY(
         Path::normalize(temporaryDirectory,
@@ -1653,21 +1710,23 @@ static bool bootstrapOutputContainsUpToDateStep(const CapturedProcessOutput& out
 static Result appendBootstrapProbeCommonChecks(const CapturedProcessOutput& output, StringView expectedTool,
                                                Span<const StringSpan> expectedArguments)
 {
-    SC_TRY_MSG(output.exitStatus == 0, "Bootstrap probe process failed");
-    SC_TRY_MSG(StringView(output.stdOut.view()).containsString("BOOTSTRAP_PROBE_OK"), "Bootstrap probe did not run");
+    SC_TRY(fixtureCheck(output.exitStatus == 0, BuildFixtureFailure::BootstrapProbeFailed));
+    SC_TRY(fixtureCheck(StringView(output.stdOut.view()).containsString("BOOTSTRAP_PROBE_OK"),
+                        BuildFixtureFailure::BootstrapProbeNotRun));
     String expectedLine = StringEncoding::Utf8;
     SC_TRY(StringBuilder::format(expectedLine, "BOOTSTRAP_PROBE_TOOL={}", expectedTool));
-    SC_TRY_MSG(StringView(output.stdOut.view()).containsString(expectedLine.view()), "Unexpected bootstrap probe tool");
-    SC_TRY_MSG(StringView(output.stdOut.view()).containsString("BOOTSTRAP_PROBE_ACTION=verify"),
-               "Unexpected bootstrap probe action");
-    SC_TRY_MSG(StringView(output.stdOut.view()).containsString("synthetic checkout spazio cafe"),
-               "Bootstrap probe output does not contain synthetic checkout root");
+    SC_TRY(fixtureCheck(StringView(output.stdOut.view()).containsString(expectedLine.view()),
+                        BuildFixtureFailure::BootstrapProbeToolMismatch));
+    SC_TRY(fixtureCheck(StringView(output.stdOut.view()).containsString("BOOTSTRAP_PROBE_ACTION=verify"),
+                        BuildFixtureFailure::BootstrapProbeActionMismatch));
+    SC_TRY(fixtureCheck(StringView(output.stdOut.view()).containsString("synthetic checkout spazio cafe"),
+                        BuildFixtureFailure::BootstrapProbeRootMissing));
 
     for (size_t idx = 0; idx < expectedArguments.sizeInElements(); ++idx)
     {
         SC_TRY(StringBuilder::format(expectedLine, "BOOTSTRAP_PROBE_ARG[{}]={}", idx, expectedArguments[idx]));
-        SC_TRY_MSG(StringView(output.stdOut.view()).containsString(expectedLine.view()),
-                   "Missing forwarded bootstrap probe argument");
+        SC_TRY(fixtureCheck(StringView(output.stdOut.view()).containsString(expectedLine.view()),
+                            BuildFixtureFailure::BootstrapProbeArgumentMissing));
     }
     return Result(true);
 }
@@ -2006,7 +2065,7 @@ static constexpr StringView windowsGNUTargetTriple(Build::Architecture::Type arc
 static Result configureWindowsGNUAction(Build::Action& action, Build::Architecture::Type architecture)
 {
     const StringView targetTriple = windowsGNUTargetTriple(architecture);
-    SC_TRY_MSG(not targetTriple.isEmpty(), "Unsupported Windows GNU fixture architecture");
+    SC_TRY(fixtureCheck(not targetTriple.isEmpty(), BuildFixtureFailure::UnsupportedArchitecture));
 
     action.parameters.platform                   = Build::Platform::Windows;
     action.parameters.architecture               = architecture;
@@ -2058,7 +2117,7 @@ static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnv
             break;
         case Build::Architecture::Intel32:
         case Build::Architecture::Wasm:
-        case Build::Architecture::Any: return Result::Error("Unsupported Linux glibc fixture architecture");
+        case Build::Architecture::Any: return fixtureFailure(BuildFixtureFailure::UnsupportedArchitecture);
         }
         break;
     case Build::TargetEnvironment::LinuxMusl:
@@ -2072,12 +2131,13 @@ static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnv
             break;
         case Build::Architecture::Intel32:
         case Build::Architecture::Wasm:
-        case Build::Architecture::Any: return Result::Error("Unsupported Linux musl fixture architecture");
+        case Build::Architecture::Any: return fixtureFailure(BuildFixtureFailure::UnsupportedArchitecture);
         }
         break;
     case Build::TargetEnvironment::Native:
     case Build::TargetEnvironment::WindowsGNU:
-    case Build::TargetEnvironment::WindowsMSVC: return Result::Error("Unsupported Linux fixture target environment");
+    case Build::TargetEnvironment::WindowsMSVC:
+        return fixtureFailure(BuildFixtureFailure::UnsupportedTargetEnvironment);
     }
 
     SC_TRY(action.parameters.toolchain.sysroot.assign(sysroot));
@@ -2173,7 +2233,8 @@ static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
     {
         wchar_t tempPathStorage[MAX_PATH + 1] = {};
         DWORD   tempPathLength                = ::GetTempPathW(MAX_PATH + 1, tempPathStorage);
-        SC_TRY_MSG(tempPathLength != 0 and tempPathLength <= MAX_PATH, "Failed resolving Windows temp directory");
+        SC_TRY(fixtureCheck(tempPathLength != 0 and tempPathLength <= MAX_PATH,
+                            BuildFixtureFailure::CaptureDirectoryUnavailable));
 
         String tempDirectory = StringEncoding::Utf8;
         SC_TRY(tempDirectory.assign(StringView::fromNullTerminated(tempPathStorage, StringEncoding::Utf16)));
@@ -2208,7 +2269,7 @@ static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
     StringSpan processArguments[] = {executablePath};
     SC_TRY(process.exec({processArguments, 1}, rawStdout));
 #endif
-    SC_TRY_MSG(process.getExitStatus() == 0, "Fixture program exited with non-zero status");
+    SC_TRY(fixtureCheck(process.getExitStatus() == 0, BuildFixtureFailure::FixtureProgramFailed));
 #if SC_PLATFORM_WINDOWS
     SC_TRY(stdoutOutput.assign({}));
     SC_TRY(StringBuilder::create(stdoutOutput).appendReplaceAll(rawStdout.view(), "\r\n", "\n"));
@@ -2223,8 +2284,8 @@ static Result verifyNoSCExportsFromExecutable(StringView executablePath, StringV
 #if SC_PLATFORM_WINDOWS
     FileSystem fs;
     SC_TRY(fs.init("."));
-    SC_TRY_MSG(not importLibraryPath.isEmpty(), "Missing import library path");
-    SC_TRY_MSG(not fs.existsAndIsFile(importLibraryPath), "Unexpected import library emitted for executable");
+    SC_TRY(fixtureCheck(not importLibraryPath.isEmpty(), BuildFixtureFailure::ImportLibraryPathUnavailable));
+    SC_TRY(fixtureCheck(not fs.existsAndIsFile(importLibraryPath), BuildFixtureFailure::UnexpectedImportLibrary));
     (void)(executablePath);
     return Result(true);
 #else
@@ -2248,8 +2309,8 @@ static Result verifyNoSCExportsFromExecutable(StringView executablePath, StringV
     Process process;
     String  output = StringEncoding::Utf8;
     SC_TRY(process.exec({argumentsStorage, numArguments}, output));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed to inspect executable exports");
-    SC_TRY_MSG(not StringView(output.view()).containsString("SC::"), "Unexpected SC export from executable");
+    SC_TRY(fixtureCheck(process.getExitStatus() == 0, BuildFixtureFailure::ExportInspectionFailed));
+    SC_TRY(fixtureCheck(not StringView(output.view()).containsString("SC::"), BuildFixtureFailure::UnexpectedExport));
     return Result(true);
 #endif
 }
