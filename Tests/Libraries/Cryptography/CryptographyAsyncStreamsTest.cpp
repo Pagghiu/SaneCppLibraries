@@ -95,15 +95,15 @@ struct SC::CryptographyAsyncStreamsTest : public SC::TestCase
         size_t inputOffset = 0;
         for (size_t chunk : chunks)
         {
-            SC_TRY_MSG(inputOffset + chunk <= input.sizeInBytes(), "runCipher - invalid input chunks");
+            SC_TRY(Result(inputOffset + chunk <= input.sizeInBytes()));
             const Span<const char> chunkData(reinterpret_cast<const char*>(input.data() + inputOffset), chunk);
             SC_TRY(stream.AsyncWritableStream::write(AsyncBufferView(chunkData)));
             inputOffset += chunk;
         }
-        SC_TRY_MSG(inputOffset == input.sizeInBytes(), "runCipher - input chunks do not cover input");
+        SC_TRY(Result(inputOffset == input.sizeInBytes()));
         stream.AsyncWritableStream::end();
         if (not collector.succeeded)
-            return collector.error ? Result::Error("runCipher - stream error") : collector.error;
+            return collector.error ? Result(false) : collector.error;
         return Result(true);
     }
 
@@ -239,7 +239,7 @@ void SC::CryptographyAsyncStreamsTest::hmacPipelineFanOut()
         {
             Span<const char> input;
             SC_TRY(getBuffersPool().getReadableData(bufferID, input));
-            SC_TRY_MSG(size + input.sizeInBytes() <= sizeof(bytes), "CopySink - input too large");
+            SC_TRY(Result(size + input.sizeInBytes() <= sizeof(bytes)));
             memcpy(bytes + size, input.data(), input.sizeInBytes());
             size += input.sizeInBytes();
             finishedWriting(bufferID, move(callback), Result(true));

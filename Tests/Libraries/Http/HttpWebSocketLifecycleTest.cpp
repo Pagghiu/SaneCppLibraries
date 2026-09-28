@@ -23,7 +23,7 @@ struct MessageCollector
 
     SC::Result onMessage(SC::HttpWebSocketOpcode messageOpcode, SC::Span<const char> message)
     {
-        SC_TRY_MSG(message.sizeInBytes() <= sizeof(payload), "MessageCollector payload too large");
+        SC_TRY(SC::Result(message.sizeInBytes() <= sizeof(payload)));
         opcode = messageOpcode;
         size   = message.sizeInBytes();
         count++;
@@ -51,7 +51,7 @@ struct FrameCollector
 
     SC::Result onPayload(SC::Span<char> data, bool)
     {
-        SC_TRY_MSG(payloadSize + data.sizeInBytes() <= sizeof(payload), "FrameCollector payload too large");
+        SC_TRY(SC::Result(payloadSize + data.sizeInBytes() <= sizeof(payload)));
         if (data.sizeInBytes() > 0)
         {
             ::memcpy(payload + payloadSize, data.data(), data.sizeInBytes());
@@ -86,7 +86,7 @@ struct PumpWritableStream : public SC::AsyncWritableStream
     {
         SC::Span<const char> data;
         SC_TRY(getBuffersPool().getReadableData(bufferID, data));
-        SC_TRY_MSG(outputSize + data.sizeInBytes() <= sizeof(output), "PumpWritableStream output too small");
+        SC_TRY(SC::Result(outputSize + data.sizeInBytes() <= sizeof(output)));
         ::memcpy(output + outputSize, data.data(), data.sizeInBytes());
         outputSize += data.sizeInBytes();
         finishedWriting(bufferID, SC::move(cb), SC::Result(true));
@@ -107,7 +107,7 @@ struct PumpPayloadCollector
         {
             return SC::Result(true);
         }
-        SC_TRY_MSG(data.sizeInBytes() <= sizeof(payload), "PumpPayloadCollector payload too large");
+        SC_TRY(SC::Result(data.sizeInBytes() <= sizeof(payload)));
         opcode = payloadOpcode;
         size   = data.sizeInBytes();
         count++;

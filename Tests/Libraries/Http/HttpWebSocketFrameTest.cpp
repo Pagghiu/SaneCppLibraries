@@ -42,15 +42,14 @@ struct ReaderCollector
 
     SC::Result onHeader(const SC::HttpWebSocketFrameHeaderView& header)
     {
-        SC_TRY_MSG(numHeaders < sizeof(headers) / sizeof(headers[0]), "ReaderCollector too many headers");
+        SC_TRY(SC::Result(numHeaders < sizeof(headers) / sizeof(headers[0])));
         headers[numHeaders++] = header;
         return SC::Result(true);
     }
 
     SC::Result onPayload(SC::Span<char> data, bool finished)
     {
-        SC_TRY_MSG(numPayloadEvents < sizeof(finishedFlags) / sizeof(finishedFlags[0]),
-                   "ReaderCollector too many payload callbacks");
+        SC_TRY(SC::Result(numPayloadEvents < sizeof(finishedFlags) / sizeof(finishedFlags[0])));
         SC_TRY(append(data));
         finishedFlags[numPayloadEvents++] = finished;
         return SC::Result(true);
@@ -64,8 +63,7 @@ static SC::Result encodeFrame(SC::HttpWebSocketFrameWriter& writer, const SC::Ht
 {
     SC::Span<const char> encodedHeader;
     SC_TRY(writer.beginFrame(header, outputStorage, encodedHeader));
-    SC_TRY_MSG(outputStorage.sizeInBytes() >= encodedHeader.sizeInBytes() + payload.sizeInBytes(),
-               "encodeFrame output storage too small");
+    SC_TRY(SC::Result(outputStorage.sizeInBytes() >= encodedHeader.sizeInBytes() + payload.sizeInBytes()));
 
     if (payload.sizeInBytes() > 0)
     {
@@ -96,17 +94,17 @@ static SC::Result parseFrameInChunks(SC::HttpWebSocketFrameReader& reader, SC::S
         }
         size_t consumed = 0;
         SC_TRY(reader.parse({encoded.data() + offset, chunk}, consumed));
-        SC_TRY_MSG(consumed == chunk, "parseFrameInChunks did not consume the full chunk");
+        SC_TRY(SC::Result(consumed == chunk));
         offset += chunk;
     }
     if (offset < encoded.sizeInBytes())
     {
         size_t consumed = 0;
         SC_TRY(reader.parse({encoded.data() + offset, encoded.sizeInBytes() - offset}, consumed));
-        SC_TRY_MSG(consumed == encoded.sizeInBytes() - offset, "parseFrameInChunks did not consume the trailing bytes");
+        SC_TRY(SC::Result(consumed == encoded.sizeInBytes() - offset));
         offset += consumed;
     }
-    SC_TRY_MSG(offset == encoded.sizeInBytes(), "parseFrameInChunks did not process all bytes");
+    SC_TRY(SC::Result(offset == encoded.sizeInBytes()));
     return SC::Result(true);
 }
 
