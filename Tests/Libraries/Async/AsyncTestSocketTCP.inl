@@ -418,7 +418,7 @@ void SC::AsyncTest::socketTCPSendReceiveError()
         // - Apple: after poll on macOS (where we're pushing the async handles to OS)
         // - Windows: during Staging (precisely in Activate)
         SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-        SC_TEST_EXPECT(serverSideClient.get(handle, Result::Error("ASD")));
+        SC_TEST_EXPECT(serverSideClient.get(handle, Result(false)));
         SocketDescriptor socketToClose;
         SC_TEST_EXPECT(socketToClose.assign(handle));
         SC_TEST_EXPECT(socketToClose.close());

@@ -458,7 +458,7 @@ void SC::FileTest::testNamedPipeCreateConnectAccept()
     {
         PipeDescriptor accepted;
         EventObject    acceptedEvent;
-        Result         acceptResult = Result::Error("accept not completed");
+        Result         acceptResult = Result(false);
         struct AcceptContext
         {
             NamedPipeServer* server;
@@ -575,7 +575,7 @@ void SC::FileTest::testDescriptorOperations()
     SC_TEST_EXPECT(chownResult.detail == FileErrorDetail::ChangeDescriptorOwnership);
 #else
     int nativeHandle = -1;
-    SC_TEST_EXPECT(fd.get(nativeHandle, Result::Error("native handle")));
+    SC_TEST_EXPECT(fd.get(nativeHandle, Result(false)));
 
     struct stat nativeStat;
     SC_TEST_EXPECT(::fstat(nativeHandle, &nativeStat) == 0);
@@ -671,7 +671,8 @@ SC::Result SC::FileTest::snippetForNamedPipeServer()
     SC_TRY(serverConnection.readPipe.read({readBuffer, sizeof(readBuffer)}, readData));
 
     StringSpan received(readData, false, StringEncoding::Ascii);
-    SC_TRY_MSG(received == "ping", "Unexpected payload");
+    if (received != "ping")
+        return Result(false);
 
     SC_TRY(clientConnection.close());
     SC_TRY(serverConnection.close());

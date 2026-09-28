@@ -436,7 +436,7 @@ void SC::AsyncStreamsTest::writableStream()
 
         virtual Result asyncWrite(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>) override
         {
-            return Result::Error("DeferredEndWritable does not accept writes");
+            return Result(false);
         }
 
         virtual bool canEndWritable() override { return allowEnd; }

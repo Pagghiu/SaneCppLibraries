@@ -664,7 +664,7 @@ asyncReadFile.callback = [&](AsyncFileRead::Result& res)
 char buffer[100] = {0};
 asyncReadFile.buffer = {buffer, sizeof(buffer)};
 // Obtain file descriptor handle and associate it with event loop
-SC_TRY(fd.get(asyncReadFile.handle, Result::Error("Invalid handle")));
+SC_TRY(fd.get(asyncReadFile.handle, Result(false)));
 
 // Start the operation on a thread pool
 AsyncTaskSequence asyncFileTask;
@@ -710,7 +710,7 @@ asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
     }
 };
 // Obtain file descriptor handle
-SC_TRY(fd.get(asyncWriteFile.handle, Result::Error("Invalid Handle")));
+SC_TRY(fd.get(asyncWriteFile.handle, Result(false)));
 asyncWriteFile.buffer = StringView("test").toCharSpan();
 // Vectorized writes: use proper start overload or set
 // AsyncFileWrite::buffers and AsyncFileWrite::singleBuffer = false

@@ -1196,7 +1196,7 @@ void SC::AsyncContractTest::sequenceClearsQueuedRequestsOnError()
     work.work = [ctx = &context]
     {
         ctx->workCalls++;
-        return Result::Error("AsyncContractTest expected work error");
+        return Result(false);
     };
     work.callback = [this, ctx = &context](AsyncLoopWork::Result& result)
     {
@@ -1286,7 +1286,7 @@ void SC::AsyncContractTest::sequenceResumesQueuedRequestsOnErrorWhenConfigured()
     work.work = [ctx = &context]
     {
         ctx->workCalls++;
-        return Result::Error("AsyncContractTest expected work error");
+        return Result(false);
     };
     work.callback = [ctx = &context](AsyncLoopWork::Result& result)
     {
@@ -1435,7 +1435,7 @@ void SC::AsyncContractTest::threadPoolModeCanForceSuppliedPool()
     SC_TEST_EXPECT(fd.open(filePath.view(), openMode));
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
-    SC_TEST_EXPECT(fd.get(handle, Result::Error("AsyncContractTest invalid file handle")));
+    SC_TEST_EXPECT(fd.get(handle, Result(false)));
 
     ThreadPool uncreatedThreadPool;
 

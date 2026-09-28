@@ -53,7 +53,8 @@ struct BroadcastCollector
 
     SC::Result onFrame(size_t clientIndex, SC::Span<const char> encodedFrame)
     {
-        SC_TRY_MSG(encodedFrame.sizeInBytes() <= sizeof(frame), "BroadcastCollector frame too large");
+        if (encodedFrame.sizeInBytes() > sizeof(frame))
+            return SC::Result(false);
         calls++;
         lastIndex = clientIndex;
         frameSize = encodedFrame.sizeInBytes();
@@ -76,7 +77,8 @@ struct PayloadCollector
 
     SC::Result onPayload(SC::Span<char> data, bool)
     {
-        SC_TRY_MSG(payloadSize + data.sizeInBytes() <= sizeof(payload), "PayloadCollector payload too large");
+        if (payloadSize + data.sizeInBytes() > sizeof(payload))
+            return SC::Result(false);
         ::memcpy(payload + payloadSize, data.data(), data.sizeInBytes());
         payloadSize += data.sizeInBytes();
         return SC::Result(true);

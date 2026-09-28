@@ -467,7 +467,8 @@ void SC::HttpWebSocketHandshakeTest::asyncServerKeepsUpgradedConnectionAlive()
 
         Result sendAfterUpgrade()
         {
-            SC_TRY_MSG(transport != nullptr and transport->isValid(), "client websocket transport invalid");
+            if (transport == nullptr or not transport->isValid())
+                return Result(false);
 
             constexpr uint8_t maskKey[4]       = {1, 2, 3, 4};
             char              frameStorage[64] = {0};

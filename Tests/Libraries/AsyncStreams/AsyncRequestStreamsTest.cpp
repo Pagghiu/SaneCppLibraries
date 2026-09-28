@@ -382,7 +382,7 @@ void SC::AsyncRequestStreamsTest::createAsyncConnectedNamedPipes(AsyncEventLoop&
 
     PipeDescriptor acceptedConnection;
     EventObject    acceptedEvent;
-    Result         acceptResult = Result::Error("NamedPipe accept failed");
+    Result         acceptResult = Result(false);
 
     struct AcceptContext
     {
