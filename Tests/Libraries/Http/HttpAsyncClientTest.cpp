@@ -25,6 +25,22 @@ using ServerConnection = SC::HttpAsyncConnection<3, 3, 8 * 1024, 8 * 1024>;
 using ClientConnection = SC::HttpAsyncClientConnection<4, 6, 8 * 1024, 8 * 1024>;
 using size_t           = SC::size_t;
 
+static constexpr SC::ResultCategory HttpAsyncClientFixtureCategory = SC::ResultCategory(0x80000000u);
+enum class HttpAsyncClientFixtureError : SC::uint32_t
+{
+    UnexpectedUrl = 1,
+    PreflightRejected,
+    UnexpectedTransportSetup,
+    ExternalConnectorRejected,
+    TlsBackendUnavailable,
+    TerminalTransportFailure,
+};
+
+static constexpr SC::Result fixtureError(HttpAsyncClientFixtureError error)
+{
+    return SC::Result::Error(HttpAsyncClientFixtureCategory, error);
+}
+
 struct ResponseCollector
 {
     SC::Buffer buffer;
@@ -189,22 +205,13 @@ static SC::Result decompressForTest(SC::ZLibStream::Algorithm algorithm, SC::Spa
     static char    outputStorage[512];
     SC::Span<char> remaining = outputStorage;
     SC_TRY(stream.process(input, remaining));
-    SC_TRY_MSG(input.empty(), "HttpAsyncClientTest compressed fixture output too small");
+    SC_TRY(SC::Result(input.empty()));
 
     bool streamEnded = false;
     SC_TRY(stream.finalize(remaining, streamEnded));
-    SC_TRY_MSG(streamEnded, "HttpAsyncClientTest compressed fixture did not end");
+    SC_TRY(SC::Result(streamEnded));
     decoded = {outputStorage, sizeof(outputStorage) - remaining.sizeInBytes()};
     return SC::Result(true);
-}
-
-static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
-{
-    if (result or result.message == nullptr)
-    {
-        return false;
-    }
-    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
 }
 
 static bool resultHasHttpError(SC::Result result, SC::HttpError expected)
@@ -1625,18 +1632,18 @@ void SC::HttpAsyncClientTest::transportPreflightRejectsBeforeDNS()
     client.setTransportPreflight({[&preflightCalled](const HttpURLParser& url) -> Result
                                   {
                                       preflightCalled = true;
-                                      SC_TRY_MSG(url.hostname == "not-resolvable.invalid",
-                                                 "unexpected transport preflight URL");
-                                      return Result::Error("transport policy rejected URL");
+                                      if (url.hostname != "not-resolvable.invalid")
+                                          return fixtureError(HttpAsyncClientFixtureError::UnexpectedUrl);
+                                      return fixtureError(HttpAsyncClientFixtureError::PreflightRejected);
                                   }});
     client.setTransportSetup({[&setupCalled](HttpAsyncClientTransportSetup&) -> Result
                               {
                                   setupCalled = true;
-                                  return Result::Error("transport setup must not run");
+                                  return fixtureError(HttpAsyncClientFixtureError::UnexpectedTransportSetup);
                               }});
 
     const Result result = client.get(loop, "https://not-resolvable.invalid/");
-    SC_TEST_EXPECT(resultMessageEquals(result, "transport policy rejected URL"));
+    SC_TEST_EXPECT(result.isError(HttpAsyncClientFixtureCategory, HttpAsyncClientFixtureError::PreflightRejected));
     SC_TEST_EXPECT(preflightCalled);
     SC_TEST_EXPECT(not setupCalled);
     SC_TEST_EXPECT(client.close());
@@ -1741,7 +1748,7 @@ void SC::HttpAsyncClientTest::externalConnectorOwnsConnectionEstablishment()
     client.setTransportSetup({[&context](HttpAsyncClientTransportSetup&) -> Result
                               {
                                   context.setupCalled = true;
-                                  return Result::Error("post-connect setup must not run for external connector");
+                                  return fixtureError(HttpAsyncClientFixtureError::UnexpectedTransportSetup);
                               }});
 
     String url = StringEncoding::Ascii;
@@ -1787,7 +1794,7 @@ void SC::HttpAsyncClientTest::externalConnectorSynchronousFailureIsReusable()
                                  {
                                      connectorCalls++;
                                      transportOwned = true;
-                                     return Result::Error("external connector rejected request");
+                                     return fixtureError(HttpAsyncClientFixtureError::ExternalConnectorRejected);
                                  }});
     client.setTransportClose({[&transportCloses, &transportOwned]
                               {
@@ -1800,12 +1807,14 @@ void SC::HttpAsyncClientTest::externalConnectorSynchronousFailureIsReusable()
     client.onError = [&errorCallbacks](Result) { errorCallbacks++; };
 
     const Result first = client.get(loop, "http://example.invalid/first");
-    SC_TEST_EXPECT(resultMessageEquals(first, "external connector rejected request"));
+    SC_TEST_EXPECT(
+        first.isError(HttpAsyncClientFixtureCategory, HttpAsyncClientFixtureError::ExternalConnectorRejected));
     SC_TEST_EXPECT(not transportOwned);
     SC_TEST_EXPECT(transportCloses == 1);
 
     const Result second = client.get(loop, "http://example.invalid/second");
-    SC_TEST_EXPECT(resultMessageEquals(second, "external connector rejected request"));
+    SC_TEST_EXPECT(
+        second.isError(HttpAsyncClientFixtureCategory, HttpAsyncClientFixtureError::ExternalConnectorRejected));
     SC_TEST_EXPECT(connectorCalls == 2);
     SC_TEST_EXPECT(not transportOwned);
     SC_TEST_EXPECT(transportCloses == 2);
@@ -1920,9 +1929,9 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
         HttpAsyncClientTest* test   = nullptr;
         HttpAsyncServer*     server = nullptr;
 
-        bool setupCalled         = false;
-        bool errorCalled         = false;
-        bool errorMessageMatched = false;
+        bool setupCalled          = false;
+        bool errorCalled          = false;
+        bool errorIdentityMatched = false;
 
         Result onSetup(HttpAsyncClientTransportSetup& setup)
         {
@@ -1936,7 +1945,7 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
             test->recordExpectation("https tls error setup fail", setup.fail.isValid());
 
             setupCalled = true;
-            return Result::Error("HttpAsyncClient TLS backend unavailable");
+            return fixtureError(HttpAsyncClientFixtureError::TlsBackendUnavailable);
         }
     } ctx;
 
@@ -1952,8 +1961,9 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
     client.onResponse = [this](HttpAsyncClientResponse&) { SC_TEST_EXPECT(false); };
     client.onError    = [this, &ctx](Result result)
     {
-        ctx.errorCalled         = true;
-        ctx.errorMessageMatched = resultMessageEquals(result, "HttpAsyncClient TLS backend unavailable");
+        ctx.errorCalled = true;
+        ctx.errorIdentityMatched =
+            result.isError(HttpAsyncClientFixtureCategory, HttpAsyncClientFixtureError::TlsBackendUnavailable);
         SC_TEST_EXPECT(ctx.server->stop());
     };
 
@@ -1962,7 +1972,7 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
     SC_TEST_EXPECT(loop.run());
     SC_TEST_EXPECT(ctx.setupCalled);
     SC_TEST_EXPECT(ctx.errorCalled);
-    SC_TEST_EXPECT(ctx.errorMessageMatched);
+    SC_TEST_EXPECT(ctx.errorIdentityMatched);
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(loop.close());
@@ -2006,7 +2016,7 @@ void SC::HttpAsyncClientTest::httpsTransportFailureAfterSetup()
 
         void onFailDelay(AsyncLoopTimeout::Result&)
         {
-            failTransport(Result::Error("HttpAsyncClient terminal transport failure"));
+            failTransport(fixtureError(HttpAsyncClientFixtureError::TerminalTransportFailure));
         }
     } context;
 
@@ -2023,7 +2033,8 @@ void SC::HttpAsyncClientTest::httpsTransportFailureAfterSetup()
     client.onError    = [this, &context](Result result)
     {
         context.errorCalled = true;
-        SC_TEST_EXPECT(resultMessageEquals(result, "HttpAsyncClient terminal transport failure"));
+        SC_TEST_EXPECT(
+            result.isError(HttpAsyncClientFixtureCategory, HttpAsyncClientFixtureError::TerminalTransportFailure));
         SC_TEST_EXPECT(context.server->stop());
     };
 
