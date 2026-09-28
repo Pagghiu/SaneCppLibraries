@@ -144,6 +144,53 @@ inline ResultErrorFormat formatPackageError(PackageError error, Span<char> outpu
     case PackageError::SourceRevisionCheckoutFailed: formatter.append("Package source revision checkout failed"); break;
     case PackageError::SourceRevisionProbeFailed: formatter.append("Package source revision probe failed"); break;
     case PackageError::SourceRevisionMismatch: formatter.append("Package source revision does not match"); break;
+    case PackageError::ToolchainIncludesMissing: formatter.append("Toolchain include directory is missing"); break;
+    case PackageError::SystemApiIncludesMissing: formatter.append("System API include directory is missing"); break;
+    case PackageError::SystemSharedIncludesMissing:
+        formatter.append("Shared system include directory is missing");
+        break;
+    case PackageError::SystemRuntimeIncludesMissing:
+        formatter.append("System runtime include directory is missing");
+        break;
+    case PackageError::SystemProjectionIncludesMissing:
+        formatter.append("System projection include directory is missing");
+        break;
+    case PackageError::SystemCppProjectionIncludesMissing:
+        formatter.append("C++ system projection include directory is missing");
+        break;
+    case PackageError::Intel64ToolchainLibrariesMissing:
+        formatter.append("Intel64 toolchain library directory is missing");
+        break;
+    case PackageError::Intel64SystemApiLibrariesMissing:
+        formatter.append("Intel64 system API library directory is missing");
+        break;
+    case PackageError::Intel64SystemRuntimeLibrariesMissing:
+        formatter.append("Intel64 system runtime library directory is missing");
+        break;
+    case PackageError::Intel64CompilerMissing: formatter.append("Intel64 compiler executable is missing"); break;
+    case PackageError::Intel64LinkerMissing: formatter.append("Intel64 linker executable is missing"); break;
+    case PackageError::Intel64ArchiverMissing: formatter.append("Intel64 archiver executable is missing"); break;
+    case PackageError::Arm64ToolchainLibrariesMissing:
+        formatter.append("ARM64 toolchain library directory is missing");
+        break;
+    case PackageError::Arm64SystemApiLibrariesMissing:
+        formatter.append("ARM64 system API library directory is missing");
+        break;
+    case PackageError::Arm64SystemRuntimeLibrariesMissing:
+        formatter.append("ARM64 system runtime library directory is missing");
+        break;
+    case PackageError::Arm64CompilerMissing: formatter.append("ARM64 compiler executable is missing"); break;
+    case PackageError::Arm64LinkerMissing: formatter.append("ARM64 linker executable is missing"); break;
+    case PackageError::Arm64ArchiverMissing: formatter.append("ARM64 archiver executable is missing"); break;
+    case PackageError::RunnerCrashDialogConfigurationFailed:
+        formatter.append("Runner crash-dialog configuration failed");
+        break;
+    case PackageError::RunnerFirstChanceConfigurationFailed:
+        formatter.append("Runner first-chance exception configuration failed");
+        break;
+    case PackageError::RunnerMenuServiceConfigurationFailed:
+        formatter.append("Runner menu-service configuration failed");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

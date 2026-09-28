@@ -1337,14 +1337,14 @@ static Result repairMSVCPackageLayout(StringView packageRoot, StringView wineExe
 }
 
 static Result msvcPackagePathExists(FileSystem& fs, StringView packageRoot, Span<const StringView> components,
-                                    const char* missingMessage)
+                                    PackageError missingError)
 {
     String path = StringEncoding::Utf8;
     SC_TRY(Path::join(path, {packageRoot}));
     SC_TRY(Path::append(path, components, Path::AsNative));
     if (not fs.exists(path.view()))
     {
-        return Result::FromStableCharPointer(missingMessage);
+        return Result::Error(PackageResultCategory, missingError);
     }
     return Result(true);
 }
@@ -1356,49 +1356,49 @@ static Result validateMSVCPackageLayout(FileSystem& fs, StringView packageRoot)
     SC_TRY(resolveMSVCVersions(packageRoot, msvcVersion, sdkVersion));
 
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"VC", "Tools", "MSVC", msvcVersion.view(), "include"},
-                                 "Portable MSVC package is missing the MSVC include directory"));
+                                 PackageError::ToolchainIncludesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "um"},
-                                 "Portable MSVC package is missing the Windows SDK um include directory"));
+                                 PackageError::SystemApiIncludesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "shared"},
-                                 "Portable MSVC package is missing the Windows SDK shared include directory"));
+                                 PackageError::SystemSharedIncludesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "ucrt"},
-                                 "Portable MSVC package is missing the Windows SDK ucrt include directory"));
+                                 PackageError::SystemRuntimeIncludesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "winrt"},
-                                 "Portable MSVC package is missing the Windows SDK winrt include directory"));
+                                 PackageError::SystemProjectionIncludesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "cppwinrt"},
-                                 "Portable MSVC package is missing the Windows SDK cppwinrt include directory"));
+                                 PackageError::SystemCppProjectionIncludesMissing));
 
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"VC", "Tools", "MSVC", msvcVersion.view(), "lib", "x64"},
-                                 "Portable MSVC package is missing the x64 MSVC library directory"));
+                                 PackageError::Intel64ToolchainLibrariesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "um", "x64"},
-                                 "Portable MSVC package is missing the x64 Windows SDK um library directory"));
+                                 PackageError::Intel64SystemApiLibrariesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "ucrt", "x64"},
-                                 "Portable MSVC package is missing the x64 Windows SDK ucrt library directory"));
+                                 PackageError::Intel64SystemRuntimeLibrariesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot,
                                  {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "x64", "cl.exe"},
-                                 "Portable MSVC package is missing the x64 cl.exe tool"));
+                                 PackageError::Intel64CompilerMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot,
                                  {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "x64", "link.exe"},
-                                 "Portable MSVC package is missing the x64 link.exe tool"));
+                                 PackageError::Intel64LinkerMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot,
                                  {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "x64", "lib.exe"},
-                                 "Portable MSVC package is missing the x64 lib.exe tool"));
+                                 PackageError::Intel64ArchiverMissing));
 
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"VC", "Tools", "MSVC", msvcVersion.view(), "lib", "arm64"},
-                                 "Portable MSVC package is missing the arm64 MSVC library directory"));
+                                 PackageError::Arm64ToolchainLibrariesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "um", "arm64"},
-                                 "Portable MSVC package is missing the arm64 Windows SDK um library directory"));
+                                 PackageError::Arm64SystemApiLibrariesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "ucrt", "arm64"},
-                                 "Portable MSVC package is missing the arm64 Windows SDK ucrt library directory"));
+                                 PackageError::Arm64SystemRuntimeLibrariesMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot,
                                  {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "arm64", "cl.exe"},
-                                 "Portable MSVC package is missing the arm64 cl.exe tool"));
+                                 PackageError::Arm64CompilerMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot,
                                  {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "arm64", "link.exe"},
-                                 "Portable MSVC package is missing the arm64 link.exe tool"));
+                                 PackageError::Arm64LinkerMissing));
     SC_TRY(msvcPackagePathExists(fs, packageRoot,
                                  {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "arm64", "lib.exe"},
-                                 "Portable MSVC package is missing the arm64 lib.exe tool"));
+                                 PackageError::Arm64ArchiverMissing));
     return Result(true);
 }
 
@@ -1661,7 +1661,7 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
         return Result(true);
     };
 
-    auto runRegCommand = [&](Span<const StringSpan> arguments, const char* errorMessage,
+    auto runRegCommand = [&](Span<const StringSpan> arguments, PackageError configurationError,
                              int allowedExitStatus = 0) -> Result
     {
         Process process;
@@ -1671,7 +1671,7 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
         SC_TRY(process.exec(arguments, stdOut, {}, stdErr));
         if (not(process.getExitStatus() == allowedExitStatus or process.getExitStatus() == 0))
         {
-            return Result::FromStableCharPointer(errorMessage);
+            return Result::Error(PackageResultCategory, configurationError);
         }
         return Result(true);
     };
@@ -1684,7 +1684,7 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
         "/d",           "0",
         "/f",
     };
-    SC_TRY(runRegCommand(showCrashDialogArguments, "Failed configuring MSVC Wine crash dialog"));
+    SC_TRY(runRegCommand(showCrashDialogArguments, PackageError::RunnerCrashDialogConfigurationFailed));
 
     const StringSpan breakOnFirstChanceArguments[] = {
         wineExecutable, "reg",
@@ -1694,7 +1694,7 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
         "/d",           "0",
         "/f",
     };
-    SC_TRY(runRegCommand(breakOnFirstChanceArguments, "Failed configuring MSVC Wine first-chance exceptions"));
+    SC_TRY(runRegCommand(breakOnFirstChanceArguments, PackageError::RunnerFirstChanceConfigurationFailed));
 
     const StringSpan removeWinemenubuilderArguments[] = {
         wineExecutable, "reg",
@@ -1702,7 +1702,7 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
         "/v",           "winemenubuilder",
         "/f",
     };
-    SC_TRY(runRegCommand(removeWinemenubuilderArguments, "Failed disabling MSVC Wine menu builder", 1));
+    SC_TRY(runRegCommand(removeWinemenubuilderArguments, PackageError::RunnerMenuServiceConfigurationFailed, 1));
 
     const StringSpan removeWow64WinemenubuilderArguments[] = {
         wineExecutable, "reg",
@@ -1710,7 +1710,7 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
         "/v",           "winemenubuilder",
         "/f",
     };
-    SC_TRY(runRegCommand(removeWow64WinemenubuilderArguments, "Failed disabling MSVC Wine menu builder", 1));
+    SC_TRY(runRegCommand(removeWow64WinemenubuilderArguments, PackageError::RunnerMenuServiceConfigurationFailed, 1));
     return Result(true);
 }
 
