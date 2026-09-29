@@ -273,6 +273,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             fileSend();
         }
+        if (test_section("file send followed by filesystem close"))
+        {
+            fileSend(true);
+        }
         if (test_section("file system operations"))
         {
             fileSystemOperations();
@@ -912,8 +916,9 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    static AwaitTask fileSendOnce(AwaitEventLoop& await, const FileDescriptor& file, const SocketDescriptor& sender,
-                                  const SocketDescriptor& receiver, ThreadPool& threadPool, Span<const char> expected)
+    static AwaitTask fileSendOnce(AwaitEventLoop& await, FileDescriptor& file, const SocketDescriptor& sender,
+                                  const SocketDescriptor& receiver, ThreadPool& threadPool, Span<const char> expected,
+                                  bool closeAfterSend = false)
     {
         char receiveBuffer[256] = {0};
 
@@ -923,6 +928,12 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitFileSendResult sendResult;
         SC_CO_TRY(co_await await.fileSend(file, sender, sendResult, sendOptions));
+        if (closeAfterSend)
+        {
+            SC_CO_TRY(co_await await.fsClose(threadPool, file));
+            if (file.isValid())
+                co_return awaitTestFailure(AwaitTestFailure::FsCloseLeftDescriptorValid);
+        }
         if (sendResult.bytesTransferred != expected.sizeInBytes() or not sendResult.complete)
         {
             co_return awaitTestFailure(AwaitTestFailure::FileSendTransferMismatch);
@@ -3265,7 +3276,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
-    void fileSend()
+    void fileSend(bool closeAfterSend = false)
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
@@ -3298,8 +3309,8 @@ struct SC::AwaitTest : public SC::TestCase
         readOpen.blocking = true;
         SC_TEST_EXPECT(file.open(filePath.view(), readOpen));
 
-        AwaitTask task =
-            fileSendOnce(await, file, sender, receiver, threadPool, {fileContent, sizeof(fileContent) - 1});
+        AwaitTask task = fileSendOnce(await, file, sender, receiver, threadPool, {fileContent, sizeof(fileContent) - 1},
+                                      closeAfterSend);
         SC_TEST_EXPECT(await.spawn(task));
         SC_TEST_EXPECT(await.run());
 

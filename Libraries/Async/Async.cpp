@@ -1675,7 +1675,10 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
     removeActiveHandle(async);
     AsyncTeardown teardown;
     prepareTeardown(eventLoop, async, teardown);
-    bool hasBeenReactivated = false;
+    // An idle sequence may be embedded in a request/awaiter released by the callback. Only an existing backlog
+    // needs post-callback advancement; new submissions from the callback already advance themselves when idle.
+    const bool sequenceHadPendingSubmissions = teardown.sequence and not teardown.sequence->submissions.isEmpty();
+    bool       hasBeenReactivated            = false;
     async.flags |= Flag_NeedsTeardown;
     SC_TRY(completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode, &hasBeenReactivated));
     if (hasBeenReactivated)
@@ -1697,7 +1700,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
     else
     {
         SC_TRY(teardownAsync(teardown));
-        if (teardown.sequence)
+        if (sequenceHadPendingSubmissions)
         {
             if (not returnCode and teardown.sequence->clearSequenceOnError)
             {
