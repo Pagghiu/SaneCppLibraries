@@ -149,6 +149,9 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::ExportLibrariesConfigurationFailed:
         formatter.append("Exported libraries could not be configured");
         break;
+    case BuildError::DirectoryMustBeAbsolute:
+        formatter.append("Build output, library, and project directories must be absolute paths");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

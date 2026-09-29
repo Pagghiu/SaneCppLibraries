@@ -93,6 +93,7 @@ enum class BuildError : uint32_t
     ExternalOutputDirectoryMissing,
     ExternalIntermediateDirectoryMissing,
     ExportLibrariesConfigurationFailed,
+    DirectoryMustBeAbsolute,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

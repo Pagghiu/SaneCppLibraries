@@ -1366,8 +1366,7 @@ static Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& d
         not Path::isAbsolute(arguments.libraryDirectory.view(), SC::Path::AsNative) or
         not Path::isAbsolute(arguments.projectDirectory.view(), SC::Path::AsNative))
     {
-        return Result::Error(
-            "The build output directory, the libraries directory, and the project directory must be absolute paths");
+        return Result::Error(BuildResultCategory, BuildError::DirectoryMustBeAbsolute);
     }
     return Result(true);
 }
