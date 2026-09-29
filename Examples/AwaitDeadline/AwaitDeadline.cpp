@@ -10,9 +10,42 @@
 #include "../../Libraries/Await/Await.h"
 #include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
+
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
+static constexpr ResultCategory AwaitDeadlineResultCategory = ResultCategory(0x80000015u);
+enum class AwaitDeadlineError : uint32_t
+{
+    TimeoutCancellationMismatch = 1,
+};
+static constexpr Result AwaitDeadlineFailure(AwaitDeadlineError error)
+{
+    return Result::Error(AwaitDeadlineResultCategory, error);
+}
+static ResultErrorFormat formatAwaitDeadlineError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() != AwaitDeadlineResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitDeadlineError>(result.errorValue()))
+    {
+    case AwaitDeadlineError::TimeoutCancellationMismatch: formatter.append("Expected timeout cancellation"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static AwaitTask slowOperation(AwaitEventLoop& await)
 {
     SC_CO_TRY(co_await await.sleep({1000}));
@@ -27,7 +60,7 @@ static AwaitTask deadlineWorkflow(AwaitEventLoop& await, AwaitTimeoutResult& tim
     Result waitResult = co_await await.waitFor(child, {1}, &timeout);
     if (waitResult or not timeout.timedOut or not child.isCompleted() or not AwaitIsCancelled(child.result()))
     {
-        co_return Result::Error("AwaitDeadline expected timeout cancellation");
+        co_return AwaitDeadlineFailure(AwaitDeadlineError::TimeoutCancellationMismatch);
     }
 
     co_return Result(true);
@@ -54,8 +87,7 @@ static Result runAwaitDeadline()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitDeadline event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -73,7 +105,13 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitDeadline failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitDeadlineError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitDeadline failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitDeadline failed: category {} error {}\n", result.category().value, result.errorValue());
         return -1;
     }
     return 0;

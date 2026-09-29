@@ -11,9 +11,45 @@
 #include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/Process/Process.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
+
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Process/ProcessErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
+static constexpr ResultCategory AwaitProcessExitCodesResultCategory = ResultCategory(0x8000001cu);
+enum class AwaitProcessExitCodesError : uint32_t
+{
+    ExitStatusMismatch = 1,
+};
+static constexpr Result AwaitProcessExitCodesFailure(AwaitProcessExitCodesError error)
+{
+    return Result::Error(AwaitProcessExitCodesResultCategory, error);
+}
+static ResultErrorFormat formatAwaitProcessExitCodesError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == ProcessResultCategory)
+        return formatProcessError(result, output);
+    if (result.category() != AwaitProcessExitCodesResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitProcessExitCodesError>(result.errorValue()))
+    {
+    case AwaitProcessExitCodesError::ExitStatusMismatch: formatter.append("Observed unexpected exit status"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 struct ProcessWaitJob
 {
     Process                process;
@@ -75,14 +111,13 @@ static Result runAwaitProcessExitCodes()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitProcessExitCodes event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
     if (success.result.exitStatus != 0 or failure.result.exitStatus != 7)
     {
-        return Result::Error("AwaitProcessExitCodes observed unexpected exit status");
+        return AwaitProcessExitCodesFailure(AwaitProcessExitCodesError::ExitStatusMismatch);
     }
 
     console.print("AwaitProcessExitCodes success status: {}\n", success.result.exitStatus);
@@ -99,7 +134,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitProcessExitCodes failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitProcessExitCodesError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitProcessExitCodes failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitProcessExitCodes failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

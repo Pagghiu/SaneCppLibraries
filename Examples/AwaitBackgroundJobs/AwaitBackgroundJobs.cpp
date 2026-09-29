@@ -9,9 +9,44 @@
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Await/Await.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
+
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
+static constexpr ResultCategory AwaitBackgroundJobsResultCategory = ResultCategory(0x80000010u);
+enum class AwaitBackgroundJobsError : uint32_t
+{
+    JobCompletionMismatch = 1,
+};
+static constexpr Result AwaitBackgroundJobsFailure(AwaitBackgroundJobsError error)
+{
+    return Result::Error(AwaitBackgroundJobsResultCategory, error);
+}
+static ResultErrorFormat formatAwaitBackgroundJobsError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() != AwaitBackgroundJobsResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitBackgroundJobsError>(result.errorValue()))
+    {
+    case AwaitBackgroundJobsError::JobCompletionMismatch:
+        formatter.append("Expected two successful background jobs");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static AwaitTask warmCache(AwaitEventLoop& await, int& warmedEntries)
 {
     SC_CO_TRY(co_await await.sleep({1}));
@@ -53,7 +88,7 @@ static Result runAwaitBackgroundJobs()
     const size_t                cleared = registry.clearCompleted(&summary);
     if (cleared != 2 or summary.numSucceeded != 2)
     {
-        return Result::Error("AwaitBackgroundJobs expected two successful background jobs");
+        return AwaitBackgroundJobsFailure(AwaitBackgroundJobsError::JobCompletionMismatch);
     }
 
     console.print("AwaitBackgroundJobs warmed {} entries\n", warmedEntries);
@@ -69,7 +104,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitBackgroundJobs failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitBackgroundJobsError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitBackgroundJobs failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitBackgroundJobs failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

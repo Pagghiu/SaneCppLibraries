@@ -10,10 +10,26 @@
 #include "../../Libraries/Await/Await.h"
 #include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Threading/ThreadPool.h"
+
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
+static ResultErrorFormat formatAwaitBackgroundDigestError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+}
+
 struct DigestJob
 {
     Span<const char> input;
@@ -84,8 +100,7 @@ static Result runAwaitBackgroundDigest()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitBackgroundDigest event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -104,7 +119,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitBackgroundDigest failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitBackgroundDigestError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitBackgroundDigest failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitBackgroundDigest failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

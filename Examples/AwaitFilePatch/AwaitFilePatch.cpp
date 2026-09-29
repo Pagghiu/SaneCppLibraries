@@ -16,8 +16,50 @@
 #include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Threading/ThreadPool.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/File/FileErrorFormatter.h"
+#include "../../Libraries/FileSystem/FileSystemErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitFilePatchResultCategory = ResultCategory(0x80000018u);
+enum class AwaitFilePatchError : uint32_t
+{
+    CurrentDirectoryUnavailable = 1,
+    WriteCountMismatch,
+};
+static constexpr Result AwaitFilePatchFailure(AwaitFilePatchError error)
+{
+    return Result::Error(AwaitFilePatchResultCategory, error);
+}
+static ResultErrorFormat formatAwaitFilePatchError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == FileSystemResultCategory)
+        return formatFileSystemError(result, output);
+    if (result.category() == FileResultCategory)
+        return formatFileError(result, output);
+    if (result.category() != AwaitFilePatchResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitFilePatchError>(result.errorValue()))
+    {
+    case AwaitFilePatchError::CurrentDirectoryUnavailable:
+        formatter.append("Could not resolve current working directory");
+        break;
+    case AwaitFilePatchError::WriteCountMismatch: formatter.append("Wrote an unexpected number of bytes"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static AwaitTask patchStatus(AwaitEventLoop& await, ThreadPool& threadPool, FileDescriptor& file, Span<char> readBuffer,
                              AwaitFileReadResult& readResult, AwaitFileWriteResult& writeResult)
 {
@@ -47,7 +89,7 @@ static Result runAwaitFilePatch()
     StringSpan cwd = FileSystem::Operations::getCurrentWorkingDirectory(workingDirectory);
     if (cwd.isEmpty())
     {
-        return Result::Error("AwaitFilePatch could not resolve current working directory");
+        return AwaitFilePatchFailure(AwaitFilePatchError::CurrentDirectoryUnavailable);
     }
 
     StringPath path;
@@ -83,14 +125,13 @@ static Result runAwaitFilePatch()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitFilePatch event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
     if (writeResult.numBytes != 4)
     {
-        return Result::Error("AwaitFilePatch wrote an unexpected number of bytes");
+        return AwaitFilePatchFailure(AwaitFilePatchError::WriteCountMismatch);
     }
 
     StringView text({readResult.data.data(), readResult.data.sizeInBytes()}, false, StringEncoding::Ascii);
@@ -106,7 +147,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitFilePatch failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitFilePatchError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitFilePatch failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitFilePatch failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

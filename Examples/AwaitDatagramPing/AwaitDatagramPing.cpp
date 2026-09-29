@@ -12,15 +12,56 @@
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Socket/SocketErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitDatagramPingResultCategory = ResultCategory(0x80000014u);
+enum class AwaitDatagramPingError : uint32_t
+{
+    UnexpectedRequest = 1,
+    IncompleteReply,
+    IncompleteRequest,
+    UnexpectedReply,
+};
+static constexpr Result AwaitDatagramPingFailure(AwaitDatagramPingError error)
+{
+    return Result::Error(AwaitDatagramPingResultCategory, error);
+}
+static ResultErrorFormat formatAwaitDatagramPingError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == SocketResultCategory)
+        return formatSocketError(result, output);
+    if (result.category() != AwaitDatagramPingResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitDatagramPingError>(result.errorValue()))
+    {
+    case AwaitDatagramPingError::UnexpectedRequest: formatter.append("Server received an unexpected request"); break;
+    case AwaitDatagramPingError::IncompleteReply: formatter.append("Server sent a partial reply"); break;
+    case AwaitDatagramPingError::IncompleteRequest: formatter.append("Client sent a partial request"); break;
+    case AwaitDatagramPingError::UnexpectedReply: formatter.append("Client received an unexpected reply"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static Result createDatagramServer(AsyncEventLoop& eventLoop, SocketDescriptor& serverSocket,
                                    SocketIPAddress& serverAddress)
 {
     constexpr uint16_t firstPort = 39191;
     constexpr uint16_t numPorts  = 64;
 
-    Result lastError = Result::Error("Could not bind AwaitDatagramPing socket");
+    Result lastError = Result::Error(SocketResultCategory, SocketError::BindFailed);
     for (uint16_t offset = 0; offset < numPorts; ++offset)
     {
         const uint16_t port = static_cast<uint16_t>(firstPort + offset);
@@ -48,7 +89,7 @@ static AwaitTask datagramServer(AwaitEventLoop& await, const SocketDescriptor& s
     StringView requestText({request.data.data(), request.data.sizeInBytes()}, false, StringEncoding::Ascii);
     if (requestText != "ping await udp")
     {
-        co_return Result::Error("AwaitDatagramPing server received an unexpected request");
+        co_return AwaitDatagramPingFailure(AwaitDatagramPingError::UnexpectedRequest);
     }
 
     const char            reply[] = "pong await udp";
@@ -56,7 +97,7 @@ static AwaitTask datagramServer(AwaitEventLoop& await, const SocketDescriptor& s
     SC_CO_TRY(co_await await.sendTo(server, request.sourceAddress, {reply, sizeof(reply) - 1}, &sendResult));
     if (sendResult.numBytes != sizeof(reply) - 1)
     {
-        co_return Result::Error("AwaitDatagramPing server sent a partial reply");
+        co_return AwaitDatagramPingFailure(AwaitDatagramPingError::IncompleteReply);
     }
 
     co_return Result(true);
@@ -70,14 +111,14 @@ static AwaitTask datagramClient(AwaitEventLoop& await, const SocketDescriptor& c
     SC_CO_TRY(co_await await.sendTo(client, serverAddress, {request, sizeof(request) - 1}, &sendResult));
     if (sendResult.numBytes != sizeof(request) - 1)
     {
-        co_return Result::Error("AwaitDatagramPing client sent a partial request");
+        co_return AwaitDatagramPingFailure(AwaitDatagramPingError::IncompleteRequest);
     }
 
     SC_CO_TRY(co_await await.receiveFrom(client, replyBuffer, reply));
     StringView replyText({reply.data.data(), reply.data.sizeInBytes()}, false, StringEncoding::Ascii);
     if (replyText != "pong await udp")
     {
-        co_return Result::Error("AwaitDatagramPing client received an unexpected reply");
+        co_return AwaitDatagramPingFailure(AwaitDatagramPingError::UnexpectedReply);
     }
 
     co_return Result(true);
@@ -128,8 +169,7 @@ static Result runAwaitDatagramPing()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitDatagramPing event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -153,7 +193,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitDatagramPing failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitDatagramPingError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitDatagramPing failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitDatagramPing failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

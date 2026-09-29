@@ -9,16 +9,49 @@
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Await/Await.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Time/Time.h"
+
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
+static constexpr ResultCategory AwaitCallbackBridgeResultCategory = ResultCategory(0x80000012u);
+enum class AwaitCallbackBridgeError : uint32_t
+{
+    CallbackNotInvoked = 1,
+};
+static constexpr Result AwaitCallbackBridgeFailure(AwaitCallbackBridgeError error)
+{
+    return Result::Error(AwaitCallbackBridgeResultCategory, error);
+}
+static ResultErrorFormat formatAwaitCallbackBridgeError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() != AwaitCallbackBridgeResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitCallbackBridgeError>(result.errorValue()))
+    {
+    case AwaitCallbackBridgeError::CallbackNotInvoked: formatter.append("Callback did not fire"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static AwaitTask waitForLegacyCallback(AwaitEventLoop& await, bool& callbackFired)
 {
     SC_CO_TRY(co_await await.sleep(10_ms));
     if (not callbackFired)
     {
-        co_return Result::Error("AwaitCallbackBridge callback did not fire");
+        co_return AwaitCallbackBridgeFailure(AwaitCallbackBridgeError::CallbackNotInvoked);
     }
     co_return Result(true);
 }
@@ -47,8 +80,7 @@ static Result runAwaitCallbackBridge()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitCallbackBridge event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -66,7 +98,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitCallbackBridge failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitCallbackBridgeError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitCallbackBridge failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitCallbackBridge failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

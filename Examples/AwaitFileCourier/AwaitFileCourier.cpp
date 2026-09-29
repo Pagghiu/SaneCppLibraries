@@ -17,14 +17,59 @@
 #include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Threading/ThreadPool.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/File/FileErrorFormatter.h"
+#include "../../Libraries/FileSystem/FileSystemErrorFormatter.h"
+#include "../../Libraries/Socket/SocketErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitFileCourierResultCategory = ResultCategory(0x80000017u);
+enum class AwaitFileCourierError : uint32_t
+{
+    IncompleteFileSend = 1,
+    CurrentDirectoryUnavailable,
+};
+static constexpr Result AwaitFileCourierFailure(AwaitFileCourierError error)
+{
+    return Result::Error(AwaitFileCourierResultCategory, error);
+}
+static ResultErrorFormat formatAwaitFileCourierError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == SocketResultCategory)
+        return formatSocketError(result, output);
+    if (result.category() == FileSystemResultCategory)
+        return formatFileSystemError(result, output);
+    if (result.category() == FileResultCategory)
+        return formatFileError(result, output);
+    if (result.category() != AwaitFileCourierResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitFileCourierError>(result.errorValue()))
+    {
+    case AwaitFileCourierError::IncompleteFileSend: formatter.append("Incomplete fileSend"); break;
+    case AwaitFileCourierError::CurrentDirectoryUnavailable:
+        formatter.append("Could not resolve current working directory");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static Result createServer(AsyncEventLoop& eventLoop, SocketDescriptor& serverSocket, SocketIPAddress& address)
 {
     constexpr uint16_t firstPort = 39171;
     constexpr uint16_t numPorts  = 64;
 
-    Result lastError = Result::Error("Could not bind AwaitFileCourier socket");
+    Result lastError = Result::Error(SocketResultCategory, SocketError::BindFailed);
     for (uint16_t offset = 0; offset < numPorts; ++offset)
     {
         const uint16_t port = static_cast<uint16_t>(firstPort + offset);
@@ -86,7 +131,7 @@ static AwaitTask copyThenSend(AwaitEventLoop& await, ThreadPool& threadPool, Str
 
     if (not sendResult.complete or sendResult.bytesTransferred != receiveBuffer.sizeInBytes())
     {
-        co_return Result::Error("AwaitFileCourier incomplete fileSend");
+        co_return AwaitFileCourierFailure(AwaitFileCourierError::IncompleteFileSend);
     }
 
     SC_CO_TRY(co_await await.receiveExact(receiver, receiveBuffer, &received));
@@ -104,7 +149,7 @@ static Result runAwaitFileCourier()
     StringSpan cwd = FileSystem::Operations::getCurrentWorkingDirectory(workingDirectory);
     if (cwd.isEmpty())
     {
-        return Result::Error("AwaitFileCourier could not resolve current working directory");
+        return AwaitFileCourierFailure(AwaitFileCourierError::CurrentDirectoryUnavailable);
     }
 
     StringPath sourcePath;
@@ -151,8 +196,7 @@ static Result runAwaitFileCourier()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitFileCourier event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -169,7 +213,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitFileCourier failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitFileCourierError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitFileCourier failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitFileCourier failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

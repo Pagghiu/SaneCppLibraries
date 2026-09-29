@@ -12,14 +12,32 @@
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Socket/SocketErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static ResultErrorFormat formatAwaitEchoError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == SocketResultCategory)
+        return formatSocketError(result, output);
+    return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+}
+
 static Result createServer(AsyncEventLoop& eventLoop, SocketDescriptor& serverSocket, SocketIPAddress& address)
 {
     constexpr uint16_t firstPort = 39091;
     constexpr uint16_t numPorts  = 64;
 
-    Result lastError = Result::Error("Could not bind AwaitEcho socket");
+    Result lastError = Result::Error(SocketResultCategory, SocketError::BindFailed);
     for (uint16_t offset = 0; offset < numPorts; ++offset)
     {
         const uint16_t port = static_cast<uint16_t>(firstPort + offset);
@@ -45,20 +63,11 @@ static AwaitTask echoServer(AwaitEventLoop& await, const SocketDescriptor& serve
     AwaitSocketReceiveResult received;
 
     Result acceptResult = co_await await.accept(serverSocket, accepted);
-    if (not acceptResult)
-    {
-        co_return Result::Error("AwaitEcho server accept failed");
-    }
+    SC_CO_TRY(acceptResult);
     Result receiveResult = co_await await.receive(accepted, {buffer, sizeof(buffer)}, received);
-    if (not receiveResult)
-    {
-        co_return Result::Error("AwaitEcho server receive failed");
-    }
+    SC_CO_TRY(receiveResult);
     Result sendResult = co_await await.sendAll(accepted, received.data);
-    if (not sendResult)
-    {
-        co_return Result::Error("AwaitEcho server sendAll failed");
-    }
+    SC_CO_TRY(sendResult);
 
     co_return Result(true);
 }
@@ -69,20 +78,11 @@ static AwaitTask echoClient(AwaitEventLoop& await, const SocketDescriptor& clien
     const char message[] = "niche readable await";
 
     Result connectResult = co_await await.connect(client, address);
-    if (not connectResult)
-    {
-        co_return Result::Error("AwaitEcho client connect failed");
-    }
+    SC_CO_TRY(connectResult);
     Result sendResult = co_await await.sendAll(client, {message, sizeof(message) - 1});
-    if (not sendResult)
-    {
-        co_return Result::Error("AwaitEcho client sendAll failed");
-    }
+    SC_CO_TRY(sendResult);
     Result receiveResult = co_await await.receive(client, replyBuffer, reply);
-    if (not receiveResult)
-    {
-        co_return Result::Error("AwaitEcho client receive failed");
-    }
+    SC_CO_TRY(receiveResult);
 
     co_return Result(true);
 }
@@ -98,10 +98,7 @@ static AwaitTask echoConversation(AwaitEventLoop& await, const SocketDescriptor&
     AwaitTaskGroup group(await, children);
     SC_CO_TRY(group.spawnAll(children));
     Result waitResult = co_await group.waitAll();
-    if (not waitResult)
-    {
-        co_return Result::Error("AwaitEcho task group failed");
-    }
+    SC_CO_TRY(waitResult);
 
     co_return Result(true);
 }
@@ -136,7 +133,7 @@ static Result runAwaitEcho()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result() : Result::Error("AwaitEcho event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -161,7 +158,13 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitEcho failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitEchoError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitEcho failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitEcho failed: category {} error {}\n", result.category().value, result.errorValue());
         return -1;
     }
     return 0;

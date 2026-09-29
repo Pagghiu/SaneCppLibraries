@@ -12,14 +12,53 @@
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Socket/SocketErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitServiceProbeResultCategory = ResultCategory(0x8000001du);
+enum class AwaitServiceProbeError : uint32_t
+{
+    UnexpectedResponse = 1,
+    TimeoutCancellationMismatch,
+};
+static constexpr Result AwaitServiceProbeFailure(AwaitServiceProbeError error)
+{
+    return Result::Error(AwaitServiceProbeResultCategory, error);
+}
+static ResultErrorFormat formatAwaitServiceProbeError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == SocketResultCategory)
+        return formatSocketError(result, output);
+    if (result.category() != AwaitServiceProbeResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitServiceProbeError>(result.errorValue()))
+    {
+    case AwaitServiceProbeError::UnexpectedResponse: formatter.append("Received an unexpected response"); break;
+    case AwaitServiceProbeError::TimeoutCancellationMismatch:
+        formatter.append("Expected maintenance timeout cancellation");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static Result createProbeServer(AsyncEventLoop& eventLoop, SocketDescriptor& serverSocket, SocketIPAddress& address)
 {
     constexpr uint16_t firstPort = 39155;
     constexpr uint16_t numPorts  = 64;
 
-    Result lastError = Result::Error("Could not bind AwaitServiceProbe socket");
+    Result lastError = Result::Error(SocketResultCategory, SocketError::BindFailed);
     for (uint16_t offset = 0; offset < numPorts; ++offset)
     {
         const uint16_t port = static_cast<uint16_t>(firstPort + offset);
@@ -64,7 +103,7 @@ static AwaitTask probeClient(AwaitEventLoop& await, const SocketDescriptor& clie
     StringView text({reply.data.data(), reply.data.sizeInBytes()}, false, StringEncoding::Ascii);
     if (text != "PONG")
     {
-        co_return Result::Error("AwaitServiceProbe received an unexpected response");
+        co_return AwaitServiceProbeFailure(AwaitServiceProbeError::UnexpectedResponse);
     }
 
     co_return Result(true);
@@ -99,7 +138,7 @@ static AwaitTask boundedMaintenance(AwaitEventLoop& await, AwaitTimeoutResult& m
     Result waitResult = co_await await.waitFor(maintenance, {1}, &maintenanceTimeout);
     if (waitResult or not maintenanceTimeout.timedOut or not AwaitIsCancelled(maintenance.result()))
     {
-        co_return Result::Error("AwaitServiceProbe expected maintenance timeout cancellation");
+        co_return AwaitServiceProbeFailure(AwaitServiceProbeError::TimeoutCancellationMismatch);
     }
 
     co_return Result(true);
@@ -154,8 +193,7 @@ static Result runAwaitServiceProbe()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitServiceProbe event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -182,7 +220,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitServiceProbe failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitServiceProbeError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitServiceProbe failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitServiceProbe failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

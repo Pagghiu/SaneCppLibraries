@@ -16,8 +16,48 @@
 #include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Threading/ThreadPool.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/File/FileErrorFormatter.h"
+#include "../../Libraries/FileSystem/FileSystemErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitTaskGroupFilesResultCategory = ResultCategory(0x8000001eu);
+enum class AwaitTaskGroupFilesError : uint32_t
+{
+    CurrentDirectoryUnavailable = 1,
+};
+static constexpr Result AwaitTaskGroupFilesFailure(AwaitTaskGroupFilesError error)
+{
+    return Result::Error(AwaitTaskGroupFilesResultCategory, error);
+}
+static ResultErrorFormat formatAwaitTaskGroupFilesError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == FileSystemResultCategory)
+        return formatFileSystemError(result, output);
+    if (result.category() == FileResultCategory)
+        return formatFileError(result, output);
+    if (result.category() != AwaitTaskGroupFilesResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitTaskGroupFilesError>(result.errorValue()))
+    {
+    case AwaitTaskGroupFilesError::CurrentDirectoryUnavailable:
+        formatter.append("Could not resolve current working directory");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 struct FileReadJob
 {
     StringSpan          path;
@@ -58,7 +98,7 @@ static Result runAwaitTaskGroupFiles()
     StringSpan cwd = FileSystem::Operations::getCurrentWorkingDirectory(workingDirectory);
     if (cwd.isEmpty())
     {
-        return Result::Error("AwaitTaskGroupFiles could not resolve current working directory");
+        return AwaitTaskGroupFilesFailure(AwaitTaskGroupFilesError::CurrentDirectoryUnavailable);
     }
 
     String leftPath;
@@ -97,8 +137,7 @@ static Result runAwaitTaskGroupFiles()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitTaskGroupFiles event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -119,7 +158,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitTaskGroupFiles failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitTaskGroupFilesError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitTaskGroupFiles failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitTaskGroupFiles failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

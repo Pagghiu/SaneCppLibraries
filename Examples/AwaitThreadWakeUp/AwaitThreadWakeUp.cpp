@@ -10,10 +10,43 @@
 #include "../../Libraries/Await/Await.h"
 #include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Threading/Threading.h"
+
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 
 namespace SC
 {
+static constexpr ResultCategory AwaitThreadWakeUpResultCategory = ResultCategory(0x8000001fu);
+enum class AwaitThreadWakeUpError : uint32_t
+{
+    WakeUpNotReceived = 1,
+};
+static constexpr Result AwaitThreadWakeUpFailure(AwaitThreadWakeUpError error)
+{
+    return Result::Error(AwaitThreadWakeUpResultCategory, error);
+}
+static ResultErrorFormat formatAwaitThreadWakeUpError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() != AwaitThreadWakeUpResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitThreadWakeUpError>(result.errorValue()))
+    {
+    case AwaitThreadWakeUpError::WakeUpNotReceived: formatter.append("Did not receive producer wake-up"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 struct WakeUpState
 {
     AwaitLoopWakeUp       wakeUp;
@@ -25,7 +58,7 @@ static AwaitTask waitForProducer(AwaitEventLoop& await, WakeUpState& state)
     SC_CO_TRY(co_await await.wakeUp(state.wakeUp, state.result));
     if (state.result.deliveryCount == 0)
     {
-        co_return Result::Error("AwaitThreadWakeUp did not receive producer wake-up");
+        co_return AwaitThreadWakeUpFailure(AwaitThreadWakeUpError::WakeUpNotReceived);
     }
     co_return Result(true);
 }
@@ -68,8 +101,7 @@ static Result runAwaitThreadWakeUp()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitThreadWakeUp event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -87,7 +119,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitThreadWakeUp failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitThreadWakeUpError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitThreadWakeUp failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitThreadWakeUp failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

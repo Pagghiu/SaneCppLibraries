@@ -12,8 +12,49 @@
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/Socket/SocketErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitLineProtocolResultCategory = ResultCategory(0x8000001au);
+enum class AwaitLineProtocolError : uint32_t
+{
+    UnexpectedRequest = 1,
+    UnexpectedAcknowledgement,
+    UnexpectedValue,
+    UnexpectedCompletion,
+};
+static constexpr Result AwaitLineProtocolFailure(AwaitLineProtocolError error)
+{
+    return Result::Error(AwaitLineProtocolResultCategory, error);
+}
+static ResultErrorFormat formatAwaitLineProtocolError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == SocketResultCategory)
+        return formatSocketError(result, output);
+    if (result.category() != AwaitLineProtocolResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitLineProtocolError>(result.errorValue()))
+    {
+    case AwaitLineProtocolError::UnexpectedRequest: formatter.append("Server received unexpected request"); break;
+    case AwaitLineProtocolError::UnexpectedAcknowledgement: formatter.append("Server received unexpected ack"); break;
+    case AwaitLineProtocolError::UnexpectedValue: formatter.append("Client received unexpected value"); break;
+    case AwaitLineProtocolError::UnexpectedCompletion: formatter.append("Client received unexpected completion"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static bool equalsAscii(Span<char> data, Span<const char> expected)
 {
     return StringView({data.data(), data.sizeInBytes()}, false, StringEncoding::Ascii) ==
@@ -26,7 +67,7 @@ static Result createLineProtocolServer(AsyncEventLoop& eventLoop, SocketDescript
     constexpr uint16_t firstPort = 39131;
     constexpr uint16_t numPorts  = 64;
 
-    Result lastError = Result::Error("Could not bind AwaitLineProtocol socket");
+    Result lastError = Result::Error(SocketResultCategory, SocketError::BindFailed);
     for (uint16_t offset = 0; offset < numPorts; ++offset)
     {
         const uint16_t port = static_cast<uint16_t>(firstPort + offset);
@@ -63,14 +104,14 @@ static AwaitTask lineServer(AwaitEventLoop& await, const SocketDescriptor& serve
     if (not request.lineComplete or request.disconnected or
         not equalsAscii(request.line, {expectedRequest, sizeof(expectedRequest) - 1}))
     {
-        co_return Result::Error("AwaitLineProtocol server received unexpected request");
+        co_return AwaitLineProtocolFailure(AwaitLineProtocolError::UnexpectedRequest);
     }
 
     SC_CO_TRY(co_await await.sendAll(accepted, {valueReply, sizeof(valueReply) - 1}));
     SC_CO_TRY(co_await await.receiveLine(accepted, ackBuffer, ack));
     if (not ack.lineComplete or ack.disconnected or not equalsAscii(ack.line, {expectedAck, sizeof(expectedAck) - 1}))
     {
-        co_return Result::Error("AwaitLineProtocol server received unexpected ack");
+        co_return AwaitLineProtocolFailure(AwaitLineProtocolError::UnexpectedAcknowledgement);
     }
 
     SC_CO_TRY(co_await await.sendAll(accepted, {doneReply, sizeof(doneReply) - 1}));
@@ -93,7 +134,7 @@ static AwaitTask lineClient(AwaitEventLoop& await, const SocketDescriptor& clien
     if (not valueLine.lineComplete or valueLine.disconnected or
         not equalsAscii(valueLine.line, {expectedValue, sizeof(expectedValue) - 1}))
     {
-        co_return Result::Error("AwaitLineProtocol client received unexpected value");
+        co_return AwaitLineProtocolFailure(AwaitLineProtocolError::UnexpectedValue);
     }
 
     SC_CO_TRY(co_await await.sendAll(client, {ack, sizeof(ack) - 1}));
@@ -101,7 +142,7 @@ static AwaitTask lineClient(AwaitEventLoop& await, const SocketDescriptor& clien
     if (not doneLine.lineComplete or doneLine.disconnected or
         not equalsAscii(doneLine.line, {expectedDone, sizeof(expectedDone) - 1}))
     {
-        co_return Result::Error("AwaitLineProtocol client received unexpected completion");
+        co_return AwaitLineProtocolFailure(AwaitLineProtocolError::UnexpectedCompletion);
     }
 
     co_return Result(true);
@@ -157,8 +198,7 @@ static Result runAwaitLineProtocol()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitLineProtocol event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -183,7 +223,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitLineProtocol failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitLineProtocolError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitLineProtocol failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitLineProtocol failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;

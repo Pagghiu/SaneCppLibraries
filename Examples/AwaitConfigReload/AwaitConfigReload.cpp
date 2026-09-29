@@ -16,8 +16,50 @@
 #include "../../Libraries/Strings/StringView.h"
 #include "../../Libraries/Threading/ThreadPool.h"
 
+#include "../../Libraries/Async/AsyncErrorFormatter.h"
+#include "../../Libraries/Await/AwaitErrorFormatter.h"
+#include "../../Libraries/File/FileErrorFormatter.h"
+#include "../../Libraries/FileSystem/FileSystemErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory AwaitConfigReloadResultCategory = ResultCategory(0x80000013u);
+enum class AwaitConfigReloadError : uint32_t
+{
+    EmptyConfiguration = 1,
+    CurrentDirectoryUnavailable,
+};
+static constexpr Result AwaitConfigReloadFailure(AwaitConfigReloadError error)
+{
+    return Result::Error(AwaitConfigReloadResultCategory, error);
+}
+static ResultErrorFormat formatAwaitConfigReloadError(Result result, Span<char> output)
+{
+    if (result.category() == AwaitResultCategory)
+        return formatAwaitError(result, output);
+    if (result.category() == AsyncResultCategory)
+        return formatAsyncError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() == FileSystemResultCategory)
+        return formatFileSystemError(result, output);
+    if (result.category() == FileResultCategory)
+        return formatFileError(result, output);
+    if (result.category() != AwaitConfigReloadResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<AwaitConfigReloadError>(result.errorValue()))
+    {
+    case AwaitConfigReloadError::EmptyConfiguration: formatter.append("Loaded an empty config"); break;
+    case AwaitConfigReloadError::CurrentDirectoryUnavailable:
+        formatter.append("Could not resolve current working directory");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 struct ConfigLoadJob
 {
     StringSpan          path;
@@ -43,7 +85,7 @@ static AwaitTask reloadConfig(AwaitEventLoop& await, ThreadPool& threadPool, Con
 
     if (job.result.data.sizeInBytes() == 0)
     {
-        co_return Result::Error("AwaitConfigReload loaded an empty config");
+        co_return AwaitConfigReloadFailure(AwaitConfigReloadError::EmptyConfiguration);
     }
 
     co_return Result(true);
@@ -58,7 +100,7 @@ static Result runAwaitConfigReload()
     StringSpan cwd = FileSystem::Operations::getCurrentWorkingDirectory(workingDirectory);
     if (cwd.isEmpty())
     {
-        return Result::Error("AwaitConfigReload could not resolve current working directory");
+        return AwaitConfigReloadFailure(AwaitConfigReloadError::CurrentDirectoryUnavailable);
     }
 
     StringPath path;
@@ -88,8 +130,7 @@ static Result runAwaitConfigReload()
     Result runResult = await.run();
     if (not runResult)
     {
-        return task.isCompleted() ? task.result()
-                                  : Result::Error("AwaitConfigReload event loop stopped before task completed");
+        return task.isCompleted() ? task.result() : runResult;
     }
     SC_TRY(task.result());
 
@@ -106,7 +147,14 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("AwaitConfigReload failed: {}\n", result.message);
+        char                        message[256] = {};
+        const SC::ResultErrorFormat formatted    = SC::formatAwaitConfigReloadError(result, message);
+        if (formatted.status == SC::ResultErrorFormatStatus::Success)
+            console.print("AwaitConfigReload failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("AwaitConfigReload failed: category {} error {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;
