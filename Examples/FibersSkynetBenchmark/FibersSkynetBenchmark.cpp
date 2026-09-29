@@ -13,8 +13,86 @@
 
 #include <new>
 
+#include "../../Libraries/Fibers/FibersErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory FibersSkynetBenchmarkResultCategory = ResultCategory(0x80000007u);
+enum class SkynetBenchmarkError : uint32_t
+{
+    TaskStorageAllocationFailed = 1,
+    ChildTaskFailed,
+    JobStorageAllocationFailed,
+    JobWarmupSumMismatch,
+    JobSumMismatch,
+    InvalidArguments,
+    ParentCompletionUnderflow,
+    JobNodeFailed,
+    HelpWriteFailed,
+    ParseErrorWriteFailed,
+    InvalidWorkloadSize,
+    NegativeIdleSpinCount,
+    InvalidBackend,
+    TaskDepthOutOfRange,
+    TaskWarmupSumMismatch,
+    TaskSumMismatch,
+};
+static constexpr Result FibersSkynetBenchmarkFailure(SkynetBenchmarkError error)
+{
+    return Result::Error(FibersSkynetBenchmarkResultCategory, error);
+}
+static constexpr Result FibersSkynetBenchmarkCheck(bool condition, SkynetBenchmarkError error)
+{
+    return condition ? Result(true) : FibersSkynetBenchmarkFailure(error);
+}
+static ResultErrorFormat formatFibersSkynetBenchmarkError(Result result, Span<char> output)
+{
+    if (result.category() == FibersResultCategory)
+        return formatFibersError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() != FibersSkynetBenchmarkResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<SkynetBenchmarkError>(result.errorValue()))
+    {
+    case SkynetBenchmarkError::TaskStorageAllocationFailed:
+        formatter.append("Cannot allocate caller-owned Skynet benchmark storage");
+        break;
+    case SkynetBenchmarkError::ChildTaskFailed: formatter.append("A Fibers Skynet child task failed"); break;
+    case SkynetBenchmarkError::JobStorageAllocationFailed:
+        formatter.append("Cannot allocate caller-owned FiberJob Skynet benchmark storage");
+        break;
+    case SkynetBenchmarkError::JobWarmupSumMismatch: formatter.append("FiberJob Skynet warm-up sum mismatch"); break;
+    case SkynetBenchmarkError::JobSumMismatch: formatter.append("FiberJob Skynet sum mismatch"); break;
+    case SkynetBenchmarkError::InvalidArguments: formatter.append("Invalid FibersSkynetBenchmark arguments"); break;
+    case SkynetBenchmarkError::ParentCompletionUnderflow:
+        formatter.append("FiberJob Skynet parent completion underflow");
+        break;
+    case SkynetBenchmarkError::JobNodeFailed: formatter.append("A FiberJob Skynet node failed"); break;
+    case SkynetBenchmarkError::HelpWriteFailed: formatter.append("Failed writing FibersSkynetBenchmark help"); break;
+    case SkynetBenchmarkError::ParseErrorWriteFailed:
+        formatter.append("Failed writing FibersSkynetBenchmark parse error");
+        break;
+    case SkynetBenchmarkError::InvalidWorkloadSize:
+        formatter.append(
+            "Workers must be positive; rounds and max-depth must be between 1 and 100 and 1 and 6 respectively");
+        break;
+    case SkynetBenchmarkError::NegativeIdleSpinCount: formatter.append("Job-idle-spins must not be negative"); break;
+    case SkynetBenchmarkError::InvalidBackend:
+        formatter.append("Backend must be all, fibers, jobs, or taskflow");
+        break;
+    case SkynetBenchmarkError::TaskDepthOutOfRange:
+        formatter.append("All and fibers backends require max-depth between 1 and 4");
+        break;
+    case SkynetBenchmarkError::TaskWarmupSumMismatch: formatter.append("Fibers Skynet warm-up sum mismatch"); break;
+    case SkynetBenchmarkError::TaskSumMismatch: formatter.append("Fibers Skynet sum mismatch"); break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static constexpr size_t SkynetMaxRounds = 100;
 
 struct SkynetNode
@@ -222,7 +300,7 @@ static Result completeFiberJobSkynetNode(FiberJobSkynetState& state, FiberJobSky
         return Result(true);
     }
     const int32_t previousPending = node.parent->pendingChildren.fetch_sub(1, memory_order_acq_rel);
-    SC_TRY_MSG(previousPending > 0, "FiberJob Skynet parent completion underflow");
+    SC_TRY(FibersSkynetBenchmarkCheck(previousPending > 0, SkynetBenchmarkError::ParentCompletionUnderflow));
     if (previousPending == 1)
     {
         SC_TRY(spawnFiberJobSkynetContinuation(state, *node.parent));
@@ -278,7 +356,7 @@ static Result measureFibersSkynet(uint32_t numWorkers, uint32_t maxDepth, uint64
         delete[] threads;
         delete[] workers;
         delete[] nodes;
-        return Result::Error("Cannot allocate caller-owned Skynet benchmark storage");
+        return FibersSkynetBenchmarkFailure(SkynetBenchmarkError::TaskStorageAllocationFailed);
     }
 
     FiberScheduler  scheduler;
@@ -351,7 +429,7 @@ static Result measureFibersSkynet(uint32_t numWorkers, uint32_t maxDepth, uint64
         elapsedUs = finish.subtractExact(start).toNanoseconds().ns / 1000;
         if (state.failedTasks.load(memory_order_relaxed) != 0)
         {
-            benchmarkResult = Result::Error("A Fibers Skynet child task failed");
+            benchmarkResult = FibersSkynetBenchmarkFailure(SkynetBenchmarkError::ChildTaskFailed);
         }
     }
 
@@ -413,7 +491,7 @@ struct FiberJobsSkynetRuntime
             workers == nullptr or threads == nullptr or previousWorkerDiagnostics == nullptr)
         {
             static_cast<void>(close());
-            return Result::Error("Cannot allocate caller-owned FiberJob Skynet benchmark storage");
+            return FibersSkynetBenchmarkFailure(SkynetBenchmarkError::JobStorageAllocationFailed);
         }
 
         state.scheduler     = &scheduler;
@@ -502,7 +580,8 @@ struct FiberJobsSkynetRuntime
                 outDiagnostics->failedSteals += current.failedSteals - previous.failedSteals;
             }
         }
-        SC_TRY_MSG(state.failedJobs.load(memory_order_acquire) == 0, "A FiberJob Skynet node failed");
+        SC_TRY(FibersSkynetBenchmarkCheck(state.failedJobs.load(memory_order_acquire) == 0,
+                                          SkynetBenchmarkError::JobNodeFailed));
         return Result(true);
     }
 
@@ -575,7 +654,7 @@ static Result measureFiberJobsSkynetSamples(Console& console, const FiberJobsSky
     Result   result         = runtime.measure(measuredResult, warmupUs);
     if (result and measuredResult != options.expected)
     {
-        result = Result::Error("FiberJob Skynet warm-up sum mismatch");
+        result = FibersSkynetBenchmarkFailure(SkynetBenchmarkError::JobWarmupSumMismatch);
     }
 
     int64_t                         elapsedSamples[SkynetMaxRounds] = {};
@@ -586,7 +665,7 @@ static Result measureFiberJobsSkynetSamples(Console& console, const FiberJobsSky
             runtime.measure(measuredResult, elapsedSamples[round], options.diagnostics ? &diagnostics[round] : nullptr);
         if (result and measuredResult != options.expected)
         {
-            result = Result::Error("FiberJob Skynet sum mismatch");
+            result = FibersSkynetBenchmarkFailure(SkynetBenchmarkError::JobSumMismatch);
         }
     }
 
@@ -671,24 +750,26 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
     if (parseResult.status == CommandLineParseResult::Status::HelpRequested)
     {
         StringFormatOutput output(StringEncoding::Utf8, console, true);
-        SC_TRY_MSG(spec.writeHelp(output), "Failed writing FibersSkynetBenchmark help");
+        SC_TRY(FibersSkynetBenchmarkCheck(spec.writeHelp(output), SkynetBenchmarkError::HelpWriteFailed));
         return Result(true);
     }
     if (parseResult.status == CommandLineParseResult::Status::Error)
     {
         StringFormatOutput output(StringEncoding::Utf8, console, false);
-        SC_TRY_MSG(spec.writeError(parseResult, output), "Failed writing FibersSkynetBenchmark parse error");
-        return Result::Error("Invalid FibersSkynetBenchmark arguments");
+        SC_TRY(FibersSkynetBenchmarkCheck(spec.writeError(parseResult, output),
+                                          SkynetBenchmarkError::ParseErrorWriteFailed));
+        return FibersSkynetBenchmarkFailure(SkynetBenchmarkError::InvalidArguments);
     }
 
-    SC_TRY_MSG(workers > 0 and rounds > 0 and rounds <= static_cast<int32_t>(SkynetMaxRounds) and maxDepth > 0 and
-                   maxDepth <= 6,
-               "workers must be positive; rounds and max-depth must be between 1 and 100 and 1 and 6 respectively");
-    SC_TRY_MSG(jobIdleSpinAttempts >= 0, "job-idle-spins must not be negative");
-    SC_TRY_MSG(backend == "all" or backend == "fibers" or backend == "jobs" or backend == "taskflow",
-               "backend must be all, fibers, jobs, or taskflow");
-    SC_TRY_MSG((backend != "all" and backend != "fibers") or maxDepth <= 4,
-               "all and fibers backends require max-depth between 1 and 4");
+    SC_TRY(FibersSkynetBenchmarkCheck(workers > 0 and rounds > 0 and rounds <= static_cast<int32_t>(SkynetMaxRounds) and
+                                          maxDepth > 0 and maxDepth <= 6,
+                                      SkynetBenchmarkError::InvalidWorkloadSize));
+    SC_TRY(FibersSkynetBenchmarkCheck(jobIdleSpinAttempts >= 0, SkynetBenchmarkError::NegativeIdleSpinCount));
+    SC_TRY(FibersSkynetBenchmarkCheck(backend == "all" or backend == "fibers" or backend == "jobs" or
+                                          backend == "taskflow",
+                                      SkynetBenchmarkError::InvalidBackend));
+    SC_TRY(FibersSkynetBenchmarkCheck((backend != "all" and backend != "fibers") or maxDepth <= 4,
+                                      SkynetBenchmarkError::TaskDepthOutOfRange));
 
     console.print(
         "Skynet packageRevision=ec97c0095bd10907584a3b408e181410796b48fe workers={} rounds={} jobIdleSpins={}\n",
@@ -717,14 +798,14 @@ static Result runFibersSkynetBenchmark(int argc, const char* const* argv)
             int64_t  warmupUs       = 0;
             SC_TRY(measureFibersSkynet(static_cast<uint32_t>(workers), static_cast<uint32_t>(depth), measuredResult,
                                        warmupUs));
-            SC_TRY_MSG(measuredResult == expected, "Fibers Skynet warm-up sum mismatch");
+            SC_TRY(FibersSkynetBenchmarkCheck(measuredResult == expected, SkynetBenchmarkError::TaskWarmupSumMismatch));
 
             int64_t elapsedSamples[SkynetMaxRounds] = {};
             for (int32_t round = 0; round < rounds; ++round)
             {
                 SC_TRY(measureFibersSkynet(static_cast<uint32_t>(workers), static_cast<uint32_t>(depth), measuredResult,
                                            elapsedSamples[round]));
-                SC_TRY_MSG(measuredResult == expected, "Fibers Skynet sum mismatch");
+                SC_TRY(FibersSkynetBenchmarkCheck(measuredResult == expected, SkynetBenchmarkError::TaskSumMismatch));
             }
             SmallString<32> resultText(StringEncoding::Ascii);
             SC_TRY(StringBuilder::format(resultText, "{}", measuredResult));
@@ -769,7 +850,14 @@ int main(int argc, const char* argv[])
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("FibersSkynetBenchmark failed: {}\n", result.message);
+        char                        message[256];
+        const SC::ResultErrorFormat formatted = SC::formatFibersSkynetBenchmarkError(result, message);
+        if (formatted)
+            console.print("FibersSkynetBenchmark failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("FibersSkynetBenchmark failed: error category {}, code {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;
