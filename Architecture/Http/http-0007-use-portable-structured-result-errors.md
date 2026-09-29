@@ -109,8 +109,8 @@ result, with an ADR, and are dropped when converted to plain `Result`.
 ## Consequences
 
 Ordinary callers continue returning or forwarding `Result` through `SC_TRY`. Callers requiring stable identity inspect
-category and value, and those requiring canonical English text opt into the formatter. The temporary legacy bridge
-remains only until the full repository producer/consumer audit is clear.
+category and value, and those requiring canonical English text opt into the formatter. No legacy text state remains
+in `Result` after the repository-wide migration.
 
 ## Confirmation
 

@@ -17,8 +17,8 @@ the POSIX or Windows backend call. Platform names are forbidden in primary error
 
 `ResultSocket` composes the authoritative `Result` with a `uint16_t` detail, a `uint16_t` context kind, and one tagged
 32-bit scalar. Context may contain a native error, signed resolver error, required byte capacity, or actual transferred
-byte count. The result owns no memory and retains no borrowed strings. It is 24 bytes during the legacy-message bridge
-and 16 bytes after `Result` returns to its final eight-byte representation.
+byte count. The result owns no memory and retains no borrowed strings. It occupies 16 bytes with the eight-byte
+`Result` identity; the unreleased legacy-message bridge was temporarily 24 bytes on 64-bit targets.
 
 Native error context is captured immediately from `errno`, `WSAGetLastError()`, or `GetLastError()` only when the failed
 API defines that diagnostic channel. `getaddrinfo()` results use resolver context rather than pretending to be native

@@ -11,8 +11,8 @@ The public interface includes `Thread`, `Mutex`, `ConditionVariable`, `EventObje
 Thread and ThreadPool lifetimes must remain explicit. Started threads are joined or detached. ThreadPool tasks are caller-owned nodes with stable addresses.
 
 Native execution failures return `ResultThreading`, retaining a portable category/error identity plus optional copied
-native and backend-stage details without ownership or allocation. The enriched result remains 16 bytes after the
-temporary legacy `Result` message pointer is removed.
+native and backend-stage details without ownership or allocation. The enriched result occupies 16 bytes with the
+eight-byte plain `Result` identity.
 
 ## Boundaries
 

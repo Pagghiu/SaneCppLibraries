@@ -45,8 +45,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         if (not test_section("structured errors and formatter"))
             return;
 
-        static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemWatcher) == 24,
-                      "The migration bridge temporarily expands ResultFileSystemWatcher");
+        static_assert(sizeof(ResultFileSystemWatcher) == 16, "ResultFileSystemWatcher must remain 16 bytes");
         static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemWatcher) == sizeof(Result) + 8,
                       "ResultFileSystemWatcher must fit the final 16-byte target");
         static_assert(__is_standard_layout(ResultFileSystemWatcher),

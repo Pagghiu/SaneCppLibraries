@@ -322,11 +322,8 @@ void SC::SerialPortTest::nonSerialHandleContract()
 
 void SC::SerialPortTest::structuredErrorsAndFormatter()
 {
-    static_assert(sizeof(void*) != 8 or sizeof(Result) == 16,
-                  "The migration bridge currently retains Result's legacy message pointer");
-    static_assert(sizeof(void*) != 8 or sizeof(ResultSerialPort) == 24,
-                  "ResultSerialPort currently includes the 16-byte Result bridge and two 4-byte details");
-    // Once Result drops its legacy message pointer, its uint64_t identity plus these two fields must total 16 bytes.
+    static_assert(sizeof(ResultSerialPort) == 16, "ResultSerialPort must remain 16 bytes");
+    // The numeric identity and the two scalar detail fields fit the enriched-result budget.
     static constexpr size_t ResultSerialPortFinalSize =
         sizeof(uint64_t) + sizeof(SerialPortErrorDetail) + sizeof(uint32_t);
     static_assert(ResultSerialPortFinalSize == 16, "ResultSerialPort's final target must remain 16 bytes");
@@ -367,12 +364,12 @@ void SC::SerialPortTest::structuredErrorsAndFormatter()
     SC_TEST_EXPECT(formatted.requiredCapacity <= sizeof(detailMessage));
     SC_TEST_EXPECT(not StringView::fromNullTerminated(detailMessage, StringEncoding::Ascii).containsString("12345"));
 
-    const ResultSerialPort legacy(Result::Error("legacy serial result"));
-    SC_TEST_EXPECT(not legacy);
-    SC_TEST_EXPECT(legacy.nativeError == 0);
-    SC_TEST_EXPECT(legacy.detail == SerialPortErrorDetail::None);
-    SC_TEST_EXPECT(legacy.result.hasLegacyError());
-    formatted = formatSerialPortError(legacy, nativeMessage);
+    const ResultSerialPort foreign(Result::Error(ResultCategory(1234), 1));
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.nativeError == 0);
+    SC_TEST_EXPECT(foreign.detail == SerialPortErrorDetail::None);
+    SC_TEST_EXPECT(foreign.result.isError(ResultCategory(1234), 1));
+    formatted = formatSerialPortError(foreign, nativeMessage);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
 
     formatted = formatSerialPortError(Result(true), nativeMessage);

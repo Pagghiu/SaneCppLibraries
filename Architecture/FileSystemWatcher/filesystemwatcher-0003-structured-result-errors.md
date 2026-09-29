@@ -15,8 +15,8 @@ FileSystemWatcher owns category 6 and the portable `FileSystemWatcherError` taxo
 the append-only public `FileSystemWatcherErrorDetail` enum, and native error values are copied into
 `ResultFileSystemWatcher` as `uint32_t`. Its composed `Result` is authoritative: same-domain copies retain context,
 plain and foreign conversions clear inactive context, and conversion to plain `Result` preserves only category/error
-identity. The bridge representation is 24 bytes on the supported 64-bit targets and is expected to become 16 bytes
-when the legacy `Result` message pointer is removed.
+identity. The enriched result is 16 bytes on the supported targets; the unreleased migration bridge was temporarily
+24 bytes on 64-bit targets.
 
 Public watcher operations and private watcher helpers return the enriched result. `EventLoopRunner` virtual methods and
 `FileSystemWatcherAsyncT` overrides intentionally continue to return plain `Result`, so failures owned by Async retain

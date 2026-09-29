@@ -153,8 +153,7 @@ void SC::FileSystemIteratorTest::completionAndStickyErrors()
 
 void SC::FileSystemIteratorTest::structuredErrorsAndFormatter()
 {
-    static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemIterator) == 24,
-                  "The migration bridge temporarily expands ResultFileSystemIterator");
+    static_assert(sizeof(ResultFileSystemIterator) == 16, "ResultFileSystemIterator must remain 16 bytes");
     static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemIterator) == sizeof(Result) + 8,
                   "ResultFileSystemIterator detail must fit the final 16-byte target");
     static_assert(__is_standard_layout(ResultFileSystemIterator),
@@ -189,13 +188,13 @@ void SC::FileSystemIteratorTest::structuredErrorsAndFormatter()
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::UnknownError);
     SC_TEST_EXPECT(rootMessage[0] == '\0');
 
-    const ResultFileSystemIterator legacy(Result::Error("legacy iterator result"));
-    SC_TEST_EXPECT(not legacy);
-    SC_TEST_EXPECT(legacy.nativeError == 0);
-    SC_TEST_EXPECT(legacy.depth == 0);
-    SC_TEST_EXPECT(legacy.detail == FileSystemIteratorErrorDetail::None);
-    SC_TEST_EXPECT(legacy.result.hasLegacyError());
-    formatted = formatFileSystemIteratorError(legacy, message);
+    const ResultFileSystemIterator foreign(Result::Error(ResultCategory(1234), 1));
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.nativeError == 0);
+    SC_TEST_EXPECT(foreign.depth == 0);
+    SC_TEST_EXPECT(foreign.detail == FileSystemIteratorErrorDetail::None);
+    SC_TEST_EXPECT(foreign.result.isError(ResultCategory(1234), 1));
+    formatted = formatFileSystemIteratorError(foreign, message);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
 
     formatted = formatFileSystemIteratorError(Result(true), message);

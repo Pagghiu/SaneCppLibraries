@@ -29,8 +29,8 @@ regressions that reproduce the old behavior; changing a literal to an identity a
 
 ## Consequences
 
-Existing `SC_TRY` and callback paths remain source-compatible. During the legacy bridge, structured Async failures
-have no `Result::message`, so text consumers use the optional formatter or the generic numeric fallback. The primary
+Existing `SC_TRY` and callback paths remain source-compatible. Structured Async failures contain no text, so diagnostic
+consumers use the optional formatter or the generic numeric fallback. The primary
 code can identify the failed portable stage but cannot recover native error numbers from a plain result.
 
 ## Confirmation

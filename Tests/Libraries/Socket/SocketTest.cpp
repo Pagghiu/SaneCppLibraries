@@ -102,9 +102,7 @@ void SC::SocketTest::structuredErrorsAndFormatter()
     static_assert(static_cast<uint16_t>(SocketErrorDetail::None) == 0, "Socket detail zero is reserved for no detail");
     static_assert(static_cast<uint16_t>(SocketErrorContextKind::None) == 0,
                   "Socket context kind zero is reserved for no context");
-    static_assert(sizeof(Result) != 16 or sizeof(ResultSocket) == 24,
-                  "ResultSocket bridge layout must retain its 24-byte size");
-    static_assert(sizeof(Result) != 8 or sizeof(ResultSocket) == 16, "ResultSocket must meet the final 16-byte target");
+    static_assert(sizeof(ResultSocket) == 16, "ResultSocket must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultSocket), "ResultSocket must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultSocket>::value, "ResultSocket must remain trivially copyable");
 

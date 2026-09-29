@@ -42,9 +42,9 @@ error value. Details identify lower-level backend stages with explicit platform 
 `PosixExec` and `WindowsCreateProcess`. They are diagnostic and programmatically inspectable, but are not encoded
 when the enriched result is converted to plain `Result`.
 
-`ResultProcess` remains allocation-free, non-owning, trivially copyable, and standard-layout. During the temporary
-legacy `Result` bridge it is 24 bytes on 64-bit builds; when the legacy message pointer is removed, the plain result
-is eight bytes and `ResultProcess` reaches the 16-byte enriched-result target. Shared generic helpers continue to
+`ResultProcess` remains allocation-free, non-owning, trivially copyable, and standard-layout. Plain `Result` is eight
+bytes and `ResultProcess` meets the 16-byte enriched-result target. The unreleased migration bridge was temporarily
+24 bytes on 64-bit builds. Shared generic helpers continue to
 return their own plain `Result` failures through the existing conversion boundary, with Process detail cleared rather
 than remapping a foreign error to a Process code.
 

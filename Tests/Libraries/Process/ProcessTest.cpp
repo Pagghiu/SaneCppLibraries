@@ -151,10 +151,7 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
                   "Process details are append-only");
     static_assert(static_cast<uint32_t>(ProcessErrorDetail::WindowsNormalizeExecutablePath) == 16,
                   "Process details are append-only");
-    static_assert(sizeof(Result) != 8 or sizeof(ResultProcess) == 16,
-                  "ResultProcess must meet the final 16-byte enriched-result target");
-    static_assert(sizeof(Result) != 16 or sizeof(ResultProcess) == 24,
-                  "The legacy Result pointer temporarily expands ResultProcess");
+    static_assert(sizeof(ResultProcess) == 16, "ResultProcess must meet the final 16-byte enriched-result target");
     static_assert(__is_standard_layout(ResultProcess), "ResultProcess must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultProcess>::value,
                   "ResultProcess must remain trivially copyable");
@@ -268,12 +265,12 @@ void SC::ProcessTest::structuredErrorsAndFormatter()
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(ProcessResultCategory, ProcessError::LaunchFailed));
 
-    const ResultProcess legacy(Result::Error("legacy process result"));
-    SC_TEST_EXPECT(not legacy);
-    SC_TEST_EXPECT(legacy.detail == ProcessErrorDetail::None);
-    SC_TEST_EXPECT(legacy.nativeError == 0);
-    SC_TEST_EXPECT(legacy.result.hasLegacyError());
-    formatted = formatProcessError(legacy, nativeMessage);
+    const ResultProcess foreign(Result::Error(ResultCategory(1234), 1));
+    SC_TEST_EXPECT(not foreign);
+    SC_TEST_EXPECT(foreign.detail == ProcessErrorDetail::None);
+    SC_TEST_EXPECT(foreign.nativeError == 0);
+    SC_TEST_EXPECT(foreign.result.isError(ResultCategory(1234), 1));
+    formatted = formatProcessError(foreign, nativeMessage);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
 
     formatted = formatProcessError(Result(true), nativeMessage);

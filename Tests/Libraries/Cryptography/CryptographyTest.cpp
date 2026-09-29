@@ -342,10 +342,7 @@ void SC::CryptographyTest::structuredErrorsAndFormatter()
                   "Cryptography detail zero is reserved for no detail");
     static_assert(static_cast<uint16_t>(CryptographyErrorContextKind::None) == 0,
                   "Cryptography context kind zero is reserved for no context");
-    static_assert(sizeof(Result) != 16 or sizeof(ResultCryptography) == 24,
-                  "ResultCryptography bridge layout must retain its 24-byte size");
-    static_assert(sizeof(Result) != 8 or sizeof(ResultCryptography) == 16,
-                  "ResultCryptography must meet the final 16-byte target");
+    static_assert(sizeof(ResultCryptography) == 16, "ResultCryptography must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultCryptography), "ResultCryptography must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultCryptography>::value,
                   "ResultCryptography must remain trivially copyable");

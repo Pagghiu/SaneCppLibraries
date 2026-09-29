@@ -51,7 +51,6 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
         const Result result = runner.startWithoutInitialization();
         SC_TEST_EXPECT(result.isError(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized));
-        SC_TEST_EXPECT(not result.hasLegacyError());
     }
 
     void submitQueuedWatcher(AsyncEventLoop& eventLoop)

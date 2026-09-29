@@ -90,9 +90,7 @@ void SC::FileTest::structuredErrorsAndFormatter()
     static_assert(static_cast<uint16_t>(FileErrorDetail::None) == 0, "File detail zero is reserved for no detail");
     static_assert(static_cast<uint16_t>(FileErrorContextKind::None) == 0,
                   "File context kind zero is reserved for no context");
-    static_assert(sizeof(Result) != 16 or sizeof(ResultFile) == 24,
-                  "ResultFile bridge layout must retain its 24-byte size");
-    static_assert(sizeof(Result) != 8 or sizeof(ResultFile) == 16, "ResultFile must meet the final 16-byte target");
+    static_assert(sizeof(ResultFile) == 16, "ResultFile must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultFile), "ResultFile must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFile>::value, "ResultFile must remain trivially copyable");
 

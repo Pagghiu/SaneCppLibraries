@@ -167,9 +167,8 @@ authentication.setWriteQueue(hmacWrites);
 SC_TRY(authentication.init(buffersPool));
 
 SC::Cryptography::MacResult mac;
-SC_TRY_MSG(authentication.eventFinish.addListener(
-               [&authentication, &mac] { SC_TRUST_RESULT(authentication.hmac.getMac(mac)); }),
-           "Too many HMAC finish listeners");
+SC_TRY(authentication.eventFinish.addListener(
+    [&authentication, &mac] { SC_TRUST_RESULT(authentication.hmac.getMac(mac)); }));
 
 SC::AsyncPipeline pipeline = {&source, {}, {&destination, &authentication}};
 SC_TRY(pipeline.pipe());

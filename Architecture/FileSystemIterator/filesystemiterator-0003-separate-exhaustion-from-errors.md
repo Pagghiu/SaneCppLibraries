@@ -36,13 +36,11 @@ FileSystemIterator owns its error category, primary error enum, backend/API-stag
 optional English formatter. The enriched result contains only the plain `Result`, a native error number, the affected
 directory depth, and the backend/API stage. Depth and detail are 16-bit fixed-width values: successful path growth is
 bounded by `StringPath::MaxPath`, which is currently at most 4096 and statically constrained to fit in `uint16_t`. This
-keeps the allocation-free, standard-layout, trivially copyable result at 16 bytes after the legacy Result message
-pointer is removed.
+keeps the allocation-free, standard-layout, trivially copyable result at 16 bytes.
 Conversion to plain `Result` preserves category and error identity while deliberately discarding the additional context.
 
-On current 64-bit targets the temporary 16-byte compatibility bridge makes the enriched result 24 bytes. Removing the
-legacy pointer returns plain `Result` to eight bytes and this enriched type to the 16-byte target. The temporary size is
-not a stable ABI entitlement.
+The unreleased compatibility bridge temporarily made the enriched result 24 bytes. Plain `Result` now occupies eight
+bytes and this enriched type meets the 16-byte target. The temporary size was not a stable ABI entitlement.
 
 ## Consequences
 

@@ -18,9 +18,9 @@ forwarding the concrete plain `Result`; errors produced by Async, File, Socket, 
 The mandatory header contains numeric identity only. Optional `AwaitErrorFormatter.h` supplies canonical English text
 into caller-provided storage.
 
-The old message getter functions remain temporarily during the compatibility bridge but are not used for identity.
-They live in a separate optional source object so unused English strings can be omitted from linked binaries. The
-bridge-removal audit must decide whether to retain or remove this legacy text API. A separate typed
+The obsolete message getter functions and their source object are removed with the compatibility bridge. Optional
+formatting is the only canonical text API, so the mandatory Await implementation contains no cancellation-message
+literals. A separate typed
 coroutine result or native-detail API would require an explicit promise-size and lifetime review.
 
 ## Consequences

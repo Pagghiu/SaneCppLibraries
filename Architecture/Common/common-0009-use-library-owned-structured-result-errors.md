@@ -59,13 +59,17 @@ fields.
 Canonical English messages and variable formatting are presentation facilities, not result state. Mandatory library
 headers contain no error-message literals. Optional library-owned formatters follow the
 [Result error formatting contract](result-error-formatting.md), write to caller-provided storage, and may be replaced by
-applications that translate the public category, error, and context fields. Formatter packaging is finalized after
-static, shared, and single-file binary-elision experiments on supported platforms.
+applications that translate the public category, error, and context fields. Formatters are inline implementations in
+separate opt-in headers, not exported from mandatory shared libraries. Static and shared core artifacts therefore do
+not acquire canonical text; the application instantiates only the formatting it requests. Release binary-elision
+experiments on macOS, Linux, and Windows confirm this boundary, including unused single-file formatters. This is not
+a promise that arbitrary unoptimized builds or externally forced symbol retention will discard unused inline text.
 
-Migration uses a temporary unreleased bridge representation containing both the legacy message pointer and the new
-structured identity. Legacy and converted libraries may coexist and remain testable. After every producer, consumer,
-predicate, and exact-message test is converted, the message pointer and legacy constructors are removed and `Result`
-returns to its final eight-byte layout.
+Migration used a temporary unreleased bridge containing both the legacy message pointer and numeric identity.
+The completed representation removes the message pointer, literal/stable-pointer factories, bridge predicates, and
+`SC_TRY_MSG`. The versioned Common guard rejects mixing old and new copies in one translation unit. All participating
+binaries must be rebuilt; this is not a released-ABI compatibility layer. Boolean-only checks still propagate an
+uncategorized/unspecified failure, while library-owned failures and application invariants use their owning enums.
 
 Expected control states should not be represented as errors merely to terminate an operation. APIs such as iteration
 should expose completion separately when that can be done without making the API materially worse. Cancellation may
@@ -86,7 +90,7 @@ explicit review.
 ## Confirmation
 
 Tests assert the size, alignment, trivial copyability, standard layout, success encoding, category/error round trips,
-mixed legacy/structured bridge behavior, enriched-result conversion, detail preservation, and `SC_TRY`/coroutine
+foreign-category conversion, enriched-result conversion, detail preservation, and `SC_TRY`/coroutine
 propagation. Cross-platform tests assert equivalent backend failures have the same primary error and may assert their
 different detail values. CI checks built-in category uniqueness and reserved ranges. Binary tests verify the omission
 guarantees selected for executables, static libraries, shared libraries, and single-file artifacts by the formatter

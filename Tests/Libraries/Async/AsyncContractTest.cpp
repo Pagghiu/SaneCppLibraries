@@ -346,7 +346,6 @@ void SC::AsyncContractTest::structuredLifecycleErrors()
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{1000}));
     const Result inUse = timeout.start(loop, TimeMs{1000});
     SC_TEST_EXPECT(inUse.isError(AsyncResultCategory, AsyncError::RequestInUse));
-    SC_TEST_EXPECT(inUse.message == nullptr);
     SC_TEST_EXPECT(timeout.unschedule(loop));
 
     AsyncTaskSequence sequence;

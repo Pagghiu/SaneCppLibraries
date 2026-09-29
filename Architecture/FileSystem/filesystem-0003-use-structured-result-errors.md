@@ -45,8 +45,8 @@ The action-like `moveDirectory` facade returns `ResultFileSystem` so its failure
 checks remain source-compatible.
 
 The exported return-type changes are an intentional ABI transition on the unintegrated result branch and require
-clients to rebuild. During the legacy-message bridge the enriched result may be 24 bytes, returning to the 16-byte
-target when plain Result reaches its final eight-byte layout.
+clients to rebuild. The enriched result occupies 16 bytes with the final eight-byte plain Result; the unreleased
+legacy-message bridge temporarily occupied 24 bytes on 64-bit targets.
 
 ## Consequences
 

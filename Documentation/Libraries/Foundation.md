@@ -60,9 +60,9 @@ Foundation itself performs no dynamic allocation. That promise has practical con
 
 - A `Span` or `StringSpan` can dangle. Returning one is safe only when its backing storage remains alive. `StringPath`
   instead owns its buffer, but rejects content beyond its platform-specific `MaxPath` capacity.
-- A `Result` created with `Result::Error("literal")` is self-contained enough for normal propagation because the literal
-  has static storage. `Result::FromStableCharPointer` instead makes the caller responsible for keeping the message
-  pointer valid until it is inspected.
+- A `Result` contains only a numeric category and error value, not text or owned storage. Use the owning library\'s
+  error enum for inspection; opt into its `ErrorFormatter.h` only when a diagnostic is needed. Enriched results carry
+  copied scalar context, and conversion to plain `Result` deliberately discards that context.
 - A `Function` owns its inline functor or lambda, but references captured by that callable still follow normal C++
   lifetime rules. Increase the second template argument for a deliberately larger inline budget, or capture a pointer
   to longer-lived state; there is no allocating fallback.

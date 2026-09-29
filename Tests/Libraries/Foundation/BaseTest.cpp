@@ -138,42 +138,26 @@ struct SC::BaseTest : public SC::TestCase
                                    SC_NATIVE_STR("FileName.cpp"), "Function", 12);
         }
 
-        if (test_section("Result structured error bridge"))
+        if (test_section("Result structured identity"))
         {
-            static_assert(sizeof(void*) != 8 or sizeof(Result) == 16, "Result migration bridge must be 16 bytes");
-            static_assert(alignof(Result) >= alignof(void*), "Result must retain pointer alignment");
+            static_assert(sizeof(Result) == 8, "Result must remain eight bytes");
+            static_assert(alignof(Result) == alignof(uint64_t), "Result must retain numeric identity alignment");
             static_assert(__is_standard_layout(Result), "Result must remain standard-layout");
             static_assert(TypeTraits::IsTriviallyCopyable<Result>::value, "Result must remain trivially copyable");
             static_assert(sizeof(ResultCategory) == sizeof(uint32_t), "ResultCategory must remain 32-bit");
 
             const Result success(true);
             SC_TEST_EXPECT(success);
-            SC_TEST_EXPECT(not success.hasStructuredError());
-            SC_TEST_EXPECT(not success.hasLegacyError());
-            SC_TEST_EXPECT(not success.hasMessage());
             SC_TEST_EXPECT(success.category() == ResultCategory(Result::UncategorizedValue));
             SC_TEST_EXPECT(success.errorValue() == 0);
 
-            const Result legacy = Result::Error("Legacy error");
-            SC_TEST_EXPECT(not legacy);
-            SC_TEST_EXPECT(not legacy.hasStructuredError());
-            SC_TEST_EXPECT(legacy.hasLegacyError());
-            SC_TEST_EXPECT(legacy.hasMessage());
-            SC_TEST_EXPECT(legacy.errorValue() == 0);
-
             const Result unspecified(false);
             SC_TEST_EXPECT(not unspecified);
-            SC_TEST_EXPECT(unspecified.hasStructuredError());
-            SC_TEST_EXPECT(not unspecified.hasLegacyError());
-            SC_TEST_EXPECT(unspecified.hasMessage());
             SC_TEST_EXPECT(unspecified.category() == ResultCategory(Result::UncategorizedValue));
             SC_TEST_EXPECT(unspecified.errorValue() == Result::UnspecifiedErrorValue);
 
             const Result structured = Result::Error(ResultTestDomainA::category(), 42);
             SC_TEST_EXPECT(not structured);
-            SC_TEST_EXPECT(structured.hasStructuredError());
-            SC_TEST_EXPECT(not structured.hasLegacyError());
-            SC_TEST_EXPECT(not structured.hasMessage());
             SC_TEST_EXPECT(structured.category() == ResultTestDomainA::category());
             SC_TEST_EXPECT(structured.errorValue() == 42);
             SC_TEST_EXPECT(structured.isError(ResultTestDomainA::category(), 42));

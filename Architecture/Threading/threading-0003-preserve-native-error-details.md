@@ -16,8 +16,7 @@ Threading APIs return the composed `ResultThreading` type. Its authoritative `Re
 platform-agnostic Threading category and error code. `nativeError` optionally carries the copied POSIX error value or
 Windows `GetLastError()` value, and `detail` identifies the concrete backend/API stage (`pthread_*`, `CreateThread`,
 `WaitForSingleObject`, or `CloseHandle`) when that distinction is useful. Zero/None means unavailable or irrelevant.
-The type owns no memory, allocates nothing, remains standard-layout and trivially copyable, and will be 16 bytes after
-the temporary Result migration bridge is removed.
+The type owns no memory, allocates nothing, remains standard-layout and trivially copyable, and occupies 16 bytes.
 
 Conversion to plain `Result` is implicit and deliberately discards `nativeError` and `detail`. Conversion to `bool` is explicit so
 generic overload sets cannot become ambiguous between boolean and plain-result consumers; contextual boolean checks
@@ -31,8 +30,8 @@ Applications may instead consume the public fields and produce translated diagno
 
 Callers that retain the enriched type can report actionable native diagnostics, while existing code that stores or
 returns plain `Result` continues to compile and intentionally loses only optional detail. Changing the exported return
-type is part of the already-required Result ABI transition. During migration, the legacy pointer temporarily expands
-`ResultThreading` to 24 bytes on 64-bit targets.
+type is part of the already-required Result ABI transition. During the unreleased migration, the legacy pointer
+temporarily expanded `ResultThreading` to 24 bytes on 64-bit targets.
 
 ## Confirmation
 

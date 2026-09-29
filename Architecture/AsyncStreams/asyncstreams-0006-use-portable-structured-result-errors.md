@@ -59,9 +59,8 @@ foreign identity, and the adapter still has no Cryptography library dependency.
 ## Consequences
 
 Callers of the existing `Result` APIs can continue using `SC_TRY` unchanged. Callers that need to distinguish
-AsyncStreams failures inspect category and value, and callers that need text opt into formatting. During migration,
-other AsyncStreams producers may still use the temporary legacy bridge; it is removed only after a complete producer
-and consumer audit.
+AsyncStreams failures inspect category and value, and callers that need text opt into formatting. No AsyncStreams
+producer or consumer relies on the removed legacy text bridge.
 
 ## Confirmation
 

@@ -320,8 +320,7 @@ void SC::ThreadingTest::testSemaphore()
 
 void SC::ThreadingTest::testErrorFormatter()
 {
-    static_assert(sizeof(void*) != 8 or sizeof(ResultThreading) == 24,
-                  "The migration bridge temporarily expands ResultThreading");
+    static_assert(sizeof(ResultThreading) == 16, "ResultThreading must remain 16 bytes");
     static_assert(sizeof(void*) != 8 or sizeof(ResultThreading) == sizeof(Result) + 8,
                   "ResultThreading detail must fit the final 16-byte target");
     static_assert(__is_standard_layout(ResultThreading), "ResultThreading must remain standard-layout");

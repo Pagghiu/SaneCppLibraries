@@ -376,10 +376,7 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
                       "Plugin detail zero is reserved for no detail");
         static_assert(static_cast<uint16_t>(PluginErrorContextKind::None) == 0,
                       "Plugin context kind zero is reserved for no context");
-        static_assert(sizeof(Result) != 16 or sizeof(ResultPlugin) == 24,
-                      "ResultPlugin bridge layout must retain its 24-byte size");
-        static_assert(sizeof(Result) != 8 or sizeof(ResultPlugin) == 16,
-                      "ResultPlugin must meet the final 16-byte target");
+        static_assert(sizeof(ResultPlugin) == 16, "ResultPlugin must meet the final 16-byte target");
         static_assert(__is_standard_layout(ResultPlugin), "ResultPlugin must remain standard-layout");
         static_assert(TypeTraits::IsTriviallyCopyable<ResultPlugin>::value,
                       "ResultPlugin must remain trivially copyable");

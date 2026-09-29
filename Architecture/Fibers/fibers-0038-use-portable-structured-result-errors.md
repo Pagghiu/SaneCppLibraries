@@ -29,8 +29,8 @@ references a mutable or borrowed string.
 
 ## Consequences
 
-Existing `SC_TRY` callers keep working. During the legacy `Result::message` bridge, Fibers-owned structured failures
-have no message pointer, so clients requiring text must opt into the formatter. The numeric identity remains stable
+Existing `SC_TRY` callers keep working. Fibers-owned structured failures contain no message pointer, so clients
+requiring text must opt into the formatter. The numeric identity remains stable
 through plain-Result storage, at the cost of not retaining a native error number or the exact object for generic codes.
 
 ## Confirmation

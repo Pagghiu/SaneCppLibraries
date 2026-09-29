@@ -159,10 +159,7 @@ void SC::FileSystemTest::structuredErrorsAndFormatter()
                   "FileSystem detail zero is reserved for no detail");
     static_assert(static_cast<uint16_t>(FileSystemErrorContextKind::None) == 0,
                   "FileSystem context kind zero is reserved for no context");
-    static_assert(sizeof(Result) != 16 or sizeof(ResultFileSystem) == 24,
-                  "ResultFileSystem bridge layout must retain its 24-byte size");
-    static_assert(sizeof(Result) != 8 or sizeof(ResultFileSystem) == 16,
-                  "ResultFileSystem must meet the final 16-byte target");
+    static_assert(sizeof(ResultFileSystem) == 16, "ResultFileSystem must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultFileSystem), "ResultFileSystem must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystem>::value,
                   "ResultFileSystem must remain trivially copyable");
