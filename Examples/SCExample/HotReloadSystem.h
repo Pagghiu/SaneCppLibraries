@@ -18,6 +18,21 @@
 
 namespace SC
 {
+// Application-only failures do not extend the public library category registry.
+static constexpr ResultCategory SCExampleResultCategory = ResultCategory(0x80000030u);
+enum class SCExampleError : uint32_t
+{
+    MissingCompiledPath = 1,
+    ExecutablePathUnavailable,
+    MissingExamplesPath,
+    ExamplesDirectoryUnavailable,
+};
+
+static constexpr Result SCExampleCheck(bool condition, SCExampleError error)
+{
+    return condition ? Result(true) : Result::Error(SCExampleResultCategory, error);
+}
+
 static constexpr int ToolbarHeight = 35;
 
 static bool rebuildHotReloadIncludePaths(StringView executableDirectory, StringView includePathsText,
@@ -44,7 +59,7 @@ static bool rebuildHotReloadIncludePaths(StringView executableDirectory, StringV
         StringPath normalizedIncludePath;
         SC_TRY(Path::normalize(normalizedIncludePath, includePath.view(), Path::AsNative));
         includePath = move(normalizedIncludePath);
-        SC_TRY_MSG(compiler.includePaths.push_back(includePath), "HotReloadSystem exceeded include path capacity");
+        SC_TRY(compiler.includePaths.push_back(includePath));
     }
     return true;
 }
@@ -83,9 +98,10 @@ struct HotReloadSystem
         SC_TRY(fs.init("."));
         FileSystem::Operations::getExecutablePath(state.executablePath);
         SC_TRY(state.executableDirectory.assign(Path::dirname(state.executablePath.view(), Path::AsNative)));
-        SC_TRY_MSG(not options.examplesPath.isEmpty(), "HotReloadSystem missing examples path");
+        SC_TRY(SCExampleCheck(not options.examplesPath.isEmpty(), SCExampleError::MissingExamplesPath));
         SC_TRY(state.examplesPath.assign(options.examplesPath));
-        SC_TRY_MSG(fs.existsAndIsDirectory(state.examplesPath.view()), "HotReloadSystem examples path does not exist");
+        SC_TRY(SCExampleCheck(fs.existsAndIsDirectory(state.examplesPath.view()),
+                              SCExampleError::ExamplesDirectoryUnavailable));
         StringView iosSysroot = "/var/mobile/theos/sdks/iPhoneOS14.4.sdk";
         if (FileSystem().existsAndIsDirectory(iosSysroot))
         {

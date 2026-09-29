@@ -22,6 +22,12 @@ SC::Console* globalConsole;
 
 namespace SC
 {
+static constexpr ResultCategory AsyncWebServerResultCategory = ResultCategory(0x80000031u);
+enum class AsyncWebServerError : uint32_t
+{
+    ConnectionIndexOutOfRange = 1,
+};
+
 struct AsyncWebServerExample
 {
     String directory;
@@ -106,7 +112,8 @@ struct AsyncWebServerExample
         Result result = assignConnectionMemory(static_cast<size_t>(maxClients));
         if (not result)
         {
-            globalConsole->printError("AsyncWebServer assignConnectionMemory failed: {}\n", result.message);
+            globalConsole->printError("AsyncWebServer assignConnectionMemory failed: category {} error {}\n",
+                                      result.category().value, result.errorValue());
             return result;
         }
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
@@ -115,7 +122,8 @@ struct AsyncWebServerExample
             result = threadPool.create(static_cast<size_t>(numThreads));
             if (not result)
             {
-                globalConsole->printError("AsyncWebServer threadPool.create failed: {}\n", result.message);
+                globalConsole->printError("AsyncWebServer threadPool.create failed: category {} error {}\n",
+                                          result.category().value, result.errorValue());
                 return result;
             }
             if (not useSendFile)
@@ -127,19 +135,22 @@ struct AsyncWebServerExample
         result = httpServer.init(clients.toSpan());
         if (not result)
         {
-            globalConsole->printError("AsyncWebServer httpServer.init failed: {}\n", result.message);
+            globalConsole->printError("AsyncWebServer httpServer.init failed: category {} error {}\n",
+                                      result.category().value, result.errorValue());
             return result;
         }
         result = httpServer.start(*eventLoop, interface.view(), static_cast<uint16_t>(port));
         if (not result)
         {
-            globalConsole->printError("AsyncWebServer httpServer.start failed: {}\n", result.message);
+            globalConsole->printError("AsyncWebServer httpServer.start failed: category {} error {}\n",
+                                      result.category().value, result.errorValue());
             return result;
         }
         result = fileServer.init(threadPool, *eventLoop, directory.view());
         if (not result)
         {
-            globalConsole->printError("AsyncWebServer fileServer.init failed: {}\n", result.message);
+            globalConsole->printError("AsyncWebServer fileServer.init failed: category {} error {}\n",
+                                      result.category().value, result.errorValue());
             return result;
         }
         fileServer.setUseAsyncFileSend(useSendFile);
@@ -153,7 +164,8 @@ struct AsyncWebServerExample
         result = fileServer.setOptions(fileOptions);
         if (not result)
         {
-            globalConsole->printError("AsyncWebServer fileServer.setOptions failed: {}\n", result.message);
+            globalConsole->printError("AsyncWebServer fileServer.setOptions failed: category {} error {}\n",
+                                      result.category().value, result.errorValue());
             return result;
         }
 
@@ -180,13 +192,15 @@ struct AsyncWebServerExample
                 const Result result = handleWebSocketRequest(connection);
                 if (not result)
                 {
-                    globalConsole->printError("AsyncWebServer WebSocket upgrade failed: {}\n", result.message);
+                    globalConsole->printError("AsyncWebServer WebSocket upgrade failed: category {} error {}\n",
+                                              result.category().value, result.errorValue());
                     connection.response.reset();
                     const Result responseResult = connection.sendTextCopy(500, "WebSocket upgrade failed\n");
                     if (not responseResult)
                     {
-                        globalConsole->printError("AsyncWebServer WebSocket error response failed: {}\n",
-                                                  responseResult.message);
+                        globalConsole->printError(
+                            "AsyncWebServer WebSocket error response failed: category {} error {}\n",
+                            responseResult.category().value, responseResult.errorValue());
                     }
                 }
                 return;
@@ -200,7 +214,8 @@ struct AsyncWebServerExample
     Result handleWebSocketRequest(HttpConnection& connection)
     {
         const size_t connectionIndex = connection.getConnectionID().getIndex();
-        SC_TRY_MSG(connectionIndex < webSocketRuntimes.size(), "WebSocket connection index out of range");
+        if (connectionIndex >= webSocketRuntimes.size())
+            return Result::Error(AsyncWebServerResultCategory, AsyncWebServerError::ConnectionIndexOutOfRange);
 
         WebSocketRuntime& runtime = webSocketRuntimes.toSpan()[connectionIndex];
         runtime.owner             = this;

@@ -170,7 +170,7 @@ int main()
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("FibersDemo failed: {}\n", result.message);
+        console.print("FibersDemo failed: category {} error {}\n", result.category().value, result.errorValue());
         return -1;
     }
     return 0;

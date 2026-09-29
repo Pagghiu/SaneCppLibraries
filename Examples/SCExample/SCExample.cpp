@@ -24,7 +24,7 @@ namespace SC
 static Result resolveCompiledPathFromExecutableDirectory(StringView compiledPath, StringView executableDirectory,
                                                          String& resolved)
 {
-    SC_TRY_MSG(not compiledPath.isEmpty(), "SCExample missing required compile-time path");
+    SC_TRY(SCExampleCheck(not compiledPath.isEmpty(), SCExampleError::MissingCompiledPath));
     String candidate = StringEncoding::Utf8;
     if (Path::isAbsolute(compiledPath, Path::AsNative))
     {
@@ -62,8 +62,8 @@ struct HotReloadOptionsStorage
 static Result buildHotReloadOptions(HotReloadOptionsStorage& storage)
 {
     StringPath executablePath;
-    SC_TRY_MSG(not FileSystem::Operations::getExecutablePath(executablePath).isEmpty(),
-               "SCExample could not resolve executable path");
+    SC_TRY(SCExampleCheck(not FileSystem::Operations::getExecutablePath(executablePath).isEmpty(),
+                          SCExampleError::ExecutablePathUnavailable));
 
     String executableDirectory = StringEncoding::Utf8;
     SC_TRY(executableDirectory.assign(Path::dirname(executablePath.view(), Path::AsNative)));

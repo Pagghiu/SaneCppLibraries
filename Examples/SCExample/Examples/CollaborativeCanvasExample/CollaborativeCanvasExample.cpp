@@ -32,6 +32,12 @@
 
 namespace SC
 {
+static constexpr ResultCategory CollaborativeCanvasResultCategory = ResultCategory(0x80000032u);
+enum class CollaborativeCanvasError : uint32_t
+{
+    ConnectionIndexOutOfRange = 1,
+};
+
 struct CollaborativeCanvasModel;
 struct CollaborativeCanvasView;
 struct CollaborativeCanvasModelState;
@@ -151,8 +157,8 @@ struct SC::CollaborativeCanvasModel
         {
             if (connection != nullptr)
             {
-                ::printf("[CanvasWS] destroying readable conn=%zu reason=%s\n",
-                         connection->getConnectionID().getIndex(), result.message);
+                ::printf("[CanvasWS] destroying readable conn=%zu category=%u error=%u\n",
+                         connection->getConnectionID().getIndex(), result.category().value, result.errorValue());
                 ::fflush(stdout);
             }
         }
@@ -302,8 +308,9 @@ struct SC::CollaborativeCanvasModel
         if (not buffer)
         {
             droppedBroadcasts++;
-            ::printf("[CanvasWS] drop broadcast targetHub=%zu bytes=%zu reason=%s dropped=%zu\n", clientIndex,
-                     encodedFrame.sizeInBytes(), buffer.message, droppedBroadcasts);
+            ::printf("[CanvasWS] drop broadcast targetHub=%zu bytes=%zu category=%u error=%u dropped=%zu\n",
+                     clientIndex, encodedFrame.sizeInBytes(), buffer.category().value, buffer.errorValue(),
+                     droppedBroadcasts);
             ::fflush(stdout);
             return Result(true);
         }
@@ -315,8 +322,9 @@ struct SC::CollaborativeCanvasModel
         if (not write)
         {
             droppedBroadcasts++;
-            ::printf("[CanvasWS] drop broadcast targetHub=%zu bytes=%zu reason=%s dropped=%zu\n", clientIndex,
-                     encodedFrame.sizeInBytes(), write.message, droppedBroadcasts);
+            ::printf("[CanvasWS] drop broadcast targetHub=%zu bytes=%zu category=%u error=%u dropped=%zu\n",
+                     clientIndex, encodedFrame.sizeInBytes(), write.category().value, write.errorValue(),
+                     droppedBroadcasts);
             ::fflush(stdout);
             return Result(true);
         }
@@ -373,7 +381,9 @@ struct SC::CollaborativeCanvasModel
     Result handleWebSocketRequest(HttpConnection& connection)
     {
         const size_t connectionIndex = connection.getConnectionID().getIndex();
-        SC_TRY_MSG(connectionIndex < webSocketRuntimes.size(), "CollaborativeCanvas connection index out of range");
+        if (connectionIndex >= webSocketRuntimes.size())
+            return Result::Error(CollaborativeCanvasResultCategory,
+                                 CollaborativeCanvasError::ConnectionIndexOutOfRange);
 
         ::printf("[CanvasWS] ws request conn=%zu activeClientsBefore=%zu\n", connectionIndex,
                  webSocketHub.getNumClients());
@@ -425,7 +435,8 @@ struct SC::CollaborativeCanvasModel
         ::printf("[CanvasWS] clear button activeClients=%zu\n", webSocketHub.getNumClients());
         ::fflush(stdout);
         Result broadcast = webSocketHub.broadcastText("{\"type\":\"clear\"}"_a8.toCharSpan(), frameStorage);
-        ::printf("[CanvasWS] clear broadcast result=%s activeClients=%zu\n", broadcast ? "ok" : broadcast.message,
+        ::printf("[CanvasWS] clear broadcast result=%s category=%u error=%u activeClients=%zu\n",
+                 broadcast ? "ok" : "failed", broadcast.category().value, broadcast.errorValue(),
                  webSocketHub.getNumClients());
         ::fflush(stdout);
         return broadcast;
