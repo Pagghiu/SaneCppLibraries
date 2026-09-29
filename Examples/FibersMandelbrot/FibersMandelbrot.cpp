@@ -19,8 +19,73 @@
 #include "../../Libraries/Strings/StringBuilder.h"
 #include "../../Libraries/Strings/StringView.h"
 
+#include "../../Libraries/Fibers/FibersErrorFormatter.h"
+#include "../../Libraries/File/FileErrorFormatter.h"
+#include "../../Libraries/FileSystem/FileSystemErrorFormatter.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
+
 namespace SC
 {
+static constexpr ResultCategory FibersMandelbrotResultCategory = ResultCategory(0x80000008u);
+enum class MandelbrotExampleError : uint32_t
+{
+    InvalidArguments = 1,
+    OutputPathTooLong,
+    RowOutsideImage,
+    HelpWriteFailed,
+    ParseErrorWriteFailed,
+    WidthOutOfRange,
+    HeightOutOfRange,
+    WorkerCountOutOfRange,
+    IterationCountOutOfRange,
+    JobCountMismatch,
+    CurrentDirectoryUnavailable,
+};
+static constexpr Result FibersMandelbrotFailure(MandelbrotExampleError error)
+{
+    return Result::Error(FibersMandelbrotResultCategory, error);
+}
+static constexpr Result FibersMandelbrotCheck(bool condition, MandelbrotExampleError error)
+{
+    return condition ? Result(true) : FibersMandelbrotFailure(error);
+}
+static ResultErrorFormat formatFibersMandelbrotError(Result result, Span<char> output)
+{
+    if (result.category() == FibersResultCategory)
+        return formatFibersError(result, output);
+    if (result.category() == FileResultCategory)
+        return formatFileError(result, output);
+    if (result.category() == FileSystemResultCategory)
+        return formatFileSystemError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category() != FibersMandelbrotResultCategory)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    ResultErrorFormatter formatter(output);
+    switch (static_cast<MandelbrotExampleError>(result.errorValue()))
+    {
+    case MandelbrotExampleError::InvalidArguments: formatter.append("Invalid FibersMandelbrot arguments"); break;
+    case MandelbrotExampleError::OutputPathTooLong: formatter.append("Output path is too long"); break;
+    case MandelbrotExampleError::RowOutsideImage: formatter.append("Job is outside the image"); break;
+    case MandelbrotExampleError::HelpWriteFailed: formatter.append("Failed writing FibersMandelbrot help"); break;
+    case MandelbrotExampleError::ParseErrorWriteFailed:
+        formatter.append("Failed writing FibersMandelbrot parse error");
+        break;
+    case MandelbrotExampleError::WidthOutOfRange: formatter.append("Width must be between 2 and 1024"); break;
+    case MandelbrotExampleError::HeightOutOfRange: formatter.append("Height must be between 2 and 1024"); break;
+    case MandelbrotExampleError::WorkerCountOutOfRange: formatter.append("Workers must be between 1 and 16"); break;
+    case MandelbrotExampleError::IterationCountOutOfRange:
+        formatter.append("Iterations must be between 1 and 255");
+        break;
+    case MandelbrotExampleError::JobCountMismatch: formatter.append("Executed an unexpected number of jobs"); break;
+    case MandelbrotExampleError::CurrentDirectoryUnavailable:
+        formatter.append("Could not resolve the current directory");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
 static constexpr size_t MandelbrotMaxWidth   = 1024;
 static constexpr size_t MandelbrotMaxHeight  = 1024;
 static constexpr size_t MandelbrotMaxWorkers = 16;
@@ -29,12 +94,12 @@ static Result resolveOutputPath(StringSpan argument, StringSpan currentDirectory
 {
     if (Path::isAbsolute(StringView(argument), Path::AsNative))
     {
-        SC_TRY_MSG(path.assign(argument), "FibersMandelbrot output path is too long");
+        SC_TRY(FibersMandelbrotCheck(path.assign(argument), MandelbrotExampleError::OutputPathTooLong));
         return Result(true);
     }
 
     StringView components[] = {StringView(currentDirectory), StringView(argument)};
-    SC_TRY_MSG(Path::join(path, components), "FibersMandelbrot output path is too long");
+    SC_TRY(FibersMandelbrotCheck(Path::join(path, components), MandelbrotExampleError::OutputPathTooLong));
     return Result(true);
 }
 
@@ -50,7 +115,7 @@ struct FibersMandelbrotState
     {
         SC_TRY(context.checkCancellation());
         const size_t row = static_cast<size_t>(&context.job() - jobs);
-        SC_TRY_MSG(row < height, "FibersMandelbrot job is outside the image");
+        SC_TRY(FibersMandelbrotCheck(row < height, MandelbrotExampleError::RowOutsideImage));
 
         const double imaginary = -1.25 + 2.5 * static_cast<double>(row) / static_cast<double>(height - 1);
         for (size_t column = 0; column < width; ++column)
@@ -119,22 +184,25 @@ static Result runFibersMandelbrot(int argc, const char* const* argv)
     if (parseResult.status == CommandLineParseResult::Status::HelpRequested)
     {
         StringFormatOutput output(StringEncoding::Utf8, console, true);
-        SC_TRY_MSG(spec.writeHelp(output), "Failed writing FibersMandelbrot help");
+        SC_TRY(FibersMandelbrotCheck(spec.writeHelp(output), MandelbrotExampleError::HelpWriteFailed));
         return Result(true);
     }
     if (parseResult.status == CommandLineParseResult::Status::Error)
     {
         StringFormatOutput output(StringEncoding::Utf8, console, false);
-        SC_TRY_MSG(spec.writeError(parseResult, output), "Failed writing FibersMandelbrot parse error");
-        return Result::Error("Invalid FibersMandelbrot arguments");
+        SC_TRY(
+            FibersMandelbrotCheck(spec.writeError(parseResult, output), MandelbrotExampleError::ParseErrorWriteFailed));
+        return FibersMandelbrotFailure(MandelbrotExampleError::InvalidArguments);
     }
 
-    SC_TRY_MSG(width >= 2 and width <= static_cast<int32_t>(MandelbrotMaxWidth), "width must be between 2 and 1024");
-    SC_TRY_MSG(height >= 2 and height <= static_cast<int32_t>(MandelbrotMaxHeight),
-               "height must be between 2 and 1024");
-    SC_TRY_MSG(workers >= 1 and workers <= static_cast<int32_t>(MandelbrotMaxWorkers),
-               "workers must be between 1 and 16");
-    SC_TRY_MSG(iterations >= 1 and iterations <= 255, "iterations must be between 1 and 255");
+    SC_TRY(FibersMandelbrotCheck(width >= 2 and width <= static_cast<int32_t>(MandelbrotMaxWidth),
+                                 MandelbrotExampleError::WidthOutOfRange));
+    SC_TRY(FibersMandelbrotCheck(height >= 2 and height <= static_cast<int32_t>(MandelbrotMaxHeight),
+                                 MandelbrotExampleError::HeightOutOfRange));
+    SC_TRY(FibersMandelbrotCheck(workers >= 1 and workers <= static_cast<int32_t>(MandelbrotMaxWorkers),
+                                 MandelbrotExampleError::WorkerCountOutOfRange));
+    SC_TRY(
+        FibersMandelbrotCheck(iterations >= 1 and iterations <= 255, MandelbrotExampleError::IterationCountOutOfRange));
 
     static FiberJob             jobs[MandelbrotMaxHeight];
     static FiberJob*            readyStorage[MandelbrotMaxHeight] = {};
@@ -195,11 +263,11 @@ static Result runFibersMandelbrot(int argc, const char* const* argv)
         executedJobs += diagnostics.executedJobs;
         stolenJobs += diagnostics.stolenJobs;
     }
-    SC_TRY_MSG(executedJobs == state.height, "FibersMandelbrot executed an unexpected number of jobs");
+    SC_TRY(FibersMandelbrotCheck(executedJobs == state.height, MandelbrotExampleError::JobCountMismatch));
 
     StringPath       currentDirectoryStorage;
     const StringSpan currentDirectory = FileSystem::Operations::getCurrentWorkingDirectory(currentDirectoryStorage);
-    SC_TRY_MSG(not currentDirectory.isEmpty(), "FibersMandelbrot could not resolve the current directory");
+    SC_TRY(FibersMandelbrotCheck(not currentDirectory.isEmpty(), MandelbrotExampleError::CurrentDirectoryUnavailable));
     StringPath outputPath;
     SC_TRY(resolveOutputPath(outputArgument, currentDirectory, outputPath));
 
@@ -227,7 +295,14 @@ int main(int argc, const char* const* argv)
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("FibersMandelbrot failed: {}\n", result.message);
+        char                        message[256];
+        const SC::ResultErrorFormat formatted = SC::formatFibersMandelbrotError(result, message);
+        if (formatted)
+            console.print("FibersMandelbrot failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("FibersMandelbrot failed: error category {}, code {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;
