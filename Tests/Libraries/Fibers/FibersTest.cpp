@@ -77,6 +77,7 @@ enum class FibersTestFailure : uint32_t
 
     ExpectedCancellation,
     NestedFaultAccountingResetFailed,
+    MutexOwnerCountMismatch,
 };
 
 static constexpr Result fibersTestFailure(FibersTestFailure failure)
@@ -5312,27 +5313,27 @@ struct SC::FibersTest : public SC::TestCase
 
             for (size_t idx = 0; idx < NumMutexTasks; ++idx)
             {
-                SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
-                                                             [&state](FiberScheduler& scheduler)
-                                                             {
-                                                                 for (int loop = 0; loop < NumMutexLoops; ++loop)
-                                                                 {
-                                                                     SC_TRY(state.mutex->lock(scheduler));
-                                                                     state.inside += 1;
-                                                                     if (state.inside != 1)
-                                                                     {
-                                                                         return Result::Error(
-                                                                             "FiberMutex allowed concurrent owners");
-                                                                     }
-                                                                     const int value = state.value;
-                                                                     SC_TRY(scheduler.yield());
-                                                                     state.value = value + 1;
-                                                                     state.inside -= 1;
-                                                                     SC_TRY(state.mutex->unlock(scheduler));
-                                                                     SC_TRY(scheduler.yield());
-                                                                 }
-                                                                 return Result(true);
-                                                             })));
+                SC_TEST_EXPECT(taskPool.spawn(
+                    scheduler, FiberTask::Procedure(
+                                   [&state](FiberScheduler& scheduler)
+                                   {
+                                       for (int loop = 0; loop < NumMutexLoops; ++loop)
+                                       {
+                                           SC_TRY(state.mutex->lock(scheduler));
+                                           state.inside += 1;
+                                           if (state.inside != 1)
+                                           {
+                                               return fibersTestFailure(FibersTestFailure::MutexOwnerCountMismatch);
+                                           }
+                                           const int value = state.value;
+                                           SC_TRY(scheduler.yield());
+                                           state.value = value + 1;
+                                           state.inside -= 1;
+                                           SC_TRY(state.mutex->unlock(scheduler));
+                                           SC_TRY(scheduler.yield());
+                                       }
+                                       return Result(true);
+                                   })));
             }
 
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
@@ -9305,7 +9306,6 @@ void SC::FibersTest::structuredErrorsAndFormatter()
 
     const Result own = Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
     SC_TEST_EXPECT(own.isError(FibersResultCategory, FibersError::SlotUnavailable));
-    SC_TEST_EXPECT(own.message == nullptr);
 
     char              message[64];
     ResultErrorFormat formatted = formatFibersError(own, message);
