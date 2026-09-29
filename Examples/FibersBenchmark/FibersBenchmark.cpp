@@ -5,12 +5,16 @@
 // Standalone Fibers scheduler benchmark for comparing worker-pool and deque changes without polluting normal tests.
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/AsyncFibers/AsyncFibers.h"
+#include "../../Libraries/AsyncFibers/AsyncFibersErrorFormatter.h"
+#include "../../Libraries/Common/ResultErrorFormatter.h"
 #include "../../Libraries/Fibers/Fibers.h"
+#include "../../Libraries/Fibers/FibersErrorFormatter.h"
 #include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringFormat.h"
 #include "../../Libraries/Threading/Atomic.h"
 #include "../../Libraries/Threading/Threading.h"
+#include "../../Libraries/Threading/ThreadingErrorFormatter.h"
 #include "../../Libraries/Time/Time.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -22,6 +26,228 @@
 
 namespace SC
 {
+static constexpr ResultCategory FibersBenchmarkResultCategory = ResultCategory(0x80000005u);
+enum class FibersBenchmarkError : uint32_t
+{
+    JobCompletionMismatch = 1,
+    JobChecksumMismatch,
+    JobPoolCompletionMismatch,
+    JobPoolChecksumMismatch,
+    JobWorkerCountOutOfRange,
+    JobWorkerResultMismatch,
+    JobWorkerChecksumMismatch,
+    JobWorkerActiveJobsRemain,
+    JobWorkerExecutionMismatch,
+    JobRoundsOutOfRange,
+    WorkerStorageInsufficient,
+    SustainedJobSubmissionMismatch,
+    SustainedJobIndependentCompletionMismatch,
+    SustainedJobCompletionMismatch,
+    SustainedJobExecutionMismatch,
+
+    ForcedStealTasksNotWaiting,
+    ForcedStealBacklogMissing,
+    ForcedStealCompletionMismatch,
+    ForcedStealNotObserved,
+    ForcedStealPeerIdle,
+    ForcedStealSlotsNotRecycled,
+    ForcedStealActiveFibersRemain,
+    IncrementalSuspensionUnavailable,
+    MassSuspensionFiberCountMismatch,
+    MassSuspensionTaskCountMismatch,
+    MassSuspensionStackCountMismatch,
+    MassSuspensionActiveFibersRemain,
+    MassSuspensionSlotsNotRecycled,
+    AsyncHighWaterCompletionMismatch,
+
+    MicroTaskWorkerCountOutOfRange,
+    MicroTaskProducerCountOutOfRange,
+    MicroTaskJobRangeIncomplete,
+    MicroTaskSubmissionMismatch,
+    MicroTaskCompletionMismatch,
+    SustainedMicroTaskSubmissionMismatch,
+    SustainedMicroTaskCompletionMismatch,
+    CounterCompletionMismatch,
+    CounterNotDrained,
+    CounterActiveTasksRemain,
+
+    HelpWriteFailed,
+    ParseErrorWriteFailed,
+    InvalidArguments,
+    MutuallyExclusiveModes,
+    ExternalProducerCountOutOfRange,
+    SchedulerWorkerCountOutOfRange,
+    SchedulerRoundsOutOfRange,
+    UnknownSchedulerWorkload,
+    MassSuspensionCommitModeInvalid,
+    MassSuspensionCountInvalid,
+};
+
+static constexpr Result benchmarkFailure(FibersBenchmarkError error)
+{
+    return Result::Error(FibersBenchmarkResultCategory, error);
+}
+
+static constexpr Result benchmarkCheck(bool condition, FibersBenchmarkError error)
+{
+    return condition ? Result(true) : benchmarkFailure(error);
+}
+
+static ResultErrorFormat formatBenchmarkError(FibersBenchmarkError error, Span<char> output)
+{
+    ResultErrorFormatter formatter(output);
+    switch (error)
+    {
+    case FibersBenchmarkError::JobCompletionMismatch:
+        formatter.append("Fiber job completion count is incorrect");
+        break;
+    case FibersBenchmarkError::JobChecksumMismatch: formatter.append("Fiber job checksum is incorrect"); break;
+    case FibersBenchmarkError::JobPoolCompletionMismatch:
+        formatter.append("Fiber job pool completion count is incorrect");
+        break;
+    case FibersBenchmarkError::JobPoolChecksumMismatch: formatter.append("Fiber job pool checksum is incorrect"); break;
+    case FibersBenchmarkError::JobWorkerCountOutOfRange:
+        formatter.append("Fiber job worker count must be between one and 64");
+        break;
+    case FibersBenchmarkError::JobWorkerResultMismatch: formatter.append("Fiber job worker result is incorrect"); break;
+    case FibersBenchmarkError::JobWorkerChecksumMismatch:
+        formatter.append("Fiber job worker checksum is incorrect");
+        break;
+    case FibersBenchmarkError::JobWorkerActiveJobsRemain: formatter.append("Fiber jobs remain active"); break;
+    case FibersBenchmarkError::JobWorkerExecutionMismatch:
+        formatter.append("Fiber job execution count is incorrect");
+        break;
+    case FibersBenchmarkError::JobRoundsOutOfRange:
+        formatter.append("Fiber job benchmark rounds must be between one and 15");
+        break;
+    case FibersBenchmarkError::WorkerStorageInsufficient:
+        formatter.append("Fixed worker storage is too small for this machine");
+        break;
+    case FibersBenchmarkError::SustainedJobSubmissionMismatch:
+        formatter.append("Sustained fiber job submission count is incorrect");
+        break;
+    case FibersBenchmarkError::SustainedJobIndependentCompletionMismatch:
+        formatter.append("Independent fiber job completion count is incorrect");
+        break;
+    case FibersBenchmarkError::SustainedJobCompletionMismatch:
+        formatter.append("Sustained fiber job completion count is incorrect");
+        break;
+    case FibersBenchmarkError::SustainedJobExecutionMismatch:
+        formatter.append("Sustained fiber job execution count is incorrect");
+        break;
+
+    case FibersBenchmarkError::ForcedStealTasksNotWaiting:
+        formatter.append("Forced-steal tasks did not reach the gate");
+        break;
+    case FibersBenchmarkError::ForcedStealBacklogMissing:
+        formatter.append("Forced-steal owner backlog was not prepared");
+        break;
+    case FibersBenchmarkError::ForcedStealCompletionMismatch:
+        formatter.append("Forced-steal task completion count is incorrect");
+        break;
+    case FibersBenchmarkError::ForcedStealNotObserved: formatter.append("No work stealing was observed"); break;
+    case FibersBenchmarkError::ForcedStealPeerIdle: formatter.append("No peer worker executed stolen work"); break;
+    case FibersBenchmarkError::ForcedStealSlotsNotRecycled:
+        formatter.append("Forced-steal task slots were not recycled");
+        break;
+    case FibersBenchmarkError::ForcedStealActiveFibersRemain:
+        formatter.append("Forced-steal fibers remain active");
+        break;
+    case FibersBenchmarkError::IncrementalSuspensionUnavailable:
+        formatter.append("Incremental mass suspension is unavailable under the active tooling");
+        break;
+    case FibersBenchmarkError::MassSuspensionFiberCountMismatch:
+        formatter.append("Mass-suspension fiber count is incorrect");
+        break;
+    case FibersBenchmarkError::MassSuspensionTaskCountMismatch:
+        formatter.append("Mass-suspension task count is incorrect");
+        break;
+    case FibersBenchmarkError::MassSuspensionStackCountMismatch:
+        formatter.append("Mass-suspension stack count is incorrect");
+        break;
+    case FibersBenchmarkError::MassSuspensionActiveFibersRemain:
+        formatter.append("Mass-suspension fibers remain active");
+        break;
+    case FibersBenchmarkError::MassSuspensionSlotsNotRecycled:
+        formatter.append("Mass-suspension task slots were not recycled");
+        break;
+    case FibersBenchmarkError::AsyncHighWaterCompletionMismatch:
+        formatter.append("Async fiber high-water completion count is incorrect");
+        break;
+
+    case FibersBenchmarkError::MicroTaskWorkerCountOutOfRange:
+        formatter.append("Micro-task worker count is out of range");
+        break;
+    case FibersBenchmarkError::MicroTaskProducerCountOutOfRange:
+        formatter.append("Micro-task external producer count is out of range");
+        break;
+    case FibersBenchmarkError::MicroTaskJobRangeIncomplete:
+        formatter.append("Micro-task producer ranges do not cover every job");
+        break;
+    case FibersBenchmarkError::MicroTaskSubmissionMismatch:
+        formatter.append("Micro-task submission count is incorrect");
+        break;
+    case FibersBenchmarkError::MicroTaskCompletionMismatch:
+        formatter.append("Micro-task completion count is incorrect");
+        break;
+    case FibersBenchmarkError::SustainedMicroTaskSubmissionMismatch:
+        formatter.append("Sustained micro-task submission count is incorrect");
+        break;
+    case FibersBenchmarkError::SustainedMicroTaskCompletionMismatch:
+        formatter.append("Sustained micro-task completion count is incorrect");
+        break;
+    case FibersBenchmarkError::CounterCompletionMismatch:
+        formatter.append("Counter completion task count is incorrect");
+        break;
+    case FibersBenchmarkError::CounterNotDrained: formatter.append("Completion counter did not reach zero"); break;
+    case FibersBenchmarkError::CounterActiveTasksRemain:
+        formatter.append("Counter completion tasks remain active");
+        break;
+
+    case FibersBenchmarkError::HelpWriteFailed: formatter.append("Could not write benchmark help"); break;
+    case FibersBenchmarkError::ParseErrorWriteFailed: formatter.append("Could not write argument error"); break;
+    case FibersBenchmarkError::InvalidArguments: formatter.append("Benchmark arguments are invalid"); break;
+    case FibersBenchmarkError::MutuallyExclusiveModes:
+        formatter.append("Throughput and mass-suspension modes cannot be combined");
+        break;
+    case FibersBenchmarkError::ExternalProducerCountOutOfRange:
+        formatter.append("External producer count must be between one and eight");
+        break;
+    case FibersBenchmarkError::SchedulerWorkerCountOutOfRange:
+        formatter.append("Scheduler worker count must be between zero and 16");
+        break;
+    case FibersBenchmarkError::SchedulerRoundsOutOfRange:
+        formatter.append("Scheduler rounds must be between one and 1000");
+        break;
+    case FibersBenchmarkError::UnknownSchedulerWorkload: formatter.append("Scheduler workload is unknown"); break;
+    case FibersBenchmarkError::MassSuspensionCommitModeInvalid:
+        formatter.append("Mass-suspension commitment must be full or incremental");
+        break;
+    case FibersBenchmarkError::MassSuspensionCountInvalid:
+        formatter.append("Mass-suspension fiber count must be greater than zero");
+        break;
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
+    }
+    return formatter.finish();
+}
+
+static ResultErrorFormat formatBenchmarkError(Result result, Span<char> output)
+{
+    if (result)
+        return ResultErrorFormatter::failure(ResultErrorFormatStatus::NotAnError, output);
+    if (result.category() == FibersBenchmarkResultCategory)
+        return formatBenchmarkError(static_cast<FibersBenchmarkError>(result.errorValue()), output);
+    if (result.category() == FibersResultCategory)
+        return formatFibersError(result, output);
+    if (result.category() == AsyncFibersResultCategory)
+        return formatAsyncFibersError(result, output);
+    if (result.category() == ThreadingResultCategory)
+        return formatThreadingError(result, output);
+    if (result.category().value == Result::UncategorizedValue and result.errorValue() == Result::UnspecifiedErrorValue)
+        return ResultErrorFormatter::formatMessage("Unspecified error", output);
+    return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+}
+
 static size_t availableHardwareWorkers()
 {
 #if SC_PLATFORM_WINDOWS
@@ -246,8 +472,9 @@ static Result runFiberJobBenchmark(Console& console)
     Time::HighResolutionCounter finish;
     finish.snap();
     SC_TRY(scheduler.close());
-    SC_TRY_MSG(state.completed == TotalJobs, "FiberJob benchmark did not complete every job");
-    SC_TRY_MSG(state.checksum == TotalJobs * (TotalJobs + 1) / 2, "FiberJob benchmark checksum mismatch");
+    SC_TRY(benchmarkCheck(state.completed == TotalJobs, FibersBenchmarkError::JobCompletionMismatch));
+    SC_TRY(
+        benchmarkCheck(state.checksum == TotalJobs * (TotalJobs + 1) / 2, FibersBenchmarkError::JobChecksumMismatch));
 
     const Time::HighResolutionCounter elapsed       = finish.subtractExact(start);
     const int64_t                     elapsedNs     = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
@@ -307,8 +534,9 @@ static Result runFiberJobPoolBenchmark(Console& console)
     finish.snap();
     SC_TRY(pool.close());
     SC_TRY(scheduler.close());
-    SC_TRY_MSG(state.completed == TotalJobs, "FiberJobPool benchmark did not complete every job");
-    SC_TRY_MSG(state.checksum == TotalJobs * (TotalJobs + 1) / 2, "FiberJobPool benchmark checksum mismatch");
+    SC_TRY(benchmarkCheck(state.completed == TotalJobs, FibersBenchmarkError::JobPoolCompletionMismatch));
+    SC_TRY(benchmarkCheck(state.checksum == TotalJobs * (TotalJobs + 1) / 2,
+                          FibersBenchmarkError::JobPoolChecksumMismatch));
 
     const Time::HighResolutionCounter elapsed       = finish.subtractExact(start);
     const int64_t                     elapsedNs     = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
@@ -332,7 +560,7 @@ static Result runFiberJobWorkerPoolBenchmarkCase(Console& console, size_t numWor
     static constexpr size_t TotalJobs              = 1'000'000;
     static constexpr size_t DequeCapacityPerWorker = 256;
 
-    SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "FiberJob worker count must be between one and 64");
+    SC_TRY(benchmarkCheck(numWorkers > 0 and numWorkers <= MaxWorkers, FibersBenchmarkError::JobWorkerCountOutOfRange));
 
     static FiberJob  jobs[TotalJobs];
     static FiberJob* readyStorage[TotalJobs] = {};
@@ -372,12 +600,13 @@ static Result runFiberJobWorkerPoolBenchmarkCase(Console& console, size_t numWor
     size_t checksum = 0;
     for (size_t index = 0; index < TotalJobs; ++index)
     {
-        SC_TRY_MSG(results[index] == index + 1, "FiberJob worker-pool benchmark result mismatch");
+        SC_TRY(benchmarkCheck(results[index] == index + 1, FibersBenchmarkError::JobWorkerResultMismatch));
         checksum += results[index];
         results[index] = 0;
     }
-    SC_TRY_MSG(checksum == TotalJobs * (TotalJobs + 1) / 2, "FiberJob worker-pool benchmark checksum mismatch");
-    SC_TRY_MSG(not scheduler.hasActiveJobs(), "FiberJob worker-pool benchmark left active jobs");
+    SC_TRY(
+        benchmarkCheck(checksum == TotalJobs * (TotalJobs + 1) / 2, FibersBenchmarkError::JobWorkerChecksumMismatch));
+    SC_TRY(benchmarkCheck(not scheduler.hasActiveJobs(), FibersBenchmarkError::JobWorkerActiveJobsRemain));
 
     size_t stealAttempts = 0;
     size_t stolenJobs    = 0;
@@ -400,7 +629,7 @@ static Result runFiberJobWorkerPoolBenchmarkCase(Console& console, size_t numWor
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(scheduler.close());
     SC_TRY(allocator.close());
-    SC_TRY_MSG(executedJobs == TotalJobs, "FiberJob worker-pool benchmark execution count mismatch");
+    SC_TRY(benchmarkCheck(executedJobs == TotalJobs, FibersBenchmarkError::JobWorkerExecutionMismatch));
 
     const Time::HighResolutionCounter elapsed       = finish.subtractExact(start);
     const int64_t                     elapsedNs     = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
@@ -460,11 +689,10 @@ static Result runFiberJobWorkerPoolBenchmarkMatrix(Console& console, size_t numR
     static constexpr size_t MaxWorkers         = 64;
     static constexpr size_t MaxRounds          = 15;
 
-    SC_TRY_MSG(numRounds > 0 and numRounds <= MaxRounds, "FiberJob benchmark rounds must be between one and 15");
+    SC_TRY(benchmarkCheck(numRounds > 0 and numRounds <= MaxRounds, FibersBenchmarkError::JobRoundsOutOfRange));
 
     const size_t hardwareWorkers = availableHardwareWorkers();
-    SC_TRY_MSG(hardwareWorkers <= MaxWorkers,
-               "FibersBenchmark must increase its fixed FiberJob worker storage for this machine");
+    SC_TRY(benchmarkCheck(hardwareWorkers <= MaxWorkers, FibersBenchmarkError::WorkerStorageInsufficient));
 
     size_t       workerCounts[MaxBenchmarkCounts] = {};
     size_t       numWorkerCounts                  = 0;
@@ -529,7 +757,7 @@ static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWork
         Atomic<int32_t> checksum;
     };
 
-    SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "FiberJob worker count must be between one and 64");
+    SC_TRY(benchmarkCheck(numWorkers > 0 and numWorkers <= MaxWorkers, FibersBenchmarkError::JobWorkerCountOutOfRange));
 
     static FiberJob  jobs[BatchCapacity];
     static FiberJob* readyStorage[BatchCapacity]     = {};
@@ -613,8 +841,8 @@ static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWork
 
     SC_TRY(workerPool.requestStop());
     SC_TRY(workerPool.join());
-    SC_TRY_MSG(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(TotalJobs),
-               "Sustained FiberJob benchmark did not submit every job");
+    SC_TRY(benchmarkCheck(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(TotalJobs),
+                          FibersBenchmarkError::SustainedJobSubmissionMismatch));
 
     size_t completedJobs = static_cast<size_t>(state.completed.load(memory_order_relaxed));
     size_t checksum      = static_cast<size_t>(state.checksum.load(memory_order_relaxed));
@@ -627,12 +855,13 @@ static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWork
         for (size_t index = 0; index < BatchCapacity; ++index)
         {
             const size_t expected = completeWaves + (index < remainder ? 1 : 0);
-            SC_TRY_MSG(localCompletions[index] == expected, "Sustained FiberJob independent completion count mismatch");
+            SC_TRY(benchmarkCheck(localCompletions[index] == expected,
+                                  FibersBenchmarkError::SustainedJobIndependentCompletionMismatch));
             completedJobs += localCompletions[index];
             checksum += localValues[index];
         }
     }
-    SC_TRY_MSG(completedJobs == TotalJobs, "Sustained FiberJob benchmark did not complete every job");
+    SC_TRY(benchmarkCheck(completedJobs == TotalJobs, FibersBenchmarkError::SustainedJobCompletionMismatch));
 
     size_t executedJobs    = 0;
     size_t minExecutedJobs = TotalJobs;
@@ -657,7 +886,7 @@ static Result runSustainedFiberJobBenchmarkCase(Console& console, size_t numWork
         stolenJobs += diagnostics.stolenJobs;
         failedSteals += diagnostics.failedSteals;
     }
-    SC_TRY_MSG(executedJobs == TotalJobs, "Sustained FiberJob benchmark execution count mismatch");
+    SC_TRY(benchmarkCheck(executedJobs == TotalJobs, FibersBenchmarkError::SustainedJobExecutionMismatch));
 
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(scheduler.close());
@@ -746,14 +975,14 @@ static Result runForcedStealingBenchmark(Console& console)
         SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
     }
 
-    SC_TRY_MSG(state.waiting.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-               "Forced-steal benchmark tasks did not reach the gate");
+    SC_TRY(benchmarkCheck(state.waiting.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                          FibersBenchmarkError::ForcedStealTasksNotWaiting));
     SC_TRY(scheduler.spawn(
         releaseTask, releaseStack,
         FiberTask::Procedure([&gate](FiberScheduler& runningScheduler) { return runningScheduler.done(gate); })));
     SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
-    SC_TRY_MSG(scheduler.readyFiberCount(workers[0]) == NumTasks,
-               "Forced-steal benchmark did not prepare worker zero's local backlog");
+    SC_TRY(benchmarkCheck(scheduler.readyFiberCount(workers[0]) == NumTasks,
+                          FibersBenchmarkError::ForcedStealBacklogMissing));
 
     Time::HighResolutionCounter start;
     start.snap();
@@ -764,9 +993,9 @@ static Result runForcedStealingBenchmark(Console& console)
 
     FiberWorkerDiagnostics diagnostics;
     scheduler.workerDiagnostics({workers, NumWorkers}, diagnostics);
-    SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-               "Forced-steal benchmark did not complete every task");
-    SC_TRY_MSG(diagnostics.stolenFibers > 0, "Forced-steal benchmark did not steal work");
+    SC_TRY(benchmarkCheck(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                          FibersBenchmarkError::ForcedStealCompletionMismatch));
+    SC_TRY(benchmarkCheck(diagnostics.stolenFibers > 0, FibersBenchmarkError::ForcedStealNotObserved));
     size_t peerExecutions = 0;
     for (size_t workerIndex = 1; workerIndex < NumWorkers; ++workerIndex)
     {
@@ -774,9 +1003,9 @@ static Result runForcedStealingBenchmark(Console& console)
         scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
         peerExecutions += workerDiagnostics.executedFibers;
     }
-    SC_TRY_MSG(peerExecutions > 0, "Forced-steal benchmark did not execute work on a peer worker");
-    SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Forced-steal benchmark task pool did not fully recycle");
-    SC_TRY_MSG(not scheduler.hasActiveFibers(), "Forced-steal benchmark left active fibers");
+    SC_TRY(benchmarkCheck(peerExecutions > 0, FibersBenchmarkError::ForcedStealPeerIdle));
+    SC_TRY(benchmarkCheck(taskPool.availableCount() == NumTasks, FibersBenchmarkError::ForcedStealSlotsNotRecycled));
+    SC_TRY(benchmarkCheck(not scheduler.hasActiveFibers(), FibersBenchmarkError::ForcedStealActiveFibersRemain));
 
     const Time::HighResolutionCounter elapsed     = finish.subtractExact(start);
     const int64_t                     elapsedNs   = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
@@ -827,8 +1056,8 @@ static Result runForcedStealingBenchmark(Console& console)
     FiberStackGrowthThread  growthThread;
     if (commitMode == FiberStackCommitMode::Incremental)
     {
-        SC_TRY_MSG(FiberStackGrowthRuntime::isSupported(),
-                   "Incremental mass suspension is unavailable under the active tooling");
+        SC_TRY(benchmarkCheck(FiberStackGrowthRuntime::isSupported(),
+                              FibersBenchmarkError::IncrementalSuspensionUnavailable));
         SC_TRY(growthRuntime.create());
 #if SC_PLATFORM_WINDOWS
         SC_TRY(growthThread.create(growthRuntime, {}));
@@ -894,11 +1123,12 @@ static Result runForcedStealingBenchmark(Console& console)
 
     FiberTaskPoolDiagnostics suspendedDiagnostics;
     taskPool.diagnostics(suspendedDiagnostics);
-    SC_TRY_MSG(scheduler.activeFiberCount() == numFibers, "Mass-suspension benchmark did not suspend every fiber");
-    SC_TRY_MSG(suspendedDiagnostics.activeTasks == numFibers,
-               "Mass-suspension benchmark task class did not retain every task");
-    SC_TRY_MSG(suspendedDiagnostics.stackClass.activeStacks == numFibers,
-               "Mass-suspension benchmark stack class did not retain every stack");
+    SC_TRY(benchmarkCheck(scheduler.activeFiberCount() == numFibers,
+                          FibersBenchmarkError::MassSuspensionFiberCountMismatch));
+    SC_TRY(benchmarkCheck(suspendedDiagnostics.activeTasks == numFibers,
+                          FibersBenchmarkError::MassSuspensionTaskCountMismatch));
+    SC_TRY(benchmarkCheck(suspendedDiagnostics.stackClass.activeStacks == numFibers,
+                          FibersBenchmarkError::MassSuspensionStackCountMismatch));
 
     Time::HighResolutionCounter wakeStart;
     wakeStart.snap();
@@ -914,8 +1144,9 @@ static Result runForcedStealingBenchmark(Console& console)
 
     FiberTaskPoolDiagnostics completedDiagnostics;
     taskPool.diagnostics(completedDiagnostics);
-    SC_TRY_MSG(not scheduler.hasActiveFibers(), "Mass-suspension benchmark left active fibers");
-    SC_TRY_MSG(taskPool.availableCount() == numFibers, "Mass-suspension benchmark did not recycle every slot");
+    SC_TRY(benchmarkCheck(not scheduler.hasActiveFibers(), FibersBenchmarkError::MassSuspensionActiveFibersRemain));
+    SC_TRY(
+        benchmarkCheck(taskPool.availableCount() == numFibers, FibersBenchmarkError::MassSuspensionSlotsNotRecycled));
 
     const Time::HighResolutionCounter spawnElapsed      = spawnFinish.subtractExact(spawnStart);
     const Time::HighResolutionCounter suspendElapsed    = suspendFinish.subtractExact(suspendStart);
@@ -996,7 +1227,8 @@ static Result runForcedStealingBenchmark(Console& console)
     Time::HighResolutionCounter finish;
     finish.snap();
 
-    SC_TRY_MSG(state.completed == static_cast<int>(NumTasks), "AsyncFibers high-water benchmark did not complete");
+    SC_TRY(benchmarkCheck(state.completed == static_cast<int>(NumTasks),
+                          FibersBenchmarkError::AsyncHighWaterCompletionMismatch));
 
     size_t maxStackUsed = 0;
     for (size_t taskIndex = 0; taskIndex < taskPool.capacity(); ++taskIndex)
@@ -1198,9 +1430,10 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     static constexpr size_t StackSize              = 32 * 1024;
     static constexpr size_t DequeCapacityPerWorker = 256;
     static constexpr size_t InjectionCapacity      = NumJobs + 1;
-    SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "Invalid micro-task worker count");
-    SC_TRY_MSG(numExternalProducers > 0 and numExternalProducers <= MaxExternalProducers,
-               "Invalid micro-task external producer count");
+    SC_TRY(benchmarkCheck(numWorkers > 0 and numWorkers <= MaxWorkers,
+                          FibersBenchmarkError::MicroTaskWorkerCountOutOfRange));
+    SC_TRY(benchmarkCheck(numExternalProducers > 0 and numExternalProducers <= MaxExternalProducers,
+                          FibersBenchmarkError::MicroTaskProducerCountOutOfRange));
 
     FiberScheduler    scheduler;
     FiberWorker       workers[MaxWorkers];
@@ -1387,7 +1620,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
             SC_TRY(producerJoinResult);
             SC_TRY(producerRunResult);
             SC_TRY(producerStartResult);
-            SC_TRY_MSG(firstJob == NumJobs, "Micro-task producer ranges did not cover all jobs");
+            SC_TRY(benchmarkCheck(firstJob == NumJobs, FibersBenchmarkError::MicroTaskJobRangeIncomplete));
             finish.snap();
 
             if (numStartedProducers > 0)
@@ -1413,10 +1646,10 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
         }
     }
 
-    SC_TRY_MSG(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
-               "Micro-task benchmark did not submit all jobs");
-    SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
-               "Micro-task benchmark did not complete all jobs");
+    SC_TRY(benchmarkCheck(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
+                          FibersBenchmarkError::MicroTaskSubmissionMismatch));
+    SC_TRY(benchmarkCheck(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
+                          FibersBenchmarkError::MicroTaskCompletionMismatch));
 
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(allocator.close());
@@ -1446,8 +1679,7 @@ static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProduce
         const size_t requestedCounts[] = {1, 2, 4, 8, availableHardwareWorkers()};
         for (size_t requestedCount : requestedCounts)
         {
-            SC_TRY_MSG(requestedCount <= MaxWorkers,
-                       "FibersBenchmark must increase its fixed worker storage for this machine");
+            SC_TRY(benchmarkCheck(requestedCount <= MaxWorkers, FibersBenchmarkError::WorkerStorageInsufficient));
             size_t workerCount = requestedCount;
             if (workerCount == 0)
             {
@@ -1577,10 +1809,10 @@ static Result runSustainedMicroTaskBenchmark(Console& console, size_t selectedWo
     Time::HighResolutionCounter finish;
     finish.snap();
 
-    SC_TRY_MSG(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
-               "Sustained micro-task benchmark did not submit all jobs");
-    SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
-               "Sustained micro-task benchmark did not complete all jobs");
+    SC_TRY(benchmarkCheck(state.submitted.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
+                          FibersBenchmarkError::SustainedMicroTaskSubmissionMismatch));
+    SC_TRY(benchmarkCheck(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumJobs),
+                          FibersBenchmarkError::SustainedMicroTaskCompletionMismatch));
 
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(allocator.close());
@@ -1662,10 +1894,10 @@ static Result runCounterCompletionBenchmark(Console& console)
     Time::HighResolutionCounter finish;
     finish.snap();
 
-    SC_TRY_MSG(completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
-               "Counter completion benchmark did not complete all tasks");
-    SC_TRY_MSG(completionCounter.value() == 0, "Counter completion benchmark counter did not reach zero");
-    SC_TRY_MSG(not scheduler.hasActiveFibers(), "Counter completion benchmark retained active tasks");
+    SC_TRY(benchmarkCheck(completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                          FibersBenchmarkError::CounterCompletionMismatch));
+    SC_TRY(benchmarkCheck(completionCounter.value() == 0, FibersBenchmarkError::CounterNotDrained));
+    SC_TRY(benchmarkCheck(not scheduler.hasActiveFibers(), FibersBenchmarkError::CounterActiveTasksRemain));
 
     FiberSchedulerDiagnostics schedulerDiagnostics;
     scheduler.schedulerDiagnostics(schedulerDiagnostics);
@@ -1792,16 +2024,16 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     if (parseResult.status == CommandLineParseResult::Status::HelpRequested)
     {
         StringFormatOutput output(StringEncoding::Utf8, console, true);
-        SC_TRY_MSG(spec.writeHelp(output), "Failed writing FibersBenchmark help");
+        SC_TRY(benchmarkCheck(spec.writeHelp(output), FibersBenchmarkError::HelpWriteFailed));
         console.flush();
         return Result(true);
     }
     if (parseResult.status == CommandLineParseResult::Status::Error)
     {
         StringFormatOutput output(StringEncoding::Utf8, console, false);
-        SC_TRY_MSG(spec.writeError(parseResult, output), "Failed writing FibersBenchmark parse error");
+        SC_TRY(benchmarkCheck(spec.writeError(parseResult, output), FibersBenchmarkError::ParseErrorWriteFailed));
         console.flushStdErr();
-        return Result::Error("Invalid FibersBenchmark arguments");
+        return benchmarkFailure(FibersBenchmarkError::InvalidArguments);
     }
     const size_t selectedModes = static_cast<size_t>(schedulerThroughput) + static_cast<size_t>(jobThroughput) +
                                  static_cast<size_t>(jobPoolThroughput) + static_cast<size_t>(jobWorkerThroughput) +
@@ -1809,43 +2041,43 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
                                  static_cast<size_t>(massSuspensionCount != 0);
     if (selectedModes > 1)
     {
-        return Result::Error("Throughput and mass-suspension modes are mutually exclusive");
+        return benchmarkFailure(FibersBenchmarkError::MutuallyExclusiveModes);
     }
     if (externalProducers <= 0 or externalProducers > 8)
     {
-        return Result::Error("External producer count must be between one and eight");
+        return benchmarkFailure(FibersBenchmarkError::ExternalProducerCountOutOfRange);
     }
     if (schedulerWorkers < 0 or schedulerWorkers > 16)
     {
-        return Result::Error("Scheduler worker count must be between one and 16");
+        return benchmarkFailure(FibersBenchmarkError::SchedulerWorkerCountOutOfRange);
     }
     if (schedulerRounds <= 0 or schedulerRounds > 1000)
     {
-        return Result::Error("Scheduler rounds must be between one and 1000");
+        return benchmarkFailure(FibersBenchmarkError::SchedulerRoundsOutOfRange);
     }
     if (schedulerWorkload != "all" and schedulerWorkload != "worker-pool" and schedulerWorkload != "forced-steal" and
         schedulerWorkload != "preloaded" and schedulerWorkload != "external" and schedulerWorkload != "in-fiber" and
         schedulerWorkload != "balanced" and schedulerWorkload != "counter" and schedulerWorkload != "sustained")
     {
-        return Result::Error("Unknown scheduler workload");
+        return benchmarkFailure(FibersBenchmarkError::UnknownSchedulerWorkload);
     }
     if (jobWorkers <= 0 or jobWorkers > 64)
     {
-        return Result::Error("FiberJob worker count must be between one and 64");
+        return benchmarkFailure(FibersBenchmarkError::JobWorkerCountOutOfRange);
     }
     if (jobRounds <= 0 or jobRounds > 15)
     {
-        return Result::Error("FiberJob benchmark rounds must be between one and 15");
+        return benchmarkFailure(FibersBenchmarkError::JobRoundsOutOfRange);
     }
     if (massSuspensionCommit != "full" and massSuspensionCommit != "incremental")
     {
-        return Result::Error("Mass-suspension commitment must be full or incremental");
+        return benchmarkFailure(FibersBenchmarkError::MassSuspensionCommitModeInvalid);
     }
     if (massSuspensionCount < 0 or (not schedulerThroughput and not jobThroughput and not jobPoolThroughput and
                                     not jobWorkerThroughput and not jobWorkerMatrix and not jobWorkerSustained and
                                     arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
     {
-        return Result::Error("Mass-suspension fiber count must be greater than zero");
+        return benchmarkFailure(FibersBenchmarkError::MassSuspensionCountInvalid);
     }
     if (massSuspensionCount > 0)
     {
@@ -1922,7 +2154,14 @@ int main(int argc, const char* argv[])
     {
         SC::Console console;
         SC::Console::tryAttachingToParentConsole();
-        console.print("FibersBenchmark failed: {}\n", result.message);
+        char                        message[256];
+        const SC::ResultErrorFormat formatted = SC::formatBenchmarkError(result, message);
+        if (formatted)
+            console.print("FibersBenchmark failed: {}\n",
+                          SC::StringView::fromNullTerminated(message, SC::StringEncoding::Ascii));
+        else
+            console.print("FibersBenchmark failed: error category {}, code {}\n", result.category().value,
+                          result.errorValue());
         return -1;
     }
     return 0;
