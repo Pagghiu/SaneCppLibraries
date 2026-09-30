@@ -149,6 +149,25 @@ enum class CryptographyErrorContextKind : uint16_t
 /// @brief A typed scalar payload for a Cryptography error.
 union CryptographyErrorContext
 {
+    struct AppleCommonCryptoStatus
+    {
+    };
+    struct PosixErrno
+    {
+    };
+    struct ExpectedBytes
+    {
+    };
+    struct RequiredBytes
+    {
+    };
+    struct MaximumBytes
+    {
+    };
+    struct ActualBytes
+    {
+    };
+
     int32_t  appleCommonCryptoStatus;
     uint32_t windowsNtStatus;
     int32_t  posixErrno;
@@ -158,6 +177,12 @@ union CryptographyErrorContext
     uint32_t actualBytes;
 
     constexpr CryptographyErrorContext(uint32_t value = 0) : windowsNtStatus(value) {}
+    constexpr CryptographyErrorContext(AppleCommonCryptoStatus, int32_t value) : appleCommonCryptoStatus(value) {}
+    constexpr CryptographyErrorContext(PosixErrno, int32_t value) : posixErrno(value) {}
+    constexpr CryptographyErrorContext(ExpectedBytes, uint32_t value) : expectedBytes(value) {}
+    constexpr CryptographyErrorContext(RequiredBytes, uint32_t value) : requiredBytes(value) {}
+    constexpr CryptographyErrorContext(MaximumBytes, uint32_t value) : maximumBytes(value) {}
+    constexpr CryptographyErrorContext(ActualBytes, uint32_t value) : actualBytes(value) {}
 };
 
 /// @brief Stable category assigned to errors owned by Cryptography.
@@ -193,9 +218,8 @@ struct [[nodiscard]] ResultCryptography
     static constexpr ResultCryptography withAppleCommonCryptoStatus(CryptographyError       error,
                                                                     CryptographyErrorDetail detail, int32_t status)
     {
-        CryptographyErrorContext context;
-        context.appleCommonCryptoStatus = status;
-        return {error, detail, CryptographyErrorContextKind::AppleCommonCryptoStatus, context};
+        return {error, detail, CryptographyErrorContextKind::AppleCommonCryptoStatus,
+                CryptographyErrorContext(CryptographyErrorContext::AppleCommonCryptoStatus{}, status)};
     }
 
     static constexpr ResultCryptography withWindowsNtStatus(CryptographyError error, CryptographyErrorDetail detail,
@@ -207,33 +231,36 @@ struct [[nodiscard]] ResultCryptography
     static constexpr ResultCryptography withPosixErrno(CryptographyError error, CryptographyErrorDetail detail,
                                                        int32_t errorNumber)
     {
-        CryptographyErrorContext context;
-        context.posixErrno = errorNumber;
-        return {error, detail, CryptographyErrorContextKind::PosixErrno, context};
+        return {error, detail, CryptographyErrorContextKind::PosixErrno,
+                CryptographyErrorContext(CryptographyErrorContext::PosixErrno{}, errorNumber)};
     }
 
     static constexpr ResultCryptography withExpectedBytes(CryptographyError error, CryptographyErrorDetail detail,
                                                           uint32_t expectedBytes)
     {
-        return {error, detail, CryptographyErrorContextKind::ExpectedBytes, CryptographyErrorContext(expectedBytes)};
+        return {error, detail, CryptographyErrorContextKind::ExpectedBytes,
+                CryptographyErrorContext(CryptographyErrorContext::ExpectedBytes{}, expectedBytes)};
     }
 
     static constexpr ResultCryptography withRequiredBytes(CryptographyError error, CryptographyErrorDetail detail,
                                                           uint32_t requiredBytes)
     {
-        return {error, detail, CryptographyErrorContextKind::RequiredBytes, CryptographyErrorContext(requiredBytes)};
+        return {error, detail, CryptographyErrorContextKind::RequiredBytes,
+                CryptographyErrorContext(CryptographyErrorContext::RequiredBytes{}, requiredBytes)};
     }
 
     static constexpr ResultCryptography withMaximumBytes(CryptographyError error, CryptographyErrorDetail detail,
                                                          uint32_t maximumBytes)
     {
-        return {error, detail, CryptographyErrorContextKind::MaximumBytes, CryptographyErrorContext(maximumBytes)};
+        return {error, detail, CryptographyErrorContextKind::MaximumBytes,
+                CryptographyErrorContext(CryptographyErrorContext::MaximumBytes{}, maximumBytes)};
     }
 
     static constexpr ResultCryptography withActualBytes(CryptographyError error, CryptographyErrorDetail detail,
                                                         uint32_t actualBytes)
     {
-        return {error, detail, CryptographyErrorContextKind::ActualBytes, CryptographyErrorContext(actualBytes)};
+        return {error, detail, CryptographyErrorContextKind::ActualBytes,
+                CryptographyErrorContext(CryptographyErrorContext::ActualBytes{}, actualBytes)};
     }
 
     explicit constexpr operator bool() const { return static_cast<bool>(result); }

@@ -102,11 +102,20 @@ enum class FileErrorContextKind : uint16_t
 /// @brief Typed scalar payload for a File error.
 union FileErrorContext
 {
+    struct RequiredBytes
+    {
+    };
+    struct ActualBytes
+    {
+    };
+
     uint32_t nativeError;
     uint32_t requiredBytes;
     uint32_t actualBytes;
 
     constexpr FileErrorContext(uint32_t value = 0) : nativeError(value) {}
+    constexpr FileErrorContext(RequiredBytes, uint32_t value) : requiredBytes(value) {}
+    constexpr FileErrorContext(ActualBytes, uint32_t value) : actualBytes(value) {}
 };
 
 /// @brief Stable category assigned to errors owned by File.
@@ -144,12 +153,14 @@ struct [[nodiscard]] ResultFile
 
     static constexpr ResultFile withRequiredBytes(FileError error, FileErrorDetail detail, uint32_t requiredBytes)
     {
-        return {error, detail, FileErrorContextKind::RequiredBytes, FileErrorContext(requiredBytes)};
+        return {error, detail, FileErrorContextKind::RequiredBytes,
+                FileErrorContext(FileErrorContext::RequiredBytes{}, requiredBytes)};
     }
 
     static constexpr ResultFile withActualBytes(FileError error, FileErrorDetail detail, uint32_t actualBytes)
     {
-        return {error, detail, FileErrorContextKind::ActualBytes, FileErrorContext(actualBytes)};
+        return {error, detail, FileErrorContextKind::ActualBytes,
+                FileErrorContext(FileErrorContext::ActualBytes{}, actualBytes)};
     }
 
     explicit constexpr operator bool() const { return static_cast<bool>(result); }

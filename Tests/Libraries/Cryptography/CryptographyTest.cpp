@@ -347,13 +347,49 @@ void SC::CryptographyTest::structuredErrorsAndFormatter()
     static_assert(TypeTraits::IsTriviallyCopyable<ResultCryptography>::value,
                   "ResultCryptography must remain trivially copyable");
 
+    static_assert(sizeof(CryptographyErrorContext) == 4, "CryptographyErrorContext must retain its four-byte payload");
+
+    constexpr ResultCryptography appleCommonCryptoStatusContext = ResultCryptography::withAppleCommonCryptoStatus(
+        CryptographyError::BackendOperationFailed, CryptographyErrorDetail::AppleCommonCryptoCipherUpdate,
+        (-2147483647 - 1));
+    static_assert(
+        appleCommonCryptoStatusContext.contextKind == CryptographyErrorContextKind::AppleCommonCryptoStatus and
+            appleCommonCryptoStatusContext.context.appleCommonCryptoStatus == (-2147483647 - 1),
+        "withAppleCommonCryptoStatus must initialize the appleCommonCryptoStatus member in constant evaluation");
+    constexpr ResultCryptography windowsNtStatusContext =
+        ResultCryptography::withWindowsNtStatus(CryptographyError::BackendInitializationFailed,
+                                                CryptographyErrorDetail::WindowsBCryptAeadOpenAlgorithm, 0xffffffffu);
+    static_assert(windowsNtStatusContext.contextKind == CryptographyErrorContextKind::WindowsNtStatus and
+                      windowsNtStatusContext.context.windowsNtStatus == 0xffffffffu,
+                  "withWindowsNtStatus must initialize the windowsNtStatus member in constant evaluation");
+    constexpr ResultCryptography posixErrnoContext = ResultCryptography::withPosixErrno(
+        CryptographyError::BackendOperationFailed, CryptographyErrorDetail::LinuxAFAlgCipherReceive, -5);
+    static_assert(posixErrnoContext.contextKind == CryptographyErrorContextKind::PosixErrno and
+                      posixErrnoContext.context.posixErrno == -5,
+                  "withPosixErrno must initialize the posixErrno member in constant evaluation");
+    constexpr ResultCryptography expectedBytesContext = ResultCryptography::withExpectedBytes(
+        CryptographyError::InvalidNonceSize, CryptographyErrorDetail::ValidateAeadNonce, 12);
+    static_assert(expectedBytesContext.contextKind == CryptographyErrorContextKind::ExpectedBytes and
+                      expectedBytesContext.context.expectedBytes == 12,
+                  "withExpectedBytes must initialize the expectedBytes member in constant evaluation");
+    constexpr ResultCryptography requiredBytesContext = ResultCryptography::withRequiredBytes(
+        CryptographyError::OutputCapacityExceeded, CryptographyErrorDetail::ValidateCipherOutput, 0xffffffffu);
+    static_assert(requiredBytesContext.contextKind == CryptographyErrorContextKind::RequiredBytes and
+                      requiredBytesContext.context.requiredBytes == 0xffffffffu,
+                  "withRequiredBytes must initialize the requiredBytes member in constant evaluation");
+    constexpr ResultCryptography maximumBytesContext = ResultCryptography::withMaximumBytes(
+        CryptographyError::SizeLimitExceeded, CryptographyErrorDetail::ValidateHkdfOutput, 12240);
+    static_assert(maximumBytesContext.contextKind == CryptographyErrorContextKind::MaximumBytes and
+                      maximumBytesContext.context.maximumBytes == 12240,
+                  "withMaximumBytes must initialize the maximumBytes member in constant evaluation");
+    constexpr ResultCryptography actualBytesContext = ResultCryptography::withActualBytes(
+        CryptographyError::UnexpectedOutputSize, CryptographyErrorDetail::OpenSSL3CipherUpdate, 7);
+    static_assert(actualBytesContext.contextKind == CryptographyErrorContextKind::ActualBytes and
+                      actualBytesContext.context.actualBytes == 7,
+                  "withActualBytes must initialize the actualBytes member in constant evaluation");
+
     const ResultCryptography detailed = ResultCryptography::withPosixErrno(
         CryptographyError::BackendOperationFailed, CryptographyErrorDetail::LinuxAFAlgCipherReceive, -5);
-    const ResultCryptography copied = detailed;
-    SC_TEST_EXPECT(copied.isError(CryptographyError::BackendOperationFailed));
-    SC_TEST_EXPECT(copied.detail == CryptographyErrorDetail::LinuxAFAlgCipherReceive);
-    SC_TEST_EXPECT(copied.contextKind == CryptographyErrorContextKind::PosixErrno);
-    SC_TEST_EXPECT(copied.context.posixErrno == -5);
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(CryptographyResultCategory, CryptographyError::BackendOperationFailed));

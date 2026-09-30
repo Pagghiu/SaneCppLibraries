@@ -94,13 +94,26 @@ void SC::FileTest::structuredErrorsAndFormatter()
     static_assert(__is_standard_layout(ResultFile), "ResultFile must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFile>::value, "ResultFile must remain trivially copyable");
 
+    static_assert(sizeof(FileErrorContext) == 4, "FileErrorContext must retain its four-byte payload");
+
+    constexpr ResultFile nativeErrorContext =
+        ResultFile::withNativeError(FileError::ReadFailed, FileErrorDetail::ReadDescriptor, 0xffffffffu);
+    static_assert(nativeErrorContext.contextKind == FileErrorContextKind::NativeError and
+                      nativeErrorContext.context.nativeError == 0xffffffffu,
+                  "withNativeError must initialize the nativeError member in constant evaluation");
+    constexpr ResultFile requiredBytesContext = ResultFile::withRequiredBytes(
+        FileError::PathCapacityExceeded, FileErrorDetail::BuildTransportPath, 0xffffffffu);
+    static_assert(requiredBytesContext.contextKind == FileErrorContextKind::RequiredBytes and
+                      requiredBytesContext.context.requiredBytes == 0xffffffffu,
+                  "withRequiredBytes must initialize the requiredBytes member in constant evaluation");
+    constexpr ResultFile actualBytesContext =
+        ResultFile::withActualBytes(FileError::IncompleteWrite, FileErrorDetail::WriteDescriptor, 7);
+    static_assert(actualBytesContext.contextKind == FileErrorContextKind::ActualBytes and
+                      actualBytesContext.context.actualBytes == 7,
+                  "withActualBytes must initialize the actualBytes member in constant evaluation");
+
     const ResultFile detailed =
         ResultFile::withNativeError(FileError::ReadFailed, FileErrorDetail::ReadDescriptor, 12345);
-    const ResultFile copied = detailed;
-    SC_TEST_EXPECT(copied.isError(FileError::ReadFailed));
-    SC_TEST_EXPECT(copied.detail == FileErrorDetail::ReadDescriptor);
-    SC_TEST_EXPECT(copied.contextKind == FileErrorContextKind::NativeError);
-    SC_TEST_EXPECT(copied.context.nativeError == 12345);
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(FileResultCategory, FileError::ReadFailed));

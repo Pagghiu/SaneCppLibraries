@@ -106,13 +106,31 @@ void SC::SocketTest::structuredErrorsAndFormatter()
     static_assert(__is_standard_layout(ResultSocket), "ResultSocket must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultSocket>::value, "ResultSocket must remain trivially copyable");
 
+    static_assert(sizeof(SocketErrorContext) == 4, "SocketErrorContext must retain its four-byte payload");
+
+    constexpr ResultSocket nativeErrorContext =
+        ResultSocket::withNativeError(SocketError::ReceiveFailed, SocketErrorDetail::ReceiveDatagram, 0xffffffffu);
+    static_assert(nativeErrorContext.contextKind == SocketErrorContextKind::NativeError and
+                      nativeErrorContext.context.nativeError == 0xffffffffu,
+                  "withNativeError must initialize the nativeError member in constant evaluation");
+    constexpr ResultSocket resolverErrorContext = ResultSocket::withResolverError(
+        SocketError::DNSResolutionFailed, SocketErrorDetail::ResolveHostName, (-2147483647 - 1));
+    static_assert(resolverErrorContext.contextKind == SocketErrorContextKind::ResolverError and
+                      resolverErrorContext.context.resolverError == (-2147483647 - 1),
+                  "withResolverError must initialize the resolverError member in constant evaluation");
+    constexpr ResultSocket requiredBytesContext = ResultSocket::withRequiredBytes(
+        SocketError::OutputCapacityExceeded, SocketErrorDetail::CopyResolvedAddress, 0xffffffffu);
+    static_assert(requiredBytesContext.contextKind == SocketErrorContextKind::RequiredBytes and
+                      requiredBytesContext.context.requiredBytes == 0xffffffffu,
+                  "withRequiredBytes must initialize the requiredBytes member in constant evaluation");
+    constexpr ResultSocket actualBytesContext =
+        ResultSocket::withActualBytes(SocketError::ReceiveFailed, SocketErrorDetail::ReceiveDatagram, 7);
+    static_assert(actualBytesContext.contextKind == SocketErrorContextKind::ActualBytes and
+                      actualBytesContext.context.actualBytes == 7,
+                  "withActualBytes must initialize the actualBytes member in constant evaluation");
+
     const ResultSocket detailed =
         ResultSocket::withNativeError(SocketError::ReceiveFailed, SocketErrorDetail::ReceiveDatagram, 12345);
-    const ResultSocket copied = detailed;
-    SC_TEST_EXPECT(copied.isError(SocketError::ReceiveFailed));
-    SC_TEST_EXPECT(copied.detail == SocketErrorDetail::ReceiveDatagram);
-    SC_TEST_EXPECT(copied.contextKind == SocketErrorContextKind::NativeError);
-    SC_TEST_EXPECT(copied.context.nativeError == 12345);
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(SocketResultCategory, SocketError::ReceiveFailed));

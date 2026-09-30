@@ -103,12 +103,25 @@ enum class SocketErrorContextKind : uint16_t
 /// @brief A typed scalar payload for a Socket error. Its interpretation is selected by SocketErrorContextKind.
 union SocketErrorContext
 {
+    struct ResolverError
+    {
+    };
+    struct RequiredBytes
+    {
+    };
+    struct ActualBytes
+    {
+    };
+
     uint32_t nativeError;
     int32_t  resolverError;
     uint32_t requiredBytes;
     uint32_t actualBytes;
 
     constexpr SocketErrorContext(uint32_t value = 0) : nativeError(value) {}
+    constexpr SocketErrorContext(ResolverError, int32_t value) : resolverError(value) {}
+    constexpr SocketErrorContext(RequiredBytes, uint32_t value) : requiredBytes(value) {}
+    constexpr SocketErrorContext(ActualBytes, uint32_t value) : actualBytes(value) {}
 };
 
 /// @brief Stable category assigned to errors owned by Socket.
@@ -146,19 +159,20 @@ struct [[nodiscard]] ResultSocket
 
     static constexpr ResultSocket withResolverError(SocketError error, SocketErrorDetail detail, int32_t resolverError)
     {
-        SocketErrorContext context;
-        context.resolverError = resolverError;
-        return {error, detail, SocketErrorContextKind::ResolverError, context};
+        return {error, detail, SocketErrorContextKind::ResolverError,
+                SocketErrorContext(SocketErrorContext::ResolverError{}, resolverError)};
     }
 
     static constexpr ResultSocket withRequiredBytes(SocketError error, SocketErrorDetail detail, uint32_t requiredBytes)
     {
-        return {error, detail, SocketErrorContextKind::RequiredBytes, SocketErrorContext(requiredBytes)};
+        return {error, detail, SocketErrorContextKind::RequiredBytes,
+                SocketErrorContext(SocketErrorContext::RequiredBytes{}, requiredBytes)};
     }
 
     static constexpr ResultSocket withActualBytes(SocketError error, SocketErrorDetail detail, uint32_t actualBytes)
     {
-        return {error, detail, SocketErrorContextKind::ActualBytes, SocketErrorContext(actualBytes)};
+        return {error, detail, SocketErrorContextKind::ActualBytes,
+                SocketErrorContext(SocketErrorContext::ActualBytes{}, actualBytes)};
     }
 
     explicit constexpr operator bool() const { return static_cast<bool>(result); }

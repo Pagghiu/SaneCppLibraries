@@ -119,12 +119,25 @@ enum class PluginErrorContextKind : uint16_t
 /// @brief A typed scalar payload for a Plugin error. Its interpretation is selected by PluginErrorContextKind.
 union PluginErrorContext
 {
+    struct ExitCode
+    {
+    };
+    struct RequiredBytes
+    {
+    };
+    struct RequiredElements
+    {
+    };
+
     uint32_t nativeError;
     int32_t  exitCode;
     uint32_t requiredBytes;
     uint32_t requiredElements;
 
     constexpr PluginErrorContext(uint32_t value = 0) : nativeError(value) {}
+    constexpr PluginErrorContext(ExitCode, int32_t value) : exitCode(value) {}
+    constexpr PluginErrorContext(RequiredBytes, uint32_t value) : requiredBytes(value) {}
+    constexpr PluginErrorContext(RequiredElements, uint32_t value) : requiredElements(value) {}
 };
 
 /// @brief Stable category assigned to errors owned by Plugin.
@@ -161,20 +174,21 @@ struct [[nodiscard]] ResultPlugin
 
     static constexpr ResultPlugin withExitCode(PluginError error, PluginErrorDetail detail, int32_t exitCode)
     {
-        PluginErrorContext context;
-        context.exitCode = exitCode;
-        return {error, detail, PluginErrorContextKind::ExitCode, context};
+        return {error, detail, PluginErrorContextKind::ExitCode,
+                PluginErrorContext(PluginErrorContext::ExitCode{}, exitCode)};
     }
 
     static constexpr ResultPlugin withRequiredBytes(PluginError error, PluginErrorDetail detail, uint32_t requiredBytes)
     {
-        return {error, detail, PluginErrorContextKind::RequiredBytes, PluginErrorContext(requiredBytes)};
+        return {error, detail, PluginErrorContextKind::RequiredBytes,
+                PluginErrorContext(PluginErrorContext::RequiredBytes{}, requiredBytes)};
     }
 
     static constexpr ResultPlugin withRequiredElements(PluginError error, PluginErrorDetail detail,
                                                        uint32_t requiredElements)
     {
-        return {error, detail, PluginErrorContextKind::RequiredElements, PluginErrorContext(requiredElements)};
+        return {error, detail, PluginErrorContextKind::RequiredElements,
+                PluginErrorContext(PluginErrorContext::RequiredElements{}, requiredElements)};
     }
 
     explicit constexpr operator bool() const { return static_cast<bool>(result); }

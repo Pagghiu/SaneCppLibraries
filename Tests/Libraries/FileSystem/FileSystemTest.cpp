@@ -164,13 +164,26 @@ void SC::FileSystemTest::structuredErrorsAndFormatter()
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystem>::value,
                   "ResultFileSystem must remain trivially copyable");
 
+    static_assert(sizeof(FileSystemErrorContext) == 4, "FileSystemErrorContext must retain its four-byte payload");
+
+    constexpr ResultFileSystem nativeErrorContext = ResultFileSystem::withNativeError(
+        FileSystemError::EntryNotFound, FileSystemErrorDetail::OpenFileForRead, 0xffffffffu);
+    static_assert(nativeErrorContext.contextKind == FileSystemErrorContextKind::NativeError and
+                      nativeErrorContext.context.nativeError == 0xffffffffu,
+                  "withNativeError must initialize the nativeError member in constant evaluation");
+    constexpr ResultFileSystem requiredBytesContext = ResultFileSystem::withRequiredBytes(
+        FileSystemError::PathCapacityExceeded, FileSystemErrorDetail::BuildChildPath, 0xffffffffu);
+    static_assert(requiredBytesContext.contextKind == FileSystemErrorContextKind::RequiredBytes and
+                      requiredBytesContext.context.requiredBytes == 0xffffffffu,
+                  "withRequiredBytes must initialize the requiredBytes member in constant evaluation");
+    constexpr ResultFileSystem actualBytesContext =
+        ResultFileSystem::withActualBytes(FileSystemError::OperationFailed, FileSystemErrorDetail::CopyFileEntry, 7);
+    static_assert(actualBytesContext.contextKind == FileSystemErrorContextKind::ActualBytes and
+                      actualBytesContext.context.actualBytes == 7,
+                  "withActualBytes must initialize the actualBytes member in constant evaluation");
+
     const ResultFileSystem detailed = ResultFileSystem::withNativeError(FileSystemError::EntryNotFound,
                                                                         FileSystemErrorDetail::OpenFileForRead, 12345);
-    const ResultFileSystem copied   = detailed;
-    SC_TEST_EXPECT(copied.isError(FileSystemError::EntryNotFound));
-    SC_TEST_EXPECT(copied.detail == FileSystemErrorDetail::OpenFileForRead);
-    SC_TEST_EXPECT(copied.contextKind == FileSystemErrorContextKind::NativeError);
-    SC_TEST_EXPECT(copied.context.nativeError == 12345);
 
     const Result plain = detailed;
     SC_TEST_EXPECT(plain.isError(FileSystemResultCategory, FileSystemError::EntryNotFound));

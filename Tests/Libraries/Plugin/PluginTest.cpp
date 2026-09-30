@@ -381,13 +381,31 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
         static_assert(TypeTraits::IsTriviallyCopyable<ResultPlugin>::value,
                       "ResultPlugin must remain trivially copyable");
 
+        static_assert(sizeof(PluginErrorContext) == 4, "PluginErrorContext must retain its four-byte payload");
+
+        constexpr ResultPlugin nativeErrorContext =
+            ResultPlugin::withNativeError(PluginError::FileOpenFailed, PluginErrorDetail::PosixFileOpen, 0xffffffffu);
+        static_assert(nativeErrorContext.contextKind == PluginErrorContextKind::NativeError and
+                          nativeErrorContext.context.nativeError == 0xffffffffu,
+                      "withNativeError must initialize the nativeError member in constant evaluation");
+        constexpr ResultPlugin exitCodeContext = ResultPlugin::withExitCode(
+            PluginError::CompilerExitedWithFailure, PluginErrorDetail::CompilerBuildArguments, (-2147483647 - 1));
+        static_assert(exitCodeContext.contextKind == PluginErrorContextKind::ExitCode and
+                          exitCodeContext.context.exitCode == (-2147483647 - 1),
+                      "withExitCode must initialize the exitCode member in constant evaluation");
+        constexpr ResultPlugin requiredBytesContext = ResultPlugin::withRequiredBytes(
+            PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerBuildArguments, 0xffffffffu);
+        static_assert(requiredBytesContext.contextKind == PluginErrorContextKind::RequiredBytes and
+                          requiredBytesContext.context.requiredBytes == 0xffffffffu,
+                      "withRequiredBytes must initialize the requiredBytes member in constant evaluation");
+        constexpr ResultPlugin requiredElementsContext = ResultPlugin::withRequiredElements(
+            PluginError::ArgumentCapacityExceeded, PluginErrorDetail::CompilerBuildArguments, 7);
+        static_assert(requiredElementsContext.contextKind == PluginErrorContextKind::RequiredElements and
+                          requiredElementsContext.context.requiredElements == 7,
+                      "withRequiredElements must initialize the requiredElements member in constant evaluation");
+
         const ResultPlugin detailed =
             ResultPlugin::withNativeError(PluginError::FileOpenFailed, PluginErrorDetail::PosixFileOpen, 12345);
-        const ResultPlugin copied = detailed;
-        SC_TEST_EXPECT(copied.isError(PluginError::FileOpenFailed));
-        SC_TEST_EXPECT(copied.detail == PluginErrorDetail::PosixFileOpen);
-        SC_TEST_EXPECT(copied.contextKind == PluginErrorContextKind::NativeError);
-        SC_TEST_EXPECT(copied.context.nativeError == 12345);
 
         const Result plain = detailed;
         SC_TEST_EXPECT(plain.isError(PluginResultCategory, PluginError::FileOpenFailed));
