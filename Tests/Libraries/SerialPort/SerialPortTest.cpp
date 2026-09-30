@@ -323,10 +323,6 @@ void SC::SerialPortTest::nonSerialHandleContract()
 void SC::SerialPortTest::structuredErrorsAndFormatter()
 {
     static_assert(sizeof(ResultSerialPort) == 16, "ResultSerialPort must remain 16 bytes");
-    // The numeric identity and the two scalar detail fields fit the enriched-result budget.
-    static constexpr size_t ResultSerialPortFinalSize =
-        sizeof(uint64_t) + sizeof(SerialPortErrorDetail) + sizeof(uint32_t);
-    static_assert(ResultSerialPortFinalSize == 16, "ResultSerialPort's final target must remain 16 bytes");
     static_assert(__is_standard_layout(ResultSerialPort), "ResultSerialPort must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultSerialPort>::value,
                   "ResultSerialPort must remain trivially copyable");

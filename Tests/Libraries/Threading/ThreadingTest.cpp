@@ -11,15 +11,6 @@ namespace SC
 {
 struct ThreadingTest;
 
-static bool areEqual(const char* first, const char* second)
-{
-    while (*first != '\0' and *first == *second)
-    {
-        ++first;
-        ++second;
-    }
-    return *first == *second;
-}
 } // namespace SC
 
 struct SC::ThreadingTest : public SC::TestCase
@@ -321,8 +312,6 @@ void SC::ThreadingTest::testSemaphore()
 void SC::ThreadingTest::testErrorFormatter()
 {
     static_assert(sizeof(ResultThreading) == 16, "ResultThreading must remain 16 bytes");
-    static_assert(sizeof(void*) != 8 or sizeof(ResultThreading) == sizeof(Result) + 8,
-                  "ResultThreading detail must fit the final 16-byte target");
     static_assert(__is_standard_layout(ResultThreading), "ResultThreading must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultThreading>::value,
                   "ResultThreading must remain trivially copyable");
@@ -384,14 +373,6 @@ void SC::ThreadingTest::testErrorFormatter()
     SC_TEST_EXPECT(foreign.detail == ThreadingErrorDetail::None);
     formatted = formatThreadingError(foreign, nativeMessage);
     SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::ForeignCategory);
-
-    char                 translated[64];
-    ResultErrorFormatter translatedFormatter(translated);
-    translatedFormatter.append("Errore nativo del thread: ");
-    translatedFormatter.append(static_cast<uint64_t>(12345));
-    formatted = translatedFormatter.finish();
-    SC_TEST_EXPECT(formatted);
-    SC_TEST_EXPECT(areEqual(translated, "Errore nativo del thread: 12345"));
 }
 
 namespace SC

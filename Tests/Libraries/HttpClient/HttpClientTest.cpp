@@ -5,7 +5,6 @@
 #include "Libraries/Common/Deferred.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/HttpClient/HttpClientAsync.h"
-#include "Libraries/HttpClient/HttpClientErrorFormatter.h"
 #include "Libraries/HttpClient/HttpClientScheduler.h"
 #include "Libraries/HttpClient/HttpClientSession.h"
 #include "Libraries/Memory/String.h"

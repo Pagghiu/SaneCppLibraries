@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Common/Assert.h"
+#include "Libraries/Common/ResultErrorFormatter.h"
 #include "Libraries/Common/TypeTraits.h"
 #include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Limits.h"
@@ -123,6 +124,27 @@ struct SC::BaseTest : public SC::TestCase
 
     BaseTest(SC::TestReport& report) : TestCase(report, "BaseTest")
     {
+        if (test_section("Result diagnostic writer"))
+        {
+            char                 translated[64];
+            ResultErrorFormatter translatedFormatter(translated);
+            translatedFormatter.append("Errore nativo del thread: ");
+            translatedFormatter.append(static_cast<uint64_t>(12345));
+            SC_TEST_EXPECT(translatedFormatter.finish());
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(translated, StringEncoding::Ascii) ==
+                           "Errore nativo del thread: 12345");
+
+            char                 extremes[23];
+            ResultErrorFormatter extremesFormatter(extremes);
+            extremesFormatter.append(static_cast<uint64_t>(0));
+            extremesFormatter.append(" ");
+            extremesFormatter.append(static_cast<uint64_t>(MaxValue()));
+            const ResultErrorFormat formatted = extremesFormatter.finish();
+            SC_TEST_EXPECT(formatted.status == ResultErrorFormatStatus::Success);
+            SC_TEST_EXPECT(formatted.requiredCapacity == sizeof(extremes));
+            SC_TEST_EXPECT(StringSpan::fromNullTerminated(extremes, StringEncoding::Ascii) == "0 18446744073709551615");
+        }
+
         if (test_section("new/delete"))
         {
             int* a = new int(2);

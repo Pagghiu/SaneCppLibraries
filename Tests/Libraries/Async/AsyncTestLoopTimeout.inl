@@ -97,25 +97,29 @@ void SC::AsyncTest::loopTimeoutCallbackLifetime()
 {
     struct Context
     {
-        AsyncLoopTimeout* timeout           = nullptr;
-        int               storedGeneration  = 0;
-        int               invokedGeneration = 0;
+        AsyncLoopTimeout* timeout          = nullptr;
+        int               callbackCount    = 0;
+        bool              callbackSurvived = false;
     } context;
 
     struct ReleaseTimeout
     {
-        Context* context    = nullptr;
-        int      generation = 0;
+        Context* volatile context = nullptr;
 
         explicit ReleaseTimeout(Context& context) : context(&context) {}
-        ReleaseTimeout(const ReleaseTimeout& other) : context(other.context), generation(other.generation + 1) {}
-        ReleaseTimeout(ReleaseTimeout&& other) : context(other.context), generation(other.generation + 1) {}
+        ~ReleaseTimeout() { context = nullptr; }
 
         void operator()(AsyncLoopTimeout::Result&)
         {
-            context->invokedGeneration = generation;
+            Context& callbackContext = *context;
             dtor(*context->timeout);
-            context->timeout = nullptr;
+            // Continue through caller-owned state after destroying the request and its stored callable.
+            callbackContext.timeout = nullptr;
+            // The executing callable must outlive destruction of the stored callable. Either a safe copy or move
+            // can provide that lifetime; querying its capture catches direct invocation of destroyed storage.
+            callbackContext.callbackSurvived = context == &callbackContext;
+            if (context != nullptr)
+                context->callbackCount += 1;
         }
     };
 
@@ -125,16 +129,14 @@ void SC::AsyncTest::loopTimeoutCallbackLifetime()
     context.timeout = timeout;
 
     ReleaseTimeout callback(context);
-    timeout->callback              = callback;
-    ReleaseTimeout* storedCallback = timeout->callback.dynamicCastTo<ReleaseTimeout>();
-    SC_TEST_EXPECT(storedCallback != nullptr);
-    context.storedGeneration = storedCallback->generation;
+    timeout->callback = callback;
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
     SC_TEST_EXPECT(timeout->start(eventLoop, TimeMs{0}));
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(context.timeout == nullptr);
-    SC_TEST_EXPECT(context.invokedGeneration > context.storedGeneration);
+    SC_TEST_EXPECT(context.callbackSurvived);
+    SC_TEST_EXPECT(context.callbackCount == 1);
     SC_TEST_EXPECT(eventLoop.close());
 }

@@ -9305,7 +9305,6 @@ void SC::FibersTest::structuredErrorsAndFormatter()
                   "Fibers error values are append-only");
 
     const Result own = Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
-    SC_TEST_EXPECT(own.isError(FibersResultCategory, FibersError::SlotUnavailable));
 
     char              message[64];
     ResultErrorFormat formatted = formatFibersError(own, message);

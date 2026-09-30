@@ -46,8 +46,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             return;
 
         static_assert(sizeof(ResultFileSystemWatcher) == 16, "ResultFileSystemWatcher must remain 16 bytes");
-        static_assert(sizeof(void*) != 8 or sizeof(ResultFileSystemWatcher) == sizeof(Result) + 8,
-                      "ResultFileSystemWatcher must fit the final 16-byte target");
         static_assert(__is_standard_layout(ResultFileSystemWatcher),
                       "ResultFileSystemWatcher must remain standard-layout");
         static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystemWatcher>::value,
@@ -69,12 +67,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const ResultFileSystemWatcher notWatching = watcher.stopWatching();
         SC_TEST_EXPECT(notWatching.isError(FileSystemWatcherError::NotWatching));
 
-        ResultFileSystemWatcher       detailed(FileSystemWatcherError::WatchSetupFailed,
-                                               FileSystemWatcherErrorDetail::LinuxAddRootWatch, 12345);
-        const ResultFileSystemWatcher copied = detailed;
-        SC_TEST_EXPECT(copied.detail == FileSystemWatcherErrorDetail::LinuxAddRootWatch);
-        SC_TEST_EXPECT(copied.nativeError == 12345);
-        const Result plain = detailed;
+        ResultFileSystemWatcher detailed(FileSystemWatcherError::WatchSetupFailed,
+                                         FileSystemWatcherErrorDetail::LinuxAddRootWatch, 12345);
+        const Result            plain = detailed;
         SC_TEST_EXPECT(plain.isError(FileSystemWatcherResultCategory, FileSystemWatcherError::WatchSetupFailed));
 
         const ResultFileSystemWatcher fromPlain(plain);

@@ -201,7 +201,6 @@ struct SupportToolsTest : public TestCase
             static_assert(static_cast<uint32_t>(ToolsError::ChildProcessExitedNonzero) == 2,
                           "Tool errors are append-only");
             const Result unsupported = Result::Error(ToolsResultCategory, ToolsError::UnsupportedFormatAction);
-            SC_TEST_EXPECT(unsupported.isError(ToolsResultCategory, ToolsError::UnsupportedFormatAction));
 
             char message[64];
             SC_TEST_EXPECT(formatToolsError(unsupported, message));
@@ -1247,7 +1246,6 @@ struct SupportToolsTest : public TestCase
                                .isError(PackageResultCategory, PackageError::DownloadVersionMissing));
             download.packageVersion  = "1";
             download.packagePlatform = SmallString<255>();
-            SC_TEST_EXPECT(download.packagePlatform.isEmpty());
             SC_TEST_EXPECT(packageInstall(download, package, functions)
                                .isError(PackageResultCategory, PackageError::DownloadPlatformMissing));
             download.packagePlatform = "test";

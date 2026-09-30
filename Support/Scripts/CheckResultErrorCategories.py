@@ -35,7 +35,7 @@ def main():
     if values[0] != 0 or categories[0].get("owner") != "Common":
         return fail("category zero must be the first Common reservation")
     if values != sorted(values):
-        return fail("built-in categories must remain in ascending append-only order")
+        return fail("built-in categories must be listed in ascending numeric order")
     if len(values) != len(set(values)):
         return fail("duplicate category value")
     if any(not isinstance(value, int) or value < 0 or value >= 0x80000000 for value in values):
