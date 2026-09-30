@@ -32,8 +32,11 @@ use that library; see [TOOLS-0001](../Tools/tools-0001-own-tool-error-identities
 the library that owns them, not collected in Common. Built-in category numbers are centrally assigned, append-only,
 and collision-checked in the [Result error category registry](result-error-categories.md). A reserved numeric range is
 available for application and external-library categories.
+Each owner keeps its error enum, category, detail/context types, and enriched result (when present) in a dedicated
+`<Owner>Error.h`. The ordinary API header includes that file for source compatibility; optional formatter headers
+include the error header directly rather than pulling in the whole API.
 The foundational `StringSpan` source fragment is a narrow exception: it owns its own type-specific category and enum
-in its guarded header because Common cannot depend on Strings and several libraries propagate its native-output
+in its guarded `StringSpanError.h` because Common cannot depend on Strings and several libraries propagate its native-output
 failures. This does not create a Common-wide error catalogue or collect any library's errors centrally.
 
 A library may define a composed enriched result when callers benefit from structured context. Its first-class status is

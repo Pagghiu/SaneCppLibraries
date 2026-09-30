@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Common/ResultErrorFormatter.h"
-#include "Process.h"
+#include "ProcessError.h"
 
 namespace SC
 {

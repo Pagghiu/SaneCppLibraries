@@ -12,8 +12,9 @@ same underlying failure behind unrelated identities.
 
 ## Decision
 
-The foundational `StringSpan` type owns built-in category 19 and a small append-only `StringSpanError` enum beside
-its definition. This is a type-specific shared category, not a category for all Common code and not a repository-wide
+The foundational `StringSpan` type owns built-in category 19 and a small append-only `StringSpanError` enum in
+the dedicated guarded `StringSpanError.h`, included by `StringSpan.h`. This is a type-specific shared category,
+not a category for all Common code and not a repository-wide
 list of library errors. It distinguishes an invalid destination offset, insufficient destination, native conversion
 failure, and unsupported encoding. The Windows conversion helper currently reports malformed input and insufficient
 output through one boolean; its primary code therefore honestly combines those causes rather than claiming to know

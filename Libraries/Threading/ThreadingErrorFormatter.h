@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Common/ResultErrorFormatter.h"
-#include "Threading.h"
+#include "ThreadingError.h"
 
 namespace SC
 {

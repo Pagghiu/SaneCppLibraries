@@ -8,7 +8,7 @@
 #define SC_FOUNDATION_STRING_SPAN_ERROR_FORMATTER_DEFINITION_H 1
 
 #include "ResultErrorFormatter.h"
-#include "StringSpan.h"
+#include "StringSpanError.h"
 
 namespace SC
 {

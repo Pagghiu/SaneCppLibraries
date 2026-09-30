@@ -1,16 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #ifdef SC_FOUNDATION_STRING_SPAN_DEFINITION_H
-#if SC_FOUNDATION_STRING_SPAN_DEFINITION_H != 3
+#if SC_FOUNDATION_STRING_SPAN_DEFINITION_H != 4
 #error "StringSpan.h has been included multiple times in different versions."
 #endif
 #else
-#define SC_FOUNDATION_STRING_SPAN_DEFINITION_H 3 // Increment to indicate a new version of the file
+#define SC_FOUNDATION_STRING_SPAN_DEFINITION_H 4 // Increment to indicate a new version of the file
 
 #include "CompilerBuiltins.h"
 #include "PlatformMacrosType.h"
-#include "Result.h"
 #include "Span.h"
+#include "StringSpanError.h"
 
 #ifndef SC_STRING_SPAN_ASSERT_RELEASE
 #define SC_STRING_SPAN_ASSERT_RELEASE(expression) (void)(expression)
@@ -18,18 +18,6 @@
 
 namespace SC
 {
-/// @brief Stable failures of the shared StringSpan native-output helper.
-enum class StringSpanError : uint32_t
-{
-    DestinationOffsetInvalid = 1,
-    DestinationTooSmall,
-    NativeConversionFailed,
-    EncodingUnsupported,
-};
-
-/// @brief Category owned by the foundational StringSpan type, not by a higher-level string library.
-static constexpr ResultCategory StringSpanResultCategory = ResultCategory(19);
-
 #if SC_PLATFORM_WINDOWS
 #define SC_NATIVE_STR(str) L##str
 #else
