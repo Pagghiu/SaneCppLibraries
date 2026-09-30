@@ -158,6 +158,10 @@ For API signatures and per-member contracts, see @ref group_http_client. The pub
 the layers explicitly: `HttpClient.h` for the core, `HttpClientSession.h` for state,
 `HttpClientScheduler.h` for readiness coordination, and `HttpClientAsync.h` for stream integration.
 
+# Blog
+
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
+
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/HttpClient`.
 Single File counts

@@ -95,6 +95,10 @@ The current design is most credible as a development-time hot-reload facility un
 - [Ep.25 – C++ Serialization and Reflection (with Hot-Reload)](https://www.youtube.com/watch?v=d7DXxC6xG_A)
 - [June 2024 update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html) and [July 2024 update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html) provide historical context.
 
+# Blog
+
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
+
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Plugin`.
 Single File counts

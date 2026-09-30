@@ -174,6 +174,7 @@ should be added only after concrete workflows establish their storage and overfl
 Some relevant blog posts are:
 
 - [May 2026 Update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 

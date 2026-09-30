@@ -276,6 +276,7 @@ Current Draft goals:
 Development notes and design changes are recorded in the project updates:
 
 - [August 2026 Update](https://pagghiu.github.io/site/blog/2026-08-31-SaneCppLibrariesUpdate.html)
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Cryptography`.

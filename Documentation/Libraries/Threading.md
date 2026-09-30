@@ -148,6 +148,10 @@ Development background:
 🟦 Complete Features:
 - Support more types in `Atomic<T>`.
 
+# Blog
+
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
+
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Threading`.
 Single File counts

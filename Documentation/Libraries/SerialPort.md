@@ -114,6 +114,7 @@ For example:
 Some relevant blog posts are:
 
 - [February 2026 Update](https://pagghiu.github.io/site/blog/2026-02-28-SaneCppLibrariesUpdate.html)
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 

@@ -173,6 +173,7 @@ For the exact operation list and result fields, see [SC::AsyncFiberIO](@ref SC::
 Development notes and design changes are recorded in the project updates:
 
 - [July 2026 Update](https://pagghiu.github.io/site/blog/2026-07-31-SaneCppLibrariesUpdate.html)
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 

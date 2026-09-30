@@ -106,6 +106,10 @@ Relevant development notes:
 
 @copydoc SC::FileSystemIterator
 
+# Blog
+
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
+
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/FileSystemIterator`.
 Single File counts

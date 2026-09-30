@@ -135,6 +135,10 @@ polling fallback.
 Possible future work includes a polling/stat backend for filesystems without usable native notifications and a mode where
 the caller supplies the watcher thread. Neither is currently planned as part of the public API.
 
+# Blog
+
+- [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
+
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/FileSystemWatcher`.
 Single File counts
