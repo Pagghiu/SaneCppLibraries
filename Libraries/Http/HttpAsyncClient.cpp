@@ -305,7 +305,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error(HttpResultCategory, HttpError::ClientReconnectReadableListenerUnavailable);
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -316,7 +316,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error(HttpResultCategory, HttpError::ClientReconnectWritableListenerUnavailable);
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -327,7 +327,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error(HttpResultCategory, HttpError::ClientReconnectSocketReadableListenerUnavailable);
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -338,7 +338,7 @@ Result HttpAsyncClient::beginReconnectClose()
         if (not added)
         {
             clearReconnectCloseListeners();
-            return Result::Error(HttpResultCategory, HttpError::ClientReconnectSocketWritableListenerUnavailable);
+            return Result::Error(HttpResultCategory, HttpError::ClientReconnectListenerUnavailable);
         }
         reconnectClosuresPending++;
     }
@@ -812,17 +812,17 @@ Result HttpAsyncClient::prepareResponseDecompression()
 
     HttpIncomingMessage::BodyStream& rawBody = response.rawBodyStream();
     if (not rawBody.eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyData>(*this))
-        return Result::Error(HttpResultCategory, HttpError::ClientDecoderDataListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderListenerUnavailable);
     if (not rawBody.eventEnd.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyEnd>(*this))
-        return Result::Error(HttpResultCategory, HttpError::ClientDecoderEndListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderListenerUnavailable);
     if (not rawBody.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this))
-        return Result::Error(HttpResultCategory, HttpError::ClientDecoderRawErrorListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderListenerUnavailable);
     if (not responseDecoder->AsyncReadableStream::eventError
                 .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this))
-        return Result::Error(HttpResultCategory, HttpError::ClientDecoderReadableErrorListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderListenerUnavailable);
     if (not responseDecoder->AsyncWritableStream::eventError
                 .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this))
-        return Result::Error(HttpResultCategory, HttpError::ClientDecoderWritableErrorListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::ClientDecoderListenerUnavailable);
 
     response.attachReadableStream(*responseDecoder);
     responseDecoderActive = true;

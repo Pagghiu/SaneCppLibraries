@@ -23,6 +23,13 @@ formatting is the only canonical text API, so the mandatory Await implementation
 literals. A separate typed
 coroutine result or native-detail API would require an explicit promise-size and lifetime review.
 
+Before release, task preconditions are consolidated by condition rather than container: `InvalidTask` covers plain
+tasks, groups, and registries; `TaskAlreadyStarted` also covers registry insertion; `InactiveTask` covers group and
+registry waits. The caller already knows which container API it invoked, and container provenance does not change
+recovery. `InactiveTask` remains separate from `InvalidTask` and `TaskNotStarted` because these lifecycle conditions
+have different contracts. Formatter text describes the shared condition. Unaffected numeric values are preserved;
+removed identities leave unused gaps and have no compatibility aliases. New values remain append-only.
+
 ## Consequences
 
 Cancellation and wrong-loop checks no longer depend on string address identity. Existing promise, awaiter, and task

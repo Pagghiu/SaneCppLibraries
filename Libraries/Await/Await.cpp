@@ -2430,7 +2430,7 @@ Result AwaitTaskGroup::spawnAll(Span<AwaitTask*> taskList)
     {
         if (taskList[idx] == nullptr)
         {
-            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+            return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
         }
     }
 
@@ -2465,7 +2465,7 @@ Result AwaitTaskGroup::collectResults(Span<Result> outResults, AwaitTaskGroupRes
         AwaitTask* task = tasks[idx];
         if (task == nullptr)
         {
-            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+            return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
         }
 
         Result taskResult = task->result();
@@ -2509,7 +2509,7 @@ Result AwaitTaskGroup::summarizeResults(AwaitTaskGroupResultSummary& outSummary)
         AwaitTask* task = tasks[idx];
         if (task == nullptr)
         {
-            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+            return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
         }
 
         Result taskResult = task->result();
@@ -2560,7 +2560,7 @@ Result AwaitTaskRegistry::spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* 
     }
     if (task.isStarted())
     {
-        return Result::Error(AwaitResultCategory, AwaitError::RegistryTaskAlreadyStarted);
+        return Result::Error(AwaitResultCategory, AwaitError::TaskAlreadyStarted);
     }
 
     for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
@@ -2744,7 +2744,7 @@ bool AwaitTaskRegistryWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinu
         }
         if (not task.isActive())
         {
-            operationResult = Result::Error(AwaitResultCategory, AwaitError::RegistryInactiveTask);
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::InactiveTask);
             clearTaskCallbacks();
             return false;
         }
@@ -2892,7 +2892,7 @@ bool AwaitTaskRegistryWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinu
         }
         if (not task.isActive())
         {
-            operationResult = Result::Error(AwaitResultCategory, AwaitError::RegistryInactiveTask);
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::InactiveTask);
             clearTaskCallbacks();
             return false;
         }
@@ -3049,7 +3049,7 @@ Result AwaitTaskRegistryWaitAnyAwaiter::setWinner(size_t index)
     AwaitTask& task = registry.tasks[index];
     if (not task.isValid())
     {
-        return Result::Error(AwaitResultCategory, AwaitError::RegistryInvalidTask);
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
 
     winnerIndex     = index;
@@ -3089,7 +3089,7 @@ bool AwaitTaskGroupWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuati
         AwaitTask* task = group.tasks[idx];
         if (task == nullptr or not task->isValid())
         {
-            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
             clearChildCallbacks();
             return false;
         }
@@ -3100,7 +3100,7 @@ bool AwaitTaskGroupWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuati
         }
         if (not task->isActive())
         {
-            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInactiveTask);
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::InactiveTask);
             clearChildCallbacks();
             return false;
         }
@@ -3219,7 +3219,7 @@ Result AwaitTaskGroupWaitAllAwaiter::collectResult() const
         AwaitTask* task = group.tasks[idx];
         if (task == nullptr)
         {
-            return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+            return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
         }
         SC_TRY(task->result());
     }
@@ -3250,7 +3250,7 @@ bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuati
         AwaitTask* task = group.tasks[idx];
         if (task == nullptr or not task->isValid())
         {
-            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
             clearChildCallbacks();
             return false;
         }
@@ -3265,7 +3265,7 @@ bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuati
         }
         if (not task->isActive())
         {
-            operationResult = Result::Error(AwaitResultCategory, AwaitError::TaskGroupInactiveTask);
+            operationResult = Result::Error(AwaitResultCategory, AwaitError::InactiveTask);
             clearChildCallbacks();
             return false;
         }
@@ -3416,7 +3416,7 @@ Result AwaitTaskGroupWaitAnyAwaiter::setWinner(size_t index)
     AwaitTask* task = group.tasks[index];
     if (task == nullptr)
     {
-        return Result::Error(AwaitResultCategory, AwaitError::TaskGroupInvalidTask);
+        return Result::Error(AwaitResultCategory, AwaitError::InvalidTask);
     }
 
     winnerIndex     = index;

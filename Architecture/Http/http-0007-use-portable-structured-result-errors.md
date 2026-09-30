@@ -57,8 +57,10 @@ Outgoing message and response failures now distinguish header lifecycle/order, i
 streams, invalid response status/reason text, redirect validation, and fixed chunk-header storage. Shared conditions
 such as already-sent headers use one identity across request and response paths.
 
-Client request setup shares the outgoing lifecycle identities and adds distinct codes for repeated request starts,
-unsupported response content coding, invalid compressed-body coding, and missing multipart writer/boundary state.
+Client request setup shares the outgoing lifecycle identities and adds distinct codes for unsupported response
+content coding, invalid compressed-body coding, and missing multipart writer/boundary state. Repeated response and
+request starts share `MessageStartAlreadyWritten`: the caller knows which API it invoked and can recover by resetting
+or replacing the message. The primary code intentionally does not retain the request/response distinction.
 
 Connection-pool initialization distinguishes active-connection lifecycle, empty header storage, per-resource caller
 storage shortages, and invalid read/buffer queue configuration. Capacity checks use division rather than multiplying
@@ -105,6 +107,15 @@ One Http category is sufficient for now even though the library has several doma
 appended within the local enum as each cohesive port lands. Platform-specific failures do not become primary codes.
 Backend stage and native error numbers can be carried only by a separately designed bounded Http-specific enriched
 result, with an ADR, and are dropped when converted to plain `Result`.
+
+Before release, reconnect, response-decoder, and WebSocket-pump listener-registration failures are consolidated into
+`ClientReconnectListenerUnavailable`, `ClientDecoderListenerUnavailable`, and `WebSocketPumpListenerUnavailable`.
+These operation-level codes report the same failed bounded registration and recovery within each operation. The
+precise internal registration slot (readable/writable/socket close, decoder data/end/error, or pump data/end/close)
+is intentionally lost and cannot be recovered from plain `Result` or its canonical formatter. That detail does not
+change the caller's recovery decision, so this consolidation does not introduce `ResultHttp` or a detail enum.
+Protocol, transport-state, unattached-pump, and backpressure failures remain distinct. Unaffected numeric values are
+preserved; removed identities leave unused gaps and have no compatibility aliases. New values remain append-only.
 
 ## Consequences
 

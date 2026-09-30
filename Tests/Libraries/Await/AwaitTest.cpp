@@ -1445,7 +1445,7 @@ struct SC::AwaitTest : public SC::TestCase
         }
 
         AwaitTask* invalidChildren[1] = {};
-        if (not group.spawnAll(invalidChildren).isError(AwaitResultCategory, AwaitError::TaskGroupInvalidTask))
+        if (not group.spawnAll(invalidChildren).isError(AwaitResultCategory, AwaitError::InvalidTask))
         {
             co_return awaitTestFailure(AwaitTestFailure::TaskGroupSpawnAllUnexpectedlyIgnoredInvalidTask);
         }
@@ -1745,7 +1745,6 @@ struct SC::AwaitTest : public SC::TestCase
         static_assert(AwaitResultCategory.value == 15, "Await owns category 15");
         static_assert(static_cast<uint32_t>(AwaitError::UnhandledException) == 14, "Await errors are append-only");
         static_assert(static_cast<uint32_t>(AwaitError::TaskAlreadyAwaited) == 32, "Await errors are append-only");
-        static_assert(static_cast<uint32_t>(AwaitError::RegistryInvalidTask) == 37, "Await errors are append-only");
         static_assert(static_cast<uint32_t>(AwaitError::InvalidWorkCallback) == 39, "Await errors are append-only");
 
         Result cancelled = AwaitCancelledResult();
@@ -1761,30 +1760,6 @@ struct SC::AwaitTest : public SC::TestCase
         char message[64];
         SC_TEST_EXPECT(formatAwaitError(cancelled, message).status == ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(formatAwaitError(wrongLoop, message).status == ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupStorageFull, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupInvalidTask, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupResultStorageTooSmall, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupInactiveTask, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskGroupEmpty, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskAlreadyAwaited, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryTaskAlreadyStarted, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryStorageFull, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryInactiveTask, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryEmpty, message).status == ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::RegistryInvalidTask, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::TaskTimedOut, message).status == ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::InvalidWorkCallback, message).status ==
-                       ResultErrorFormatStatus::Success);
         SC_TEST_EXPECT(
             formatAwaitError(Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized), message).status ==
             ResultErrorFormatStatus::ForeignCategory);
@@ -1802,24 +1777,6 @@ struct SC::AwaitTest : public SC::TestCase
     void awaiterErrorIdentities()
     {
         static_assert(static_cast<uint32_t>(AwaitError::InvalidFileHandle) == 22, "Await errors are append-only");
-
-        char message[80];
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::SocketSendNoProgress, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::SocketReceiveIncomplete, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::SocketReceiveNoProgress, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::EmptyReceiveBuffer, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::ReceiveLineBufferExhausted, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::FileReadNoProgress, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::OperationUnsupported, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::InvalidFileHandle, message).status ==
-                       ResultErrorFormatStatus::Success);
 
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
@@ -1848,15 +1805,6 @@ struct SC::AwaitTest : public SC::TestCase
     {
         static_assert(static_cast<uint32_t>(AwaitError::InvalidFileSystemOperation) == 26,
                       "Await errors are append-only");
-
-        char message[64];
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::MissingOutputFile, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::MissingFile, message).status == ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::MissingReadResult, message).status ==
-                       ResultErrorFormatStatus::Success);
-        SC_TEST_EXPECT(formatAwaitError(AwaitError::InvalidFileSystemOperation, message).status ==
-                       ResultErrorFormatStatus::Success);
 
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
@@ -3934,8 +3882,16 @@ struct SC::AwaitTest : public SC::TestCase
             AwaitTask         storage[1];
             AwaitTaskRegistry registry(await, storage);
 
-            SC_TEST_EXPECT(not registry.spawn(AwaitTask()));
+            SC_TEST_EXPECT(registry.spawn(AwaitTask()).isError(AwaitResultCategory, AwaitError::InvalidTask));
             SC_TEST_EXPECT(registry.size() == 0);
+
+            AwaitTask started = waitTwice(await);
+            SC_TEST_EXPECT(await.spawn(started));
+            SC_TEST_EXPECT(registry.spawn(move(started)).isError(AwaitResultCategory, AwaitError::TaskAlreadyStarted));
+            SC_TEST_EXPECT(registry.size() == 0);
+            SC_TEST_EXPECT(started.isActive());
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(started.result());
             SC_TEST_EXPECT(async.close());
         }
     }

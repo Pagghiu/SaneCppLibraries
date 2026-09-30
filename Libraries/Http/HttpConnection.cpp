@@ -1156,7 +1156,7 @@ Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
     if (headersSent)
         return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
     if (responseHeaders.writtenBytes() != 0)
-        return Result::Error(HttpResultCategory, HttpError::HeaderStartAlreadyWritten);
+        return Result::Error(HttpResultCategory, HttpError::MessageStartAlreadyWritten);
     if (code < 100 or code > 999)
         return Result::Error(HttpResultCategory, HttpError::ResponseStatusInvalid);
     if (reasonPhrase.isEmpty())
@@ -1269,7 +1269,7 @@ Result HttpAsyncClientRequest::startRequest(HttpParser::Method value, StringSpan
     if (headersSent)
         return Result::Error(HttpResultCategory, HttpError::HeadersAlreadySent);
     if (responseHeaders.writtenBytes() != 0)
-        return Result::Error(HttpResultCategory, HttpError::RequestStartAlreadyWritten);
+        return Result::Error(HttpResultCategory, HttpError::MessageStartAlreadyWritten);
 
     method = value;
     url    = valueURL.sizeInBytes() > 0 ? valueURL : StringSpan("/");

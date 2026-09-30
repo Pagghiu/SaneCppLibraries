@@ -100,7 +100,7 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ChunkedDestinationMissing: formatter.append("Chunked HTTP output destination is missing"); break;
     case HttpError::HeadersAlreadySent: formatter.append("HTTP headers have already been sent"); break;
     case HttpError::HeaderStartMissing: formatter.append("HTTP message start must precede headers"); break;
-    case HttpError::HeaderStartAlreadyWritten: formatter.append("HTTP message start has already been written"); break;
+    case HttpError::MessageStartAlreadyWritten: formatter.append("HTTP message start has already been written"); break;
     case HttpError::KeepAliveDisabled: formatter.append("HTTP keep-alive is disabled for this connection"); break;
     case HttpError::ContentLengthTransferEncodingConflict:
         formatter.append("Content-Length conflicts with Transfer-Encoding");
@@ -117,7 +117,6 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::RedirectStatusInvalid: formatter.append("HTTP redirect status must be 3xx"); break;
     case HttpError::RedirectLocationEmpty: formatter.append("HTTP redirect location is empty"); break;
     case HttpError::ContentEncodingUnsupported: formatter.append("HTTP Content-Encoding is unsupported"); break;
-    case HttpError::RequestStartAlreadyWritten: formatter.append("HTTP request start has already been written"); break;
     case HttpError::CompressedBodyEncodingInvalid:
         formatter.append("Compressed HTTP request body requires gzip or deflate");
         break;
@@ -200,17 +199,8 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("HTTP client URL user information is unsupported");
         break;
     case HttpError::ClientReconnectNotPending: formatter.append("HTTP client reconnect is not pending"); break;
-    case HttpError::ClientReconnectReadableListenerUnavailable:
-        formatter.append("HTTP client reconnect readable close listener is unavailable");
-        break;
-    case HttpError::ClientReconnectWritableListenerUnavailable:
-        formatter.append("HTTP client reconnect writable close listener is unavailable");
-        break;
-    case HttpError::ClientReconnectSocketReadableListenerUnavailable:
-        formatter.append("HTTP client reconnect socket readable close listener is unavailable");
-        break;
-    case HttpError::ClientReconnectSocketWritableListenerUnavailable:
-        formatter.append("HTTP client reconnect socket writable close listener is unavailable");
+    case HttpError::ClientReconnectListenerUnavailable:
+        formatter.append("HTTP client reconnect listener is unavailable");
         break;
     case HttpError::ClientSocketInvalid: formatter.append("HTTP client socket is invalid"); break;
     case HttpError::ClientHttpsTransportMissing:
@@ -230,20 +220,8 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ClientTransformWritablePoolMismatch:
         formatter.append("HTTP client body transform writable side uses a different buffer pool");
         break;
-    case HttpError::ClientDecoderDataListenerUnavailable:
-        formatter.append("HTTP response decoder data listener is unavailable");
-        break;
-    case HttpError::ClientDecoderEndListenerUnavailable:
-        formatter.append("HTTP response decoder end listener is unavailable");
-        break;
-    case HttpError::ClientDecoderRawErrorListenerUnavailable:
-        formatter.append("HTTP response decoder raw error listener is unavailable");
-        break;
-    case HttpError::ClientDecoderReadableErrorListenerUnavailable:
-        formatter.append("HTTP response decoder readable error listener is unavailable");
-        break;
-    case HttpError::ClientDecoderWritableErrorListenerUnavailable:
-        formatter.append("HTTP response decoder writable error listener is unavailable");
+    case HttpError::ClientDecoderListenerUnavailable:
+        formatter.append("HTTP response decoder listener is unavailable");
         break;
     case HttpError::ClientInformationalResponseUnsupported:
         formatter.append("HTTP informational response is unsupported by this client");
@@ -331,15 +309,7 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
         formatter.append("WebSocket automatic control storage is too small");
         break;
     case HttpError::WebSocketTransportInvalid: formatter.append("WebSocket transport is invalid"); break;
-    case HttpError::WebSocketPumpDataListenerUnavailable:
-        formatter.append("WebSocket pump data listener is unavailable");
-        break;
-    case HttpError::WebSocketPumpEndListenerUnavailable:
-        formatter.append("WebSocket pump end listener is unavailable");
-        break;
-    case HttpError::WebSocketPumpCloseListenerUnavailable:
-        formatter.append("WebSocket pump close listener is unavailable");
-        break;
+    case HttpError::WebSocketPumpListenerUnavailable: formatter.append("WebSocket pump listener is unavailable"); break;
     case HttpError::WebSocketPumpNotAttached: formatter.append("WebSocket pump is not attached"); break;
     case HttpError::WebSocketFrameEmpty: formatter.append("WebSocket encoded frame is empty"); break;
     case HttpError::WebSocketHubFull: formatter.append("WebSocket hub has no free client slot"); break;

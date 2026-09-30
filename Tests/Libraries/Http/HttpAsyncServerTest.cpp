@@ -1160,7 +1160,7 @@ void SC::HttpAsyncServerTest::responseDiagnosticMessages()
         ProbeHttpResponse response;
         response.setup(headers, writable);
         SC_TEST_EXPECT(response.startResponse(200));
-        SC_TEST_EXPECT(resultHasHttpError(response.startResponse(201), HttpError::HeaderStartAlreadyWritten));
+        SC_TEST_EXPECT(resultHasHttpError(response.startResponse(201), HttpError::MessageStartAlreadyWritten));
         response.disableKeepAlive();
         SC_TEST_EXPECT(
             resultHasHttpError(response.addHeader("Connection", "keep-alive"), HttpError::KeepAliveDisabled));
@@ -1527,7 +1527,7 @@ void SC::HttpAsyncServerTest::chunkedClientRequestWriting()
 
     SC_TEST_EXPECT(request.startRequest(HttpParser::Method::HttpPUT, "/chunked"));
     SC_TEST_EXPECT(resultHasHttpError(request.startRequest(HttpParser::Method::HttpPOST, "/again"),
-                                      HttpError::RequestStartAlreadyWritten));
+                                      HttpError::MessageStartAlreadyWritten));
     SC_TEST_EXPECT(request.addHeader("Host", "127.0.0.1"));
     SC_TEST_EXPECT(request.setBody(bodyStream));
     SC_TEST_EXPECT(request.sendHeaders());

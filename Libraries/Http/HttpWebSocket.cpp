@@ -1532,7 +1532,7 @@ Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& new
     if (not dataListenerAdded)
     {
         detach();
-        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpDataListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpListenerUnavailable);
     }
 
     endListenerAdded = transport.readableStream->eventEnd
@@ -1540,7 +1540,7 @@ Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& new
     if (not endListenerAdded)
     {
         detach();
-        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpEndListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpListenerUnavailable);
     }
 
     closeListenerAdded =
@@ -1549,7 +1549,7 @@ Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& new
     if (not closeListenerAdded)
     {
         detach();
-        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpCloseListenerUnavailable);
+        return Result::Error(HttpResultCategory, HttpError::WebSocketPumpListenerUnavailable);
     }
     return Result(true);
 }
