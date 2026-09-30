@@ -20,8 +20,8 @@ failures retain their OS-qualified operation detail without context because `dle
 string rather than a stable numeric code; `errno` is not used as a substitute.
 
 Plain and foreign `Result` conversion deliberately clears Plugin detail and context. Same-domain copying preserves
-them. Conversion to plain `Result` preserves only the structured category/error identity. The bridge layout is 24 bytes
-on 64-bit supported targets and becomes 16 bytes after the legacy Result message pointer is removed.
+them. Conversion to plain `Result` preserves only the structured category/error identity. The enriched result occupies
+16 bytes; the unreleased legacy bridge temporarily occupied 24 bytes on 64-bit targets.
 
 The optional `PluginErrorFormatter.h` follows the Common caller-storage formatter contract. It accepts enum, plain, and
 enriched values, rejects foreign categories and unknown primary/detail/context values, and formats signed exit codes

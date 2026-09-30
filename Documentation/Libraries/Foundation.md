@@ -27,8 +27,8 @@ Foundation separates *access* from *ownership*.
 - `Span<T>` is a pointer and an element count. `StringSpan` adds an explicit ASCII, UTF-8, UTF-16, or native encoding
   and records whether a terminator follows the viewed bytes. Neither type owns or extends the lifetime of its data.
   `StringPath` is the deliberate exception: it owns one fixed-capacity, native-encoded path buffer.
-- `Result` is a `[[nodiscard]]` success/failure value. `SC_TRY` forwards a failure without exceptions. It deliberately
-  carries only a stable ASCII error-message pointer, not an arbitrary error payload.
+- `Result` is an eight-byte `[[nodiscard]]` success/failure value. `SC_TRY` forwards a failure without exceptions.
+  It carries a numeric category and error value; text formatting is optional and owned by each library.
 - `Function<Signature>` stores a free function, member binding, functor, or lambda inline. Its default callable storage
   is `2 * sizeof(void*)`; an oversized capture is a compile-time error rather than a heap allocation.
 - `UniqueHandle` owns one native-style handle and releases it deterministically. `Deferred` runs local cleanup at scope
@@ -60,7 +60,7 @@ Foundation itself performs no dynamic allocation. That promise has practical con
 
 - A `Span` or `StringSpan` can dangle. Returning one is safe only when its backing storage remains alive. `StringPath`
   instead owns its buffer, but rejects content beyond its platform-specific `MaxPath` capacity.
-- A `Result` contains only a numeric category and error value, not text or owned storage. Use the owning library\'s
+- A `Result` contains only a numeric category and error value, not text or owned storage. Use the owning library's
   error enum for inspection; opt into its `ErrorFormatter.h` only when a diagnostic is needed. Enriched results carry
   copied scalar context, and conversion to plain `Result` deliberately discards that context.
 - A `Function` owns its inline functor or lambda, but references captured by that callable still follow normal C++

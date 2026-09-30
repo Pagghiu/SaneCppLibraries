@@ -30,8 +30,8 @@ until all of its sections have run.
 
 Derived test cases normally execute their checks directly in their constructor. `test_section()` is not a nested test
 object: it decides whether the following ordinary C++ block should execute and labels its expectations. `SC_TEST_EXPECT`
-accepts either a Boolean expression or an `SC::Result`; for a failed `Result`, the result message becomes the detailed
-error. Successful expectations are counted but only section summaries and failures are printed.
+accepts either a Boolean expression or an `SC::Result`; for a failed `Result`, its numeric category and error value
+become the detailed error. Successful expectations are counted but only section summaries and failures are printed.
 
 The repository's Console test is representative source, not a synthetic API catalogue:
 

@@ -27,8 +27,8 @@ registration and error values remain append-only.
 ## Confirmation
 
 The category checker scans library and tool headers. Focused tool tests verify numeric identity, canonical formatting,
-and the command-line presentation path. The final bridge audit must find no tool-owned literal-error factory or
-`SC_TRY_MSG` call before removing `Result.message`.
+and the command-line presentation path. The completed bridge audit finds no tool-owned literal-error factory,
+`SC_TRY_MSG` call, or legacy message consumer.
 
 ## Related
 

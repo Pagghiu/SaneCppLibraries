@@ -61,9 +61,9 @@ These limits are behavior, not tuning hints:
   caller storage when requested;
 - increasing concurrent connection count multiplies the per-connection storage chosen by the application.
 
-The library reports these conditions through `Result`; it does not silently truncate and does not throw. Error messages
-usually name the layer enforcing the invariant (`HttpIncomingMessage`, `HttpAsyncClient`, `HttpWebSocketFrameReader`,
-and so on), which is more useful here than a large exception hierarchy.
+The library reports these conditions through structured `Result` identities; it does not silently truncate and does
+not throw. Inspect the library-owned error enum to distinguish conditions, and opt into `HttpErrorFormatter.h` only
+when a caller-storage diagnostic is needed.
 
 # Representative server
 
