@@ -53,11 +53,17 @@ struct SC::FileSystemIterator::Internal
     {
         if (entry.dirEnumerator != nullptr)
         {
+            const int enumeratorDescriptor = ::dirfd(static_cast<DIR*>(entry.dirEnumerator));
             ::closedir(static_cast<DIR*>(entry.dirEnumerator));
+            entry.dirEnumerator = nullptr;
+            // closedir owns its descriptor. A second close could hit a descriptor reused by another thread.
+            if (entry.fileDescriptor == enumeratorDescriptor)
+                entry.fileDescriptor = -1;
         }
         if (entry.fileDescriptor != -1)
         {
             ::close(entry.fileDescriptor);
+            entry.fileDescriptor = -1;
         }
     }
 
@@ -105,9 +111,15 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::enumerateNextInternal(Entry
     struct dirent* item;
     for (;;)
     {
-        item = ::readdir(static_cast<DIR*>(parent.dirEnumerator));
+        errno = 0; // readdir uses nullptr for both exhaustion and failure; only a fresh errno distinguishes them.
+        item  = ::readdir(static_cast<DIR*>(parent.dirEnumerator));
         if (item == nullptr)
         {
+            const int errorCode = errno;
+            if (errorCode != 0)
+                return Internal::nativeError(FileSystemIteratorError::DirectoryEnumerationFailed,
+                                             FileSystemIteratorErrorDetail::PosixReadDir, errorCode,
+                                             static_cast<uint32_t>(recurseStack.size() - 1));
             Internal::closeFolderState(recurseStack.back());
             recurseStack.pop_back();
             if (recurseStack.isEmpty())

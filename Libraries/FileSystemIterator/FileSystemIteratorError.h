@@ -18,6 +18,7 @@ enum class FileSystemIteratorError : uint32_t
     RecursionLimitExceeded,
     PathResolutionFailed,
     OpenDirectoryFailed,
+    DirectoryEnumerationFailed,
 };
 
 /// @brief Stable detail identifying the backend stage of a FileSystemIterator failure.
@@ -30,6 +31,8 @@ enum class FileSystemIteratorErrorDetail : uint16_t
     PosixFdOpenDir,
     WindowsFindFirstFile,
     PushRecursionState,
+    PosixReadDir,
+    WindowsFindNextFile,
 };
 
 /// @brief Stable category assigned to errors owned by the FileSystemIterator library.
@@ -39,7 +42,7 @@ static constexpr ResultCategory FileSystemIteratorResultCategory = ResultCategor
 /// @details nativeError is zero when unavailable. depth is the affected root-relative directory depth and detail is
 /// None when no lower-level stage is relevant. The path storage bounds successful traversal depth by
 /// StringPath::MaxPath, which is at most 65535 on supported platforms, so depth and detail can safely use 16 bits
-/// each. This keeps the type 16 bytes after the legacy Result message pointer is removed. Converting to Result
+/// each. The type occupies 16 bytes. Converting to Result
 /// preserves the portable error identity and deliberately discards all context fields.
 struct [[nodiscard]] ResultFileSystemIterator
 {

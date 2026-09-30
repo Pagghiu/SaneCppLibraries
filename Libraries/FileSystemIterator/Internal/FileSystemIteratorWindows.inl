@@ -120,6 +120,12 @@ SC::ResultFileSystemIterator SC::FileSystemIterator::enumerateNextInternal(Entry
         {
             if (!::FindNextFileW(parent.fileDescriptor, &dirEnumerator))
             {
+                const DWORD errorCode = ::GetLastError();
+                if (errorCode != ERROR_NO_MORE_FILES)
+                    return ResultFileSystemIterator(FileSystemIteratorError::DirectoryEnumerationFailed,
+                                                    FileSystemIteratorErrorDetail::WindowsFindNextFile,
+                                                    static_cast<uint32_t>(errorCode),
+                                                    static_cast<uint32_t>(recurseStack.size() - 1));
                 Internal::closeFolderState(recurseStack.back());
                 recurseStack.pop_back();
                 if (recurseStack.isEmpty())

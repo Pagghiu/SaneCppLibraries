@@ -44,6 +44,11 @@ bytes and this enriched type meets the 16-byte target. The temporary size was no
 
 ## Consequences
 
+Native enumeration failure is not successful exhaustion: POSIX clears and checks `errno` around each `readdir`, and
+Windows accepts only `ERROR_NO_MORE_FILES` as exhaustion after `FindNextFileW`. Other native errors retain the portable
+`DirectoryEnumerationFailed` identity, backend detail, native error, and depth through the existing sticky error API.
+Tests invalidate the caller-owned native enumeration handle and prove failure retention and successful reinitialization.
+
 Existing loop conditions remain source-compatible. Callers that stored or propagated the direct return value of
 `enumerateNext()` must migrate to the boolean completion contract and use `checkErrors()` for traversal failures.
 Using `SC_TRY(iterator.enumerateNext())` is no longer meaningful because normal exhaustion is a false boolean.

@@ -8,6 +8,14 @@
 #include "Libraries/Testing/Testing.h"
 
 #include <string.h>
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#else
+#include <dirent.h>
+#include <errno.h>
+#include <unistd.h>
+#endif
 namespace SC
 {
 struct FileSystemIteratorTest;
@@ -34,6 +42,12 @@ struct SC::FileSystemIteratorTest : public SC::TestCase
         {
             completionAndStickyErrors();
         }
+#if !SC_PLATFORM_APPLE
+        if (test_section("native enumeration failure is not exhaustion"))
+        {
+            nativeEnumerationFailure();
+        }
+#endif
         if (test_section("structured errors and formatter"))
         {
             structuredErrorsAndFormatter();
@@ -49,6 +63,7 @@ struct SC::FileSystemIteratorTest : public SC::TestCase
     inline void walkRecursive();
     inline void walkNotEnough();
     inline void completionAndStickyErrors();
+    inline void nativeEnumerationFailure();
     inline void structuredErrorsAndFormatter();
 #if SC_PLATFORM_WINDOWS
     inline void prefixedInputLogicalOutput();
@@ -136,6 +151,9 @@ void SC::FileSystemIteratorTest::completionAndStickyErrors()
     SC_TEST_EXPECT(failedInit.checkErrors().isError(FileSystemIteratorError::OpenDirectoryFailed));
 
     SC_TEST_EXPECT(failedInit.init(emptyPath.view(), entries));
+#if !SC_PLATFORM_WINDOWS
+    errno = EBADF; // Empty-directory exhaustion must not inherit an unrelated stale native error.
+#endif
     SC_TEST_EXPECT(not failedInit.enumerateNext());
     SC_TEST_EXPECT(failedInit.checkErrors());
     SC_TEST_EXPECT(not failedInit.enumerateNext());
@@ -149,6 +167,55 @@ void SC::FileSystemIteratorTest::completionAndStickyErrors()
     SC_TEST_EXPECT(invalidRecursion.checkErrors().isError(FileSystemIteratorError::InvalidRecursionState));
 
     SC_TEST_EXPECT(fs.removeEmptyDirectory(emptyDirectory));
+}
+
+void SC::FileSystemIteratorTest::nativeEnumerationFailure()
+{
+#if !SC_PLATFORM_APPLE
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+    constexpr StringView directory = "FileSystemIteratorReadFailure";
+    (void)fs.removeEmptyDirectory(directory);
+    SC_TEST_EXPECT(fs.makeDirectory(directory));
+    StringPath path;
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), directory}));
+    {
+        FileSystemIterator::FolderState entries[1];
+        FileSystemIterator              iterator;
+        SC_TEST_EXPECT(iterator.init(path.view(), entries));
+        // Invalidate the native enumeration handle in caller-owned state. The next OS read must fail,
+        // not silently report an empty directory. No unrelated handle is opened before iterator cleanup.
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(::FindClose(entries[0].fileDescriptor));
+        entries[0].fileDescriptor = INVALID_HANDLE_VALUE;
+#else
+        const int enumerationDescriptor = ::dirfd(static_cast<DIR*>(entries[0].dirEnumerator));
+        SC_TEST_EXPECT(::close(enumerationDescriptor) == 0);
+        if (entries[0].fileDescriptor == enumerationDescriptor)
+            entries[0].fileDescriptor = -1;
+#endif
+        SC_TEST_EXPECT(not iterator.enumerateNext());
+        const ResultFileSystemIterator failure = iterator.checkErrors();
+        SC_TEST_EXPECT(failure.isError(FileSystemIteratorError::DirectoryEnumerationFailed));
+        SC_TEST_EXPECT(failure.depth == 0);
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(failure.detail == FileSystemIteratorErrorDetail::WindowsFindNextFile);
+        SC_TEST_EXPECT(failure.nativeError == ERROR_INVALID_HANDLE);
+#else
+        SC_TEST_EXPECT(failure.detail == FileSystemIteratorErrorDetail::PosixReadDir);
+        SC_TEST_EXPECT(failure.nativeError == EBADF);
+#endif
+        SC_TEST_EXPECT(not iterator.enumerateNext());
+        SC_TEST_EXPECT(iterator.checkErrors().isError(FileSystemIteratorError::DirectoryEnumerationFailed));
+        SC_TEST_EXPECT(iterator.init(path.view(), entries));
+#if !SC_PLATFORM_WINDOWS
+        errno = EBADF; // Successful exhaustion must not inherit an unrelated stale errno.
+#endif
+        SC_TEST_EXPECT(not iterator.enumerateNext());
+        SC_TEST_EXPECT(iterator.checkErrors());
+    }
+    SC_TEST_EXPECT(fs.removeEmptyDirectory(directory));
+#endif
 }
 
 void SC::FileSystemIteratorTest::structuredErrorsAndFormatter()

@@ -30,6 +30,7 @@ inline ResultErrorFormat formatFileSystemIteratorErrorWithContext(FileSystemIter
         break;
     case FileSystemIteratorError::PathResolutionFailed: formatter.append("Failed to resolve directory path"); break;
     case FileSystemIteratorError::OpenDirectoryFailed: formatter.append("Failed to open directory"); break;
+    case FileSystemIteratorError::DirectoryEnumerationFailed: formatter.append("Failed to enumerate directory"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 
@@ -50,6 +51,10 @@ inline ResultErrorFormat formatFileSystemIteratorErrorWithContext(FileSystemIter
             formatter.append("Windows begin directory enumeration");
             break;
         case FileSystemIteratorErrorDetail::PushRecursionState: formatter.append("push recursion state"); break;
+        case FileSystemIteratorErrorDetail::PosixReadDir: formatter.append("POSIX read directory entry"); break;
+        case FileSystemIteratorErrorDetail::WindowsFindNextFile:
+            formatter.append("Windows read directory entry");
+            break;
         default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
         }
         if (nativeError != 0)
