@@ -591,40 +591,42 @@ struct SC::FileDescriptor::Internal
 {
     static ResultFile translateReadError(int errorCode, FileErrorDetail detail)
     {
+        const auto nativeError = static_cast<uint32_t>(errorCode);
         switch (errorCode)
         {
-        case EAGAIN: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
+        case EAGAIN: return ResultFile::withNativeError(FileError::WouldBlock, detail, nativeError);
 #if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
-        case EWOULDBLOCK: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
+        case EWOULDBLOCK: return ResultFile::withNativeError(FileError::WouldBlock, detail, nativeError);
 #endif
-        case EBADF: return ResultFile::withNativeError(FileError::InvalidHandle, detail, errorCode);
+        case EBADF: return ResultFile::withNativeError(FileError::InvalidHandle, detail, nativeError);
 #if defined(ECANCELED)
-        case ECANCELED: return ResultFile::withNativeError(FileError::OperationCancelled, detail, errorCode);
+        case ECANCELED: return ResultFile::withNativeError(FileError::OperationCancelled, detail, nativeError);
 #endif
 #if defined(EPIPE)
-        case EPIPE: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, errorCode);
+        case EPIPE: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, nativeError);
 #endif
         }
-        return ResultFile::withNativeError(FileError::ReadFailed, detail, errorCode);
+        return ResultFile::withNativeError(FileError::ReadFailed, detail, nativeError);
     }
 
     static ResultFile translateWriteError(int errorCode, FileErrorDetail detail)
     {
+        const auto nativeError = static_cast<uint32_t>(errorCode);
         switch (errorCode)
         {
-        case EAGAIN: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
+        case EAGAIN: return ResultFile::withNativeError(FileError::WouldBlock, detail, nativeError);
 #if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
-        case EWOULDBLOCK: return ResultFile::withNativeError(FileError::WouldBlock, detail, errorCode);
+        case EWOULDBLOCK: return ResultFile::withNativeError(FileError::WouldBlock, detail, nativeError);
 #endif
-        case EBADF: return ResultFile::withNativeError(FileError::InvalidHandle, detail, errorCode);
+        case EBADF: return ResultFile::withNativeError(FileError::InvalidHandle, detail, nativeError);
 #if defined(ECANCELED)
-        case ECANCELED: return ResultFile::withNativeError(FileError::OperationCancelled, detail, errorCode);
+        case ECANCELED: return ResultFile::withNativeError(FileError::OperationCancelled, detail, nativeError);
 #endif
 #if defined(EPIPE)
-        case EPIPE: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, errorCode);
+        case EPIPE: return ResultFile::withNativeError(FileError::PipeDisconnected, detail, nativeError);
 #endif
         }
-        return ResultFile::withNativeError(FileError::WriteFailed, detail, errorCode);
+        return ResultFile::withNativeError(FileError::WriteFailed, detail, nativeError);
     }
 
     static ResultFile readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer,

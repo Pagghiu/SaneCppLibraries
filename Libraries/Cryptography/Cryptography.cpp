@@ -120,6 +120,7 @@ static bool isValid(Cryptography::Cipher::Operation operation)
     return false;
 }
 
+#if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
 static ResultCryptography withExpectedBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
 {
     if (bytes <= static_cast<size_t>(0xffffffffu))
@@ -133,6 +134,7 @@ static ResultCryptography withRequiredBytes(CryptographyError error, Cryptograph
         return ResultCryptography::withRequiredBytes(error, detail, static_cast<uint32_t>(bytes));
     return {error, detail};
 }
+#endif
 
 static ResultCryptography withMaximumBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
 {

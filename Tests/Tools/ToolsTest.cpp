@@ -1373,7 +1373,13 @@ struct SupportToolsTest : public TestCase
         {
             PackageRegistryEntry   storage[1];
             PackageRegistryBuilder builder = {{storage, 1}};
-            PackageRegistryEntry   first   = {"first", "first", PackageKind::Tool, "fixture", "host", "test"};
+            PackageRegistryEntry   first   = {};
+            first.name                     = "first";
+            first.installedName            = "first";
+            first.kind                     = PackageKind::Tool;
+            first.description              = "fixture";
+            first.variants                 = "host";
+            first.source                   = "test";
             SC_TEST_EXPECT(builder.add(first));
             SC_TEST_EXPECT(builder.add(first).isError(PackageResultCategory, PackageError::DuplicateRegistryEntry));
             first.name = "second";
