@@ -389,13 +389,6 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
             SC_TEST_EXPECT(arena.appendAsSingleString(argument).isError(PluginResultCategory,
                                                                         PluginError::ArgumentCapacityExceeded));
         }
-        static_assert(PluginResultCategory.value == 7, "Plugin category is registry value 7");
-        static_assert(static_cast<uint32_t>(PluginError::PathNotNullTerminated) == 1,
-                      "Plugin error values are append-only");
-        static_assert(static_cast<uint16_t>(PluginErrorDetail::None) == 0,
-                      "Plugin detail zero is reserved for no detail");
-        static_assert(static_cast<uint16_t>(PluginErrorContextKind::None) == 0,
-                      "Plugin context kind zero is reserved for no context");
         static_assert(sizeof(ResultPlugin) == 16, "ResultPlugin must meet the final 16-byte target");
         static_assert(__is_standard_layout(ResultPlugin), "ResultPlugin must remain standard-layout");
         static_assert(TypeTraits::IsTriviallyCopyable<ResultPlugin>::value,

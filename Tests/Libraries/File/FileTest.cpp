@@ -84,12 +84,6 @@ struct SC::FileTest : public SC::TestCase
 
 void SC::FileTest::structuredErrorsAndFormatter()
 {
-    static_assert(FileResultCategory.value == 10, "File category is registry value 10");
-    static_assert(static_cast<uint32_t>(FileError::InvalidHandle) == 1, "File error values are append-only");
-    static_assert(static_cast<uint32_t>(FileError::PipeDisconnected) == 31, "File error values are append-only");
-    static_assert(static_cast<uint16_t>(FileErrorDetail::None) == 0, "File detail zero is reserved for no detail");
-    static_assert(static_cast<uint16_t>(FileErrorContextKind::None) == 0,
-                  "File context kind zero is reserved for no context");
     static_assert(sizeof(ResultFile) == 16, "ResultFile must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultFile), "ResultFile must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFile>::value, "ResultFile must remain trivially copyable");

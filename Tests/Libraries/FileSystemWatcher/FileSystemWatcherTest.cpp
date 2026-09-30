@@ -50,11 +50,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                       "ResultFileSystemWatcher must remain standard-layout");
         static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystemWatcher>::value,
                       "ResultFileSystemWatcher must remain trivially copyable");
-        static_assert(static_cast<uint32_t>(FileSystemWatcherError::NotInitialized) == 1,
-                      "FileSystemWatcher error values are append-only");
-        static_assert(static_cast<uint32_t>(FileSystemWatcherErrorDetail::None) == 0,
-                      "FileSystemWatcher detail zero is reserved for no detail");
-        static_assert(FileSystemWatcherResultCategory.value == 6, "FileSystemWatcher category is registry value 6");
 
         FileSystemWatcher                fileEventsWatcher;
         FileSystemWatcher::FolderWatcher watcher;

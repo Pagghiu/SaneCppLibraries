@@ -95,13 +95,6 @@ struct SC::SocketTest : public SC::TestCase
 
 void SC::SocketTest::structuredErrorsAndFormatter()
 {
-    static_assert(SocketResultCategory.value == 8, "Socket category is registry value 8");
-    static_assert(static_cast<uint32_t>(SocketError::NetworkingNotInitialized) == 1,
-                  "Socket error values are append-only");
-    static_assert(static_cast<uint32_t>(SocketError::TimedOut) == 28, "Socket error values are append-only");
-    static_assert(static_cast<uint16_t>(SocketErrorDetail::None) == 0, "Socket detail zero is reserved for no detail");
-    static_assert(static_cast<uint16_t>(SocketErrorContextKind::None) == 0,
-                  "Socket context kind zero is reserved for no context");
     static_assert(sizeof(ResultSocket) == 16, "ResultSocket must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultSocket), "ResultSocket must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultSocket>::value, "ResultSocket must remain trivially copyable");

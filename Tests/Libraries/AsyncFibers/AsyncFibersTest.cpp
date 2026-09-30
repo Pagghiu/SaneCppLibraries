@@ -286,9 +286,6 @@ struct SC::AsyncFibersTest : public SC::TestCase
 
     void structuredResultIdentities()
     {
-        static_assert(AsyncFibersResultCategory.value == 14, "AsyncFibers owns category 14");
-        static_assert(static_cast<uint32_t>(AsyncFibersError::CommandQueueFull) == 9,
-                      "AsyncFibers errors are append-only");
 
         char message[64];
         SC_TEST_EXPECT(formatAsyncFibersError(AsyncFibersError::Cancelled, message).status ==

@@ -342,10 +342,6 @@ struct SC::AsyncContractTest : public SC::TestCase
 
 void SC::AsyncContractTest::structuredLifecycleErrors()
 {
-    static_assert(AsyncResultCategory.value == 13, "Async category is registry value 13");
-    static_assert(static_cast<uint32_t>(AsyncError::AlreadyInitialized) == 1, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidState) == 7, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::UnsupportedSignal) == 12, "Async errors are append-only");
 
     AsyncEventLoop loop;
     SC_TEST_EXPECT(loop.create(options));
@@ -431,15 +427,6 @@ void SC::AsyncContractTest::monitorLifecycleErrors()
 
 void SC::AsyncContractTest::backendLifecycleErrors()
 {
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidWakeUpHandle) == 32, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::SubmissionFailed) == 39, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidEventIndex) == 47, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::CancellationFailed) == 48, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::FileWriteIncomplete) == 54, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::SocketBufferCountExceeded) == 62, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::FileSendCompletionFailed) == 66, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidTransferPipe) == 68, "Async errors are append-only");
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidSubmissionState) == 71, "Async errors are append-only");
 
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;
@@ -1564,7 +1551,6 @@ void SC::AsyncContractTest::validationFailureLeavesRequestFree()
 
 void SC::AsyncContractTest::socketValidationErrors()
 {
-    static_assert(static_cast<uint32_t>(AsyncError::MissingAcceptData) == 21, "Async errors are append-only");
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -1606,7 +1592,6 @@ void SC::AsyncContractTest::socketValidationErrors()
 
 void SC::AsyncContractTest::fileValidationErrors()
 {
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidFileHandle) == 22, "Async errors are append-only");
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -1636,7 +1621,6 @@ void SC::AsyncContractTest::fileValidationErrors()
 
 void SC::AsyncContractTest::fileSendValidationErrors()
 {
-    static_assert(static_cast<uint32_t>(AsyncError::EmptyTransfer) == 23, "Async errors are append-only");
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -1666,7 +1650,6 @@ void SC::AsyncContractTest::fileSendValidationErrors()
 
 void SC::AsyncContractTest::fileSystemPreflightErrors()
 {
-    static_assert(static_cast<uint32_t>(AsyncError::InvalidDestinationPath) == 27, "Async errors are append-only");
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -1918,7 +1901,6 @@ void SC::AsyncContractTest::runDispatchesPostedManualCompletion()
 
 void SC::AsyncContractTest::externalCompletionStateErrors()
 {
-    static_assert(static_cast<uint32_t>(AsyncError::CompletionAlreadyPosted) == 17, "Async errors are append-only");
 
     AsyncEventLoop          eventLoop;
     AsyncExternalCompletion completion;

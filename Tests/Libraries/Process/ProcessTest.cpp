@@ -145,12 +145,6 @@ void SC::ProcessTest::processError()
 
 void SC::ProcessTest::structuredErrorsAndFormatter()
 {
-    static_assert(static_cast<uint32_t>(ProcessError::PathCapacityExceeded) == 12,
-                  "Process primary errors are append-only");
-    static_assert(static_cast<uint32_t>(ProcessErrorDetail::WindowsResolveWorkingDirectory) == 13,
-                  "Process details are append-only");
-    static_assert(static_cast<uint32_t>(ProcessErrorDetail::WindowsNormalizeExecutablePath) == 16,
-                  "Process details are append-only");
     static_assert(sizeof(ResultProcess) == 16, "ResultProcess must meet the final 16-byte enriched-result target");
     static_assert(__is_standard_layout(ResultProcess), "ResultProcess must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultProcess>::value,

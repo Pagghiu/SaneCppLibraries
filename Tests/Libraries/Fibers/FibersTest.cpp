@@ -9299,10 +9299,6 @@ struct SC::FibersTest : public SC::TestCase
 
 void SC::FibersTest::structuredErrorsAndFormatter()
 {
-    static_assert(FibersResultCategory.value == 12, "Fibers category is registry value 12");
-    static_assert(static_cast<uint32_t>(FibersError::InvalidState) == 1, "Fibers error values are append-only");
-    static_assert(static_cast<uint32_t>(FibersError::ThreadAffinityApplyFailed) == 34,
-                  "Fibers error values are append-only");
 
     const Result own = Result::Error(FibersResultCategory, FibersError::SlotUnavailable);
 

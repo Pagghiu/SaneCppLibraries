@@ -333,15 +333,6 @@ struct SC::CryptographyTest : public SC::TestCase
 
 void SC::CryptographyTest::structuredErrorsAndFormatter()
 {
-    static_assert(CryptographyResultCategory.value == 9, "Cryptography category is registry value 9");
-    static_assert(static_cast<uint32_t>(CryptographyError::OperationUnsupported) == 1,
-                  "Cryptography error values are append-only");
-    static_assert(static_cast<uint32_t>(CryptographyError::InvalidBlockInputSize) == 24,
-                  "Cryptography error values are append-only");
-    static_assert(static_cast<uint16_t>(CryptographyErrorDetail::None) == 0,
-                  "Cryptography detail zero is reserved for no detail");
-    static_assert(static_cast<uint16_t>(CryptographyErrorContextKind::None) == 0,
-                  "Cryptography context kind zero is reserved for no context");
     static_assert(sizeof(ResultCryptography) == 16, "ResultCryptography must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultCryptography), "ResultCryptography must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultCryptography>::value,

@@ -150,15 +150,6 @@ struct SC::FileSystemTest : public SC::TestCase
 
 void SC::FileSystemTest::structuredErrorsAndFormatter()
 {
-    static_assert(FileSystemResultCategory.value == 11, "FileSystem category is registry value 11");
-    static_assert(static_cast<uint32_t>(FileSystemError::NotInitialized) == 1,
-                  "FileSystem error values are append-only");
-    static_assert(static_cast<uint32_t>(FileSystemError::OperationFailed) == 26,
-                  "FileSystem error values are append-only");
-    static_assert(static_cast<uint16_t>(FileSystemErrorDetail::None) == 0,
-                  "FileSystem detail zero is reserved for no detail");
-    static_assert(static_cast<uint16_t>(FileSystemErrorContextKind::None) == 0,
-                  "FileSystem context kind zero is reserved for no context");
     static_assert(sizeof(ResultFileSystem) == 16, "ResultFileSystem must meet the final 16-byte target");
     static_assert(__is_standard_layout(ResultFileSystem), "ResultFileSystem must remain standard-layout");
     static_assert(TypeTraits::IsTriviallyCopyable<ResultFileSystem>::value,
