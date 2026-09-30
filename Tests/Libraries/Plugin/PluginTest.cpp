@@ -22,6 +22,10 @@
 #include "Libraries/Time/Time.h"
 #include "PluginTestDirectory/TestPluginChild/Interfaces.h"
 
+#if SC_PLATFORM_WINDOWS
+#include "Libraries/Plugin/Internal/VisualStudioPathFinder.h"
+#endif
+
 namespace SC
 {
 struct PluginTest;
@@ -35,6 +39,22 @@ struct SC::PluginTest : public SC::TestCase
     PluginTest(SC::TestReport& report) : TestCase(report, "PluginTest")
     {
         using namespace SC;
+#if SC_PLATFORM_WINDOWS
+        if (test_section("Visual Studio discovery respects captured output length"))
+        {
+            const char paths[] = "C:\\VS2022\r\nC:\\VS2025\r\n";
+            char       output[2048];
+            memset(output, 'x', sizeof(output));
+            memcpy(output, paths, sizeof(paths) - 1);
+            output[sizeof(output) - 1] = 0;
+
+            FixedVector<StringPath, 8> parsed;
+            SC_TEST_EXPECT(VisualStudioPathFinder::parsePaths({output, sizeof(paths) - 1}, parsed));
+            SC_TEST_EXPECT(parsed.size() == 2);
+            SC_TEST_EXPECT(parsed[0].view() == SC_NATIVE_STR("C:\\VS2022"));
+            SC_TEST_EXPECT(parsed[1].view() == SC_NATIVE_STR("C:\\VS2025"));
+        }
+#endif
         if (test_section("PluginDefinition"))
         {
             StringSpan test =

@@ -51,8 +51,16 @@ struct VisualStudioPathFinder
         Span<char> output = {outputStorage};
         SC_TRY(Process().exec({vsWherePath, "-prerelease", "-property", "installationPath"}, output));
 
+        return parsePaths(output, vsPaths);
+    }
+
+    /// @brief Parse the captured bytes, which Process does not null-terminate.
+    template <typename Container>
+    static ResultPlugin parsePaths(Span<const char> output, Container& vsPaths)
+    {
+
         // TODO: Check if VSWhere output is actually UTF8
-        PluginString::Tokenizer tokenizer(StringSpan::fromNullTerminated(outputStorage, StringEncoding::Utf8));
+        PluginString::Tokenizer tokenizer(StringSpan(output, false, StringEncoding::Utf8));
         while (tokenizer.next('\n'))
         {
             StringPath path;
