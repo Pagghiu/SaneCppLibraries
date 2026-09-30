@@ -24,6 +24,11 @@ Library headers do not acquire tool-specific errors. Tool executables that print
 link presentation strings; consumers that only inspect a tool Result need not include its formatter. Category
 registration and error values remain append-only.
 
+The command-line runner opts into formatters for the library categories its tools propagate, including Strings,
+File, FileSystem, Process, Socket, and their supporting operations. It formats only at the final failure-reporting
+boundary, retaining a numeric fallback for unknown categories or insufficient diagnostic storage. Mandatory library
+headers remain free of presentation strings; intentionally human-facing tool executables retain optional messages.
+
 ## Confirmation
 
 The category checker scans library and tool headers. Focused tool tests verify numeric identity, canonical formatting,

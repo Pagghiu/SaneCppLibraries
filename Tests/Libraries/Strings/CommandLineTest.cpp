@@ -3,6 +3,7 @@
 #include "Libraries/Strings/CommandLine.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringFormat.h"
+#include "Libraries/Strings/StringsErrorFormatter.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -111,6 +112,45 @@ struct SC::CommandLineTest : public SC::TestCase
     CommandLineTest(SC::TestReport& report) : TestCase(report, "CommandLineTest")
     {
         using namespace SC;
+
+        if (test_section("Strings formatter boundaries"))
+        {
+            const StringsError errors[] = {StringsError::InvalidArgumentCount,
+                                           StringsError::InsufficientArgumentStorage};
+            for (StringsError error : errors)
+            {
+                const Result            result = Result::Error(StringsResultCategory, error);
+                const ResultErrorFormat query  = formatStringsError(result, {});
+                SC_TEST_EXPECT(query.status == ResultErrorFormatStatus::InsufficientCapacity);
+                char output[128];
+                SC_TEST_EXPECT(query.requiredCapacity > 1 and query.requiredCapacity <= sizeof(output));
+                if (query.requiredCapacity > 1 and query.requiredCapacity <= sizeof(output))
+                {
+                    const ResultErrorFormat exact =
+                        formatStringsError(result, Span<char>(output, query.requiredCapacity));
+                    SC_TEST_EXPECT(exact.status == ResultErrorFormatStatus::Success);
+                    SC_TEST_EXPECT(exact.requiredCapacity == query.requiredCapacity);
+                    SC_TEST_EXPECT(output[query.requiredCapacity - 1] == '\0');
+                    output[0] = 'x';
+                    const ResultErrorFormat shortOutput =
+                        formatStringsError(error, Span<char>(output, query.requiredCapacity - 1));
+                    SC_TEST_EXPECT(shortOutput.status == ResultErrorFormatStatus::InsufficientCapacity);
+                    SC_TEST_EXPECT(shortOutput.requiredCapacity == query.requiredCapacity);
+                    SC_TEST_EXPECT(output[0] == '\0');
+                }
+            }
+            char output[16] = {'x'};
+            SC_TEST_EXPECT(formatStringsError(Result(true), output).status == ResultErrorFormatStatus::NotAnError);
+            SC_TEST_EXPECT(output[0] == '\0');
+            output[0] = 'x';
+            SC_TEST_EXPECT(formatStringsError(Result::Error(ResultCategory(99), 1), output).status ==
+                           ResultErrorFormatStatus::ForeignCategory);
+            SC_TEST_EXPECT(output[0] == '\0');
+            output[0] = 'x';
+            SC_TEST_EXPECT(formatStringsError(Result::Error(StringsResultCategory, 999), output).status ==
+                           ResultErrorFormatStatus::UnknownError);
+            SC_TEST_EXPECT(output[0] == '\0');
+        }
 
         if (test_section("main argument adapter"))
         {

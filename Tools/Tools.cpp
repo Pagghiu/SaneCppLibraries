@@ -2,10 +2,22 @@
 // SPDX-License-Identifier: MIT
 
 #include "../Libraries/Common/Deferred.h"
+#include "../Libraries/Common/StringSpanErrorFormatter.h"
 #include "../Libraries/Containers/Vector.h"
+#include "../Libraries/Cryptography/CryptographyErrorFormatter.h"
+#include "../Libraries/File/FileErrorFormatter.h"
+#include "../Libraries/FileSystem/FileSystemErrorFormatter.h"
+#include "../Libraries/FileSystemIterator/FileSystemIteratorErrorFormatter.h"
+#include "../Libraries/Http/HttpErrorFormatter.h"
+#include "../Libraries/HttpClient/HttpClientErrorFormatter.h"
 #include "../Libraries/Memory/String.h"
+#include "../Libraries/Plugin/PluginErrorFormatter.h"
+#include "../Libraries/Process/ProcessErrorFormatter.h"
+#include "../Libraries/Socket/SocketErrorFormatter.h"
 #include "../Libraries/Strings/Console.h"
 #include "../Libraries/Strings/Path.h"
+#include "../Libraries/Strings/StringsErrorFormatter.h"
+#include "../Libraries/Threading/ThreadingErrorFormatter.h"
 #include "../Libraries/Time/Time.h"
 
 #include "../SC.cpp"
@@ -24,6 +36,34 @@
 static SC::SmallString<4096> gFormatString;
 
 SC::Console* globalConsole;
+
+namespace
+{
+SC::ResultErrorFormat formatToolFailure(SC::Result result, SC::Span<char> output)
+{
+    using namespace SC;
+    using namespace SC::Tools;
+    switch (result.category().value)
+    {
+    case ToolsResultCategory.value: return formatToolsError(result, output);
+    case BuildResultCategory.value: return formatBuildError(result, output);
+    case PackageResultCategory.value: return formatPackageError(result, output);
+    case FileResultCategory.value: return formatFileError(result, output);
+    case FileSystemResultCategory.value: return formatFileSystemError(result, output);
+    case FileSystemIteratorResultCategory.value: return formatFileSystemIteratorError(result, output);
+    case ProcessResultCategory.value: return formatProcessError(result, output);
+    case StringsResultCategory.value: return formatStringsError(result, output);
+    case StringSpanResultCategory.value: return formatStringSpanError(result, output);
+    case SocketResultCategory.value: return formatSocketError(result, output);
+    case CryptographyResultCategory.value: return formatCryptographyError(result, output);
+    case PluginResultCategory.value: return formatPluginError(result, output);
+    case ThreadingResultCategory.value: return formatThreadingError(result, output);
+    case HttpResultCategory.value: return formatHttpError(result, output);
+    case HttpClientResultCategory.value: return formatHttpClientError(result, output);
+    default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::ForeignCategory, output);
+    }
+}
+} // namespace
 
 int main(int argc, const char* argv[])
 {
@@ -122,23 +162,12 @@ int main(int argc, const char* argv[])
     console.print(gFormatString.view());
     if (not result)
     {
-        if (result.category() == ToolsResultCategory or result.category() == BuildResultCategory or
-            result.category() == PackageResultCategory)
-        {
-            char                    message[128];
-            const ResultErrorFormat formatted =
-                result.category() == ToolsResultCategory   ? formatToolsError(result, message)
-                : result.category() == BuildResultCategory ? formatBuildError(result, message)
-                                                           : formatPackageError(result, message);
-            if (formatted)
-                console.printLine(StringView::fromNullTerminated(message, StringEncoding::Ascii));
-            else
-                console.print("Error category {}, code {}\n", result.category().value, result.errorValue());
-        }
+        char                    message[256];
+        const ResultErrorFormat formatted = formatToolFailure(result, message);
+        if (formatted)
+            console.printLine(StringView::fromNullTerminated(message, StringEncoding::Ascii));
         else
-        {
             console.print("Error category {}, code {}\n", result.category().value, result.errorValue());
-        }
         return -1;
     }
     return 0;
