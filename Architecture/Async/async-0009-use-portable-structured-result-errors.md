@@ -1,4 +1,4 @@
-# ASYNC-0007 - Use Portable Structured Result Errors
+# ASYNC-0009 - Use Portable Structured Result Errors
 
 Status: Accepted
 Date: 2026-09-22

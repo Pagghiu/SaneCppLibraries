@@ -1,4 +1,4 @@
-# ASYNC-0008 - Validate File-System Requests Before Backend Routing
+# ASYNC-0010 - Validate File-System Requests Before Backend Routing
 
 Status: Accepted
 Date: 2026-09-25
@@ -34,5 +34,5 @@ operations. The single-file build and category registry validator must pass.
 
 ## Related
 
-- [ASYNC-0007 - Use Portable Structured Result Errors](async-0007-use-portable-structured-result-errors.md)
+- [ASYNC-0009 - Use Portable Structured Result Errors](async-0009-use-portable-structured-result-errors.md)
 - [Async architecture](async-architecture.md)
