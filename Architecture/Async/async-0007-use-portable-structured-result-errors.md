@@ -27,6 +27,11 @@ Port producers in cohesive slices: lifecycle and validation, common request setu
 needs focused identity tests. Behavior changes, especially around cancellation, sequencing, and completion, need
 regressions that reproduce the old behavior; changing a literal to an identity alone must not alter the state machine.
 
+Known kernel-completion failures use the request's portable operation identity on io_uring, epoll, kqueue, and Windows
+overlapped I/O. Generic completion failure is reserved for unclassified infrastructure operations. This does not remap
+foreign File/Socket results from shared operations, and it does not change cancellation or transient-interruption
+handling. Refused-connect and invalid-file regressions exercise actual backend failures rather than fabricated codes.
+
 ## Consequences
 
 Existing `SC_TRY` and callback paths remain source-compatible. Structured Async failures contain no text, so diagnostic

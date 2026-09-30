@@ -12,6 +12,33 @@
 #include <signal.h> // SIGKILL / SIGSTOP
 #include <string.h> // strncpy
 
+namespace SC
+{
+namespace AsyncCompletionDetail
+{
+// Kernel completions know the request's portable operation. Do not expose the backend mechanism as its identity.
+static Result operationFailure(AsyncRequest::Type type)
+{
+    using Type = AsyncRequest::Type;
+    switch (type)
+    {
+    case Type::SocketAccept: return Result::Error(AsyncResultCategory, AsyncError::SocketAcceptFailed);
+    case Type::SocketConnect: return Result::Error(AsyncResultCategory, AsyncError::SocketConnectFailed);
+    case Type::SocketSend:
+    case Type::SocketSendTo: return Result::Error(AsyncResultCategory, AsyncError::SocketSendFailed);
+    case Type::SocketReceive:
+    case Type::SocketReceiveFrom: return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
+    case Type::FileRead: return Result::Error(AsyncResultCategory, AsyncError::FileReadFailed);
+    case Type::FileWrite: return Result::Error(AsyncResultCategory, AsyncError::FileWriteFailed);
+    case Type::FileSend: return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
+    case Type::ProcessExit: return Result::Error(AsyncResultCategory, AsyncError::ProcessWaitFailed);
+    case Type::Signal: return Result::Error(AsyncResultCategory, AsyncError::SignalReadFailed);
+    default: return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
+    }
+}
+} // namespace AsyncCompletionDetail
+} // namespace SC
+
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
 #include <stdint.h>

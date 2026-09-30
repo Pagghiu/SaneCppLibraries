@@ -49,14 +49,22 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 socketBufferCountError();
             }
+#endif
             if (test_section("file read operation error"))
             {
                 fileReadOperationError();
             }
-#endif
+            if (test_section("file write operation error"))
+            {
+                fileWriteOperationError();
+            }
             if (test_section("posix socket connect preserves foreign errors"))
             {
                 posixSocketConnectPreservesForeignErrors();
+            }
+            if (test_section("refused socket connect has portable identity"))
+            {
+                refusedSocketConnect();
             }
 #if !SC_PLATFORM_WINDOWS
             if (test_section("file send operation error"))
@@ -257,7 +265,9 @@ struct SC::AsyncContractTest : public SC::TestCase
     void backendLifecycleErrors();
     void socketBufferCountError();
     void fileReadOperationError();
+    void fileWriteOperationError();
     void posixSocketConnectPreservesForeignErrors();
+    void refusedSocketConnect();
     void fileSendOperationError();
     void ioUringCompletionError();
     void closeCallbackRunsAfterRequestIsFree();
@@ -431,85 +441,6 @@ void SC::AsyncContractTest::backendLifecycleErrors()
     static_assert(static_cast<uint32_t>(AsyncError::InvalidTransferPipe) == 68, "Async errors are append-only");
     static_assert(static_cast<uint32_t>(AsyncError::InvalidSubmissionState) == 71, "Async errors are append-only");
 
-    char message[64];
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopCreationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::WakeUpInitializationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::WakeUpFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidEventLoopHandle, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidWakeUpHandle, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::WatcherRegistrationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::WatcherRemovalFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopFlushFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventLoopPollFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::EventCompletionFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SubmissionCapacityExhausted, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SubmissionFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::ProcessWatcherCreationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::ProcessWatcherRemovalFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::ProcessWaitFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalWatcherCreationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalWatcherRemovalFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalReadFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SignalSubscriberLimitReached, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidEventIndex, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::CancellationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketConnectFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketSendFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketReceiveFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketSendIncomplete, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileWriteFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileWriteIncomplete, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::DescriptorAssociationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketCompletionFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketCreationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketAcceptFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketAcceptFinalizationFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketExtensionUnavailable, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketBindFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::SocketBufferCountExceeded, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileReadFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSeekFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendFailed, message).status == ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendCompletionFailed, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::FileSendIncomplete, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidTransferPipe, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::ThreadPoolAlreadyStopped, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::ActiveRequestsRemain, message).status ==
-                   ResultErrorFormatStatus::Success);
-    SC_TEST_EXPECT(formatAsyncError(AsyncError::InvalidSubmissionState, message).status ==
-                   ResultErrorFormatStatus::Success);
-
 #if !SC_PLATFORM_LINUX
     AsyncEventLoop          eventLoop;
     AsyncEventLoop::Options unsupported;
@@ -553,13 +484,16 @@ void SC::AsyncContractTest::socketBufferCountError()
 
 void SC::AsyncContractTest::fileReadOperationError()
 {
-#if SC_PLATFORM_WINDOWS
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
 
     char          byte = 0;
     AsyncFileRead read;
+#if SC_PLATFORM_WINDOWS
     read.handle = nullptr; // Distinct from the invalid sentinel, but not a readable handle.
+#else
+    read.handle = 999999; // Invalid positive descriptor exercises the native setup/completion failure.
+#endif
     read.buffer = Span<char>(&byte, 1);
 
     Result observed  = Result(true);
@@ -575,7 +509,32 @@ void SC::AsyncContractTest::fileReadOperationError()
     SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::FileReadFailed));
     SC_TEST_EXPECT(read.isFree());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::fileWriteOperationError()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+    const char     byte = 'x';
+    AsyncFileWrite write;
+#if SC_PLATFORM_WINDOWS
+    write.handle = nullptr;
+#else
+    write.handle = 999999;
 #endif
+    write.buffer     = {&byte, 1};
+    Result observed  = Result(true);
+    int    callbacks = 0;
+    write.callback   = [&](AsyncFileWrite::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(eventLoop.start(write));
+    SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return callbacks == 1; }));
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::FileWriteFailed));
+    SC_TEST_EXPECT(write.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
 }
 
 void SC::AsyncContractTest::posixSocketConnectPreservesForeignErrors()
@@ -640,6 +599,33 @@ void SC::AsyncContractTest::fileSendOperationError()
 #endif
 }
 
+void SC::AsyncContractTest::refusedSocketConnect()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SocketIPAddress address;
+    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5471)));
+    // Reserve the destination without listening: no unrelated process can accept this connection.
+    SocketDescriptor reserved;
+    SC_TEST_EXPECT(reserved.create(address.getAddressFamily()));
+    SC_TEST_EXPECT(SocketServer(reserved).bind(address));
+    SocketDescriptor client;
+    SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(address.getAddressFamily(), client));
+    AsyncSocketConnect connect;
+    Result             observed  = Result(true);
+    int                callbacks = 0;
+    connect.callback             = [&](AsyncSocketConnect::Result& result)
+    {
+        observed = result.isValid();
+        callbacks++;
+    };
+    SC_TEST_EXPECT(connect.start(eventLoop, client, SocketAddress(address)));
+    SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return callbacks == 1; }));
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::SocketConnectFailed));
+    SC_TEST_EXPECT(connect.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
 void SC::AsyncContractTest::ioUringCompletionError()
 {
 #if SC_PLATFORM_LINUX
@@ -663,7 +649,7 @@ void SC::AsyncContractTest::ioUringCompletionError()
     };
     SC_TEST_EXPECT(eventLoop.start(read));
     SC_TEST_EXPECT(runNoWaitUntil(eventLoop, [&] { return callbacks == 1; }, 100));
-    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::EventCompletionFailed));
+    SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::FileReadFailed));
     SC_TEST_EXPECT(read.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 #endif

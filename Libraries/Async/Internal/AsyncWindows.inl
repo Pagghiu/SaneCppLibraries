@@ -216,7 +216,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         result.reactivateRequest(true);
     }
 
-    static Result checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, size_t* size = nullptr)
+    static Result checkWSAResult(SOCKET handle, OVERLAPPED& overlapped, AsyncRequest::Type type, size_t* size = nullptr)
     {
         DWORD transferred = 0;
         DWORD flags       = 0;
@@ -224,8 +224,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         const BOOL res = ::WSAGetOverlappedResult(handle, &overlapped, &transferred, FALSE, &flags);
         if (res == FALSE)
         {
-            // TODO: report error
-            return Result::Error(AsyncResultCategory, AsyncError::SocketCompletionFailed);
+            return AsyncCompletionDetail::operationFailure(type);
         }
         if (size)
         {
@@ -436,7 +435,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result completeAsync(AsyncSocketAccept::Result& result)
     {
         AsyncSocketAccept& operation = result.getAsync();
-        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.acceptData->overlapped.get().overlapped));
+        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.acceptData->overlapped.get().overlapped,
+                                           operation.type));
         SOCKET clientSocket;
         SC_TRY(operation.acceptData->clientSocket.get(
             clientSocket, Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
@@ -552,7 +552,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result completeAsync(AsyncSocketConnect::Result& result)
     {
         AsyncSocketConnect& operation = result.getAsync();
-        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
+        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.overlapped.get().overlapped, operation.type));
         return Result(true);
     }
 
@@ -614,7 +614,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result completeAsync(AsyncSocketSend::Result& result)
     {
         return KernelQueue::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
-                                           &result.completionData.numBytes);
+                                           result.getAsync().type, &result.completionData.numBytes);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -779,8 +779,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     static Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        Result res = KernelQueue::checkWSAResult(
-            result.getAsync().handle, result.getAsync().overlapped.get().overlapped, &result.completionData.numBytes);
+        Result res =
+            KernelQueue::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
+                                        result.getAsync().type, &result.completionData.numBytes);
         if (res)
         {
             if (result.getAsync().getType() == AsyncRequest::Type::SocketReceiveFrom)
@@ -1152,7 +1153,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         if (not success)
         {
-            return Result::Error(AsyncResultCategory, AsyncError::FileSendCompletionFailed);
+            return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
         }
 
         result.completionData.bytesTransferred = transferred;

@@ -363,7 +363,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     continueProcessing = false; // Don't process cancellations
                     if (completion.res != -ECANCELED)
                     {
-                        return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
+                        return async ? AsyncCompletionDetail::operationFailure(async->type)
+                                     : Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
                     }
                 }
             }

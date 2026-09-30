@@ -378,7 +378,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 return Result(true);
             }
             continueProcessing = false;
-            return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
+            return AsyncCompletionDetail::operationFailure(request->type);
         }
         return Result(true);
     }
@@ -437,7 +437,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             // Processes that exit too fast error out with ESRCH errno, but we do not consider it an error...
             if (request->type != AsyncRequest::Type::ProcessExit or event.data != ESRCH)
             {
-                return Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
+                return AsyncCompletionDetail::operationFailure(request->type);
             }
         }
         return Result(true);
@@ -1063,7 +1063,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncFileRead& async)
     {
         bool canBeWatched;
-        SC_TRY(isDescriptorReadWatchable(async.handle, canBeWatched));
+        if (not isDescriptorReadWatchable(async.handle, canBeWatched))
+            return Result::Error(AsyncResultCategory, AsyncError::FileReadFailed);
         if (canBeWatched)
         {
             return setEventWatcher(eventLoop, async, async.handle, INPUT_EVENTS_MASK);
@@ -1135,7 +1136,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result setupAsync(AsyncEventLoop&, AsyncFileWrite& async)
     {
-        return Result(isDescriptorWriteWatchable(async.handle, async.isWatchable));
+        if (not isDescriptorWriteWatchable(async.handle, async.isWatchable))
+            return Result::Error(AsyncResultCategory, AsyncError::FileWriteFailed);
+        return Result(true);
     }
 
     static Result teardownAsync(AsyncFileWrite*, AsyncTeardown& teardown)
