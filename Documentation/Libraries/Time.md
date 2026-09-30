@@ -121,5 +121,5 @@ payloads.
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
 | Library     | 133		| 208		| 341	|
-| Single File | 238		| 303		| 541	|
-| Standalone  | 238		| 303		| 541	|
+| Single File | 238		| 389		| 627	|
+| Standalone  | 238		| 389		| 627	|

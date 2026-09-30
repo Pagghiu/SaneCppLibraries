@@ -144,5 +144,5 @@ payloads.
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
 | Library     | 593		| 0		| 593	|
-| Single File | 1013		| 0		| 1013	|
-| Standalone  | 1943		| 0		| 1943	|
+| Single File | 1045		| 0		| 1045	|
+| Standalone  | 1975		| 0		| 1975	|
