@@ -106,6 +106,29 @@ static SC::Result getCurlStringPointer(SC::StringSpan source, SC::Span<char> sto
     destination                        = storage.data();
     return SC::Result(true);
 }
+
+struct HttpClientLinuxRuntimeFeatures
+{
+    bool tls   = false;
+    bool http2 = false;
+};
+
+static const HttpClientLinuxRuntimeFeatures& getHttpClientLinuxRuntimeFeatures()
+{
+    static const HttpClientLinuxRuntimeFeatures features = []()
+    {
+        HttpClientLinuxRuntimeFeatures result;
+        HttpClientLinuxLibCurlLoader   curl;
+        if (not curl.init())
+            return result;
+
+        result.tls   = curl.supportsFeature(CURL_VERSION_SSL);
+        result.http2 = curl.supportsFeature(CURL_VERSION_HTTP2);
+        curl.close();
+        return result;
+    }();
+    return features;
+}
 } // namespace
 
 namespace SC
@@ -141,7 +164,7 @@ struct HttpClientLinuxCallbacks
         auto& internal = *reinterpret_cast<HttpClientOperation::Internal*>(operation.storage);
 
         long version = CURL_HTTP_VERSION_NONE;
-        if (session.curl.curl_easy_getinfo_long(internal.curlHandle, CURLINFO_HTTP_VERSION, &version) == CURLE_OK)
+        if (session.curl.curl_easy_getinfo(internal.curlHandle, CURLINFO_HTTP_VERSION, &version) == CURLE_OK)
         {
             const HttpClientResponse::Protocol protocol = mapCurlHttpVersion(version);
             if (protocol != HttpClientResponse::Protocol::Unknown)
@@ -258,7 +281,7 @@ struct HttpClientLinuxCallbacks
         return readBytes;
     }
 
-    static int curlProgressCallback(void* clientp, long, long, long, long)
+    static int curlProgressCallback(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
     {
         HttpClientOperation* operation = reinterpret_cast<HttpClientOperation*>(clientp);
         if (operation == nullptr)
@@ -319,6 +342,7 @@ SC::HttpClientOperation::~HttpClientOperation()
 
 SC::Result SC::HttpClientOperation::platformInit()
 {
+    (void)getHttpClientLinuxRuntimeFeatures();
     auto& session       = *reinterpret_cast<HttpClient::Internal*>(client->storage);
     auto& internal      = *reinterpret_cast<Internal*>(storage);
     internal.curlHandle = session.curl.curl_easy_init();
@@ -377,13 +401,13 @@ SC::Result SC::HttpClientOperation::platformStart()
     session.curl.curl_easy_reset(curlHandle);
 
     // libcurl recommends disabling signal handlers for Unix multi-threaded callers.
-    if (session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOSIGNAL, 1L) != CURLE_OK)
+    if (session.curl.curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L) != CURLE_OK)
         return Result::Error(HttpClientResultCategory, HttpClientError::TransportConfigurationFailed);
 
     Span<const char> urlSpan = currentRequest.url.toCharSpan();
     if (currentRequest.url.isNullTerminated())
     {
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_URL, currentRequest.url.bytesIncludingTerminator());
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_URL, currentRequest.url.bytesIncludingTerminator());
     }
     else
     {
@@ -391,35 +415,36 @@ SC::Result SC::HttpClientOperation::platformStart()
             return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
         memcpy(backendScratch.data(), urlSpan.data(), urlSpan.sizeInBytes());
         backendScratch[urlSpan.sizeInBytes()] = '\0';
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_URL, backendScratch.data());
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_URL, backendScratch.data());
     }
 
     if (currentRequest.method == HttpClientRequest::HttpPOST)
     {
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_POST, 1L);
     }
     else if (currentRequest.method == HttpClientRequest::HttpHEAD)
     {
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOBODY, 1L);
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CUSTOMREQUEST, getCustomMethod(currentRequest.method));
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_NOBODY, 1L);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_CUSTOMREQUEST, getCustomMethod(currentRequest.method));
     }
     else if (currentRequest.method != HttpClientRequest::HttpGET)
     {
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CUSTOMREQUEST, getCustomMethod(currentRequest.method));
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_CUSTOMREQUEST, getCustomMethod(currentRequest.method));
     }
 
-    session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_FOLLOWLOCATION, isAutomaticRedirectEnabled() ? 1L : 0L);
-    session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_MAXREDIRS, currentRequest.options.redirect.maxRedirects);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, isAutomaticRedirectEnabled() ? 1L : 0L);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_MAXREDIRS,
+                                  static_cast<long>(currentRequest.options.redirect.maxRedirects));
     if (currentRequest.options.timeouts.requestTimeoutMs > 0)
     {
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_TIMEOUT_MS,
-                                           static_cast<long>(currentRequest.options.timeouts.requestTimeoutMs));
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT_MS,
+                                      static_cast<long>(currentRequest.options.timeouts.requestTimeoutMs));
     }
 
     const long httpVersion = getCurlHttpVersionOption(currentRequest.options.protocol.preference);
     if (httpVersion != CURL_HTTP_VERSION_NONE)
     {
-        if (session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_HTTP_VERSION, httpVersion) != CURLE_OK)
+        if (session.curl.curl_easy_setopt(curlHandle, CURLOPT_HTTP_VERSION, httpVersion) != CURLE_OK)
         {
             switch (currentRequest.options.protocol.preference)
             {
@@ -437,35 +462,35 @@ SC::Result SC::HttpClientOperation::platformStart()
 
     if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::NoProxy)
     {
-        if (session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, "") != CURLE_OK)
+        if (session.curl.curl_easy_setopt(curlHandle, CURLOPT_PROXY, "") != CURLE_OK)
             return Result::Error(HttpClientResultCategory, HttpClientError::NoProxyPolicyUnsupported);
     }
     else if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Http)
     {
         const char* proxyUrl = nullptr;
         SC_TRY(getCurlStringPointer(currentRequest.options.proxy.url, backendScratch, proxyUrl));
-        if (session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, proxyUrl) != CURLE_OK)
+        if (session.curl.curl_easy_setopt(curlHandle, CURLOPT_PROXY, proxyUrl) != CURLE_OK)
             return Result::Error(HttpClientResultCategory, HttpClientError::HttpProxyPolicyUnsupported);
         if (currentRequest.options.proxy.bypassList.sizeInBytes() > 0)
         {
             const char* noProxy = nullptr;
             SC_TRY(getCurlStringPointer(currentRequest.options.proxy.bypassList, backendScratch, noProxy));
-            if (session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_NOPROXY, noProxy) != CURLE_OK)
+            if (session.curl.curl_easy_setopt(curlHandle, CURLOPT_NOPROXY, noProxy) != CURLE_OK)
                 return Result::Error(HttpClientResultCategory, HttpClientError::ProxyBypassListUnsupported);
         }
     }
 
     if (not currentRequest.options.tls.verifyPeer)
     {
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_SSL_VERIFYPEER, 0L);
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_SSL_VERIFYHOST, 0L);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_SSL_VERIFYPEER, 0L);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_SSL_VERIFYHOST, 0L);
     }
     if (currentRequest.options.tls.caCertificatesPath.sizeInBytes() > 0)
     {
         if (currentRequest.options.tls.caCertificatesPath.isNullTerminated())
         {
-            session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CAINFO,
-                                              currentRequest.options.tls.caCertificatesPath.bytesIncludingTerminator());
+            session.curl.curl_easy_setopt(curlHandle, CURLOPT_CAINFO,
+                                          currentRequest.options.tls.caCertificatesPath.bytesIncludingTerminator());
         }
         else
         {
@@ -474,22 +499,20 @@ SC::Result SC::HttpClientOperation::platformStart()
                 return Result::Error(HttpClientResultCategory, HttpClientError::BackendScratchTooSmall);
             memcpy(backendScratch.data(), caInfo.data(), caInfo.sizeInBytes());
             backendScratch[caInfo.sizeInBytes()] = '\0';
-            session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CAINFO, backendScratch.data());
+            session.curl.curl_easy_setopt(curlHandle, CURLOPT_CAINFO, backendScratch.data());
         }
     }
 
-    session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOPROGRESS, 0L);
-    session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_XFERINFOFUNCTION,
-                                      reinterpret_cast<void*>(&HttpClientLinuxCallbacks::curlProgressCallback));
-    session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_XFERINFODATA, this);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_NOPROGRESS, 0L);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_XFERINFOFUNCTION,
+                                  &HttpClientLinuxCallbacks::curlProgressCallback);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_XFERINFODATA, this);
 
-    session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_HEADERFUNCTION,
-                                      reinterpret_cast<void*>(&HttpClientLinuxCallbacks::curlHeaderCallback));
-    session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_HEADERDATA, this);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_HEADERFUNCTION, &HttpClientLinuxCallbacks::curlHeaderCallback);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_HEADERDATA, this);
 
-    session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_WRITEFUNCTION,
-                                      reinterpret_cast<void*>(&HttpClientLinuxCallbacks::curlWriteCallback));
-    session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_WRITEDATA, this);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, &HttpClientLinuxCallbacks::curlWriteCallback);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, this);
 
     if (internal.requestHeaders != nullptr)
     {
@@ -530,45 +553,44 @@ SC::Result SC::HttpClientOperation::platformStart()
     }
     if (internal.requestHeaders != nullptr)
     {
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_HTTPHEADER, internal.requestHeaders);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_HTTPHEADER, internal.requestHeaders);
     }
 
     if (currentRequest.body.isStreamed())
     {
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_READFUNCTION,
-                                          reinterpret_cast<void*>(&HttpClientLinuxCallbacks::curlReadCallback));
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_READDATA, this);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_READFUNCTION, &HttpClientLinuxCallbacks::curlReadCallback);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_READDATA, this);
         if (currentRequest.method == HttpClientRequest::HttpPOST)
         {
-            session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
+            session.curl.curl_easy_setopt(curlHandle, CURLOPT_POST, 1L);
             if (currentRequest.body.framing == HttpClientRequestBody::SizedStream)
             {
                 if (currentRequest.body.sizeInBytes > static_cast<uint64_t>(LONG_MAX))
                     return Result::Error(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported);
-                session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
-                                                   static_cast<long>(currentRequest.body.sizeInBytes));
+                session.curl.curl_easy_setopt(curlHandle, CURLOPT_POSTFIELDSIZE,
+                                              static_cast<long>(currentRequest.body.sizeInBytes));
             }
         }
         else
         {
-            session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_UPLOAD, 1L);
+            session.curl.curl_easy_setopt(curlHandle, CURLOPT_UPLOAD, 1L);
             if (currentRequest.body.framing == HttpClientRequestBody::SizedStream)
             {
                 if (currentRequest.body.sizeInBytes > static_cast<uint64_t>(LONG_MAX))
                     return Result::Error(HttpClientResultCategory, HttpClientError::RequestBodySizeUnsupported);
-                session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_INFILESIZE,
-                                                   static_cast<long>(currentRequest.body.sizeInBytes));
+                session.curl.curl_easy_setopt(curlHandle, CURLOPT_INFILESIZE,
+                                              static_cast<long>(currentRequest.body.sizeInBytes));
             }
         }
     }
     else if (currentRequest.body.bytes.sizeInBytes() > 0)
     {
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_POSTFIELDS, currentRequest.body.bytes.data());
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
-                                           static_cast<long>(currentRequest.body.bytes.sizeInBytes()));
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_POSTFIELDS, currentRequest.body.bytes.data());
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_POSTFIELDSIZE,
+                                      static_cast<long>(currentRequest.body.bytes.sizeInBytes()));
         if (currentRequest.method == HttpClientRequest::HttpPOST)
         {
-            session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
+            session.curl.curl_easy_setopt(curlHandle, CURLOPT_POST, 1L);
         }
     }
 
@@ -587,17 +609,17 @@ SC::Result SC::HttpClientOperation::platformStart()
             if (not internalRef.responseHeadSeen and operation->currentResponse != nullptr)
             {
                 long httpCode = 0;
-                sessionRef.curl.curl_easy_getinfo_long(internalRef.curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
+                sessionRef.curl.curl_easy_getinfo(internalRef.curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
                 operation->currentResponse->statusCode = static_cast<int>(httpCode);
                 HttpClientLinuxCallbacks::updateNegotiatedProtocol(*operation);
                 long redirectCount = 0;
-                (void)sessionRef.curl.curl_easy_getinfo_long(internalRef.curlHandle, CURLINFO_REDIRECT_COUNT,
-                                                             &redirectCount);
+                (void)sessionRef.curl.curl_easy_getinfo(internalRef.curlHandle, CURLINFO_REDIRECT_COUNT,
+                                                        &redirectCount);
                 operation->currentResponse->redirectCount =
                     static_cast<uint32_t>(redirectCount < 0 ? 0 : redirectCount);
                 char* effectiveUrl = nullptr;
-                if (sessionRef.curl.curl_easy_getinfo_ptr(internalRef.curlHandle, CURLINFO_EFFECTIVE_URL,
-                                                          &effectiveUrl) == CURLE_OK and
+                if (sessionRef.curl.curl_easy_getinfo(internalRef.curlHandle, CURLINFO_EFFECTIVE_URL, &effectiveUrl) ==
+                        CURLE_OK and
                     effectiveUrl != nullptr)
                 {
                     const Result effectiveUrlError = operation->copyResponseEffectiveUrl(

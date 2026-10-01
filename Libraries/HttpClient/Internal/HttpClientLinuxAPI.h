@@ -9,6 +9,7 @@
 #pragma once
 #include <dlfcn.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 #if SC_HTTPCLIENT_INCLUDE_CURL_HEADER
@@ -16,13 +17,33 @@
 #else
 
 // Minimal libcurl type definitions (enough for the HttpClient backend)
-typedef void CURL;
-typedef void CURLM;
+typedef void    CURL;
+typedef void    CURLM;
+typedef int64_t curl_off_t;
 
 typedef int CURLcode;
-#define CURLE_OK                  0
+#define CURLE_OK 0
 
 typedef int CURLoption;
+typedef int CURLINFO;
+typedef enum
+{
+    CURLVERSION_FIRST = 0
+} CURLversion;
+
+// The fields through features are the stable CURLVERSION_FIRST prefix.
+struct curl_version_info_data
+{
+    CURLversion  age;
+    const char*  version;
+    unsigned int version_num;
+    const char*  host;
+    int          features;
+};
+
+#define CURL_VERSION_SSL          (1 << 2)
+#define CURL_VERSION_HTTP2        (1 << 16)
+
 // Offsets per curl documentation (CURLOPT_* base values)
 #define CURLOPTTYPE_LONG          0
 #define CURLOPTTYPE_OBJECTPOINT   10000
@@ -66,13 +87,12 @@ typedef int CURLoption;
 #define CURL_HTTP_VERSION_2TLS              4
 #define CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE 5
 
-typedef int CURLINFO;
-#define CURLINFO_STRING                     0x100000
-#define CURLINFO_LONG                       0x200000
-#define CURLINFO_EFFECTIVE_URL              (CURLINFO_STRING + 1)
-#define CURLINFO_RESPONSE_CODE              (CURLINFO_LONG + 2)
-#define CURLINFO_REDIRECT_COUNT             (CURLINFO_LONG + 20)
-#define CURLINFO_HTTP_VERSION               (CURLINFO_LONG + 46)
+#define CURLINFO_STRING         0x100000
+#define CURLINFO_LONG           0x200000
+#define CURLINFO_EFFECTIVE_URL  (CURLINFO_STRING + 1)
+#define CURLINFO_RESPONSE_CODE  (CURLINFO_LONG + 2)
+#define CURLINFO_REDIRECT_COUNT (CURLINFO_LONG + 20)
+#define CURLINFO_HTTP_VERSION   (CURLINFO_LONG + 46)
 
 #define CURL_READFUNC_ABORT 0x10000000
 
@@ -91,16 +111,20 @@ struct HttpClientLinuxLibCurlLoader
     void* libcurlHandle = nullptr;
 
     // Function pointers for the libcurl functions we use
-    CURL* (*curl_easy_init)()                                                = nullptr;
-    void (*curl_easy_cleanup)(CURL*)                                         = nullptr;
-    void (*curl_easy_reset)(CURL*)                                           = nullptr;
-    int (*curl_easy_perform)(CURL*)                                          = nullptr;
-    int (*curl_easy_setopt_long)(CURL*, int, long)                           = nullptr;
-    int (*curl_easy_setopt_ptr)(CURL*, int, const void*)                     = nullptr;
-    int (*curl_easy_getinfo_long)(CURL*, int, long*)                         = nullptr;
-    int (*curl_easy_getinfo_ptr)(CURL*, int, void*)                          = nullptr;
+    CURL* (*curl_easy_init)()        = nullptr;
+    void (*curl_easy_cleanup)(CURL*) = nullptr;
+    void (*curl_easy_reset)(CURL*)   = nullptr;
+
+    CURLcode (*curl_easy_perform)(CURL*) = nullptr;
+
+    CURLcode (*curl_easy_setopt)(CURL*, CURLoption, ...) = nullptr;
+    CURLcode (*curl_easy_getinfo)(CURL*, CURLINFO, ...)  = nullptr;
+
+    curl_version_info_data* (*curl_version_info)(CURLversion) = nullptr;
+
     struct curl_slist* (*curl_slist_append)(struct curl_slist*, const char*) = nullptr;
-    void (*curl_slist_free_all)(struct curl_slist*)                          = nullptr;
+
+    void (*curl_slist_free_all)(struct curl_slist*) = nullptr;
 
     bool isValid() const { return libcurlHandle != nullptr; }
 
@@ -121,21 +145,17 @@ struct HttpClientLinuxLibCurlLoader
         curl_easy_cleanup   = reinterpret_cast<decltype(curl_easy_cleanup)>(::dlsym(libcurlHandle, "curl_easy_cleanup"));
         curl_easy_reset     = reinterpret_cast<decltype(curl_easy_reset)>(::dlsym(libcurlHandle, "curl_easy_reset"));
         curl_easy_perform   = reinterpret_cast<decltype(curl_easy_perform)>(::dlsym(libcurlHandle, "curl_easy_perform"));
+        curl_easy_setopt    = reinterpret_cast<decltype(curl_easy_setopt)>(::dlsym(libcurlHandle, "curl_easy_setopt"));
+        curl_easy_getinfo   = reinterpret_cast<decltype(curl_easy_getinfo)>(::dlsym(libcurlHandle, "curl_easy_getinfo"));
+        curl_version_info   = reinterpret_cast<decltype(curl_version_info)>(::dlsym(libcurlHandle, "curl_version_info"));
         curl_slist_append   = reinterpret_cast<decltype(curl_slist_append)>(::dlsym(libcurlHandle, "curl_slist_append"));
         curl_slist_free_all = reinterpret_cast<decltype(curl_slist_free_all)>(::dlsym(libcurlHandle, "curl_slist_free_all"));
         // clang-format on
 
-        // curl_easy_setopt is variadic, so we cast to specific function signatures
-        auto setopt           = reinterpret_cast<void*>(::dlsym(libcurlHandle, "curl_easy_setopt"));
-        curl_easy_setopt_long = reinterpret_cast<decltype(curl_easy_setopt_long)>(setopt);
-        curl_easy_setopt_ptr  = reinterpret_cast<decltype(curl_easy_setopt_ptr)>(setopt);
-
-        auto getinfo           = reinterpret_cast<void*>(::dlsym(libcurlHandle, "curl_easy_getinfo"));
-        curl_easy_getinfo_long = reinterpret_cast<decltype(curl_easy_getinfo_long)>(getinfo);
-        curl_easy_getinfo_ptr  = reinterpret_cast<decltype(curl_easy_getinfo_ptr)>(getinfo);
-
         // Verify essential symbols
-        if (curl_easy_init == nullptr or curl_easy_cleanup == nullptr or curl_easy_perform == nullptr)
+        if (curl_easy_init == nullptr or curl_easy_cleanup == nullptr or curl_easy_reset == nullptr or
+            curl_easy_perform == nullptr or curl_easy_setopt == nullptr or curl_easy_getinfo == nullptr or
+            curl_version_info == nullptr or curl_slist_append == nullptr or curl_slist_free_all == nullptr)
         {
             ::dlclose(libcurlHandle);
             libcurlHandle = nullptr;
@@ -143,6 +163,14 @@ struct HttpClientLinuxLibCurlLoader
         }
 
         return true;
+    }
+
+    bool supportsFeature(int feature) const
+    {
+        if (curl_version_info == nullptr)
+            return false;
+        const curl_version_info_data* version = curl_version_info(CURLVERSION_FIRST);
+        return version != nullptr and (version->features & feature) != 0;
     }
 
     void close()

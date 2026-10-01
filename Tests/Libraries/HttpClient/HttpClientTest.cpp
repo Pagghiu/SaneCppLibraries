@@ -14,6 +14,10 @@
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
 
+#if SC_PLATFORM_LINUX
+#include "Libraries/HttpClient/Internal/HttpClientLinuxAPI.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,13 +48,6 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             responseHeaderHelpers();
         }
-#if SC_COMPILER_FILC
-        if (not report.quietMode)
-        {
-            report.console.printLine("HttpClientTest - Skipping under Fil-C: Linux backend depends on host libcurl "
-                                     "ABI");
-        }
-#else
         if (test_section("init and close"))
         {
             initAndClose();
@@ -171,7 +168,6 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             asyncUploadPipeline();
         }
-#endif
     }
 
     struct TestServer
@@ -512,20 +508,29 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(capabilities.sizedStreamRequestBody);
         SC_TEST_EXPECT(capabilities.chunkedStreamRequestBody);
         SC_TEST_EXPECT(capabilities.redirectPolicy);
-        SC_TEST_EXPECT(capabilities.protocolHttp2Preferred);
         SC_TEST_EXPECT(not capabilities.contentCodingPolicy);
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::MultipleOperationsPerClient));
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::FixedRequestBody));
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::SizedStreamRequestBody));
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ChunkedStreamRequestBody));
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::RedirectPolicy));
-        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProtocolHttp2Preferred));
         SC_TEST_EXPECT(not capabilities.supports(HttpClientCapabilities::ContentCodingPolicy));
         HttpClientCapabilities::Feature commonRequired[] = {HttpClientCapabilities::MultipleOperationsPerClient,
                                                             HttpClientCapabilities::FixedRequestBody,
                                                             HttpClientCapabilities::RedirectPolicy};
         SC_TEST_EXPECT(capabilities.supportsAll(commonRequired));
         SC_TEST_EXPECT(capabilities.requireFeatures(commonRequired));
+        HttpClientCapabilities::Feature http2PreferredRequired[] = {HttpClientCapabilities::ProtocolHttp2Preferred};
+        SC_TEST_EXPECT(capabilities.supportsAll(http2PreferredRequired) == capabilities.protocolHttp2Preferred);
+        if (capabilities.protocolHttp2Preferred)
+        {
+            SC_TEST_EXPECT(capabilities.requireFeatures(http2PreferredRequired));
+        }
+        else
+        {
+            SC_TEST_EXPECT(capabilities.requireFeatures(http2PreferredRequired)
+                               .isError(HttpClientResultCategory, HttpClientError::RequiredFeatureUnsupported));
+        }
         HttpClientCapabilities::Feature unsupportedRequired[] = {HttpClientCapabilities::ContentCodingPolicy};
         SC_TEST_EXPECT(not capabilities.supportsAll(unsupportedRequired));
         SC_TEST_EXPECT(capabilities.requireFeatures(unsupportedRequired)
@@ -576,6 +581,13 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(capabilities.supportsRequestOptions(options) == capabilities.redirectPolicy);
             SC_TEST_EXPECT(static_cast<bool>(capabilities.requireRequestOptions(options)) ==
                            capabilities.redirectPolicy);
+        }
+        {
+            HttpClientRequestOptions options;
+            options.protocol.preference = HttpClientRequestProtocolOptions::Http2Preferred;
+            SC_TEST_EXPECT(capabilities.supportsRequestOptions(options) == capabilities.protocolHttp2Preferred);
+            SC_TEST_EXPECT(static_cast<bool>(capabilities.requireRequestOptions(options)) ==
+                           capabilities.protocolHttp2Preferred);
         }
         {
             HttpClientRequestOptions options;
@@ -632,17 +644,26 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(not capabilities.supports(HttpClientCapabilities::ProxyAuthorization));
         SC_TEST_EXPECT(not capabilities.supports(HttpClientCapabilities::ProxyBypassList));
 #elif SC_PLATFORM_LINUX
+        HttpClientLinuxLibCurlLoader curl;
+        SC_TEST_EXPECT(curl.init());
+        const bool curlSupportsHttp2 = curl.supportsFeature(CURL_VERSION_HTTP2);
+        const bool curlSupportsTls   = curl.supportsFeature(CURL_VERSION_SSL);
+        curl.close();
+
         SC_TEST_EXPECT(capabilities.protocolHttp11Only);
-        SC_TEST_EXPECT(capabilities.protocolHttp2Required);
-        SC_TEST_EXPECT(capabilities.tlsDisablePeerVerification);
-        SC_TEST_EXPECT(capabilities.tlsCustomCaPath);
+        SC_TEST_EXPECT(capabilities.protocolHttp2Preferred == curlSupportsHttp2);
+        SC_TEST_EXPECT(capabilities.protocolHttp2Required == curlSupportsHttp2);
+        SC_TEST_EXPECT(capabilities.tlsDisablePeerVerification == curlSupportsTls);
+        SC_TEST_EXPECT(capabilities.tlsCustomCaPath == curlSupportsTls);
         SC_TEST_EXPECT(capabilities.proxyNoProxy);
         SC_TEST_EXPECT(capabilities.proxyHttp);
         SC_TEST_EXPECT(capabilities.proxyAuthorization);
         SC_TEST_EXPECT(capabilities.proxyBypassList);
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProtocolHttp11Only));
-        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProtocolHttp2Required));
-        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::TlsCustomCaPath));
+        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProtocolHttp2Preferred) == curlSupportsHttp2);
+        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProtocolHttp2Required) == curlSupportsHttp2);
+        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::TlsDisablePeerVerification) == curlSupportsTls);
+        SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::TlsCustomCaPath) == curlSupportsTls);
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProxyHttp));
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProxyAuthorization));
         SC_TEST_EXPECT(capabilities.supports(HttpClientCapabilities::ProxyBypassList));
@@ -767,6 +788,12 @@ struct SC::HttpClientTest : public SC::TestCase
             HttpClientRequest request;
             request.options.protocol.preference = HttpClientRequestProtocolOptions::Http2Required;
             expectRejected(request, HttpClientError::Http2RequiredUnsupported);
+        }
+        if (not capabilities.protocolHttp2Preferred)
+        {
+            HttpClientRequest request;
+            request.options.protocol.preference = HttpClientRequestProtocolOptions::Http2Preferred;
+            expectRejected(request, HttpClientError::Http2PreferredUnsupported);
         }
         if (not capabilities.tlsDisablePeerVerification)
         {
@@ -2189,12 +2216,21 @@ struct SC::HttpClientTest : public SC::TestCase
                     request.url                         = server.endpoint.view();
                     request.options.protocol.preference = HttpClientRequestProtocolOptions::Http2Preferred;
 
-                    SC_TEST_EXPECT(HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
-                                                               localMemory.memory));
-                    SC_TEST_EXPECT(response.statusCode == 200);
-                    SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "OK");
-                    SC_TEST_EXPECT(response.negotiatedProtocol == HttpClientResponse::Protocol::Http11 or
-                                   response.negotiatedProtocol == HttpClientResponse::Protocol::Unknown);
+                    const Result result = HttpClient::executeBlocking(request, response, {body, sizeof(body)},
+                                                                      bodyLength, localMemory.memory);
+                    if (HttpClient::getCapabilities().protocolHttp2Preferred)
+                    {
+                        SC_TEST_EXPECT(result);
+                        SC_TEST_EXPECT(response.statusCode == 200);
+                        SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "OK");
+                        SC_TEST_EXPECT(response.negotiatedProtocol == HttpClientResponse::Protocol::Http11 or
+                                       response.negotiatedProtocol == HttpClientResponse::Protocol::Unknown);
+                    }
+                    else
+                    {
+                        SC_TEST_EXPECT(
+                            result.isError(HttpClientResultCategory, HttpClientError::Http2PreferredUnsupported));
+                    }
                 }
 
 #if !SC_PLATFORM_APPLE

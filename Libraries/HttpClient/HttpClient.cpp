@@ -696,10 +696,13 @@ SC::HttpClientCapabilities SC::HttpClient::getCapabilities()
     capabilities.proxyAuthorization         = false;
     capabilities.proxyBypassList            = false;
 #elif SC_PLATFORM_LINUX
+    const HttpClientLinuxRuntimeFeatures& runtimeFeatures = getHttpClientLinuxRuntimeFeatures();
+
     capabilities.protocolHttp11Only         = true;
-    capabilities.protocolHttp2Required      = true;
-    capabilities.tlsDisablePeerVerification = true;
-    capabilities.tlsCustomCaPath            = true;
+    capabilities.protocolHttp2Preferred     = runtimeFeatures.http2;
+    capabilities.protocolHttp2Required      = runtimeFeatures.http2;
+    capabilities.tlsDisablePeerVerification = runtimeFeatures.tls;
+    capabilities.tlsCustomCaPath            = runtimeFeatures.tls;
     capabilities.proxyNoProxy               = true;
     capabilities.proxyHttp                  = true;
     capabilities.proxyAuthorization         = true;
