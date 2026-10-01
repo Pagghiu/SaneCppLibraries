@@ -166,7 +166,7 @@ static constexpr StringView QEMUPhases[] = {
 static constexpr PackageRegistryExport FilCExports[] = {
     {PackageExportKind::Tool, PackageExport::Clang},
     {PackageExportKind::Tool, PackageExport::ClangXX},
-    {PackageExportKind::Capability, PackageCapability::ToolchainFilCX86_64},
+    {PackageExportKind::Capability, "toolchain.filc.<arch>"},
 };
 static constexpr StringView FilCPhases[] = {
     "resolveFilCSource",
@@ -179,7 +179,7 @@ static constexpr PackageRegistryExport ZLibFilCExports[] = {
     {PackageExportKind::Library, PackageExport::ZLibSharedLink},
     {PackageExportKind::LibraryDir, PackageExport::ZLibLibraryDir},
     {PackageExportKind::IncludeDir, PackageExport::ZLibIncludeDir},
-    {PackageExportKind::Capability, PackageCapability::LibraryZLibFilCX86_64},
+    {PackageExportKind::Capability, "library.zlib.filc.<arch>"},
 };
 static constexpr StringView ZLibFilCPhases[] = {
     "resolveZLibSource",
@@ -252,9 +252,9 @@ static constexpr PackageRegistryEntry BuiltinPackageRegistryEntries[] = {
      false, LLVMExports, LLVMPhases, installLLVMEntry},
     {"qemu", "qemu", PackageKind::Runner, "Imported QEMU user-mode runner registration", "host",
      "Imported directory or PATH", true, QEMUExports, QEMUPhases, installQEMUEntry},
-    {"filc", "filc", PackageKind::Toolchain, "Experimental Fil-C compiler toolchain", "linux-x86_64",
+    {"filc", "filc", PackageKind::Toolchain, "Experimental Fil-C compiler toolchain", "linux-x86_64/linux-arm64",
      "Pinned archive or import", true, FilCExports, FilCPhases, installFilCEntry},
-    {"zlib-filc", "zlib_filc", PackageKind::Library, "Fil-C native zlib shared library", "linux-x86_64",
+    {"zlib-filc", "zlib_filc", PackageKind::Library, "Fil-C native zlib shared library", "linux-x86_64/linux-arm64",
      "Pinned zlib archive or import", true, ZLibFilCExports, ZLibFilCPhases, installZLibFilCEntry},
     {"llvm-mingw", "llvm-mingw", PackageKind::Toolchain, "LLVM MinGW Windows GNU toolchain", "host",
      "llvm-mingw release archive", false, LLVMMingwExports, LLVMMingwPhases, installLLVMMingwEntry},

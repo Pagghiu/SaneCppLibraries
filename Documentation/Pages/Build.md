@@ -114,6 +114,22 @@ and target pair has the same build or run support. Use the command help for the 
 ./SC.sh build run --help
 ```
 
+# Experimental Fil-C toolchain
+
+On Linux, `--toolchain filc` selects the native host architecture. Fil-C 0.685 packages are available for Intel64
+(`x86_64`) and ARM64 (`aarch64`); the imported compiler's target triple must match the host. Fil-C remains toolchain-only
+and does not add a `linux-filc-*` target profile.
+
+Install the archive for the current host, then build without an explicit cross-target:
+
+```bash
+./SC.sh package install filc
+./SC.sh build compile SaneHttpGet Debug --toolchain filc
+```
+
+The ARM64 distribution is experimental and requires a 4 KiB kernel page size. Archive setup requires `patchelf`.
+Use `--import-directory` only for an installation that has already completed upstream's `setup.sh`.
+
 # Continue from here
 
 - Use [SC::Build (External use)](@ref page_build_external) to adopt the build system outside this repository.

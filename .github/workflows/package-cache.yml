@@ -313,7 +313,11 @@ jobs:
         key: ${{ steps.linux_sysroot_cache.outputs.cache-primary-key }}
 
   filc:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
 
     steps:
@@ -325,9 +329,9 @@ jobs:
         path: |
           _Build/_PackagesCache/filc
           _Build/_Packages/filc_*
-        key: sc-packages-posix-filc-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        key: sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
         restore-keys: |
-          sc-packages-posix-filc-v2-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
     - name: Warm Fil-C package
       run: ./SC.sh package install filc

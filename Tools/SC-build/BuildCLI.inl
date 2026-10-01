@@ -101,7 +101,7 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
         SC_TRY(appendNativeBackendSupportHelp(output));
         if (not output.append("\nExperimental compiler track:\n"
                               "  - Linux hosts can experiment with Fil-C through --toolchain filc for native "
-                              "x86_64 Linux builds\n"
+                              "x86_64 or ARM64 Linux builds matching the host\n"
                               "  - Fil-C is toolchain-only for now; no linux-filc-* target profile exists\n"))
             return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
         if (not output.append(
@@ -580,14 +580,14 @@ static Result applyToolchainValue(Build::Action& action, StringView toolchainVal
     {
         action.parameters.toolchain.family       = Build::Toolchain::FilC;
         action.parameters.toolchain.platform     = Build::Platform::Linux;
-        action.parameters.toolchain.architecture = Build::Architecture::Intel64;
+        action.parameters.toolchain.architecture = action.parameters.hostMachine.architecture;
         if (action.parameters.architecture == Build::Architecture::Any)
         {
-            action.parameters.architecture = Build::Architecture::Intel64;
+            action.parameters.architecture = action.parameters.hostMachine.architecture;
         }
         if (action.parameters.targetMachine.architecture == Build::Architecture::Any)
         {
-            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+            action.parameters.targetMachine.architecture = action.parameters.hostMachine.architecture;
         }
     }
     else if (resolved.equalsIgnoreCaseASCII("gcc"))
@@ -922,10 +922,12 @@ static Result validateBuildActionCombination(Build::Action::Type actionType, con
         {
             return printBuildActionCombinationError(console, "Fil-C currently only supports native Linux targets");
         }
-        if (action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
+        if ((action.parameters.targetMachine.architecture != Build::Architecture::Intel64 and
+             action.parameters.targetMachine.architecture != Build::Architecture::Arm64) or
+            action.parameters.targetMachine.architecture != action.parameters.hostMachine.architecture)
         {
             return printBuildActionCombinationError(
-                console, "Fil-C currently only supports x86_64 Linux output in the packaged pizfix distribution");
+                console, "Fil-C requires native x86_64 or ARM64 Linux output matching the host architecture");
         }
         if (not context.targetTriple.isEmpty())
         {

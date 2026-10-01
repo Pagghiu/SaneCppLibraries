@@ -250,8 +250,10 @@ struct SC::BuildTest : public SC::TestCase
 
         if (test_section("Build CLI keeps Fil-C toolchain-only"))
         {
-            StringView filcTargetProfile[] = {"SCTest", "--target", "linux-filc-x86_64"};
-            StringView filcCrossTarget[]   = {"SCTest", "--target", "linux-glibc-x86_64", "--toolchain", "filc"};
+            StringView       filcTargetProfile[] = {"SCTest", "--target", "linux-filc-x86_64"};
+            const StringView crossTargetProfile =
+                HostInstructionSet == InstructionSet::ARM64 ? "linux-glibc-x86_64"_a8 : "linux-glibc-arm64"_a8;
+            StringView filcCrossTarget[] = {"SCTest", "--target", crossTargetProfile, "--toolchain", "filc"};
 
             Build::Action                 cliAction;
             Tools::detail::BuildCLIStatus status = Tools::detail::BuildCLIStatus::Ready;
@@ -263,6 +265,25 @@ struct SC::BuildTest : public SC::TestCase
             SC_TEST_EXPECT(
                 not prepareBuildCLIAction(report, {filcCrossTarget, 5}, Build::Action::Compile, cliAction, status));
             SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+
+#if SC_PLATFORM_LINUX
+            StringView filcNative[] = {"SCTest", "--toolchain", "filc"};
+            status                  = Tools::detail::BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(prepareBuildCLIAction(report, {filcNative, 3}, Build::Action::Compile, cliAction, status));
+            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+            const Build::Architecture::Type hostArchitecture =
+                HostInstructionSet == InstructionSet::ARM64 ? Build::Architecture::Arm64 : Build::Architecture::Intel64;
+            SC_TEST_EXPECT(cliAction.parameters.architecture == hostArchitecture);
+            SC_TEST_EXPECT(cliAction.parameters.toolchain.architecture == hostArchitecture);
+            SC_TEST_EXPECT(cliAction.parameters.targetMachine.architecture == hostArchitecture);
+
+            StringView mismatchedArchitecture = HostInstructionSet == InstructionSet::ARM64 ? "intel64"_a8 : "arm64"_a8;
+            StringView filcMismatchedArch[]   = {"SCTest", "--toolchain", "filc", "--arch", mismatchedArchitecture};
+            status                            = Tools::detail::BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(
+                not prepareBuildCLIAction(report, {filcMismatchedArch, 5}, Build::Action::Compile, cliAction, status));
+            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+#endif
         }
 
         if (test_section("Build CLI help reflects support matrix"))

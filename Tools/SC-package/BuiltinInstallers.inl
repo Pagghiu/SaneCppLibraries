@@ -2251,6 +2251,18 @@ static Result extractVersionLineSuffix(StringView versionOutput, StringView pref
     return Result::Error(PackageResultCategory, PackageError::ToolMetadataMissing);
 }
 
+static Result extractFilCVersion(StringView versionOutput, String& version)
+{
+    StringView suffix;
+    if (not versionOutput.splitAfter("Fil-C ", suffix))
+        return Result::Error(PackageResultCategory, PackageError::ToolMetadataMissing);
+    StringViewTokenizer tokens(suffix);
+    if (not tokens.tokenizeNext({' ', '\t', '\r', '\n', ')'}))
+        return Result::Error(PackageResultCategory, PackageError::ToolMetadataMissing);
+    SC_TRY(version.assign(tokens.component));
+    return Result(true);
+}
+
 static Result writeFilCPackageMetadata(StringView packageRoot, StringView version, StringView flavor,
                                        StringView compilerC, StringView compilerCpp, StringView linker,
                                        StringView archiver, StringView targetTriple)
@@ -2277,8 +2289,7 @@ static Result writeFilCPackageMetadata(StringView packageRoot, StringView versio
     return Result(true);
 }
 
-static Result writeFilCCompilerWrapperScript(FileSystem& fs, StringView scriptPath, StringView launcherPath,
-                                             StringView compilerPath)
+static Result writeFilCCompilerWrapperScript(FileSystem& fs, StringView scriptPath, StringView compilerPath)
 {
     String script  = StringEncoding::Utf8;
     auto   builder = StringBuilder::create(script);
@@ -2286,14 +2297,7 @@ static Result writeFilCCompilerWrapperScript(FileSystem& fs, StringView scriptPa
     SC_TRY(builder.append("COMPILER_PATH=\"{}\"\n", compilerPath));
     SC_TRY(builder.append("COMPILER_DIR=$(dirname \"$COMPILER_PATH\")\n"));
     SC_TRY(builder.append("cd \"$COMPILER_DIR\" || exit 1\n"));
-    if (launcherPath.isEmpty())
-    {
-        SC_TRY(builder.append("exec \"$COMPILER_PATH\" \"$@\"\n"));
-    }
-    else
-    {
-        SC_TRY(builder.append("exec \"{}\" \"$COMPILER_PATH\" \"$@\"\n", launcherPath));
-    }
+    SC_TRY(builder.append("exec \"$COMPILER_PATH\" \"$@\"\n"));
     builder.finalize();
     SC_TRY(fs.writeString(scriptPath, script.view()));
     SC_TRY(fs.chmod(scriptPath, 0755u));
@@ -2310,11 +2314,23 @@ static Result prepareFilCCompilerLaunchers(StringView packageRoot)
         return Result(true);
     }
 
-    static constexpr StringView rosettaPath = "/media/psf/RosettaLinux/rosetta";
-    StringView                  launcherPath;
-    if (HostInstructionSet == InstructionSet::ARM64 and fs.existsAndIsFile(rosettaPath))
+    if (HostInstructionSet == InstructionSet::ARM64 and fs.existsAndIsDirectory("/usr/include/aarch64-linux-gnu/asm"))
     {
-        launcherPath = rosettaPath;
+        String osInclude = StringEncoding::Utf8;
+        SC_TRY(Path::join(osInclude, {packageRoot, "pizfix", "os-include"}));
+        if (fs.existsAndIsDirectory(osInclude.view()))
+        {
+            // Upstream setup prefers x86 headers even on hosts with both architectures installed.
+            String asmLink = StringEncoding::Utf8;
+            SC_TRY(Path::join(asmLink, {osInclude.view(), "asm"}));
+            StringPath destination;
+            if (not fs.readSymbolicLink(asmLink.view(), destination) or
+                destination.view() != "/usr/include/aarch64-linux-gnu/asm")
+            {
+                SC_TRY(fs.removeLinkIfExists(asmLink.view()));
+                SC_TRY(fs.createSymbolicLink("/usr/include/aarch64-linux-gnu/asm", asmLink.view()));
+            }
+        }
     }
 
     String rawCompilerC   = StringEncoding::Utf8;
@@ -2328,19 +2344,19 @@ static Result prepareFilCCompilerLaunchers(StringView packageRoot)
     SC_TRY(Path::join(wrapperC, {wrapperRoot.view(), "clang"}));
     SC_TRY(Path::join(wrapperCpp, {wrapperRoot.view(), "clang++"}));
     SC_TRY(fs.makeDirectoryRecursive(wrapperRoot.view()));
-    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperC.view(), launcherPath, rawCompilerC.view()));
-    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperCpp.view(), launcherPath, rawCompilerCpp.view()));
+    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperC.view(), rawCompilerC.view()));
+    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperCpp.view(), rawCompilerCpp.view()));
     return Result(true);
 }
 
-static Result ensureFilCPackagePrepared(StringView packageRoot)
+static Result ensureFilCPackagePrepared(StringView packageRoot, bool freshlyExtracted)
 {
     FileSystem fs;
     SC_TRY(fs.init("."));
 
     String compilerCpp = StringEncoding::Utf8;
     SC_TRY(resolveFilCRawCompilerPath(packageRoot, "clang++", compilerCpp));
-    if (fs.existsAndIsFile(compilerCpp.view()))
+    if (not freshlyExtracted and fs.existsAndIsFile(compilerCpp.view()))
     {
         return Result(true);
     }
@@ -2371,9 +2387,11 @@ static Result testFilCToolchain(const Package& package, String* detectedVersion 
     SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang", compilerC));
     SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang++", compilerCpp));
     SC_TRY(probeFilCCompiler(compilerCpp.view(), versionOut));
-    SC_TRY(extractVersionLineSuffix(versionOut.view(), "Fil-C "_a8, version));
+    SC_TRY(extractFilCVersion(versionOut.view(), version));
     SC_TRY(extractVersionLineSuffix(versionOut.view(), "Target:"_a8, targetTriple));
-    if (targetTriple != "x86_64-unknown-linux-gnu")
+    const StringView expectedTarget =
+        HostInstructionSet == InstructionSet::ARM64 ? "aarch64-unknown-linux-gnu"_a8 : "x86_64-unknown-linux-gnu"_a8;
+    if (targetTriple != expectedTarget)
         return Result::Error(PackageResultCategory, PackageError::ToolTargetUnsupported);
 
     Process process;
@@ -2403,18 +2421,26 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
                             StringView importDirectory)
 {
 
-    static constexpr StringView packageVersion = "0.678";
+    if (HostInstructionSet != InstructionSet::Intel64 and HostInstructionSet != InstructionSet::ARM64)
+        return Result::Error(PackageResultCategory, PackageError::ToolTargetUnsupported);
+    static constexpr StringView packageVersion = "0.685";
     static constexpr StringView packageFlavor  = "pizfix";
-    static constexpr StringView packageURL =
-        "https://github.com/pizlonator/fil-c/releases/download/v0.678/filc-0.678-linux-x86_64.tar.xz";
-    static constexpr StringView packageHash = "8c515f704b3ba524566847d78a8c324708a64d0eefadabb40094bc5130aa8995";
+    const bool                  arm64          = HostInstructionSet == InstructionSet::ARM64;
+    const StringView            architecture   = arm64 ? "aarch64"_a8 : "x86_64"_a8;
+    const StringView            packageURL =
+        arm64 ? "https://github.com/pizlonator/fil-c/releases/download/v0.685/filc-0.685-linux-aarch64.tar.xz"_a8
+                         : "https://github.com/pizlonator/fil-c/releases/download/v0.685/filc-0.685-linux-x86_64.tar.xz"_a8;
+    const StringView packageHash = arm64 ? "3f24d1dc84cf66422740b83e68d830669ff263dd0a7d1ea0a133d802f47681b0"_a8
+                                         : "d12bd30c33f18179a9355b32ea44ba61dcc0342c7d77d1ac2548852e64994727"_a8;
 
-    package.packageFullName       = "filc-0.678-linux-x86_64-pizfix";
-    package.packageBaseName       = "filc-0.678-linux-x86_64.tar.xz";
-    package.packageLocalFile      = format("{}/filc/{}", packagesCacheDirectory, package.packageBaseName.view());
-    package.packageLocalDirectory = format("{}/filc/pizfix-{}-linux-x86_64", packagesCacheDirectory, packageVersion);
-    package.packageLocalTxt      = format("{}/filc/pizfix-{}-linux-x86_64.txt", packagesCacheDirectory, packageVersion);
-    package.installDirectoryLink = format("{}/filc_linux_x86_64", packagesInstallDirectory);
+    package.packageFullName  = format("filc-{}-linux-{}-pizfix", packageVersion, architecture);
+    package.packageBaseName  = format("filc-{}-linux-{}.tar.xz", packageVersion, architecture);
+    package.packageLocalFile = format("{}/filc/{}", packagesCacheDirectory, package.packageBaseName.view());
+    package.packageLocalDirectory =
+        format("{}/filc/pizfix-{}-linux-{}", packagesCacheDirectory, packageVersion, architecture);
+    package.packageLocalTxt =
+        format("{}/filc/pizfix-{}-linux-{}.txt", packagesCacheDirectory, packageVersion, architecture);
+    package.installDirectoryLink = format("{}/filc_linux_{}", packagesInstallDirectory, architecture);
 
     FileSystem fs;
     SC_TRY(fs.init("."));
@@ -2539,7 +2565,7 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
                 extractTarArchiveFlatteningRoot(package.packageLocalFile.view(), package.packageLocalDirectory.view()));
         }
 
-        SC_TRY(ensureFilCPackagePrepared(activePackageRoot.view()));
+        SC_TRY(ensureFilCPackagePrepared(activePackageRoot.view(), not importing));
         SC_TRY(prepareFilCCompilerLaunchers(activePackageRoot.view()));
         SC_TRY(finalizeInstalledPackageFromRoot(activePackageRoot.view(), package));
 
@@ -2583,7 +2609,8 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
     const PackageReceiptExport exports[] = {
         {PackageExportKind::Tool, PackageExport::Clang, "sc-filc/bin/clang"},
         {PackageExportKind::Tool, PackageExport::ClangXX, "sc-filc/bin/clang++"},
-        {PackageExportKind::Capability, PackageCapability::ToolchainFilCX86_64, "sc-filc/bin/clang"},
+        {PackageExportKind::Capability,
+         arm64 ? PackageCapability::ToolchainFilCArm64 : PackageCapability::ToolchainFilCX86_64, "sc-filc/bin/clang"},
     };
     static constexpr StringView phases[] = {
         "resolveFilCSource",
@@ -2591,10 +2618,13 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
         "validateFilCToolchain",
         "writeReceipt",
     };
-    SC_TRY(writeManualPackageReceipt(
-        package, "filc", packageVersion, packageFlavor, sourceIdentifier.view(),
-        importing ? StringView() : "sha256:8c515f704b3ba524566847d78a8c324708a64d0eefadabb40094bc5130aa8995"_a8,
-        exports, phases));
+    String receiptHash = StringEncoding::Utf8;
+    if (not importing)
+    {
+        SC_TRY(StringBuilder::format(receiptHash, "sha256:{}", packageHash));
+    }
+    SC_TRY(writeManualPackageReceipt(package, "filc", packageVersion, packageFlavor, sourceIdentifier.view(),
+                                     receiptHash.view(), exports, phases));
     return Result(true);
 }
 #else
@@ -2879,7 +2909,10 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
         {PackageExportKind::Library, PackageExport::ZLibSharedLink, "lib/libz.so"},
         {PackageExportKind::LibraryDir, PackageExport::ZLibLibraryDir, "lib"},
         {PackageExportKind::IncludeDir, PackageExport::ZLibIncludeDir, "include"},
-        {PackageExportKind::Capability, PackageCapability::LibraryZLibFilCX86_64, "lib/libz.so.1"},
+        {PackageExportKind::Capability,
+         HostInstructionSet == InstructionSet::ARM64 ? PackageCapability::LibraryZLibFilCArm64
+                                                     : PackageCapability::LibraryZLibFilCX86_64,
+         "lib/libz.so.1"},
     };
     static constexpr StringView phases[] = {
         "resolveZLibSource",
@@ -2887,8 +2920,9 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
         "validateZLibRuntime",
         "writeReceipt",
     };
-    SC_TRY(writeManualPackageReceipt(package, "zlib_filc", packageVersion, "linux-x86_64", sourceIdentifier.view(),
-                                     sourceHash.view(), exports, phases));
+    SC_TRY(writeManualPackageReceipt(package, "zlib_filc", packageVersion,
+                                     HostInstructionSet == InstructionSet::ARM64 ? "linux-arm64"_a8 : "linux-x86_64"_a8,
+                                     sourceIdentifier.view(), sourceHash.view(), exports, phases));
 
     if (fs.existsAndIsDirectory(buildRoot.view()))
     {

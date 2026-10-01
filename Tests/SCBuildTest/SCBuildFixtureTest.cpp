@@ -771,16 +771,26 @@ static Result createPortableMSVCImportFixture(FileSystem& fs, StringView rootDir
 #endif
 
 #if SC_PLATFORM_LINUX
+static StringView nativeFilCTargetTriple()
+{
+    return HostInstructionSet == InstructionSet::ARM64 ? "aarch64-unknown-linux-gnu"_a8 : "x86_64-unknown-linux-gnu"_a8;
+}
+
+static StringView mismatchedFilCTargetTriple()
+{
+    return HostInstructionSet == InstructionSet::ARM64 ? "x86_64-unknown-linux-gnu"_a8 : "aarch64-unknown-linux-gnu"_a8;
+}
+
 static Result writeFilCForwardingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
-                                               StringView toolPath, StringView installedDir,
-                                               StringView targetTriple = "x86_64-unknown-linux-gnu")
+                                               StringView toolPath, StringView installedDir, StringView targetTriple)
 {
     String scriptContents = StringEncoding::Utf8;
     auto   builder        = StringBuilder::create(scriptContents);
     SC_TRY(builder.append("#!/bin/sh\n"));
     SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
     SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
-    SC_TRY(builder.append("  printf '%s\\n' 'Fil-C 0.678 clang version 20.1.8'\n"));
+    SC_TRY(builder.append("  printf '%s\\n' 'clang version 20.1.8 (Fil-C 0.685 "
+                          "git@github.com:pizlonator/fil-c.git 0123456789abcdef)'\n"));
     SC_TRY(builder.append("  printf '%s\\n' 'Target: {}'\n", targetTriple));
     SC_TRY(builder.append("  printf '%s\\n' 'Thread model: posix'\n"));
     SC_TRY(builder.append("  printf '%s\\n' 'InstalledDir: {}'\n", installedDir));
@@ -795,9 +805,13 @@ static Result writeFilCForwardingWrapperScript(FileSystem& fs, StringView script
 }
 
 static Result createFakeFilCImportFixture(FileSystem& fs, StringView rootDirectory, StringView compilerCLogPath,
-                                          StringView compilerCppLogPath,
-                                          StringView targetTriple = "x86_64-unknown-linux-gnu")
+                                          StringView compilerCppLogPath, StringView targetTriple = {})
 {
+    if (targetTriple.isEmpty())
+    {
+        targetTriple = nativeFilCTargetTriple();
+    }
+
     String binDirectory = StringEncoding::Utf8;
     String clangPath    = StringEncoding::Utf8;
     String clangCppPath = StringEncoding::Utf8;
@@ -3304,8 +3318,28 @@ struct SCBuildFixtureTest : public SC::TestCase
             String metadata = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(metadataPath.view(), metadata));
             SC_TEST_EXPECT(StringView(metadata.view()).containsString("\"flavor\": \"pizfix\""));
-            SC_TEST_EXPECT(
-                StringView(metadata.view()).containsString("\"targetTriple\": \"x86_64-unknown-linux-gnu\""));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString("\"version\": \"0.685\""));
+            String expectedTargetTriple = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                StringBuilder::format(expectedTargetTriple, "\"targetTriple\": \"{}\"", nativeFilCTargetTriple()));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString(expectedTargetTriple.view()));
+            SC_TEST_EXPECT(StringView(package.installDirectoryLink.view())
+                               .endsWith(HostInstructionSet == InstructionSet::ARM64 ? "filc_linux_aarch64"_a8
+                                                                                     : "filc_linux_x86_64"_a8));
+
+            const StringView capabilityName      = HostInstructionSet == InstructionSet::ARM64
+                                                       ? Tools::PackageCapability::ToolchainFilCArm64
+                                                       : Tools::PackageCapability::ToolchainFilCX86_64;
+            const StringView otherCapabilityName = HostInstructionSet == InstructionSet::ARM64
+                                                       ? Tools::PackageCapability::ToolchainFilCX86_64
+                                                       : Tools::PackageCapability::ToolchainFilCArm64;
+            String           capabilityPath      = StringEncoding::Utf8;
+            String           otherCapabilityPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Tools::resolvePackageCapabilityPath(package.installDirectoryLink.view(), capabilityName,
+                                                               capabilityPath));
+            SC_TEST_EXPECT(StringView(capabilityPath.view()).endsWith("sc-filc/bin/clang"));
+            SC_TEST_EXPECT(not Tools::resolvePackageCapabilityPath(package.installDirectoryLink.view(),
+                                                                   otherCapabilityName, otherCapabilityPath));
 
             String compilerCInvocation   = StringEncoding::Utf8;
             String compilerCppInvocation = StringEncoding::Utf8;
@@ -3315,7 +3349,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(compilerCppInvocation.view()).containsString("--version"));
         }
 
-        if (test_section("package install rejects filc import with unsupported target"))
+        if (test_section("package install rejects filc import with mismatched host target"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
@@ -3337,7 +3371,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Path::join(compilerCppLog, {toolRoot.view(), "filc-bad-target-clangxx.log"}));
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
             SC_TRUST_RESULT(createFakeFilCImportFixture(fs, importRoot.view(), compilerCLog.view(),
-                                                        compilerCppLog.view(), "aarch64-unknown-linux-gnu"));
+                                                        compilerCppLog.view(), mismatchedFilCTargetTriple()));
 
             Tools::Package package;
             SC_TEST_EXPECT(not Tools::installFilCToolchain(directories.packagesCacheDirectory.view(),
@@ -3421,11 +3455,11 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Build::Action action                         = makeNativeCompileAction(directories, FixtureProjectName);
             action.parameters.platform                   = Build::Platform::Linux;
-            action.parameters.architecture               = Build::Architecture::Intel64;
+            action.parameters.architecture               = getBuildArchitecture();
             action.parameters.toolchain.family           = Build::Toolchain::FilC;
-            action.parameters.toolchain.architecture     = Build::Architecture::Intel64;
+            action.parameters.toolchain.architecture     = getBuildArchitecture();
             action.parameters.targetMachine.platform     = Build::Platform::Linux;
-            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+            action.parameters.targetMachine.architecture = getBuildArchitecture();
             action.parameters.targetMachine.environment  = Build::TargetEnvironment::Native;
 
             SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
@@ -3789,9 +3823,12 @@ struct SCBuildFixtureTest : public SC::TestCase
                 ScopedEnvironmentVariable scopedPath;
                 SC_TRUST_RESULT(setScopedEnvironmentVariable("PATH", newPath.view(), scopedPath));
 
-                Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
-                action.action                 = Build::Action::Run;
-                action.parameters.runner.type = Build::RunnerSpec::Auto;
+                Build::Action action                       = makeNativeCompileAction(directories, FixtureProjectName);
+                action.action                              = Build::Action::Run;
+                action.parameters.runner.type              = Build::RunnerSpec::Auto;
+                action.parameters.hostMachine.platform     = Build::Platform::Linux;
+                action.parameters.hostMachine.architecture = Build::Architecture::Arm64;
+                action.parameters.hostMachine.environment  = Build::TargetEnvironment::Native;
                 SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Intel64));
 
                 StringView forwardedArguments[] = {"--fixture", "runner"};

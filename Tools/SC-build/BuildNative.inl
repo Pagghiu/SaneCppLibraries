@@ -2754,41 +2754,6 @@ struct SC::Build::NativeBuild
                                  adapter.executableLink));
         SC_TRY(resolveExecutable(parameters.toolchain.archiver.view(), "ar", adapter.executableArchive));
 
-        if (parameters.hostMachine.platform == Platform::Linux and
-            parameters.hostMachine.architecture == Architecture::Arm64)
-        {
-            String linkerProvider = StringEncoding::Utf8;
-            if (not resolveRunnableHostCommand("ld.lld", linkerProvider))
-            {
-                Tools::Package llvmPackage;
-                SC_TRY(Tools::installLLVMToolchain(parameters.directories.packagesCacheDirectory.view(),
-                                                   parameters.directories.packagesInstallDirectory.view(),
-                                                   llvmPackage));
-                if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(),
-                                                            Tools::PackageCapability::ToolLinker, linkerProvider))
-                {
-                    SC_TRY(Path::join(linkerProvider, {llvmPackage.installDirectoryLink.view(), "bin", "ld.lld"}));
-                }
-            }
-
-            FileSystem wrapperFs;
-            SC_TRY(wrapperFs.init("."));
-
-            String wrapperRoot = StringEncoding::Utf8;
-            String wrapperPath = StringEncoding::Utf8;
-            SC_TRY(Path::join(wrapperRoot, {parameters.directories.buildCacheDirectory.view(), "filc-linker"}));
-            SC_TRY(Path::join(wrapperPath, {wrapperRoot.view(), "ld"}));
-            SC_TRY(wrapperFs.makeDirectoryRecursive(wrapperRoot.view()));
-
-            String script  = StringEncoding::Utf8;
-            auto   builder = StringBuilder::create(script);
-            SC_TRY(builder.append("#!/bin/sh\n"));
-            SC_TRY(builder.append("exec \"{}\" \"$@\"\n", linkerProvider.view()));
-            builder.finalize();
-            SC_TRY(wrapperFs.writeString(wrapperPath.view(), script.view()));
-            SC_TRY(wrapperFs.chmod(wrapperPath.view(), 0755));
-            SC_TRY(adapter.linkerToolDirectory.assign(wrapperRoot.view()));
-        }
         return Result(true);
     }
 
@@ -3023,15 +2988,8 @@ struct SC::Build::NativeBuild
         return fs.exists(path);
     }
 
-    static bool canRunThroughHostTranslation(const Parameters& parameters, const ResolvedTargetContext& context)
+    static bool canRunThroughHostTranslation(const ResolvedTargetContext& context)
     {
-        if (parameters.toolchain.family == Toolchain::FilC and targetPlatform(context) == Platform::Linux and
-            context.hostMachine.platform == Platform::Linux and
-            context.targetMachine.environment == TargetEnvironment::Native)
-        {
-            return true;
-        }
-
         return targetPlatform(context) == Platform::Linux and context.hostMachine.platform == Platform::Linux and
                context.hostMachine.architecture == Architecture::Arm64 and
                targetArchitecture(context) == Architecture::Intel64 and
@@ -3363,12 +3321,12 @@ struct SC::Build::NativeBuild
         switch (runnerSpec.type)
         {
         case RunnerSpec::None:
-            if (not canRunDirectly(targetContext) and not canRunThroughHostTranslation(parameters, targetContext))
+            if (not canRunDirectly(targetContext) and not canRunThroughHostTranslation(targetContext))
                 return Result::Error(BuildResultCategory, BuildError::RunnerDisabledForTarget);
             runner.mode = ResolvedRunner::Direct;
             return Result(true);
         case RunnerSpec::Auto:
-            if (canRunDirectly(targetContext) or canRunThroughHostTranslation(parameters, targetContext))
+            if (canRunDirectly(targetContext) or canRunThroughHostTranslation(targetContext))
             {
                 runner.mode = ResolvedRunner::Direct;
                 return Result(true);
@@ -4086,7 +4044,9 @@ struct SC::Build::NativeBuild
             if (targetPlatform(targetContext) != Platform::Linux or
                 targetContext.targetMachine.environment != TargetEnvironment::Native)
                 return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
-            if (targetArchitecture(targetContext) != Architecture::Intel64)
+            if ((targetArchitecture(targetContext) != Architecture::Intel64 and
+                 targetArchitecture(targetContext) != Architecture::Arm64) or
+                targetArchitecture(targetContext) != targetContext.hostMachine.architecture)
                 return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
             SC_TRY(resolvePackagedFilCToolchain(parameters, adapter));
             SC_TRY(adapter.displayName.assign("filc"));

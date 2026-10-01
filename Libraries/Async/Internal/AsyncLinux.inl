@@ -722,11 +722,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
     {
-#if SC_COMPILER_FILC
-        (void)eventLoop;
-        (void)async;
-        return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
-#else
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
         if (pidFd < 0)
         {
@@ -738,7 +733,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         AsyncLinuxIOUring::prepPollAdd(submission, pidFd, POLLIN);
         AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
-#endif
     }
 
     Result completeAsync(AsyncProcessExit::Result& result)

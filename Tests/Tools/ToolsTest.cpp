@@ -355,27 +355,47 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
             SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
         }
-        if (test_section("build cli parses filc toolchain selection"))
+        if (test_section("build cli selects native filc host architecture"))
         {
             arguments.tool      = "build";
             arguments.action    = "compile";
             args[0]             = "SCTest";
             args[1]             = "--toolchain";
             args[2]             = "filc";
-            args[3]             = "--arch";
-            args[4]             = "intel64";
-            arguments.arguments = {args, 5};
+            arguments.arguments = {args, 3};
 
             Build::Action           action;
             BuildCLIResolvedStorage storage;
             BuildCLIStatus          status = BuildCLIStatus::Error;
 #if SC_PLATFORM_LINUX
+            const Build::Architecture::Type hostArchitecture =
+                HostInstructionSet == InstructionSet::ARM64 ? Build::Architecture::Arm64 : Build::Architecture::Intel64;
             SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
             SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::FilC);
-            SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Intel64);
-            SC_TEST_EXPECT(action.parameters.toolchain.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.architecture == hostArchitecture);
+            SC_TEST_EXPECT(action.parameters.toolchain.architecture == hostArchitecture);
+            SC_TEST_EXPECT(action.parameters.targetMachine.architecture == hostArchitecture);
 #else
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+#endif
+        }
+        if (test_section("build cli rejects filc architecture mismatch"))
+        {
+#if SC_PLATFORM_LINUX
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--toolchain";
+            args[2]             = "filc";
+            args[3]             = "--arch";
+            args[4]             = HostInstructionSet == InstructionSet::ARM64 ? "intel64"_a8 : "arm64"_a8;
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
             SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
 #endif

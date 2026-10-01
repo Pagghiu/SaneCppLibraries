@@ -137,6 +137,24 @@ Some large or host-specific tools can be registered from an existing directory i
 ./SC.sh package install qemu --import-directory /opt/qemu-user
 ```
 
+Fil-C 0.685 is available on native Linux Intel64 (`x86_64`) and ARM64 (`aarch64`) hosts. `package install filc`
+selects the host-matching archive; an imported compiler must report the matching Linux target triple. The resulting
+toolchain capability is `toolchain.filc.x86_64` or `toolchain.filc.aarch64`, respectively.
+
+Download the host-matching release with:
+
+```bash
+./SC.sh package install filc
+```
+
+To register an existing ARM64 installation, use:
+
+```bash
+./SC.sh package install filc --import-directory /home/user/filc-0.685-linux-aarch64
+```
+
+For an Intel64 host, use the corresponding `filc-0.685-linux-x86_64` import directory.
+
 `repair` is for a recognized existing layout whose current receipt or launcher metadata can be reconstructed. It is not
 a generic substitute for a failed install:
 

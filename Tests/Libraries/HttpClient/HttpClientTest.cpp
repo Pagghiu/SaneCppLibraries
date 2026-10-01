@@ -36,6 +36,14 @@ struct SC::HttpClientTest : public SC::TestCase
 {
     HttpClientTest(SC::TestReport& report) : TestCase(report, "HttpClientTest")
     {
+        if (test_section("request policy names"))
+        {
+            requestPolicyNames();
+        }
+        if (test_section("response header helpers"))
+        {
+            responseHeaderHelpers();
+        }
 #if SC_COMPILER_FILC
         if (not report.quietMode)
         {
@@ -50,10 +58,6 @@ struct SC::HttpClientTest : public SC::TestCase
         if (test_section("capabilities"))
         {
             capabilities();
-        }
-        if (test_section("request policy names"))
-        {
-            requestPolicyNames();
         }
         if (test_section("backend policy preflight"))
         {
@@ -86,10 +90,6 @@ struct SC::HttpClientTest : public SC::TestCase
         if (test_section("request header validation"))
         {
             requestHeaderValidation();
-        }
-        if (test_section("response header helpers"))
-        {
-            responseHeaderHelpers();
         }
         if (test_section("content coding policy"))
         {
