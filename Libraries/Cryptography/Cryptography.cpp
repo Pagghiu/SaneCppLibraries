@@ -11,7 +11,7 @@
 #include "../Common/PlacementNew.h"
 #include "../Common/PlatformMacrosType.h"
 
-#if SC_PLATFORM_LINUX && !SC_COMPILER_FILC
+#if SC_PLATFORM_LINUX
 #define SC_CRYPTOGRAPHY_LINUX_AF_ALG 1
 #else
 #define SC_CRYPTOGRAPHY_LINUX_AF_ALG 0
@@ -682,6 +682,13 @@ static ResultCryptography configureKey(int mainSocket, Span<const uint8_t> key)
     return ResultCryptography(true);
 }
 
+static int setAeadAuthenticationSize(int mainSocket)
+{
+    // AF_ALG reads the tag size from optlen; Fil-C still requires a valid optval pointer.
+    uint8_t optionValue[GCMTagSize] = {};
+    return ::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, optionValue, GCMTagSize);
+}
+
 static bool aeadSupported(size_t requestedKeySize)
 {
     uint8_t key[32]    = {0};
@@ -692,7 +699,7 @@ static bool aeadSupported(size_t requestedKeySize)
     if (supported and not configureKey(mainSocket, Span<const uint8_t>(key, requestedKeySize)))
         supported = false;
     if (supported)
-        supported = ::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) == 0;
+        supported = setAeadAuthenticationSize(mainSocket) == 0;
     if (supported)
         supported = static_cast<bool>(acceptOperationSocket(mainSocket, opSocket));
 
@@ -1712,7 +1719,7 @@ struct AFAlgAeadBackend
         SC_TRY(openAlgorithmSocket("aead", "gcm(aes)", mainSocket));
         auto deferClose = MakeDeferred([&] { close(); });
         SC_TRY(configureKey(mainSocket, key));
-        if (::setsockopt(mainSocket, SOL_ALG, ALG_SET_AEAD_AUTHSIZE, nullptr, GCMTagSize) != 0)
+        if (setAeadAuthenticationSize(mainSocket) != 0)
             return ResultCryptography::withPosixErrno(CryptographyError::BackendConfigurationFailed,
                                                       CryptographyErrorDetail::LinuxAFAlgSetAeadAuthenticationSize,
                                                       errno);
@@ -2614,8 +2621,10 @@ struct SC::Cryptography::Aead::Internal
     Backend backend = Backend::Native;
     union Storage
     {
-        AFAlgAeadBackend            native;
+        AFAlgAeadBackend native;
+#if SC_CRYPTOGRAPHY_OPENSSL3
         detail::OpenSSL3AeadBackend openSSL;
+#endif
         Storage() {}
         ~Storage() {}
     } storage;
@@ -2625,49 +2634,78 @@ struct SC::Cryptography::Aead::Internal
 
     void destructBackend()
     {
+#if SC_CRYPTOGRAPHY_OPENSSL3
         if (backend == Backend::OpenSSL)
+        {
             storage.openSSL.~OpenSSL3AeadBackend();
-        else
-            storage.native.~AFAlgAeadBackend();
+            return;
+        }
+#endif
+        storage.native.~AFAlgAeadBackend();
     }
 
     void setBackend(Backend newBackend)
     {
         if (backend == newBackend)
             return;
+#if SC_CRYPTOGRAPHY_OPENSSL3
         destructBackend();
         backend = newBackend;
         if (backend == Backend::OpenSSL)
             placementNew(storage.openSSL);
         else
             placementNew(storage.native);
+#else
+        storage.native.reset();
+        backend = newBackend;
+#endif
     }
 
     void reset()
     {
+#if SC_CRYPTOGRAPHY_OPENSSL3
         if (backend == Backend::OpenSSL)
+        {
             storage.openSSL.reset();
-        else
-            storage.native.reset();
+            return;
+        }
+#endif
+        storage.native.reset();
     }
 
     ResultCryptography init(AeadType type, Span<const uint8_t> key)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.init(type, key) : storage.native.init(type, key);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.init(type, key);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::InitializeAead};
+        return storage.native.init(type, key);
     }
 
     ResultCryptography seal(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> plaintext,
                             Span<uint8_t> ciphertext, Span<uint8_t> tag, size_t& bytesWritten)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten)
-                                           : storage.native.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::SealAead};
+        return storage.native.seal(nonce, aad, plaintext, ciphertext, tag, bytesWritten);
     }
 
     ResultCryptography open(Span<const uint8_t> nonce, Span<const uint8_t> aad, Span<const uint8_t> ciphertext,
                             Span<const uint8_t> tag, Span<uint8_t> plaintext, size_t& bytesWritten)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten)
-                                           : storage.native.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::OpenAead};
+        return storage.native.open(nonce, aad, ciphertext, tag, plaintext, bytesWritten);
     }
 };
 
@@ -2676,8 +2714,10 @@ struct SC::Cryptography::Cipher::Internal
     Backend backend = Backend::Native;
     union Storage
     {
-        AFAlgCipherBackend            native;
+        AFAlgCipherBackend native;
+#if SC_CRYPTOGRAPHY_OPENSSL3
         detail::OpenSSL3CipherBackend openSSL;
+#endif
         Storage() {}
         ~Storage() {}
     } storage;
@@ -2687,48 +2727,76 @@ struct SC::Cryptography::Cipher::Internal
 
     void destructBackend()
     {
+#if SC_CRYPTOGRAPHY_OPENSSL3
         if (backend == Backend::OpenSSL)
+        {
             storage.openSSL.~OpenSSL3CipherBackend();
-        else
-            storage.native.~AFAlgCipherBackend();
+            return;
+        }
+#endif
+        storage.native.~AFAlgCipherBackend();
     }
 
     void setBackend(Backend newBackend)
     {
         if (backend == newBackend)
             return;
+#if SC_CRYPTOGRAPHY_OPENSSL3
         destructBackend();
         backend = newBackend;
         if (backend == Backend::OpenSSL)
             placementNew(storage.openSSL);
         else
             placementNew(storage.native);
+#else
+        storage.native.reset();
+        backend = newBackend;
+#endif
     }
 
     ResultCryptography start(CipherType type, Operation operation, Span<const uint8_t> key, Span<const uint8_t> iv)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.start(type, operation, key, iv)
-                                           : storage.native.start(type, operation, key, iv);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.start(type, operation, key, iv);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::StartCipher};
+        return storage.native.start(type, operation, key, iv);
     }
 
     ResultCryptography update(Span<const uint8_t> input, Span<uint8_t> output, size_t& bytesWritten)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.update(input, output, bytesWritten)
-                                           : storage.native.update(input, output, bytesWritten);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.update(input, output, bytesWritten);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::UpdateCipher};
+        return storage.native.update(input, output, bytesWritten);
     }
 
     ResultCryptography finish(Span<uint8_t> output, size_t& bytesWritten)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.finish(output, bytesWritten)
-                                           : storage.native.finish(output, bytesWritten);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.finish(output, bytesWritten);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::FinishCipher};
+        return storage.native.finish(output, bytesWritten);
     }
 
     void reset()
     {
+#if SC_CRYPTOGRAPHY_OPENSSL3
         if (backend == Backend::OpenSSL)
+        {
             storage.openSSL.reset();
-        else
-            storage.native.reset();
+            return;
+        }
+#endif
+        storage.native.reset();
     }
 };
 
@@ -2737,8 +2805,10 @@ struct SC::Cryptography::Hmac::Internal
     Backend backend = Backend::Native;
     union Storage
     {
-        AFAlgHmacBackend            native;
+        AFAlgHmacBackend native;
+#if SC_CRYPTOGRAPHY_OPENSSL3
         detail::OpenSSL3HmacBackend openSSL;
+#endif
         Storage() {}
         ~Storage() {}
     } storage;
@@ -2748,50 +2818,87 @@ struct SC::Cryptography::Hmac::Internal
 
     void destructBackend()
     {
+#if SC_CRYPTOGRAPHY_OPENSSL3
         if (backend == Backend::OpenSSL)
+        {
             storage.openSSL.~OpenSSL3HmacBackend();
-        else
-            storage.native.~AFAlgHmacBackend();
+            return;
+        }
+#endif
+        storage.native.~AFAlgHmacBackend();
     }
 
     void setBackend(Backend newBackend)
     {
         if (backend == newBackend)
             return;
+#if SC_CRYPTOGRAPHY_OPENSSL3
         destructBackend();
         backend = newBackend;
         if (backend == Backend::OpenSSL)
             placementNew(storage.openSSL);
         else
             placementNew(storage.native);
+#else
+        storage.native.reset();
+        backend = newBackend;
+#endif
     }
 
     ResultCryptography setType(HashType type)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.setType(type) : storage.native.setType(type);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.setType(type);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::SetHmacType};
+        return storage.native.setType(type);
     }
 
     ResultCryptography setKey(Span<const uint8_t> key)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.setKey(key) : storage.native.setKey(key);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.setKey(key);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::SetHmacKey};
+        return storage.native.setKey(key);
     }
 
     ResultCryptography add(Span<const uint8_t> data)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.add(data) : storage.native.add(data);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.add(data);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::AddHmacData};
+        return storage.native.add(data);
     }
 
     ResultCryptography getMac(MacResult& result)
     {
-        return backend == Backend::OpenSSL ? storage.openSSL.getMac(result) : storage.native.getMac(result);
+#if SC_CRYPTOGRAPHY_OPENSSL3
+        if (backend == Backend::OpenSSL)
+            return storage.openSSL.getMac(result);
+#endif
+        if (backend != Backend::Native)
+            return {CryptographyError::OperationUnsupported, CryptographyErrorDetail::FinalizeHmac};
+        return storage.native.getMac(result);
     }
 
     void reset()
     {
+#if SC_CRYPTOGRAPHY_OPENSSL3
         if (backend == Backend::OpenSSL)
+        {
             storage.openSSL.reset();
-        else
-            storage.native.reset();
+            return;
+        }
+#endif
+        storage.native.reset();
     }
 };
 #elif !SC_PLATFORM_APPLE && !SC_PLATFORM_WINDOWS

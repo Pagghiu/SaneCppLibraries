@@ -491,21 +491,13 @@ void CryptographyTest::testFeatures()
         SC_TEST_EXPECT(defaultFeatures.hkdfSha384 == features.hkdfSha384);
         SC_TEST_EXPECT(defaultFeatures.maximumAeadAssociatedDataSize == features.maximumAeadAssociatedDataSize);
     }
-#if SC_PLATFORM_LINUX and not SC_COMPILER_FILC
+#if SC_PLATFORM_LINUX
     if (backend == Cryptography::Backend::Native and (features.aes128Gcm or features.aes256Gcm))
         SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 4096);
     else
         SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 0);
 #else
     SC_TEST_EXPECT(features.maximumAeadAssociatedDataSize == 0);
-#endif
-#if SC_COMPILER_FILC
-    SC_TEST_EXPECT(not features.aes128Gcm);
-    SC_TEST_EXPECT(not features.aes256Gcm);
-    SC_TEST_EXPECT(not features.aes128CbcPkcs7);
-    SC_TEST_EXPECT(not features.aes256CbcPkcs7);
-    SC_TEST_EXPECT(not features.hmacSha256);
-    SC_TEST_EXPECT(not features.hmacSha384);
 #endif
 #if SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS
     if (backend == Cryptography::Backend::Native)
@@ -1926,29 +1918,18 @@ void CryptographyTest::testInvalidInputs()
 
     Cryptography::Aead aead(backend);
     auto               badAead = aead.init(Cryptography::AeadType::AES128GCM, Span<const uint8_t>(zeroKey32, 15));
-#if SC_COMPILER_FILC
-    // Fil-C has no symmetric backend: availability precedes backend-specific input validation.
-    SC_TEST_EXPECT(badAead.isError(CryptographyError::OperationUnsupported));
-    SC_TEST_EXPECT(badAead.detail == CryptographyErrorDetail::InitializeAead);
-#else
     SC_TEST_EXPECT(badAead.isError(CryptographyError::InvalidKeySize));
     SC_TEST_EXPECT(badAead.detail == CryptographyErrorDetail::ValidateAeadKey);
     SC_TEST_EXPECT(badAead.contextKind == CryptographyErrorContextKind::ExpectedBytes);
     SC_TEST_EXPECT(badAead.context.expectedBytes == 16);
-#endif
 
     Cryptography::Cipher cipher(backend);
     auto badCipher = cipher.start(Cryptography::CipherType::AES128CBCPKCS7, Cryptography::Cipher::Operation::Encrypt,
                                   zeroKey16, Span<const uint8_t>(zeroIV16, 8));
-#if SC_COMPILER_FILC
-    SC_TEST_EXPECT(badCipher.isError(CryptographyError::OperationUnsupported));
-    SC_TEST_EXPECT(badCipher.detail == CryptographyErrorDetail::StartCipher);
-#else
     SC_TEST_EXPECT(badCipher.isError(CryptographyError::InvalidInitializationVectorSize));
     SC_TEST_EXPECT(badCipher.detail == CryptographyErrorDetail::ValidateCipherInitializationVector);
     SC_TEST_EXPECT(badCipher.contextKind == CryptographyErrorContextKind::ExpectedBytes);
     SC_TEST_EXPECT(badCipher.context.expectedBytes == 16);
-#endif
 
     auto badOperation = cipher.start(Cryptography::CipherType::AES128CBCPKCS7,
                                      static_cast<Cryptography::Cipher::Operation>(255), zeroKey16, zeroIV16);
@@ -1966,14 +1947,12 @@ void CryptographyTest::testInvalidInputs()
     uint8_t outputByte = 0;
     size_t  written    = 77;
     failure            = cipher.update({}, Span<uint8_t>(&outputByte, 1), written);
-    SC_TEST_EXPECT(failure.isError(SC_COMPILER_FILC ? CryptographyError::OperationUnsupported
-                                                    : CryptographyError::SessionNotInitialized));
+    SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
     SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::UpdateCipher);
     SC_TEST_EXPECT(written == 0);
     written = 77;
     failure = cipher.finish(Span<uint8_t>(&outputByte, 1), written);
-    SC_TEST_EXPECT(failure.isError(SC_COMPILER_FILC ? CryptographyError::OperationUnsupported
-                                                    : CryptographyError::SessionNotInitialized));
+    SC_TEST_EXPECT(failure.isError(CryptographyError::SessionNotInitialized));
     SC_TEST_EXPECT(failure.detail == CryptographyErrorDetail::FinishCipher);
     SC_TEST_EXPECT(written == 0);
 
