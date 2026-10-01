@@ -321,7 +321,7 @@ jobs:
       matrix:
         runner: [ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v4
@@ -359,6 +359,14 @@ jobs:
         key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
         restore-keys: |
           sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore curl-filc source cache
+      id: curl-filc-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/curl-filc
+        key: sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package/BuiltinInstallers.inl', 'Tools/Support/CurlFilCSmoke.c') }}
+        restore-keys: |
+          sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: test SCTest with Fil-C
       run: ./SC.sh build run SCTest Debug native --toolchain filc -- --all-tests
     - name: test SCTest Release with Fil-C
@@ -370,6 +378,12 @@ jobs:
         path: |
           _Build/_PackagesCache/zlib-filc
         key: ${{ steps.zlib-filc-cache.outputs.cache-primary-key }}
+    - name: Save curl-filc source cache
+      if: always() && steps.curl-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/curl-filc/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/curl-filc
+        key: ${{ steps.curl-filc-cache.outputs.cache-primary-key }}
     - name: Save Fil-C cache
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
       uses: actions/cache/save@v4

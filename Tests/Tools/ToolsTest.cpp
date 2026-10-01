@@ -1135,7 +1135,36 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
         }
+        if (test_section("install curl-filc reports unsupported host"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "curl-filc";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+        }
 #endif
+        if (test_section("curl-filc registry exports runtime library"))
+        {
+            const PackageRegistryEntry* entry = builtinPackageRegistry().find("curl-filc");
+            SC_TEST_EXPECT(entry != nullptr);
+            if (entry)
+            {
+                SC_TEST_EXPECT(entry->kind == PackageKind::Library);
+                SC_TEST_EXPECT(entry->installedName == "curl_filc"_a8);
+            }
+        }
+        if (test_section("install curl-filc rejects unknown option"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "curl-filc";
+            args[1]             = "--unknown";
+            arguments.arguments = {args, 2};
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
+        }
         if (test_section("install filc rejects unknown option"))
         {
             arguments.tool      = "package";
@@ -1420,8 +1449,8 @@ struct SupportToolsTest : public TestCase
             const PackageRegistryEntry fakeEntry = {
                 "fake", "external-fake", PackageKind::Tool, "External package registry fixture", "host", "test fixture",
                 false,  fakeExports,     fakePhases,        installFakeRegistryPackage};
-            PackageRegistryEntry   registryStorage[16];
-            PackageRegistryBuilder registryBuilder = {{registryStorage, 16}};
+            PackageRegistryEntry   registryStorage[32];
+            PackageRegistryBuilder registryBuilder = {{registryStorage, 32}};
             SC_TEST_EXPECT(addBuiltinPackages(registryBuilder));
             SC_TEST_EXPECT(registryBuilder.add(fakeEntry));
             const PackageRegistry registry = registryBuilder.registry();

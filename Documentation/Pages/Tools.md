@@ -155,6 +155,20 @@ To register an existing ARM64 installation, use:
 
 For an Intel64 host, use the corresponding `filc-0.685-linux-x86_64` import directory.
 
+Fil-C runs also prepare package-local `zlib-filc` and `curl-filc` libraries and prepend their library directories to
+`LD_LIBRARY_PATH`. Host libraries are not ABI-compatible with Fil-C. No system library is replaced.
+
+```bash
+./SC.sh package install curl-filc
+./SC.sh package verify curl-filc
+```
+
+`curl-filc` builds pinned curl 8.22.0 sources with the native Fil-C compiler using upstream configure and make.
+The initial profile supports HTTP, proxies and threaded DNS; it excludes TLS, HTTP/2, WebSockets and automatic
+content decoding. HttpClient reports the loaded library's TLS/HTTP2 capabilities and rejects unsupported policies.
+Building this package requires host `make` and the usual configure prerequisites. Compatible TLS/HTTP2 packages
+are separate follow-up work, not supplied by this profile.
+
 `repair` is for a recognized existing layout whose current receipt or launcher metadata can be reconstructed. It is not
 a generic substitute for a failed install:
 

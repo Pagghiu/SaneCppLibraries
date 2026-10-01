@@ -1502,6 +1502,7 @@ struct SC::Build::NativeBuild
         }
         String zlibFilCLibraryPathStorage = StringEncoding::Utf8;
         String zlibFilCLibraryPath        = StringEncoding::Utf8;
+        String curlFilCLibraryPath        = StringEncoding::Utf8;
         if (action.parameters.toolchain.family == Toolchain::FilC)
         {
             Tools::Package zlibPackage;
@@ -1509,17 +1510,23 @@ struct SC::Build::NativeBuild
                                           action.parameters.directories.packagesInstallDirectory.view(), zlibPackage));
             SC_TRY(Tools::resolvePackageExportPath(zlibPackage.installDirectoryLink.view(),
                                                    Tools::PackageExport::ZLibLibraryDir, zlibFilCLibraryPath));
+            Tools::Package curlPackage;
+            SC_TRY(Tools::installCurlFilC(action.parameters.directories.packagesCacheDirectory.view(),
+                                          action.parameters.directories.packagesInstallDirectory.view(), curlPackage));
+            SC_TRY(Tools::resolvePackageExportPath(curlPackage.installDirectoryLink.view(),
+                                                   Tools::PackageExport::CurlLibraryDir, curlFilCLibraryPath));
 
             ProcessEnvironment environment;
             StringSpan         existingPath;
             if (environment.get("LD_LIBRARY_PATH", existingPath) and not existingPath.isEmpty())
             {
-                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}", zlibFilCLibraryPath.view(),
-                                             existingPath));
+                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}:{}", zlibFilCLibraryPath.view(),
+                                             curlFilCLibraryPath.view(), existingPath));
             }
             else
             {
-                SC_TRY(zlibFilCLibraryPathStorage.assign(zlibFilCLibraryPath.view()));
+                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}", zlibFilCLibraryPath.view(),
+                                             curlFilCLibraryPath.view()));
             }
             SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", zlibFilCLibraryPathStorage.view()));
             globalConsole->print("LD_LIBRARY_PATH = {}\n", zlibFilCLibraryPathStorage.view());

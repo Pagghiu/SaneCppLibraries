@@ -2937,6 +2937,176 @@ Result installZLibFilC(StringView, StringView, Package&, StringView)
 }
 #endif
 
+#if SC_PLATFORM_LINUX
+static Result runCurlFilCSmoke(StringView compiler, StringView packageRoot, StringView buildRoot)
+{
+    String source  = StringEncoding::Utf8;
+    String binary  = StringEncoding::Utf8;
+    String include = StringEncoding::Utf8;
+    String library = StringEncoding::Utf8;
+    SC_TRY(resolveToolSupportPath("CurlFilCSmoke.c", source));
+    SC_TRY(Path::join(binary, {buildRoot, "curl-filc-smoke"}));
+    SC_TRY(StringBuilder::format(include, "-I{}/include", packageRoot));
+    SC_TRY(Path::join(library, {packageRoot, "lib"}));
+    Process compile;
+    SC_TRY(compile.exec({compiler, source.view(), include.view(), "-ldl", "-o", binary.view()}));
+    if (compile.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolchainCompileFailed);
+    Process run;
+    SC_TRY(run.setEnvironment("LD_LIBRARY_PATH", library.view()));
+    SC_TRY(run.exec({binary.view()}));
+    if (run.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolchainRunFailed);
+    return Result(true);
+}
+
+Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
+{
+    if (HostInstructionSet != InstructionSet::ARM64 and HostInstructionSet != InstructionSet::Intel64)
+        return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
+    static constexpr StringView version = "8.22.0";
+    static constexpr StringView url     = "https://curl.se/download/curl-8.22.0.tar.xz";
+    static constexpr StringView hash    = "f7ef3ae8a22e521f289803fe93543eb64c329b58aa73a9e224dfd915a2a5f4f7";
+    const StringView            flavor =
+        HostInstructionSet == InstructionSet::ARM64 ? "linux-arm64-http1"_a8 : "linux-x86_64-http1"_a8;
+    package.packageFullName       = "curl-filc-8.22.0";
+    package.packageBaseName       = "curl-8.22.0.tar.xz";
+    package.packageLocalFile      = format("{}/curl-filc/{}", packagesCacheDirectory, package.packageBaseName.view());
+    package.packageLocalDirectory = format("{}/curl-filc/source-{}", packagesCacheDirectory, version);
+    package.packageLocalTxt       = format("{}/curl-filc/{}.txt", packagesCacheDirectory, flavor);
+    package.installDirectoryLink  = format("{}/curl_filc", packagesInstallDirectory);
+
+    Package filc;
+    SC_TRY(installFilCToolchain(packagesCacheDirectory, packagesInstallDirectory, filc));
+    String compiler = StringEncoding::Utf8;
+    // Autoconf passes relative conftest paths; the SC launcher changes cwd for SC's absolute-path builds.
+    SC_TRY(resolveFilCRawCompilerPath(filc.installDirectoryLink.view(), "clang", compiler));
+    String  compilerVersion = StringEncoding::Utf8;
+    Process identify;
+    SC_TRY(identify.exec({compiler.view(), "--version"}, compilerVersion));
+    if (identify.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::ToolchainCompileFailed);
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    String buildRoot = format("{}-build", package.installDirectoryLink.view());
+    String build     = format("{}/build", buildRoot.view());
+    String library   = format("{}/lib/libcurl.so.4", package.installDirectoryLink.view());
+    String header    = format("{}/include/curl/curl.h", package.installDirectoryLink.view());
+    String receipt   = StringEncoding::Utf8;
+    SC_TRY(packageReceiptPath(package.installDirectoryLink.view(), receipt));
+    String identity = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(identity, "{}\nsha256:{}\n{}\n{}\nprofile=1\n", url, hash, flavor,
+                                 compilerVersion.view()));
+    String previous = StringEncoding::Utf8;
+    if (fs.existsAndIsFile(library.view()) and fs.existsAndIsFile(header.view()) and
+        fs.existsAndIsFile(receipt.view()) and readFileIntoString(package.packageLocalTxt.view(), previous) and
+        previous.view() == identity.view())
+    {
+        SC_TRY(fs.makeDirectoryRecursive(buildRoot.view()));
+        return runCurlFilCSmoke(compiler.view(), package.installDirectoryLink.view(), buildRoot.view());
+    }
+
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalFile.view(), Path::AsNative)));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+    SC_TRY(downloadFileHash(url, package.packageLocalFile.view(), Hashing::TypeSHA256, hash));
+    SC_TRY(extractTarArchiveFlatteningRoot(package.packageLocalFile.view(), package.packageLocalDirectory.view()));
+    if (fs.existsAndIsDirectory(buildRoot.view()))
+        SC_TRY(fs.removeDirectoriesRecursive(buildRoot.view()));
+    SC_TRY(removePackageInstallLink(fs, package));
+    SC_TRY(fs.makeDirectoryRecursive(build.view()));
+    String  configure = format("{}/configure", package.packageLocalDirectory.view());
+    String  prefix    = format("--prefix={}", package.installDirectoryLink.view());
+    Process config;
+    SC_TRY(config.setWorkingDirectory(build.view()));
+    SC_TRY(config.setEnvironment("CC", compiler.view()));
+    SC_TRY(config.setEnvironment("CFLAGS", "-O2 -fPIC"));
+    SC_TRY(config.setEnvironment("PKG_CONFIG", "false"));
+    SC_TRY(config.exec({"sh",
+                        configure.view(),
+                        prefix.view(),
+                        "--enable-http",
+                        "--enable-shared",
+                        "--disable-static",
+                        "--enable-threaded-resolver",
+                        "--disable-websockets",
+                        "--disable-ftp",
+                        "--disable-file",
+                        "--disable-ipfs",
+                        "--disable-ldap",
+                        "--disable-ldaps",
+                        "--disable-rtsp",
+                        "--disable-dict",
+                        "--disable-telnet",
+                        "--disable-tftp",
+                        "--disable-pop3",
+                        "--disable-imap",
+                        "--disable-smb",
+                        "--disable-smtp",
+                        "--disable-gopher",
+                        "--disable-mqtt",
+                        "--disable-manual",
+                        "--disable-docs",
+                        "--disable-libcurl-option",
+                        "--without-ssl",
+                        "--without-zlib",
+                        "--without-brotli",
+                        "--without-zstd",
+                        "--without-libidn2",
+                        "--without-libpsl",
+                        "--without-nghttp2",
+                        "--without-ngtcp2",
+                        "--without-nghttp3",
+                        "--without-libssh"}));
+    if (config.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildFailed);
+
+    String makeDirectory = format("{}/lib", build.view());
+    // curl 8.22.0's export-regex step misparses Fil-C's renamed nm symbols. Keep SONAME/version metadata.
+    Process make;
+    SC_TRY(make.exec({"make", "-C", makeDirectory.view(), "-j2", "am__append_7=", "libcurl.la"}));
+    if (make.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildFailed);
+    Process install;
+    SC_TRY(install.exec({"make", "-C", makeDirectory.view(), "am__append_7=", "install-libLTLIBRARIES"}));
+    if (install.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildFailed);
+    String  includeDirectory = format("{}/include/curl", build.view());
+    Process headers;
+    SC_TRY(headers.exec({"make", "-C", includeDirectory.view(), "install-pkgincludeHEADERS"}));
+    if (headers.getExitStatus() != 0)
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildFailed);
+    if (not fs.existsAndIsFile(library.view()) or not fs.existsAndIsFile(header.view()))
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildArtifactMissing);
+    SC_TRY(runCurlFilCSmoke(compiler.view(), package.installDirectoryLink.view(), buildRoot.view()));
+
+    const PackageReceiptExport exports[] = {
+        {PackageExportKind::Library, PackageExport::CurlShared, "lib/libcurl.so.4"},
+        {PackageExportKind::LibraryDir, PackageExport::CurlLibraryDir, "lib"},
+        {PackageExportKind::IncludeDir, PackageExport::CurlIncludeDir, "include"},
+        {PackageExportKind::Capability,
+         HostInstructionSet == InstructionSet::ARM64 ? PackageCapability::LibraryCurlFilCArm64
+                                                     : PackageCapability::LibraryCurlFilCX86_64,
+         "lib/libcurl.so.4"},
+    };
+    static constexpr StringView phases[] = {
+        "resolveCurlSource",
+        "buildCurlWithFilC",
+        "validateCurlRuntime",
+        "writeReceipt",
+    };
+    String sourceHash = format("sha256:{}", hash);
+    SC_TRY(writeManualPackageReceipt(package, "curl_filc", version, flavor, url, sourceHash.view(), exports, phases));
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), identity.view()));
+    return Result(true);
+}
+#else
+Result installCurlFilC(StringView, StringView, Package&)
+{
+    return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
+}
+#endif
+
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package)
 {

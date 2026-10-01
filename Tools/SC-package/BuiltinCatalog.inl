@@ -50,6 +50,16 @@ static Result installZLibFilCEntry(StringView cache, StringView install, Package
     return installZLibFilC(cache, install, package, options.importDirectory);
 }
 
+static Result installCurlFilCEntry(StringView cache, StringView install, Package& package,
+                                   Span<const StringView> arguments)
+{
+    if (arguments.sizeInElements() > 1)
+        return Result::Error(PackageResultCategory, arguments[1].startsWith("--")
+                                                        ? PackageError::UnknownInstallOption
+                                                        : PackageError::UnexpectedInstallArgument);
+    return installCurlFilC(cache, install, package);
+}
+
 static Result installLLVMMingwEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
 {
     return installLLVMMingwToolchain(cache, install, package);
@@ -187,6 +197,18 @@ static constexpr StringView ZLibFilCPhases[] = {
     "validateZLibRuntime",
     "writeReceipt",
 };
+static constexpr PackageRegistryExport CurlFilCExports[] = {
+    {PackageExportKind::Library, PackageExport::CurlShared},
+    {PackageExportKind::LibraryDir, PackageExport::CurlLibraryDir},
+    {PackageExportKind::IncludeDir, PackageExport::CurlIncludeDir},
+    {PackageExportKind::Capability, "library.curl.filc.<arch>"},
+};
+static constexpr StringView CurlFilCPhases[] = {
+    "resolveCurlSource",
+    "buildCurlWithFilC",
+    "validateCurlRuntime",
+    "writeReceipt",
+};
 static constexpr PackageRegistryExport LLVMMingwExports[] = {
     {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64},
     {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXX_X86_64},
@@ -256,6 +278,8 @@ static constexpr PackageRegistryEntry BuiltinPackageRegistryEntries[] = {
      "Pinned archive or import", true, FilCExports, FilCPhases, installFilCEntry},
     {"zlib-filc", "zlib_filc", PackageKind::Library, "Fil-C native zlib shared library", "linux-x86_64/linux-arm64",
      "Pinned zlib archive or import", true, ZLibFilCExports, ZLibFilCPhases, installZLibFilCEntry},
+    {"curl-filc", "curl_filc", PackageKind::Library, "Fil-C native HTTP-only libcurl", "linux-x86_64/linux-arm64",
+     "Pinned curl source archive", false, CurlFilCExports, CurlFilCPhases, installCurlFilCEntry},
     {"llvm-mingw", "llvm-mingw", PackageKind::Toolchain, "LLVM MinGW Windows GNU toolchain", "host",
      "llvm-mingw release archive", false, LLVMMingwExports, LLVMMingwPhases, installLLVMMingwEntry},
     {"linux-sysroot-glibc-x86_64", "linux-sysroot-glibc-x86_64", PackageKind::Sysroot, "Linux glibc x86_64 sysroot",

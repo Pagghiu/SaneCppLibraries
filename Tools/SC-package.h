@@ -454,6 +454,7 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
                             StringView importDirectory = {});
 Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                        StringView importDirectory = {});
+Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result installLinuxSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
