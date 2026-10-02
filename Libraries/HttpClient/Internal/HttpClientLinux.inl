@@ -606,7 +606,7 @@ SC::Result SC::HttpClientOperation::platformStart()
 
             const int res = sessionRef.curl.curl_easy_perform(internalRef.curlHandle);
 
-            if (not internalRef.responseHeadSeen and operation->currentResponse != nullptr)
+            if (res == CURLE_OK and not internalRef.responseHeadSeen and operation->currentResponse != nullptr)
             {
                 long httpCode = 0;
                 sessionRef.curl.curl_easy_getinfo(internalRef.curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);

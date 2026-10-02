@@ -1503,6 +1503,8 @@ struct SC::Build::NativeBuild
         String zlibFilCLibraryPathStorage = StringEncoding::Utf8;
         String zlibFilCLibraryPath        = StringEncoding::Utf8;
         String curlFilCLibraryPath        = StringEncoding::Utf8;
+        String opensslFilCLibraryPath     = StringEncoding::Utf8;
+        String nghttp2FilCLibraryPath     = StringEncoding::Utf8;
         if (action.parameters.toolchain.family == Toolchain::FilC)
         {
             Tools::Package zlibPackage;
@@ -1515,18 +1517,32 @@ struct SC::Build::NativeBuild
                                           action.parameters.directories.packagesInstallDirectory.view(), curlPackage));
             SC_TRY(Tools::resolvePackageExportPath(curlPackage.installDirectoryLink.view(),
                                                    Tools::PackageExport::CurlLibraryDir, curlFilCLibraryPath));
+            Tools::Package opensslPackage;
+            SC_TRY(Tools::installOpenSSLFilC(action.parameters.directories.packagesCacheDirectory.view(),
+                                             action.parameters.directories.packagesInstallDirectory.view(),
+                                             opensslPackage));
+            SC_TRY(Tools::resolvePackageExportPath(opensslPackage.installDirectoryLink.view(),
+                                                   Tools::PackageExport::OpenSSLLibraryDir, opensslFilCLibraryPath));
+            Tools::Package nghttp2Package;
+            SC_TRY(Tools::installNGHTTP2FilC(action.parameters.directories.packagesCacheDirectory.view(),
+                                             action.parameters.directories.packagesInstallDirectory.view(),
+                                             nghttp2Package));
+            SC_TRY(Tools::resolvePackageExportPath(nghttp2Package.installDirectoryLink.view(),
+                                                   Tools::PackageExport::NGHTTP2LibraryDir, nghttp2FilCLibraryPath));
 
             ProcessEnvironment environment;
             StringSpan         existingPath;
             if (environment.get("LD_LIBRARY_PATH", existingPath) and not existingPath.isEmpty())
             {
-                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}:{}", zlibFilCLibraryPath.view(),
-                                             curlFilCLibraryPath.view(), existingPath));
+                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}:{}:{}:{}", zlibFilCLibraryPath.view(),
+                                             curlFilCLibraryPath.view(), opensslFilCLibraryPath.view(),
+                                             nghttp2FilCLibraryPath.view(), existingPath));
             }
             else
             {
-                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}", zlibFilCLibraryPath.view(),
-                                             curlFilCLibraryPath.view()));
+                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}:{}:{}", zlibFilCLibraryPath.view(),
+                                             curlFilCLibraryPath.view(), opensslFilCLibraryPath.view(),
+                                             nghttp2FilCLibraryPath.view()));
             }
             SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", zlibFilCLibraryPathStorage.view()));
             globalConsole->print("LD_LIBRARY_PATH = {}\n", zlibFilCLibraryPathStorage.view());

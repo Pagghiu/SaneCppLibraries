@@ -108,6 +108,10 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             protocolPreference();
         }
+        if (test_section("https and http2 local fixture"))
+        {
+            httpsAndHttp2LocalFixture();
+        }
         if (test_section("proxy options"))
         {
             proxyOptions();
@@ -984,6 +988,72 @@ struct SC::HttpClientTest : public SC::TestCase
         (void)clientThread.join();
         SC_TEST_EXPECT(server.server.close());
         SC_TEST_EXPECT(loop.close());
+    }
+
+    void httpsAndHttp2LocalFixture()
+    {
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996) // getenv
+#endif
+        const char* url       = ::getenv("SC_TEST_HTTP_TLS_URL");
+        const char* ca        = ::getenv("SC_TEST_HTTP_TLS_CA");
+        const char* badCa     = ::getenv("SC_TEST_HTTP_TLS_BAD_CA");
+        const char* wrongHost = ::getenv("SC_TEST_HTTP_TLS_WRONG_HOST_URL");
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+        if (not url and not ca and not badCa and not wrongHost)
+        {
+            report.console.printLine("Skipping TLS/HTTP2 transfer fixture: fixture environment is not configured");
+            return;
+        }
+        SC_TEST_EXPECT(url and ca and badCa and wrongHost);
+        if (not url or not ca or not badCa or not wrongHost)
+            return;
+
+        HttpClient client;
+        SC_TEST_EXPECT(client.init());
+        const HttpClientCapabilities capabilities = HttpClient::getCapabilities();
+        SC_TEST_EXPECT(capabilities.tlsCustomCaPath and capabilities.protocolHttp2Required);
+
+        CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+
+        HttpClientRequest  request;
+        HttpClientResponse response;
+
+        char   body[1024] = {};
+        size_t bodyLength = 0;
+
+        request.url = StringSpan::fromNullTerminated(url, StringEncoding::Utf8);
+
+        request.options.tls.caCertificatesPath    = StringSpan::fromNullTerminated(ca, StringEncoding::Utf8);
+        request.options.protocol.preference       = HttpClientRequestProtocolOptions::Http2Required;
+        request.options.timeouts.requestTimeoutMs = 5000;
+        request.options.proxy.mode                = HttpClientRequestProxyOptions::NoProxy;
+        SC_TEST_EXPECT(HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
+        SC_TEST_EXPECT(response.statusCode == 200);
+        SC_TEST_EXPECT(response.isHttp2());
+        SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "filc-tls-http2");
+
+        request.options.tls.caCertificatesPath = StringSpan::fromNullTerminated(badCa, StringEncoding::Utf8);
+
+        bodyLength = 0;
+        SC_TEST_EXPECT(HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory)
+                           .isError(HttpClientResultCategory, HttpClientError::TransportFailed));
+        SC_TEST_EXPECT(bodyLength == 0);
+        SC_TEST_EXPECT(response.statusCode == 0);
+
+        request.url = StringSpan::fromNullTerminated(wrongHost, StringEncoding::Utf8);
+
+        request.options.tls.caCertificatesPath = StringSpan::fromNullTerminated(ca, StringEncoding::Utf8);
+
+        bodyLength = 0;
+        SC_TEST_EXPECT(HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory)
+                           .isError(HttpClientResultCategory, HttpClientError::TransportFailed));
+        SC_TEST_EXPECT(bodyLength == 0);
+        SC_TEST_EXPECT(response.statusCode == 0);
+        SC_TEST_EXPECT(client.close());
     }
 
     void blockingResponseBufferOverflow()
