@@ -455,6 +455,8 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
 Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                        StringView importDirectory = {});
 Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
+Result installOpenSSLFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
+Result installNGHTTP2FilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result installLinuxSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,

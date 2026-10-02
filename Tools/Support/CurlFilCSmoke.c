@@ -41,9 +41,9 @@ int main(void)
         (curl_version_info_data * (*)(CURLversion)) dlsym(library, "curl_version_info");
     if (!init || !cleanup || !setopt || !getinfo || !perform || !version)
         return 3;
-    curl_version_info_data* features = version(CURLVERSION_FIRST);
-    if (!features || strcmp(features->version, "8.22.0") || !(features->features & CURL_VERSION_ASYNCHDNS) ||
-        (features->features & (CURL_VERSION_SSL | CURL_VERSION_HTTP2)))
+    curl_version_info_data* features         = version(CURLVERSION_FIRST);
+    const int               requiredFeatures = CURL_VERSION_ASYNCHDNS | CURL_VERSION_SSL | CURL_VERSION_HTTP2;
+    if (!features || strcmp(features->version, "8.22.0") || (features->features & requiredFeatures) != requiredFeatures)
         return 4;
 
     int server = socket(AF_INET, SOCK_STREAM, 0);

@@ -2937,8 +2937,11 @@ Result installZLibFilC(StringView, StringView, Package&, StringView)
 }
 #endif
 
+#include "FilCRuntimeDependencies.inl"
+
 #if SC_PLATFORM_LINUX
-static Result runCurlFilCSmoke(StringView compiler, StringView packageRoot, StringView buildRoot)
+static Result runCurlFilCSmoke(StringView compiler, StringView packageRoot, StringView buildRoot,
+                               StringView dependencyLibraries)
 {
     String source  = StringEncoding::Utf8;
     String binary  = StringEncoding::Utf8;
@@ -2947,7 +2950,7 @@ static Result runCurlFilCSmoke(StringView compiler, StringView packageRoot, Stri
     SC_TRY(resolveToolSupportPath("CurlFilCSmoke.c", source));
     SC_TRY(Path::join(binary, {buildRoot, "curl-filc-smoke"}));
     SC_TRY(StringBuilder::format(include, "-I{}/include", packageRoot));
-    SC_TRY(Path::join(library, {packageRoot, "lib"}));
+    SC_TRY(StringBuilder::format(library, "{}/lib:{}", packageRoot, dependencyLibraries));
     Process compile;
     SC_TRY(compile.exec({compiler, source.view(), include.view(), "-ldl", "-o", binary.view()}));
     if (compile.getExitStatus() != 0)
@@ -2968,7 +2971,7 @@ Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesIns
     static constexpr StringView url     = "https://curl.se/download/curl-8.22.0.tar.xz";
     static constexpr StringView hash    = "f7ef3ae8a22e521f289803fe93543eb64c329b58aa73a9e224dfd915a2a5f4f7";
     const StringView            flavor =
-        HostInstructionSet == InstructionSet::ARM64 ? "linux-arm64-http1"_a8 : "linux-x86_64-http1"_a8;
+        HostInstructionSet == InstructionSet::ARM64 ? "linux-arm64-https-http2"_a8 : "linux-x86_64-https-http2"_a8;
     package.packageFullName       = "curl-filc-8.22.0";
     package.packageBaseName       = "curl-8.22.0.tar.xz";
     package.packageLocalFile      = format("{}/curl-filc/{}", packagesCacheDirectory, package.packageBaseName.view());
@@ -2978,7 +2981,15 @@ Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesIns
 
     Package filc;
     SC_TRY(installFilCToolchain(packagesCacheDirectory, packagesInstallDirectory, filc));
-    String compiler = StringEncoding::Utf8;
+    Package openssl;
+    Package nghttp2;
+    Package zlib;
+    SC_TRY(installOpenSSLFilC(packagesCacheDirectory, packagesInstallDirectory, openssl));
+    SC_TRY(installNGHTTP2FilC(packagesCacheDirectory, packagesInstallDirectory, nghttp2));
+    SC_TRY(installZLibFilC(packagesCacheDirectory, packagesInstallDirectory, zlib));
+    String dependencyLibraries = format("{}/lib:{}/lib:{}/lib", openssl.installDirectoryLink.view(),
+                                        nghttp2.installDirectoryLink.view(), zlib.installDirectoryLink.view());
+    String compiler            = StringEncoding::Utf8;
     // Autoconf passes relative conftest paths; the SC launcher changes cwd for SC's absolute-path builds.
     SC_TRY(resolveFilCRawCompilerPath(filc.installDirectoryLink.view(), "clang", compiler));
     String  compilerVersion = StringEncoding::Utf8;
@@ -2995,16 +3006,21 @@ Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesIns
     String header    = format("{}/include/curl/curl.h", package.installDirectoryLink.view());
     String receipt   = StringEncoding::Utf8;
     SC_TRY(packageReceiptPath(package.installDirectoryLink.view(), receipt));
-    String identity = StringEncoding::Utf8;
-    SC_TRY(StringBuilder::format(identity, "{}\nsha256:{}\n{}\n{}\nprofile=1\n", url, hash, flavor,
-                                 compilerVersion.view()));
+    String identity        = StringEncoding::Utf8;
+    String opensslIdentity = StringEncoding::Utf8;
+    String nghttp2Identity = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(openssl.packageLocalTxt.view(), opensslIdentity));
+    SC_TRY(readFileIntoString(nghttp2.packageLocalTxt.view(), nghttp2Identity));
+    SC_TRY(StringBuilder::format(identity, "{}\nsha256:{}\n{}\n{}\nprofile=2\n{}\n{}\n", url, hash, flavor,
+                                 compilerVersion.view(), opensslIdentity.view(), nghttp2Identity.view()));
     String previous = StringEncoding::Utf8;
     if (fs.existsAndIsFile(library.view()) and fs.existsAndIsFile(header.view()) and
         fs.existsAndIsFile(receipt.view()) and readFileIntoString(package.packageLocalTxt.view(), previous) and
         previous.view() == identity.view())
     {
         SC_TRY(fs.makeDirectoryRecursive(buildRoot.view()));
-        return runCurlFilCSmoke(compiler.view(), package.installDirectoryLink.view(), buildRoot.view());
+        return runCurlFilCSmoke(compiler.view(), package.installDirectoryLink.view(), buildRoot.view(),
+                                dependencyLibraries.view());
     }
 
     SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalFile.view(), Path::AsNative)));
@@ -3022,6 +3038,14 @@ Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesIns
     SC_TRY(config.setEnvironment("CC", compiler.view()));
     SC_TRY(config.setEnvironment("CFLAGS", "-O2 -fPIC"));
     SC_TRY(config.setEnvironment("PKG_CONFIG", "false"));
+    String sslOption   = format("--with-openssl={}", openssl.installDirectoryLink.view());
+    String http2Option = format("--with-nghttp2={}", nghttp2.installDirectoryLink.view());
+    // Configure executes Fil-C probes; keep their dependencies local without changing host tools' loader paths.
+    String linkFlags =
+        format("-L{}/lib -L{}/lib -L{}/lib -Wl,-rpath,{}", openssl.installDirectoryLink.view(),
+               nghttp2.installDirectoryLink.view(), zlib.installDirectoryLink.view(), dependencyLibraries.view());
+    SC_TRY(config.setEnvironment("LDFLAGS", linkFlags.view()));
+    SC_TRY(config.setEnvironment("LIBS", "-lz"));
     SC_TRY(config.exec({"sh",
                         configure.view(),
                         prefix.view(),
@@ -3048,13 +3072,15 @@ Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesIns
                         "--disable-manual",
                         "--disable-docs",
                         "--disable-libcurl-option",
-                        "--without-ssl",
+                        sslOption.view(),
+                        "--with-ca-bundle=/etc/ssl/certs/ca-certificates.crt",
+                        "--without-ca-path",
                         "--without-zlib",
                         "--without-brotli",
                         "--without-zstd",
                         "--without-libidn2",
                         "--without-libpsl",
-                        "--without-nghttp2",
+                        http2Option.view(),
                         "--without-ngtcp2",
                         "--without-nghttp3",
                         "--without-libssh"}));
@@ -3078,7 +3104,8 @@ Result installCurlFilC(StringView packagesCacheDirectory, StringView packagesIns
         return Result::Error(PackageResultCategory, PackageError::PackageBuildFailed);
     if (not fs.existsAndIsFile(library.view()) or not fs.existsAndIsFile(header.view()))
         return Result::Error(PackageResultCategory, PackageError::PackageBuildArtifactMissing);
-    SC_TRY(runCurlFilCSmoke(compiler.view(), package.installDirectoryLink.view(), buildRoot.view()));
+    SC_TRY(runCurlFilCSmoke(compiler.view(), package.installDirectoryLink.view(), buildRoot.view(),
+                            dependencyLibraries.view()));
 
     const PackageReceiptExport exports[] = {
         {PackageExportKind::Library, PackageExport::CurlShared, "lib/libcurl.so.4"},

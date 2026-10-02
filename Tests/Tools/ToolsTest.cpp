@@ -1144,7 +1144,41 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
         }
+        if (test_section("install Fil-C TLS dependencies reports unsupported host"))
+        {
+            const StringView names[] = {"openssl-filc", "nghttp2-filc"};
+            for (StringView name : names)
+            {
+                arguments.tool      = "package";
+                arguments.action    = "install";
+                args[0]             = name;
+                arguments.arguments = {args, 1};
+                SC_TEST_EXPECT(
+                    runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+            }
+        }
 #endif
+        if (test_section("Fil-C TLS dependency registry and option validation"))
+        {
+            const StringView names[] = {"openssl-filc", "nghttp2-filc"};
+            for (StringView name : names)
+            {
+                const PackageRegistryEntry* entry = builtinPackageRegistry().find(name);
+                SC_TEST_EXPECT(entry != nullptr);
+                if (entry)
+                {
+                    SC_TEST_EXPECT(entry->kind == PackageKind::Library);
+                    SC_TEST_EXPECT(not entry->supportsImport);
+                }
+                arguments.tool      = "package";
+                arguments.action    = "install";
+                args[0]             = name;
+                args[1]             = "--unknown";
+                arguments.arguments = {args, 2};
+                SC_TEST_EXPECT(
+                    runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
+            }
+        }
         if (test_section("curl-filc registry exports runtime library"))
         {
             const PackageRegistryEntry* entry = builtinPackageRegistry().find("curl-filc");

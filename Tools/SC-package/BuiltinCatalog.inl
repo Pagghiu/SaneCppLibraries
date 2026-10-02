@@ -65,6 +65,26 @@ static Result installLLVMMingwEntry(StringView cache, StringView install, Packag
     return installLLVMMingwToolchain(cache, install, package);
 }
 
+static Result installOpenSSLFilCEntry(StringView cache, StringView install, Package& package,
+                                      Span<const StringView> arguments)
+{
+    if (arguments.sizeInElements() > 1)
+        return Result::Error(PackageResultCategory, arguments[1].startsWith("--")
+                                                        ? PackageError::UnknownInstallOption
+                                                        : PackageError::UnexpectedInstallArgument);
+    return installOpenSSLFilC(cache, install, package);
+}
+
+static Result installNGHTTP2FilCEntry(StringView cache, StringView install, Package& package,
+                                      Span<const StringView> arguments)
+{
+    if (arguments.sizeInElements() > 1)
+        return Result::Error(PackageResultCategory, arguments[1].startsWith("--")
+                                                        ? PackageError::UnknownInstallOption
+                                                        : PackageError::UnexpectedInstallArgument);
+    return installNGHTTP2FilC(cache, install, package);
+}
+
 static Result installLinuxSysrootGlibcX64Entry(StringView cache, StringView install, Package& package,
                                                Span<const StringView>)
 {
@@ -218,6 +238,29 @@ static constexpr PackageRegistryExport LLVMMingwExports[] = {
     {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUX86_64},
     {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUArm64},
 };
+
+static constexpr PackageRegistryExport OpenSSLFilCExports[] = {
+    {PackageExportKind::Library, PackageExport::OpenSSLCryptoShared},
+    {PackageExportKind::Library, PackageExport::OpenSSLShared},
+    {PackageExportKind::LibraryDir, PackageExport::OpenSSLLibraryDir},
+    {PackageExportKind::IncludeDir, PackageExport::OpenSSLIncludeDir},
+    {PackageExportKind::Capability, "library.openssl.filc.<arch>"},
+};
+static constexpr StringView OpenSSLFilCPhases[] = {
+    "resolveOpenSSLSource", "applyFilCOpenSSLPort", "buildOpenSSLWithFilC", "validateOpenSSLRuntime", "writeReceipt",
+};
+static constexpr PackageRegistryExport NGHTTP2FilCExports[] = {
+    {PackageExportKind::Library, PackageExport::NGHTTP2Shared},
+    {PackageExportKind::LibraryDir, PackageExport::NGHTTP2LibraryDir},
+    {PackageExportKind::IncludeDir, PackageExport::NGHTTP2IncludeDir},
+    {PackageExportKind::Capability, "library.nghttp2.filc.<arch>"},
+};
+static constexpr StringView NGHTTP2FilCPhases[] = {
+    "resolveNGHTTP2Source",
+    "buildNGHTTP2WithFilC",
+    "validateNGHTTP2Runtime",
+    "writeReceipt",
+};
 static constexpr StringView LLVMMingwPhases[] = {
     "resolveLLVMMingwArchive",
     "extractLLVMMingwToolchain",
@@ -278,8 +321,13 @@ static constexpr PackageRegistryEntry BuiltinPackageRegistryEntries[] = {
      "Pinned archive or import", true, FilCExports, FilCPhases, installFilCEntry},
     {"zlib-filc", "zlib_filc", PackageKind::Library, "Fil-C native zlib shared library", "linux-x86_64/linux-arm64",
      "Pinned zlib archive or import", true, ZLibFilCExports, ZLibFilCPhases, installZLibFilCEntry},
-    {"curl-filc", "curl_filc", PackageKind::Library, "Fil-C native HTTP-only libcurl", "linux-x86_64/linux-arm64",
+    {"curl-filc", "curl_filc", PackageKind::Library, "Fil-C native HTTPS/HTTP2 libcurl", "linux-x86_64/linux-arm64",
      "Pinned curl source archive", false, CurlFilCExports, CurlFilCPhases, installCurlFilCEntry},
+    {"openssl-filc", "openssl_filc", PackageKind::Library, "Fil-C native patched OpenSSL", "linux-x86_64/linux-arm64",
+     "Pinned OpenSSL source archive and port patch", false, OpenSSLFilCExports, OpenSSLFilCPhases,
+     installOpenSSLFilCEntry},
+    {"nghttp2-filc", "nghttp2_filc", PackageKind::Library, "Fil-C native HTTP2 library", "linux-x86_64/linux-arm64",
+     "Pinned nghttp2 source archive", false, NGHTTP2FilCExports, NGHTTP2FilCPhases, installNGHTTP2FilCEntry},
     {"llvm-mingw", "llvm-mingw", PackageKind::Toolchain, "LLVM MinGW Windows GNU toolchain", "host",
      "llvm-mingw release archive", false, LLVMMingwExports, LLVMMingwPhases, installLLVMMingwEntry},
     {"linux-sysroot-glibc-x86_64", "linux-sysroot-glibc-x86_64", PackageKind::Sysroot, "Linux glibc x86_64 sysroot",

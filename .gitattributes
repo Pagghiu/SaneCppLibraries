@@ -8,3 +8,4 @@
 *.pgm binary
 *.png binary
 *.ppm binary
+Tools/Support/FilCOpenSSL365.patch whitespace=-blank-at-eol,-space-before-tab

@@ -67,15 +67,25 @@ struct Package
 
 namespace PackageExport
 {
-constexpr StringView Clang                   = "clang";
-constexpr StringView ClangXX                 = "clang++";
-constexpr StringView ZLibShared              = "libz.so.1";
-constexpr StringView ZLibSharedLink          = "libz.so";
-constexpr StringView ZLibLibraryDir          = "zlib.lib";
-constexpr StringView ZLibIncludeDir          = "zlib.include";
-constexpr StringView CurlShared              = "libcurl.so.4";
-constexpr StringView CurlLibraryDir          = "curl.lib";
-constexpr StringView CurlIncludeDir          = "curl.include";
+constexpr StringView Clang          = "clang";
+constexpr StringView ClangXX        = "clang++";
+constexpr StringView ZLibShared     = "libz.so.1";
+constexpr StringView ZLibSharedLink = "libz.so";
+constexpr StringView ZLibLibraryDir = "zlib.lib";
+constexpr StringView ZLibIncludeDir = "zlib.include";
+constexpr StringView CurlShared     = "libcurl.so.4";
+constexpr StringView CurlLibraryDir = "curl.lib";
+constexpr StringView CurlIncludeDir = "curl.include";
+
+constexpr StringView OpenSSLCryptoShared = "libcrypto.so.3";
+constexpr StringView OpenSSLShared       = "libssl.so.3";
+constexpr StringView OpenSSLLibraryDir   = "openssl.lib";
+constexpr StringView OpenSSLIncludeDir   = "openssl.include";
+
+constexpr StringView NGHTTP2Shared     = "libnghttp2.so.14";
+constexpr StringView NGHTTP2LibraryDir = "nghttp2.lib";
+constexpr StringView NGHTTP2IncludeDir = "nghttp2.include";
+
 constexpr StringView LLVMAr                  = "llvm-ar";
 constexpr StringView LLVMLinker              = "ld.lld";
 constexpr StringView Sysroot                 = "sysroot";
@@ -118,17 +128,23 @@ constexpr StringView Toolchain = "toolchain";
 
 namespace PackageCapability
 {
-constexpr StringView ToolCCompiler             = "tool.c-compiler";
-constexpr StringView ToolCXXCompiler           = "tool.cxx-compiler";
-constexpr StringView ToolArchiver              = "tool.archiver";
-constexpr StringView ToolLinker                = "tool.linker";
-constexpr StringView RunnerWine                = "runner.wine";
-constexpr StringView RunnerQEMUX86_64          = "runner.qemu.x86_64";
-constexpr StringView RunnerQEMUArm64           = "runner.qemu.arm64";
-constexpr StringView LibraryZLibFilCX86_64     = "library.zlib.filc.x86_64";
-constexpr StringView LibraryZLibFilCArm64      = "library.zlib.filc.aarch64";
-constexpr StringView LibraryCurlFilCX86_64     = "library.curl.filc.x86_64";
-constexpr StringView LibraryCurlFilCArm64      = "library.curl.filc.aarch64";
+constexpr StringView ToolCCompiler         = "tool.c-compiler";
+constexpr StringView ToolCXXCompiler       = "tool.cxx-compiler";
+constexpr StringView ToolArchiver          = "tool.archiver";
+constexpr StringView ToolLinker            = "tool.linker";
+constexpr StringView RunnerWine            = "runner.wine";
+constexpr StringView RunnerQEMUX86_64      = "runner.qemu.x86_64";
+constexpr StringView RunnerQEMUArm64       = "runner.qemu.arm64";
+constexpr StringView LibraryZLibFilCX86_64 = "library.zlib.filc.x86_64";
+constexpr StringView LibraryZLibFilCArm64  = "library.zlib.filc.aarch64";
+constexpr StringView LibraryCurlFilCX86_64 = "library.curl.filc.x86_64";
+constexpr StringView LibraryCurlFilCArm64  = "library.curl.filc.aarch64";
+
+constexpr StringView LibraryOpenSSLFilCX86_64 = "library.openssl.filc.x86_64";
+constexpr StringView LibraryOpenSSLFilCArm64  = "library.openssl.filc.aarch64";
+constexpr StringView LibraryNGHTTP2FilCX86_64 = "library.nghttp2.filc.x86_64";
+constexpr StringView LibraryNGHTTP2FilCArm64  = "library.nghttp2.filc.aarch64";
+
 constexpr StringView ToolchainFilCX86_64       = "toolchain.filc.x86_64";
 constexpr StringView ToolchainFilCArm64        = "toolchain.filc.aarch64";
 constexpr StringView ToolchainWindowsGNUX86_64 = "toolchain.windows-gnu.x86_64";
