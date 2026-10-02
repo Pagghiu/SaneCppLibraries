@@ -508,7 +508,7 @@ void CryptographyTest::testFeatures()
         SC_TEST_EXPECT(features.hmacSha384);
     }
 #endif
-#if (SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX) and not SC_COMPILER_FILC
+#if SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX
     if (backend == Cryptography::Backend::OpenSSL and requireOpenSSL())
     {
         SC_TEST_EXPECT(features.aes128Gcm);
@@ -2052,7 +2052,7 @@ void CryptographyTest::testOverlapRejected()
 void runCryptographyTest(SC::TestReport& report)
 {
     CryptographyTest nativeTest(report, Cryptography::Backend::Native, "CryptographyTest");
-#if (SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX) and not SC_COMPILER_FILC
+#if SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX
     CryptographyTest openSSLTest(report, Cryptography::Backend::OpenSSL, "CryptographyOpenSSLTest");
 #endif
 }
