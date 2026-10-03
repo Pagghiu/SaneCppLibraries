@@ -12,6 +12,13 @@
 #include "Tools/ToolsErrorFormatter.h"
 
 extern SC::Console* globalConsole;
+
+#if SC_PLATFORM_WINDOWS
+#define SC_TOOLS_TEST_NO_INLINE __declspec(noinline)
+#else
+#define SC_TOOLS_TEST_NO_INLINE __attribute__((noinline))
+#endif
+
 namespace SC
 {
 namespace Build
@@ -196,6 +203,23 @@ struct SupportToolsTest : public TestCase
 
         const bool runHeavySections = shouldRunHeavySupportToolsTests();
         StringView args[10];
+
+        testValidation(arguments);
+        testBuildCLIParsing(arguments, args);
+        testBuildCLIRejection(arguments, args);
+        testHeavyTools(arguments, args, runHeavySections);
+        testPackageInputs(arguments, args, outputDirectory);
+        testPackageCommands(arguments, args, outputDirectory);
+        testPackageReceipts(arguments, args, outputDirectory);
+        testPackageOutput(arguments, args, outputDirectory, runHeavySections);
+    }
+
+    // Keep assertion-heavy groups separate: Fil-C compilation scales poorly with one large test function.
+    SC_TOOLS_TEST_NO_INLINE void testValidation(Tools::Tool::Arguments& arguments)
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("tool structured errors"))
         {
             const Result unsupported = Result::Error(ToolsResultCategory, ToolsError::UnsupportedFormatAction);
@@ -277,6 +301,13 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(Build::Action::execute(action, configureEmptyBuildDefinition)
                                .isError(BuildResultCategory, BuildError::NoWorkspacesDefined));
         }
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testBuildCLIParsing(Tools::Tool::Arguments& arguments, StringView (&args)[10])
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("build cli parses legacy positional arguments"))
         {
             arguments.tool      = "build";
@@ -636,6 +667,13 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "x86_64-custom-windows-gnu");
             SC_TEST_EXPECT(action.parameters.toolchain.sysroot == "/tmp/custom-windows-sysroot");
         }
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testBuildCLIRejection(Tools::Tool::Arguments& arguments, StringView (&args)[10])
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("build cli rejects incompatible generator for Windows GNU target profiles"))
         {
             arguments.tool      = "build";
@@ -1022,6 +1060,14 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
             SC_TEST_EXPECT(action.configurationName == "DebugCoverage");
         }
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testHeavyTools(Tools::Tool::Arguments& arguments, StringView (&args)[10],
+                                                bool                    runHeavySections)
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (runHeavySections and test_section("coverage"))
         {
             arguments.tool      = "build";
@@ -1092,6 +1138,14 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
         }
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testPackageInputs(Tools::Tool::Arguments& arguments, StringView (&args)[10],
+                                                   StringPath&             outputDirectory)
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("install filc rejects missing import-directory value"))
         {
             arguments.tool      = "package";
@@ -1383,6 +1437,14 @@ struct SupportToolsTest : public TestCase
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
         }
 #endif
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testPackageCommands(Tools::Tool::Arguments& arguments, StringView (&args)[10],
+                                                     StringPath&             outputDirectory)
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("package list is available"))
         {
             arguments.tool      = "package";
@@ -1766,6 +1828,14 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(runPackageTool(arguments, badRecipeRegistry, &package)
                                .isError(PackageResultCategory, PackageError::RecipePhaseUnknown));
         }
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testPackageReceipts(Tools::Tool::Arguments& arguments, StringView (&args)[10],
+                                                     StringPath&             outputDirectory)
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("package receipt resolves exports and capabilities"))
         {
             FileSystem fs;
@@ -2092,6 +2162,14 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved)
                                .isError(PackageResultCategory, PackageError::DuplicateExport));
         }
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testPackageOutput(Tools::Tool::Arguments& arguments, StringView (&args)[10],
+                                                   StringPath& outputDirectory, bool runHeavySections)
+    {
+        using namespace SC::Tools;
+        using namespace SC::Tools::detail;
+
         if (test_section("package status can scan registry"))
         {
             arguments.tool      = "package";
