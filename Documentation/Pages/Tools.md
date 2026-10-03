@@ -172,7 +172,7 @@ The profile supports HTTP/HTTPS, HTTP/2, proxies and threaded DNS. It builds com
 1.70.0 dependencies; WebSockets and automatic content decoding remain disabled. HttpClient reports actual loaded-library
 features. OpenSSL also supplies Cryptography's optional runtime backend, without a link dependency in consumer libraries.
 Building these packages requires host `make`, `patch`, Perl and the usual configure prerequisites. OpenSSL uses the
-project-maintained [Fil-C port rebase](../../Tools/Support/FilCOpenSSLPort.md), retaining its assembly bridge.
+project-maintained [Fil-C port rebase](https://github.com/Pagghiu/SaneCppLibraries/blob/filc/Tools/Support/FilCOpenSSLPort.md), retaining its assembly bridge.
 curl defaults to the Linux CA bundle `/etc/ssl/certs/ca-certificates.crt`; requests can supply a custom CA file.
 Cache identity includes source, compiler, port patch and relevant dependency identities. No system libraries are replaced.
 
