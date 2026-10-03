@@ -177,6 +177,10 @@ curl defaults to the Linux CA bundle `/etc/ssl/certs/ca-certificates.crt`; reque
 Cache identity includes source, compiler, port patch and relevant dependency identities. No system libraries are replaced.
 
 The experimental Fil-C CI runs SCTest through `Support/Scripts/RunFilCTLSFixture.sh Debug` and `Release`.
+Its full x86_64/ARM64 checks run weekly on the default branch, or explicitly through the Posix workflow's
+`run_filc` dispatch input. A pushed commit whose message contains `[filc]` also requests those checks, including on
+branches before the dispatch configuration reaches the default branch. Ordinary pushes and pull requests retain
+the normal compiler checks without waiting for Fil-C. The Posix matrix also tests Ubuntu 26.04 explicitly.
 This native Linux fixture requires OpenSSL capabilities and exercises HttpClient's trusted custom CA, required HTTP/2
 response, wrong CA and hostname rejection. Ordinary runs without fixture variables report an explicit transfer-test
 skip. Its public test-only credentials must never be used for a real service or installed into a system trust store.

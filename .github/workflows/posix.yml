@@ -3,6 +3,14 @@ name: Posix
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run_filc:
+        description: Run the full native x86_64 and ARM64 Fil-C checks
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 3 * * 0'
 
 env:
   ASAN_OPTIONS: halt_on_error=1
@@ -14,16 +22,18 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name != 'schedule'
     strategy:
       matrix:
         config: [ Debug, Release ]
-        params: [ { os: ubuntu-latest },
+        params: [ { os: ubuntu-24.04 },
+                  { os: ubuntu-26.04 },
                   { os: macos-latest  } ]
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 20
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: LibC Compatibility Check
       run: ./Support/Scripts/CheckLibC.sh
     - name: Standard C++ Header No Runtime Link Check
@@ -31,7 +41,7 @@ jobs:
     - name: Restore llvm-mingw cache
       id: llvm-mingw-cache
       if: matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm-mingw
@@ -43,7 +53,7 @@ jobs:
     - name: Restore LLVM package cache
       id: llvm-cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -59,7 +69,7 @@ jobs:
     - name: Restore Linux glibc x86_64 sysroot cache
       id: linux_sysroot_glibc_x64_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-x86_64
@@ -72,7 +82,7 @@ jobs:
     - name: Restore Linux glibc arm64 sysroot cache
       id: linux_sysroot_glibc_arm64_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-arm64
@@ -85,7 +95,7 @@ jobs:
     - name: Restore Linux musl x86_64 sysroot cache
       id: linux_sysroot_musl_x64_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-x86_64
@@ -98,7 +108,7 @@ jobs:
     - name: Restore Linux musl arm64 sysroot cache
       id: linux_sysroot_musl_arm64_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-arm64
@@ -111,7 +121,7 @@ jobs:
     - name: Restore legacy Linux sysroot cache
       id: linux_sysroot_legacy_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && (steps.linux_sysroot_glibc_x64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_musl_arm64_cache.outputs.cache-hit != 'true')
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot
@@ -124,7 +134,7 @@ jobs:
       run:  |
         sudo apt-get update
         sudo apt-get install -y liburing-dev openssl
-      if: matrix.params.os == 'ubuntu-latest'
+      if: startsWith(matrix.params.os, 'ubuntu-')
     - name: Install OpenSSL 3
       run: |
         HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
@@ -254,7 +264,7 @@ jobs:
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Save llvm-mingw cache
       if: matrix.config == 'Release' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/llvm-mingw
@@ -262,7 +272,7 @@ jobs:
         key: ${{ steps.llvm-mingw-cache.outputs.cache-primary-key }}
     - name: Save LLVM package cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -270,7 +280,7 @@ jobs:
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
     - name: Save Linux glibc x86_64 sysroot cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_glibc_x64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_glibc_x86_64/sc-package-receipt.json') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-x86_64
@@ -280,7 +290,7 @@ jobs:
         key: ${{ steps.linux_sysroot_glibc_x64_cache.outputs.cache-primary-key }}
     - name: Save Linux glibc arm64 sysroot cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_glibc_arm64/sc-package-receipt.json') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-arm64
@@ -290,7 +300,7 @@ jobs:
         key: ${{ steps.linux_sysroot_glibc_arm64_cache.outputs.cache-primary-key }}
     - name: Save Linux musl x86_64 sysroot cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_musl_x86_64/sc-package-receipt.json') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-x86_64
@@ -300,7 +310,7 @@ jobs:
         key: ${{ steps.linux_sysroot_musl_x64_cache.outputs.cache-primary-key }}
     - name: Save Linux musl arm64 sysroot cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_musl_arm64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_musl_arm64/sc-package-receipt.json') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-arm64
@@ -316,18 +326,19 @@ jobs:
     #   run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest
 
   filc-linux-experimental:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_filc) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[filc]'))
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-26.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore Fil-C cache
       id: filc-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/filc
@@ -352,7 +363,7 @@ jobs:
       run: ./SC.sh build compile "SCSingleFileLibs:" Release native --toolchain filc
     - name: Restore zlib-filc source cache
       id: zlib-filc-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/zlib-filc
@@ -361,7 +372,7 @@ jobs:
           sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore curl-filc package cache
       id: curl-filc-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/curl-filc
@@ -372,7 +383,7 @@ jobs:
           sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Fil-C TLS package cache
       id: filc-tls-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/openssl-filc
@@ -397,14 +408,14 @@ jobs:
       run: ./Support/Scripts/RunFilCTLSFixture.sh Release --all-tests
     - name: Save zlib-filc source cache
       if: always() && steps.zlib-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/zlib-filc/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/zlib-filc
         key: ${{ steps.zlib-filc-cache.outputs.cache-primary-key }}
     - name: Save curl-filc package cache
       if: always() && steps.filc-runtime-packages.outcome == 'success' && steps.curl-filc-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/curl-filc
@@ -412,7 +423,7 @@ jobs:
         key: ${{ steps.curl-filc-cache.outputs.cache-primary-key }}
     - name: Save Fil-C TLS package cache
       if: always() && steps.filc-runtime-packages.outcome == 'success' && steps.filc-tls-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/openssl-filc
@@ -422,7 +433,7 @@ jobs:
         key: ${{ steps.filc-tls-cache.outputs.cache-primary-key }}
     - name: Save Fil-C cache
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/filc
@@ -435,7 +446,7 @@ jobs:
     if: always()
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Print CI timing summary
       env:
         GH_TOKEN: ${{ github.token }}
