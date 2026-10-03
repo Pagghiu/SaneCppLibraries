@@ -345,9 +345,9 @@ jobs:
     - name: compile SaneHttpGet with Fil-C
       run: ./SC.sh build compile SaneHttpGet Debug native --toolchain filc
     - name: compile SCTest with Fil-C
-      run: ./SC.sh build compile SCTest Debug native --toolchain filc
+      run: ./SC.sh build compile SCTest Debug native --toolchain filc --verbose
     - name: compile SCTest Release with Fil-C
-      run: ./SC.sh build compile SCTest Release native --toolchain filc
+      run: ./SC.sh build compile SCTest Release native --toolchain filc --verbose
     - name: compile Single File Libs with Fil-C
       run: ./SC.sh build compile "SCSingleFileLibs:" Release native --toolchain filc
     - name: Restore zlib-filc source cache
@@ -359,24 +359,38 @@ jobs:
         key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
         restore-keys: |
           sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-
-    - name: Restore curl-filc source cache
+    - name: Restore curl-filc package cache
       id: curl-filc-cache
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/curl-filc
-        key: sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package/BuiltinInstallers.inl', 'Tools/Support/CurlFilCSmoke.c') }}
+        path: |
+          _Build/_PackagesCache/curl-filc
+          _Build/_Packages/curl_filc
+        key: sc-packages-posix-curl-filc-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/CurlFilCSmoke.c') }}
         restore-keys: |
+          sc-packages-posix-curl-filc-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-
-    - name: Restore Fil-C TLS source cache
+    - name: Restore Fil-C TLS package cache
       id: filc-tls-cache
       uses: actions/cache/restore@v4
       with:
         path: |
           _Build/_PackagesCache/openssl-filc
           _Build/_PackagesCache/nghttp2-filc
-        key: sc-packages-posix-filc-tls-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch') }}
+          _Build/_Packages/openssl_filc
+          _Build/_Packages/nghttp2_filc
+        key: sc-packages-posix-filc-tls-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/OpenSSLFilCSmoke.c', 'Tools/Support/NGHTTP2FilCSmoke.c') }}
         restore-keys: |
+          sc-packages-posix-filc-tls-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-tls-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Prepare and verify Fil-C runtime packages
+      id: filc-runtime-packages
+      run: |
+        ./SC.sh package install curl-filc
+        ./SC.sh package verify zlib-filc
+        ./SC.sh package verify openssl-filc
+        ./SC.sh package verify nghttp2-filc
+        ./SC.sh package verify curl-filc
     - name: test SCTest with Fil-C
       run: ./Support/Scripts/RunFilCTLSFixture.sh Debug --all-tests
     - name: test SCTest Release with Fil-C
@@ -388,19 +402,23 @@ jobs:
         path: |
           _Build/_PackagesCache/zlib-filc
         key: ${{ steps.zlib-filc-cache.outputs.cache-primary-key }}
-    - name: Save curl-filc source cache
-      if: always() && steps.curl-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/curl-filc/**') != ''
+    - name: Save curl-filc package cache
+      if: always() && steps.filc-runtime-packages.outcome == 'success' && steps.curl-filc-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache/curl-filc
+        path: |
+          _Build/_PackagesCache/curl-filc
+          _Build/_Packages/curl_filc
         key: ${{ steps.curl-filc-cache.outputs.cache-primary-key }}
-    - name: Save Fil-C TLS source cache
-      if: always() && steps.filc-tls-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/openssl-filc/**') != ''
+    - name: Save Fil-C TLS package cache
+      if: always() && steps.filc-runtime-packages.outcome == 'success' && steps.filc-tls-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: |
           _Build/_PackagesCache/openssl-filc
           _Build/_PackagesCache/nghttp2-filc
+          _Build/_Packages/openssl_filc
+          _Build/_Packages/nghttp2_filc
         key: ${{ steps.filc-tls-cache.outputs.cache-primary-key }}
     - name: Save Fil-C cache
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
