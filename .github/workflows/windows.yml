@@ -14,10 +14,10 @@ jobs:
     timeout-minutes: 20
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore LLVM package cache
       id: llvm-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -29,7 +29,7 @@ jobs:
           sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux glibc arm64 sysroot cache
       id: linux_sysroot_glibc_arm64_cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-arm64
@@ -41,7 +41,7 @@ jobs:
           sc-packages-windows-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux musl x86_64 sysroot cache
       id: linux_sysroot_musl_x64_cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-x86_64
@@ -94,7 +94,7 @@ jobs:
         call SC.bat package lock
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -102,7 +102,7 @@ jobs:
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
     - name: Save Linux glibc arm64 sysroot cache
       if: always() && steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_glibc_arm64/sc-package-receipt.json') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-arm64
@@ -112,7 +112,7 @@ jobs:
         key: ${{ steps.linux_sysroot_glibc_arm64_cache.outputs.cache-primary-key }}
     - name: Save Linux musl x86_64 sysroot cache
       if: always() && steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_musl_x86_64/sc-package-receipt.json') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-x86_64
@@ -134,7 +134,7 @@ jobs:
       WINDOWS_LONG_PATH_ARGS: ${{ matrix.config == 'Debug' && matrix.params.os == 'windows-2022' && '--windows-long-path-aware off' || '' }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Verify OpenSSL 3
       shell: pwsh
       run: |
@@ -152,7 +152,7 @@ jobs:
     - name: Restore LLVM package cache
       id: llvm-cache
       if: matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -165,7 +165,7 @@ jobs:
     - name: Restore Linux glibc arm64 sysroot cache
       id: linux_sysroot_glibc_arm64_cache
       if: matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/glibc-arm64
@@ -178,7 +178,7 @@ jobs:
     - name: Restore Linux musl x86_64 sysroot cache
       id: linux_sysroot_musl_x64_cache
       if: matrix.config == 'Release'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/musl-x86_64
@@ -248,7 +248,7 @@ jobs:
     if: always()
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Print CI timing summary
       env:
         GH_TOKEN: ${{ github.token }}

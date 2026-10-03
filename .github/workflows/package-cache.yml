@@ -23,10 +23,10 @@ jobs:
     timeout-minutes: 20
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore LLVM package cache
       id: llvm-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -62,7 +62,7 @@ jobs:
       run: ./SC.sh package lock
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -94,10 +94,10 @@ jobs:
             install_root: linux-sysroot_musl_arm64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore Linux sysroot cache
       id: linux_sysroot_cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}
@@ -109,7 +109,7 @@ jobs:
           sc-packages-posix-linux-sysroot-${{ matrix.sysroot.key }}-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore legacy Linux sysroot cache
       if: steps.linux_sysroot_cache.outputs.cache-hit != 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot
@@ -151,7 +151,7 @@ jobs:
       run: ./SC.sh package lock
     - name: Save Linux sysroot cache
       if: always() && steps.linux_sysroot_cache.outputs.cache-hit != 'true' && steps.linux_sysroot_ready.outputs.installed == 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}
@@ -169,10 +169,10 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore llvm-mingw cache
       id: llvm-mingw-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm-mingw
@@ -189,7 +189,7 @@ jobs:
       run: ./SC.sh package lock
     - name: Save llvm-mingw cache
       if: always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/llvm-mingw
@@ -201,10 +201,10 @@ jobs:
     timeout-minutes: 20
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore LLVM package cache
       id: llvm-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -230,7 +230,7 @@ jobs:
       run: call SC.bat package lock
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/llvm
@@ -254,10 +254,10 @@ jobs:
             install_root: linux-sysroot_musl_x86_64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore Linux sysroot cache
       id: linux_sysroot_cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}
@@ -303,7 +303,7 @@ jobs:
       run: call SC.bat package lock
     - name: Save Linux sysroot cache
       if: always() && steps.linux_sysroot_cache.outputs.cache-hit != 'true' && steps.linux_sysroot_ready.outputs.installed == 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}
@@ -321,10 +321,10 @@ jobs:
     timeout-minutes: 20
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Restore Fil-C cache
       id: filc-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           _Build/_PackagesCache/filc
@@ -339,7 +339,7 @@ jobs:
       run: ./SC.sh package verify filc
     - name: Save Fil-C cache
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           _Build/_PackagesCache/filc
