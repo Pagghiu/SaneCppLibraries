@@ -155,19 +155,32 @@ To register an existing ARM64 installation, use:
 
 For an Intel64 host, use the corresponding `filc-0.685-linux-x86_64` import directory.
 
-Fil-C runs also prepare package-local `zlib-filc` and `curl-filc` libraries and prepend their library directories to
+Fil-C runs also prepare package-local `zlib-filc`, `openssl-filc`, `nghttp2-filc` and `curl-filc` libraries and prepend their library directories to
 `LD_LIBRARY_PATH`. Host libraries are not ABI-compatible with Fil-C. No system library is replaced.
 
 ```bash
 ./SC.sh package install curl-filc
 ./SC.sh package verify curl-filc
+./SC.sh package install openssl-filc
+./SC.sh package verify openssl-filc
+./SC.sh package install nghttp2-filc
+./SC.sh package verify nghttp2-filc
 ```
 
 `curl-filc` builds pinned curl 8.22.0 sources with the native Fil-C compiler using upstream configure and make.
-The initial profile supports HTTP, proxies and threaded DNS; it excludes TLS, HTTP/2, WebSockets and automatic
-content decoding. HttpClient reports the loaded library's TLS/HTTP2 capabilities and rejects unsupported policies.
-Building this package requires host `make` and the usual configure prerequisites. Compatible TLS/HTTP2 packages
-are separate follow-up work, not supplied by this profile.
+The profile supports HTTP/HTTPS, HTTP/2, proxies and threaded DNS. It builds compatible OpenSSL 3.6.5 and nghttp2
+1.70.0 dependencies; WebSockets and automatic content decoding remain disabled. HttpClient reports actual loaded-library
+features. OpenSSL also supplies Cryptography's optional runtime backend, without a link dependency in consumer libraries.
+Building these packages requires host `make`, `patch`, Perl and the usual configure prerequisites. OpenSSL uses the
+project-maintained [Fil-C port rebase](../../Tools/Support/FilCOpenSSLPort.md), retaining its assembly bridge.
+curl defaults to the Linux CA bundle `/etc/ssl/certs/ca-certificates.crt`; requests can supply a custom CA file.
+Cache identity includes source, compiler, port patch and relevant dependency identities. No system libraries are replaced.
+
+The experimental Fil-C CI runs SCTest through `Support/Scripts/RunFilCTLSFixture.sh Debug` and `Release`.
+This native Linux fixture requires OpenSSL capabilities and exercises HttpClient's trusted custom CA, required HTTP/2
+response, wrong CA and hostname rejection. Ordinary runs without fixture variables report an explicit transfer-test
+skip. Its public test-only credentials must never be used for a real service or installed into a system trust store.
+Functional ABI and protocol checks do not replace upstream OpenSSL tests or establish side-channel resistance.
 
 `repair` is for a recognized existing layout whose current receipt or launcher metadata can be reconstructed. It is not
 a generic substitute for a failed install:

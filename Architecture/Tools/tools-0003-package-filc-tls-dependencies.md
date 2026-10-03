@@ -20,3 +20,11 @@ Package installation requires native Fil-C, Perl/Autoconf build prerequisites, `
 ## Confirmation
 
 Verify source and patch hashes, package-local exports and receipts, OpenSSL's version and SHA-256 vector plus TLS context lifetime, and nghttp2's version and serialized client SETTINGS frame. Smoke binaries must resolve package-local OpenSSL/zlib/nghttp2 libraries through their runtime search paths.
+
+The experimental CI also runs SCTest through `Support/Scripts/RunFilCTLSFixture.sh`. Its bounded loopback server
+and public test-only credentials exercise a trusted custom CA, required HTTP/2 status/body, wrong CA and hostname
+rejection. The fixture uses per-run DSO copies because the SC runner prepares zlib again before execution. OpenSSL
+Cryptography capabilities are mandatory in that run, including the existing backend and differential tests.
+These checks establish functional ABI/protocol behavior; they are not the full upstream OpenSSL test suite,
+constant-time validation, or a side-channel security proof. The port rebase is project-maintained, not an
+upstream Fil-C 3.6.5 release.

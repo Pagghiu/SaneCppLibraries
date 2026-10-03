@@ -20,7 +20,8 @@ The patch preserves the upstream assembly bridge and safety checks; it is not a 
 See the upstream [constant-time port explanation](https://fil-c.org/constant_time_crypto). Its detailed discussion
 describes the earlier x86_64 port, not an independent proof of this ARM/security-release rebase.
 
-OpenSSL sources retain their [Apache License 2.0](https://www.openssl.org/source/license.html) notices.
+OpenSSL sources retain their [Apache License 2.0](FilCOpenSSL365.LICENSE.txt) notices; the adjacent license text is
+copied from the pinned 3.6.5 source archive.
 The patch is retained as upstream-derived source data, not relicensed as SC's MIT implementation code.
 Keep upstream copyright/license notices when updating it.
 
