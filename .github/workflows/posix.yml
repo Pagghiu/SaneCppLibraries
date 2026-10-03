@@ -321,7 +321,7 @@ jobs:
       matrix:
         runner: [ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
     - uses: actions/checkout@v4
@@ -367,10 +367,20 @@ jobs:
         key: sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package/BuiltinInstallers.inl', 'Tools/Support/CurlFilCSmoke.c') }}
         restore-keys: |
           sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Fil-C TLS source cache
+      id: filc-tls-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/openssl-filc
+          _Build/_PackagesCache/nghttp2-filc
+        key: sc-packages-posix-filc-tls-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch') }}
+        restore-keys: |
+          sc-packages-posix-filc-tls-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: test SCTest with Fil-C
-      run: ./SC.sh build run SCTest Debug native --toolchain filc -- --all-tests
+      run: ./Support/Scripts/RunFilCTLSFixture.sh Debug --all-tests
     - name: test SCTest Release with Fil-C
-      run: ./SC.sh build run SCTest Release native --toolchain filc -- --all-tests
+      run: ./Support/Scripts/RunFilCTLSFixture.sh Release --all-tests
     - name: Save zlib-filc source cache
       if: always() && steps.zlib-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/zlib-filc/**') != ''
       uses: actions/cache/save@v4
@@ -384,6 +394,14 @@ jobs:
       with:
         path: _Build/_PackagesCache/curl-filc
         key: ${{ steps.curl-filc-cache.outputs.cache-primary-key }}
+    - name: Save Fil-C TLS source cache
+      if: always() && steps.filc-tls-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/openssl-filc/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/openssl-filc
+          _Build/_PackagesCache/nghttp2-filc
+        key: ${{ steps.filc-tls-cache.outputs.cache-primary-key }}
     - name: Save Fil-C cache
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
       uses: actions/cache/save@v4
