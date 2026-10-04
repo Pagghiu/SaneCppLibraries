@@ -1076,6 +1076,22 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(allocator.used() == 0);
         SC_TEST_EXPECT(allocator.close());
         SC_TEST_EXPECT(existingAllocator.close());
+
+        alignas(64) char misalignedStorage[257] = {};
+        SC_TEST_EXPECT(allocator.createFixed({misalignedStorage + 1, 256}));
+        void* alignedAllocation = allocator.allocate(nullptr, 32, 64);
+        SC_TEST_EXPECT(alignedAllocation != nullptr);
+        if (alignedAllocation != nullptr)
+        {
+            SC_TEST_EXPECT((reinterpret_cast<size_t>(alignedAllocation) & 63) == 0);
+            char* bytes = static_cast<char*>(alignedAllocation);
+            bytes[0]    = 11;
+            bytes[31]   = 22;
+            SC_TEST_EXPECT(bytes[0] == 11 and bytes[31] == 22);
+            allocator.release(alignedAllocation);
+        }
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(allocator.close());
     }
 
     void fiberJobWorkerStealing()
