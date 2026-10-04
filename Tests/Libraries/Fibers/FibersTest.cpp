@@ -9,6 +9,8 @@
 #include "Libraries/Threading/Atomic.h"
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #if !SC_PLATFORM_WINDOWS
 #include <signal.h>
@@ -16,7 +18,6 @@
 #endif
 
 #if !SC_PLATFORM_WINDOWS
-#include <stdlib.h>
 #include <sys/mman.h>
 #endif
 
@@ -107,14 +108,14 @@ struct SC::FibersTest : public SC::TestCase
 #if SC_COMPILER_FILC
         if (not report.quietMode)
         {
-            report.console.printLine("FibersTest - Skipping under Fil-C: manual stack switching is unsupported");
+            report.console.printLine("FibersTest - Skipping stack-switching sections under Fil-C; running job tests");
         }
-        return;
-#else
+#endif
         if (test_section("structured errors and formatter"))
         {
             structuredErrorsAndFormatter();
         }
+#if !SC_COMPILER_FILC
         if (test_section("context switch"))
         {
             contextSwitch();
@@ -123,6 +124,7 @@ struct SC::FibersTest : public SC::TestCase
         {
             schedulerYield();
         }
+#endif
         if (test_section("fiber jobs"))
         {
             fiberJobs();
@@ -159,6 +161,7 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobWorkerPool();
         }
+#if !SC_COMPILER_FILC
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -1267,6 +1270,48 @@ struct SC::FibersTest : public SC::TestCase
 
     void fiberJobWorkerPool()
     {
+        struct Watchdog
+        {
+            Atomic<bool>    finished;
+            Atomic<int32_t> phase;
+            Thread          thread;
+
+            ~Watchdog()
+            {
+                finished.store(true);
+                if (thread.wasStarted())
+                {
+                    (void)thread.join();
+                }
+            }
+        } watchdog;
+        Watchdog*    watchdogPointer = &watchdog;
+        const Result watchdogStarted = watchdog.thread.start(
+            [watchdogPointer](Thread&)
+            {
+                const Time::Monotonic started = Time::Monotonic::now();
+                while (not watchdogPointer->finished.load())
+                {
+                    if (Time::Monotonic::now().subtractExact(started).ms > 30000)
+                    {
+                        const char* phases[] = {"scalar fanout",         "batch publication",
+                                                "scalar publication",    "cancellation",
+                                                "request stop",          "parked worker completion",
+                                                "persistent pool waves", "batch publication race"};
+                        fprintf(stderr, "FibersTest worker pool exceeded 30 seconds; active subcase: %s\n",
+                                phases[watchdogPointer->phase.load()]);
+                        fflush(stderr);
+                        abort();
+                    }
+                    Thread::Sleep(10);
+                }
+            });
+        SC_TEST_EXPECT(watchdogStarted);
+        if (not watchdogStarted)
+        {
+            return;
+        }
+
         static constexpr size_t NumWorkers  = 4;
         static constexpr size_t NumChildren = 64;
 
@@ -1349,6 +1394,7 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            watchdog.phase.store(1);
             static constexpr size_t BatchWorkers  = 2;
             static constexpr size_t BatchChildren = 8;
 
@@ -1418,6 +1464,7 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            watchdog.phase.store(2);
             static constexpr size_t SingleWorkers  = 2;
             static constexpr size_t SingleChildren = 8;
 
@@ -1492,6 +1539,7 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            watchdog.phase.store(3);
             static constexpr size_t CancelWorkers = 2;
             static constexpr size_t CancelJobs    = 64;
 
@@ -1567,6 +1615,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 Atomic<int32_t> invoked;
             };
+            watchdog.phase.store(4);
 
             static constexpr size_t StopJobs = 4;
 
@@ -1613,6 +1662,7 @@ struct SC::FibersTest : public SC::TestCase
                 Atomic<bool> entered;
                 Atomic<bool> release;
             };
+            watchdog.phase.store(5);
 
             FiberJob                  job;
             FiberJob*                 readyStorage[1] = {};
@@ -1649,6 +1699,7 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            watchdog.phase.store(6);
             static constexpr size_t PersistentWorkers = 2;
             static constexpr size_t PersistentJobs    = 8;
 
@@ -1702,6 +1753,7 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            watchdog.phase.store(7);
             static constexpr size_t RaceWorkers  = 4;
             static constexpr size_t RaceChildren = 16;
             static constexpr size_t RaceWaves    = 128;
