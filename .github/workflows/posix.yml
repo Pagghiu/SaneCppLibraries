@@ -20,10 +20,15 @@ jobs:
     if: github.event_name != 'schedule'
     strategy:
       matrix:
-        config: [ Debug, Release ]
-        params: [ { os: ubuntu-24.04 },
-                  { os: ubuntu-26.04 },
-                  { os: macos-latest  } ]
+        include:
+          - config: Debug
+            params: { os: ubuntu-24.04 }
+          - config: Release
+            params: { os: ubuntu-26.04 }
+          - config: Debug
+            params: { os: macos-latest }
+          - config: Release
+            params: { os: macos-latest }
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 20
 
