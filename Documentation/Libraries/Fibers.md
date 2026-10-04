@@ -134,9 +134,10 @@ remain caller-owned, while every local deque comes from the explicit `FiberAlloc
 `waitIdle()` then marks each wave boundary, and `requestStop()` is required before the final `join()`. Stop wakes every
 parked worker and makes cancellation observable through `FiberJobContext`. Multi-worker pools transfer claimed batches
 to cache-line-isolated worker ready and active counters, so local execution and completion do not contend on
-scheduler-wide counters. `readyJobCount()` and `activeJobCount()` are exact at stable observation points and can only
-conservatively overcount during a concurrent ownership transfer; neither reports a false zero. No stack is reserved for
-a job.
+scheduler-wide counters. `readyJobCount()` and `activeJobCount()` are exact at stable observation points. Positive
+concurrent totals may combine observations from different instants and can conservatively overcount an ownership
+transfer. A candidate zero is confirmed while all accounting-domain activation gates are held: neither getter reports
+zero unless every corresponding count is zero at one observation point. No stack is reserved for a job.
 
 ```cpp
 FiberJobWorkerPoolOptions options;
@@ -169,6 +170,10 @@ SC_TRY(workerPool.join());
 or otherwise coordinated if the caller needs a closed submission boundary; a concurrent later spawn begins a new wave.
 A persistent pool rejects `join()` until stop has been requested, avoiding an accidental indefinite wait while it is
 still accepting work.
+
+An idle observation does not stop producers or pin the scheduler at zero. Work accepted after that observation can
+already be running when `waitIdle()` returns. Keep scheduler, worker and deque storage alive until the pool joins;
+coordinate producers before closing the scheduler or releasing records that they can still submit.
 
 `Examples/FibersMandelbrot` applies this model to a bounded image renderer. It preallocates one stable job per possible
 row, starts a persistent worker pool, transactionally publishes the requested rows, waits for the wave, and then

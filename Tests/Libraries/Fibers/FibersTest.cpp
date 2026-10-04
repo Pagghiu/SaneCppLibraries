@@ -189,6 +189,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobIdleObserverWake();
         }
+        if (test_section("fiber job quiescence"))
+        {
+            fiberJobQuiescence();
+        }
 #if !SC_COMPILER_FILC
         if (test_section("explicit worker"))
         {
@@ -2182,6 +2186,237 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(allocator.close());
         state.finished.store(true);
         SC_TEST_EXPECT(watchdog.join());
+    }
+
+    void fiberJobQuiescence()
+    {
+        struct Watchdog
+        {
+            Atomic<bool>    finished;
+            Atomic<int32_t> phase;
+            Thread          thread;
+
+            ~Watchdog()
+            {
+                finished.store(true);
+                if (thread.wasStarted())
+                {
+                    (void)thread.join();
+                }
+            }
+        } watchdog;
+        Watchdog* watchdogPointer = &watchdog;
+        SC_TEST_EXPECT(watchdog.thread.start(
+            [watchdogPointer](Thread&)
+            {
+                const Time::Monotonic started = Time::Monotonic::now();
+                while (not watchdogPointer->finished.load())
+                {
+                    if (Time::Monotonic::now().subtractExact(started).ms > 15000)
+                    {
+                        fprintf(stderr, "FibersTest job quiescence exceeded 15 seconds; phase: %d\n",
+                                watchdogPointer->phase.load());
+                        fflush(stderr);
+                        abort();
+                    }
+                    Thread::Sleep(10);
+                }
+            }));
+        if (not watchdog.thread.wasStarted())
+        {
+            return;
+        }
+
+        const size_t workerCounts[] = {1, 2, 4};
+        for (size_t numWorkers : workerCounts)
+        {
+            watchdog.phase.store(static_cast<int32_t>(numWorkers));
+            static constexpr size_t NumJobs = 128;
+            struct State
+            {
+                FiberJob* jobs = nullptr;
+
+                Atomic<int32_t> entered;
+                Atomic<int32_t> releaseThrough{-1};
+                Atomic<bool>    continuouslyActive;
+                Atomic<bool>    falseZero;
+                Atomic<bool>    prematureIdle;
+            } state;
+            State*   statePointer = &state;
+            FiberJob jobs[NumJobs];
+            state.jobs = jobs;
+
+            FiberJob*                 readyStorage[NumJobs] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[4];
+            FiberJobWorkerThread      threads[4];
+            FiberJobWorkerPool        pool;
+            FiberJobWorkerPoolOptions options;
+            alignas(64) char          allocatorStorage[4096] = {};
+            FiberAllocator            allocator;
+            Thread                    observer;
+            Thread                    sampler;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = 4;
+            options.idleSpinAttempts       = 0;
+            options.keepAliveWhenIdle      = true;
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SC_TEST_EXPECT(pool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, options));
+            auto submit = [&scheduler, statePointer](FiberJob& job)
+            {
+                return scheduler.spawn(job, FiberJob::Procedure(
+                                                [statePointer](FiberJobContext& context)
+                                                {
+                                                    const int32_t index =
+                                                        static_cast<int32_t>(&context.job() - statePointer->jobs);
+                                                    statePointer->entered.fetch_add(1);
+                                                    while (statePointer->releaseThrough.load() < index)
+                                                    {
+                                                        Thread::Sleep(1);
+                                                    }
+                                                    return Result(true);
+                                                }));
+            };
+            SC_TEST_EXPECT(submit(jobs[0]));
+            while (state.entered.load() != 1)
+            {
+                Thread::Sleep(1);
+            }
+            state.continuouslyActive.store(true);
+            SC_TEST_EXPECT(observer.start(
+                [&pool, statePointer](Thread&)
+                {
+                    if (not pool.waitIdle())
+                    {
+                        abort();
+                    }
+                    if (statePointer->continuouslyActive.load())
+                    {
+                        statePointer->prematureIdle.store(true);
+                    }
+                }));
+            SC_TEST_EXPECT(sampler.start(
+                [&scheduler, statePointer](Thread&)
+                {
+                    while (statePointer->continuouslyActive.load())
+                    {
+                        if ((scheduler.activeJobCount() == 0 or not scheduler.hasActiveJobs()) and
+                            statePointer->continuouslyActive.load())
+                        {
+                            statePointer->falseZero.store(true);
+                        }
+                    }
+                }));
+            for (size_t index = 1; index < NumJobs; ++index)
+            {
+                // Accept the successor before allowing its predecessor to finish: there is no idle instant.
+                SC_TEST_EXPECT(submit(jobs[index]));
+                state.releaseThrough.store(static_cast<int32_t>(index - 1));
+                while (state.entered.load() != static_cast<int32_t>(index + 1))
+                {
+                    Thread::Sleep(1);
+                }
+            }
+            state.continuouslyActive.store(false);
+            SC_TEST_EXPECT(sampler.join());
+            state.releaseThrough.store(static_cast<int32_t>(NumJobs - 1));
+            SC_TEST_EXPECT(observer.join());
+            SC_TEST_EXPECT(not state.falseZero.load());
+            SC_TEST_EXPECT(not state.prematureIdle.load());
+            SC_TEST_EXPECT(pool.waitIdle());
+            for (FiberJob& job : jobs)
+            {
+                SC_TEST_EXPECT(job.result());
+            }
+            SC_TEST_EXPECT(scheduler.activeJobCount() == 0);
+            SC_TEST_EXPECT(scheduler.readyJobCount() == 0);
+            SC_TEST_EXPECT(pool.requestStop());
+            SC_TEST_EXPECT(pool.join());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
+
+        watchdog.phase.store(5);
+        {
+            struct State
+            {
+                Atomic<int32_t> entered;
+                Atomic<bool>    release;
+            } state;
+            State*                    statePointer = &state;
+            FiberJob                  jobs[4];
+            FiberJob*                 readyStorage[4] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[4];
+            FiberJobWorkerThread      threads[4];
+            FiberJobWorkerPool        pool;
+            FiberJobWorkerPoolOptions options;
+            alignas(64) char          allocatorStorage[4096] = {};
+            FiberAllocator            allocator;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = 1;
+            options.idleSpinAttempts       = 0;
+            options.keepAliveWhenIdle      = true;
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            SC_TEST_EXPECT(pool.start(scheduler, workers, threads, options));
+            for (size_t wave = 0; wave < 32; ++wave)
+            {
+                const int32_t wavePhase = 100 + static_cast<int32_t>(wave * 10);
+                state.entered.store(0);
+                state.release.store(false);
+                for (size_t index = 0; index < 4; ++index)
+                {
+                    watchdog.phase.store(wavePhase + static_cast<int32_t>(index));
+                    SC_TEST_EXPECT(scheduler.spawn(jobs[index], FiberJob::Procedure(
+                                                                    [statePointer](FiberJobContext&)
+                                                                    {
+                                                                        statePointer->entered.fetch_add(1);
+                                                                        while (not statePointer->release.load())
+                                                                        {
+                                                                            Thread::Sleep(1);
+                                                                        }
+                                                                        return Result(true);
+                                                                    })));
+                    // Claim one job per domain before publishing the next, with no transferred ready backlog.
+                    while (state.entered.load() != static_cast<int32_t>(index + 1))
+                    {
+                        Thread::Sleep(1);
+                    }
+                }
+                SC_TEST_EXPECT(scheduler.activeJobCount() == 4);
+                SC_TEST_EXPECT(scheduler.readyJobCount() == 0);
+                Thread observer;
+                watchdog.phase.store(wavePhase + 4);
+                SC_TEST_EXPECT(observer.start(
+                    [&pool](Thread&)
+                    {
+                        if (not pool.waitIdle())
+                        {
+                            abort();
+                        }
+                    }));
+                while (pool.parkedWorkerCount() != 1)
+                {
+                    Thread::Sleep(1);
+                }
+                state.release.store(true);
+                watchdog.phase.store(wavePhase + 5);
+                SC_TEST_EXPECT(observer.join());
+                SC_TEST_EXPECT(scheduler.activeJobCount() == 0);
+                for (FiberJob& job : jobs)
+                {
+                    SC_TEST_EXPECT(job.result());
+                }
+            }
+            SC_TEST_EXPECT(pool.requestStop());
+            SC_TEST_EXPECT(pool.join());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
     }
 
     void fiberJobPersistentStop()

@@ -2005,6 +2005,26 @@ static bool fiberAtomicCompareExchangeSize(volatile size_t& value, size_t& expec
 #endif
 }
 
+static void fiberJobAddCount(volatile size_t& count, volatile int32_t& activationLock, size_t amount)
+{
+    if (amount == 0)
+    {
+        return;
+    }
+    size_t observed = fiberAtomicLoadSize(count);
+    while (observed != 0)
+    {
+        if (fiberAtomicCompareExchangeSize(count, observed, observed + amount))
+        {
+            return;
+        }
+    }
+    // A positive-only CAS cannot reactivate a zero domain while a confirming observer holds its gate.
+    fiberSchedulerLock(activationLock);
+    fiberAtomicFetchAddSize(count, amount);
+    fiberSchedulerUnlock(activationLock);
+}
+
 static void fiberAtomicSequentialFence()
 {
 #if SC_PLATFORM_WINDOWS
@@ -2088,12 +2108,13 @@ struct FiberWorkerPoolWakeEvent
             {
                 conditionWaited = true;
                 ::SleepConditionVariableCS(&condition, &mutex, INFINITE);
+                // A same-generation wake still consumes its OS notification before re-parking.
+                if (pendingSignals > 0)
+                {
+                    pendingSignals -= 1;
+                }
             }
             fiberAtomicFetchSubUInt32(parked, 1);
-        }
-        if (conditionWaited and pendingSignals > 0)
-        {
-            pendingSignals -= 1;
         }
         ::LeaveCriticalSection(&mutex);
         return conditionWaited;
@@ -2163,12 +2184,13 @@ struct FiberWorkerPoolWakeEvent
                 conditionWaited = true;
                 const int res   = ::pthread_cond_wait(&condition, &mutex);
                 (void)res;
+                // A same-generation wake still consumes its OS notification before re-parking.
+                if (pendingSignals > 0)
+                {
+                    pendingSignals -= 1;
+                }
             }
             fiberAtomicFetchSubUInt32(parked, 1);
-        }
-        if (conditionWaited and pendingSignals > 0)
-        {
-            pendingSignals -= 1;
         }
         ::pthread_mutex_unlock(&mutex);
         return conditionWaited;
@@ -4096,6 +4118,41 @@ struct FiberJobScheduler::QueueLockGuard
     const FiberJobScheduler& jobScheduler;
 };
 
+struct FiberJobScheduler::CountActivationLockGuard
+{
+    explicit CountActivationLockGuard(const FiberJobScheduler& scheduler) : jobScheduler(scheduler)
+    {
+        fiberSchedulerLock(jobScheduler.countActivationLock);
+    }
+
+    void lockWorkerActivations()
+    {
+        if (jobScheduler.workerPool != nullptr and jobScheduler.workerPool->workers.sizeInElements() > 1)
+        {
+            lockedWorkers = jobScheduler.workerPool->workers;
+            for (FiberJobWorker& worker : lockedWorkers)
+            {
+                fiberSchedulerLock(worker.countActivationLock);
+            }
+        }
+    }
+
+    ~CountActivationLockGuard()
+    {
+        for (size_t index = lockedWorkers.sizeInElements(); index != 0; --index)
+        {
+            fiberSchedulerUnlock(lockedWorkers[index - 1].countActivationLock);
+        }
+        fiberSchedulerUnlock(jobScheduler.countActivationLock);
+    }
+
+    CountActivationLockGuard(const CountActivationLockGuard&)            = delete;
+    CountActivationLockGuard& operator=(const CountActivationLockGuard&) = delete;
+
+    const FiberJobScheduler& jobScheduler;
+    Span<FiberJobWorker>     lockedWorkers;
+};
+
 FiberJobScheduler::FiberJobScheduler() = default;
 
 FiberJobScheduler::~FiberJobScheduler()
@@ -4418,13 +4475,13 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
             // Exact accounting must be visible before the release-store publishes the deque bottom to thieves.
             if (distributedAccounting)
             {
-                fiberAtomicFetchAddSize(worker->ownedReadyJobs, 1);
-                fiberAtomicFetchAddSize(worker->ownedActiveJobs, 1);
+                fiberJobAddCount(worker->ownedActiveJobs, worker->countActivationLock, 1);
+                fiberJobAddCount(worker->ownedReadyJobs, worker->countActivationLock, 1);
             }
             else
             {
-                fiberAtomicFetchAddSize(readyJobs, 1);
-                fiberAtomicFetchAddSize(activeJobs, 1);
+                fiberJobAddCount(activeJobs, countActivationLock, 1);
+                fiberJobAddCount(readyJobs, countActivationLock, 1);
             }
             SC_FIBERS_ASSERT_RELEASE(tryPushWorkerDeque(*worker, job));
             if (workerPool != nullptr)
@@ -4448,8 +4505,8 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
     queueStorage[queueTail] = &job;
     queueTail               = (queueTail + 1) % queueStorage.sizeInElements();
     queueCount += 1;
-    fiberAtomicFetchAddSize(readyJobs, 1);
-    fiberAtomicFetchAddSize(activeJobs, 1);
+    fiberJobAddCount(activeJobs, countActivationLock, 1);
+    fiberJobAddCount(readyJobs, countActivationLock, 1);
     if (workerPool != nullptr)
     {
         workerPool->wakeOneWorker();
@@ -4508,13 +4565,13 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
             }
             if (distributedAccounting)
             {
-                fiberAtomicFetchAddSize(worker->ownedReadyJobs, jobs.sizeInElements());
-                fiberAtomicFetchAddSize(worker->ownedActiveJobs, jobs.sizeInElements());
+                fiberJobAddCount(worker->ownedActiveJobs, worker->countActivationLock, jobs.sizeInElements());
+                fiberJobAddCount(worker->ownedReadyJobs, worker->countActivationLock, jobs.sizeInElements());
             }
             else
             {
-                fiberAtomicFetchAddSize(readyJobs, jobs.sizeInElements());
-                fiberAtomicFetchAddSize(activeJobs, jobs.sizeInElements());
+                fiberJobAddCount(activeJobs, countActivationLock, jobs.sizeInElements());
+                fiberJobAddCount(readyJobs, countActivationLock, jobs.sizeInElements());
             }
             fiberAtomicStoreSize(worker->localDequeBottom, bottom + jobs.sizeInElements());
             const size_t workerReady = bottom + jobs.sizeInElements() - top;
@@ -4561,8 +4618,8 @@ Result FiberJobScheduler::spawn(Span<FiberJob> jobs, FiberJob::Procedure procedu
             queueTail               = (queueTail + 1) % queueStorage.sizeInElements();
         }
         queueCount += jobs.sizeInElements();
-        fiberAtomicFetchAddSize(readyJobs, jobs.sizeInElements());
-        fiberAtomicFetchAddSize(activeJobs, jobs.sizeInElements());
+        fiberJobAddCount(activeJobs, countActivationLock, jobs.sizeInElements());
+        fiberJobAddCount(readyJobs, countActivationLock, jobs.sizeInElements());
     }
     if (workerPool != nullptr)
     {
@@ -4667,10 +4724,9 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
             job->accountingWorker = distributedAccounting ? &worker : nullptr;
             if (distributedAccounting)
             {
-                // Add the worker ownership first so a concurrent control-path snapshot can overcount but never see
-                // zero.
-                fiberAtomicFetchAddSize(worker.ownedReadyJobs, transferred);
-                fiberAtomicFetchAddSize(worker.ownedActiveJobs, claimedJobs);
+                // Charge the destination before releasing the source's ownership.
+                fiberJobAddCount(worker.ownedActiveJobs, worker.countActivationLock, claimedJobs);
+                fiberJobAddCount(worker.ownedReadyJobs, worker.countActivationLock, transferred);
                 const size_t previousReady  = fiberAtomicFetchSubSize(readyJobs, claimedJobs);
                 const size_t previousActive = fiberAtomicFetchSubSize(activeJobs, claimedJobs);
                 SC_FIBERS_ASSERT_RELEASE(previousReady >= claimedJobs);
@@ -4812,6 +4868,10 @@ size_t FiberJobScheduler::readyJobCount() const
         {
             ready += fiberAtomicLoadSize(worker.ownedReadyJobs);
         }
+        if (ready == 0)
+        {
+            return confirmedJobCount(true);
+        }
     }
     return ready;
 }
@@ -4825,8 +4885,37 @@ size_t FiberJobScheduler::activeJobCount() const
         {
             active += fiberAtomicLoadSize(worker.ownedActiveJobs);
         }
+        if (active == 0)
+        {
+            return confirmedJobCount(false);
+        }
     }
     return active;
+}
+
+size_t FiberJobScheduler::confirmedJobCount(bool ready) const
+{
+    CountActivationLockGuard guard(*this);
+    size_t                   total = fiberAtomicLoadSize(ready ? readyJobs : activeJobs);
+    if (workerPool != nullptr and workerPool->workers.sizeInElements() > 1)
+    {
+        for (const FiberJobWorker& worker : workerPool->workers)
+        {
+            total += fiberAtomicLoadSize(ready ? worker.ownedReadyJobs : worker.ownedActiveJobs);
+        }
+    }
+    // Even positive final-completion scans hold the global gate to import earlier final decrements.
+    if (total != 0)
+    {
+        return total;
+    }
+    guard.lockWorkerActivations();
+    total = fiberAtomicLoadSize(ready ? readyJobs : activeJobs);
+    for (const FiberJobWorker& worker : guard.lockedWorkers)
+    {
+        total += fiberAtomicLoadSize(ready ? worker.ownedReadyJobs : worker.ownedActiveJobs);
+    }
+    return total;
 }
 
 FiberJob* FiberJobScheduler::currentJob()
@@ -4872,7 +4961,8 @@ Result FiberJobScheduler::complete(FiberJob& job, Result result)
                                       ? fiberAtomicFetchSubSize(accountingWorker->ownedActiveJobs, 1)
                                       : fiberAtomicFetchSubSize(activeJobs, 1);
     SC_FIBERS_ASSERT_RELEASE(previousActive > 0);
-    if (previousActive == 1 and workerPool != nullptr and not hasActiveJobs())
+    // Serialize final-domain confirmations so the last completer imports earlier decrements before scanning.
+    if (previousActive == 1 and workerPool != nullptr and confirmedJobCount(false) == 0)
     {
         workerPool->wakeAllWorkers();
     }

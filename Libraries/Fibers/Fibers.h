@@ -885,6 +885,8 @@ struct SC_FIBERS_EXPORT FiberJobWorker
 
     alignas(128) volatile size_t ownedReadyJobs  = 0;
     alignas(128) volatile size_t ownedActiveJobs = 0;
+
+    mutable volatile int32_t countActivationLock = 0;
 };
 #if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(pop)
@@ -928,9 +930,9 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     Result requestCancelAll();
 
     [[nodiscard]] bool isOpen() const;
-    //! Never reports false while ready work transfers from the external queue to a worker.
+    //! Confirms zero while preventing new ready-count activation across accounting domains.
     [[nodiscard]] bool hasReadyJobs() const;
-    //! Never reports false while active work transfers from the external queue to a worker.
+    //! Confirms zero while preventing new active-count activation across accounting domains.
     [[nodiscard]] bool   hasActiveJobs() const;
     [[nodiscard]] size_t capacity() const;
     //! Returns the exact stable count. A concurrent batch ownership transfer may conservatively overcount.
@@ -957,15 +959,19 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     alignas(128) volatile size_t readyJobs  = 0;
     alignas(128) volatile size_t activeJobs = 0;
 
+    mutable volatile int32_t countActivationLock = 0;
+
     alignas(128) mutable volatile int32_t queueLock = 0;
     volatile uint32_t cancelGeneration              = 0;
 
     FiberJobWorkerPool* workerPool = nullptr;
 
     struct QueueLockGuard;
+    struct CountActivationLockGuard;
 
     void      initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result    complete(FiberJob& job, Result result);
+    size_t    confirmedJobCount(bool ready) const;
     bool      tryPushWorkerDeque(FiberJobWorker& worker, FiberJob& job);
     FiberJob* popWorkerReady(FiberJobWorker& worker);
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
