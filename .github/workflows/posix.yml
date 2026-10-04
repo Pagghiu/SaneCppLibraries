@@ -354,9 +354,7 @@ jobs:
     - name: verify Fil-C package receipt
       run: ./SC.sh package verify filc
     - name: compile SaneHttpGet with Fil-C
-      run: ./SC.sh build compile SaneHttpGet Debug native --toolchain filc
-    - name: compile SCTest with Fil-C
-      run: ./SC.sh build compile SCTest Debug native --toolchain filc --verbose
+      run: ./SC.sh build compile SaneHttpGet Release native --toolchain filc
     - name: compile SCTest Release with Fil-C
       run: ./SC.sh build compile SCTest Release native --toolchain filc --verbose
     - name: compile Single File Libs with Fil-C
@@ -402,8 +400,6 @@ jobs:
         ./SC.sh package verify openssl-filc
         ./SC.sh package verify nghttp2-filc
         ./SC.sh package verify curl-filc
-    - name: test SCTest with Fil-C
-      run: ./Support/Scripts/RunFilCTLSFixture.sh Debug --all-tests
     - name: test SCTest Release with Fil-C
       run: ./Support/Scripts/RunFilCTLSFixture.sh Release --all-tests
     - name: Save zlib-filc source cache

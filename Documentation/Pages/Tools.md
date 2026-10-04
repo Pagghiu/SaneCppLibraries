@@ -176,7 +176,8 @@ project-maintained [Fil-C port rebase](https://github.com/Pagghiu/SaneCppLibrari
 curl defaults to the Linux CA bundle `/etc/ssl/certs/ca-certificates.crt`; requests can supply a custom CA file.
 Cache identity includes source, compiler, port patch and relevant dependency identities. No system libraries are replaced.
 
-The experimental Fil-C CI runs SCTest through `Support/Scripts/RunFilCTLSFixture.sh Debug` and `Release`.
+The experimental Fil-C CI builds SaneHttpGet, SCTest and the single-file libraries in Release only, and runs
+SCTest through `Support/Scripts/RunFilCTLSFixture.sh Release`.
 Its full x86_64/ARM64 checks run weekly on the default branch, or explicitly through the Posix workflow's
 `run_filc` dispatch input. A pushed commit whose message contains `[filc]` also requests those checks, including on
 branches before the dispatch configuration reaches the default branch. Ordinary pushes and pull requests retain
