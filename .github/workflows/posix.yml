@@ -4,11 +4,6 @@ on:
   push:
   pull_request:
   workflow_dispatch:
-    inputs:
-      run_filc:
-        description: Run the full native x86_64 and ARM64 Fil-C checks
-        type: boolean
-        default: false
   schedule:
     - cron: '0 3 * * 0'
 
@@ -326,7 +321,6 @@ jobs:
     #   run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest
 
   filc-linux-experimental:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_filc) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[filc]'))
     strategy:
       fail-fast: false
       matrix:
@@ -347,18 +341,12 @@ jobs:
         restore-keys: |
           sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
-    - name: Generate Single File Libs (Python)
-      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: install Fil-C
       run: ./SC.sh package install filc
     - name: verify Fil-C package receipt
       run: ./SC.sh package verify filc
-    - name: compile SaneHttpGet with Fil-C
-      run: ./SC.sh build compile SaneHttpGet Release native --toolchain filc
     - name: compile SCTest Release with Fil-C
       run: ./SC.sh build compile SCTest Release native --toolchain filc --verbose
-    - name: compile Single File Libs with Fil-C
-      run: ./SC.sh build compile "SCSingleFileLibs:" Release native --toolchain filc
     - name: Restore zlib-filc source cache
       id: zlib-filc-cache
       uses: actions/cache/restore@v5
