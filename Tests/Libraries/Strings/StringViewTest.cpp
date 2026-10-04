@@ -4,6 +4,12 @@
 #include "Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Libraries/Testing/Testing.h"
 
+#if SC_PLATFORM_WINDOWS
+#define SC_STRING_VIEW_TEST_NO_INLINE __declspec(noinline)
+#else
+#define SC_STRING_VIEW_TEST_NO_INLINE __attribute__((noinline))
+#endif
+
 namespace SC
 {
 struct StringViewTest;
@@ -12,6 +18,14 @@ struct StringViewTest;
 struct SC::StringViewTest : public SC::TestCase
 {
     StringViewTest(SC::TestReport& report) : TestCase(report, "StringViewTest")
+    {
+        testConstructionAndParsing();
+        testSlicingAndSplitting();
+        testPredicates();
+        testOrderingAndTermination();
+    }
+
+    SC_STRING_VIEW_TEST_NO_INLINE void testConstructionAndParsing()
     {
         using namespace SC;
 
@@ -121,6 +135,11 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(not StringView("-..0").parseFloat(value));
             SC_TEST_EXPECT(not StringView("").parseFloat(value));
         }
+    }
+
+    SC_STRING_VIEW_TEST_NO_INLINE void testSlicingAndSplitting()
+    {
+        using namespace SC;
 
         if (test_section("startsWith/endsWith"))
         {
@@ -242,6 +261,12 @@ struct SC::StringViewTest : public SC::TestCase
                 SC_TEST_EXPECT(split == "KEY");
             }
         }
+    }
+
+    SC_STRING_VIEW_TEST_NO_INLINE void testPredicates()
+    {
+        using namespace SC;
+
         if (test_section("isInteger"))
         {
             SC_TEST_EXPECT("0"_a8.isIntegerNumber());
@@ -291,6 +316,12 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT("caf\xc3\xa9-runner"_u8.containsStringIgnoreCaseASCII("CAF\xc3\xa9"_u8));
             SC_TEST_EXPECT(not "caf\xc3\xa9-runner"_u8.containsStringIgnoreCaseASCII("CAF\xc3\x89"_u8));
         }
+    }
+
+    SC_STRING_VIEW_TEST_NO_INLINE void testOrderingAndTermination()
+    {
+        using namespace SC;
+
         if (test_section("compare"))
         {
             StringView sv[3] = {
