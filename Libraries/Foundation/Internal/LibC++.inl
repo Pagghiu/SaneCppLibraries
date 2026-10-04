@@ -3,6 +3,8 @@
 #include "../../Foundation/Compiler.h"
 #include <stdlib.h> // malloc / free
 
+#if !(SC_COMPILER_FILC && defined(__GLIBC__))
+
 #if !defined(__SANITIZE_ADDRESS__)
 void operator delete(void* p) noexcept
 {
@@ -71,3 +73,5 @@ extern "C" int __cxa_thread_atexit(void (*func)(void*), void* obj, void* dso_sym
 }
 #endif
 #endif
+
+#endif // Fil-C/glibc uses its bundled libc++abi instead of duplicate ABI shims.

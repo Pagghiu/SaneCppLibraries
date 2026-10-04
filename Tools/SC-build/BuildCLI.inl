@@ -96,7 +96,8 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
                               "  - msvc: explicit MSVC toolchain family\n"
                               "  - clang-cl: explicit clang-cl toolchain family\n"
                               "  - llvm-mingw: packaged Windows GNU cross-toolchain\n"
-                              "  - filc: experimental Linux-only Fil-C compiler track\n"))
+                              "  - filc: experimental Linux-only rootless Fil-C compiler track\n"
+                              "  - filc-glibc: experimental preinstalled /opt/fil compiler/runtime\n"))
             return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
         SC_TRY(appendNativeBackendSupportHelp(output));
         if (not output.append("\nExperimental compiler track:\n"
@@ -566,7 +567,7 @@ static Result applyToolchainValue(Build::Action& action, StringView toolchainVal
     {
         return Result(true);
     }
-    static constexpr StringView toolchainNames[] = {"default", "host-default", "clang",    "filc",
+    static constexpr StringView toolchainNames[] = {"default", "host-default", "clang",    "filc",      "filc-glibc",
                                                     "gcc",     "msvc",         "clang-cl", "llvm-mingw"};
     StringView                  resolved;
     SC_TRY(resolveKeywordValue("--toolchain", toolchainValue, toolchainNames, resolved, console));
@@ -576,9 +577,10 @@ static Result applyToolchainValue(Build::Action& action, StringView toolchainVal
     {
         action.parameters.toolchain.family = Build::Toolchain::Clang;
     }
-    else if (resolved.equalsIgnoreCaseASCII("filc"))
+    else if (resolved.equalsIgnoreCaseASCII("filc") or resolved.equalsIgnoreCaseASCII("filc-glibc"))
     {
         action.parameters.toolchain.family       = Build::Toolchain::FilC;
+        action.parameters.toolchain.filcGlibc    = resolved.equalsIgnoreCaseASCII("filc-glibc");
         action.parameters.toolchain.platform     = Build::Platform::Linux;
         action.parameters.toolchain.architecture = action.parameters.hostMachine.architecture;
         if (action.parameters.architecture == Build::Architecture::Any)
@@ -1126,7 +1128,8 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     numOptions++;
 
     options[numOptions].longName = "toolchain";
-    options[numOptions].help = "Compiler family (default, host-default, clang, filc, gcc, msvc, clang-cl, llvm-mingw)";
+    options[numOptions].help =
+        "Compiler family (default, host-default, clang, filc, filc-glibc, gcc, msvc, clang-cl, llvm-mingw)";
     options[numOptions].valueName = "NAME";
     options[numOptions].value     = CommandLineValue::stringSpan(context.toolchain);
     numOptions++;

@@ -77,3 +77,4 @@ Inferred anti-inspirations: it avoids centralizing every convenient helper in on
 - [FOUNDATION-0001 - Keep Foundation as the public facade for Common primitives](foundation-0001-keep-foundation-as-the-public-facade-for-common-primitives.md)
 - [FOUNDATION-0002 - Keep Foundation tests and documentation as the home for Common primitives](foundation-0002-keep-foundation-tests-and-documentation-as-the-home-for-common-primitives.md)
 - [FOUNDATION-0003 - Keep C++ runtime shims optional and Foundation-owned](foundation-0003-keep-cpp-runtime-shims-optional-and-foundation-owned.md)
+- [FOUNDATION-0004 - Delegate Fil-C glibc TLS cleanup to bundled ABI](foundation-0004-delegate-filc-glibc-tls-cleanup-to-bundled-abi.md)

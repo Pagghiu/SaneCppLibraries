@@ -52,15 +52,18 @@ static bool isDebuggerAttached()
 
 struct SC::AsyncFibersTest : public SC::TestCase
 {
+    bool useRuntimeStacks = SC_COMPILER_FILC != 0;
+
     AsyncFibersTest(SC::TestReport& report) : TestCase(report, "AsyncFibersTest")
     {
-#if SC_COMPILER_FILC
-        if (not report.quietMode)
+        if (useRuntimeStacks and not FiberScheduler::supportsRuntimeOwnedStacks())
         {
-            report.console.printLine("AsyncFibersTest - Skipping under Fil-C: manual stack switching is unsupported");
+            if (not report.quietMode)
+            {
+                report.console.printLine("AsyncFibersTest - Skipping: Fil-C glibc fiber runtime is required");
+            }
+            return;
         }
-        return;
-#else
         if (test_section("sleep"))
         {
             sleep();
@@ -85,35 +88,35 @@ struct SC::AsyncFibersTest : public SC::TestCase
         {
             cancelSleepStress();
         }
-        if (test_section("cross thread sleep"))
+        if (not useRuntimeStacks and test_section("cross thread sleep"))
         {
             crossThreadSleep();
         }
-        if (test_section("owner loop while worker runs"))
+        if (not useRuntimeStacks and test_section("owner loop while worker runs"))
         {
             ownerLoopWhileWorkerRuns();
         }
-        if (test_section("worker pool sleep"))
+        if (not useRuntimeStacks and test_section("worker pool sleep"))
         {
             workerPoolSleep();
         }
-        if (test_section("worker pool cancel sleep"))
+        if (not useRuntimeStacks and test_section("worker pool cancel sleep"))
         {
             workerPoolCancelSleep();
         }
-        if (test_section("worker pool cancel sleep stress"))
+        if (not useRuntimeStacks and test_section("worker pool cancel sleep stress"))
         {
             workerPoolCancelSleepStress();
         }
-        if (test_section("worker pool sleep cancel complete race"))
+        if (not useRuntimeStacks and test_section("worker pool sleep cancel complete race"))
         {
             workerPoolSleepCancelCompleteRace();
         }
-        if (test_section("worker pool owner command race stress"))
+        if (not useRuntimeStacks and test_section("worker pool owner command race stress"))
         {
             workerPoolOwnerCommandRaceStress();
         }
-        if (test_section("command queue overflow"))
+        if (not useRuntimeStacks and test_section("command queue overflow"))
         {
             commandQueueOverflow();
         }
@@ -129,19 +132,19 @@ struct SC::AsyncFibersTest : public SC::TestCase
         {
             socketSendReceive();
         }
-        if (test_section("cross thread socket accept connect"))
+        if (not useRuntimeStacks and test_section("cross thread socket accept connect"))
         {
             crossThreadSocketAcceptConnect();
         }
-        if (test_section("cross thread socket send receive"))
+        if (not useRuntimeStacks and test_section("cross thread socket send receive"))
         {
             crossThreadSocketSendReceive();
         }
-        if (test_section("worker pool socket send receive"))
+        if (not useRuntimeStacks and test_section("worker pool socket send receive"))
         {
             workerPoolSocketSendReceive();
         }
-        if (test_section("worker pool cancel socket receive"))
+        if (not useRuntimeStacks and test_section("worker pool cancel socket receive"))
         {
             workerPoolCancelSocketReceive();
         }
@@ -207,11 +210,23 @@ struct SC::AsyncFibersTest : public SC::TestCase
         {
             cancelSignal();
         }
-        if (test_section("worker pool cancel signal"))
+        if (not useRuntimeStacks and test_section("worker pool cancel signal"))
         {
             workerPoolCancelSignal();
         }
-#endif
+    }
+
+    void configureScheduler(FiberScheduler& scheduler)
+    {
+        if (useRuntimeStacks)
+        {
+            SC_TEST_EXPECT(scheduler.enableRuntimeOwnedStacks());
+        }
+    }
+
+    FiberStack stackForTest(Span<char> storage)
+    {
+        return useRuntimeStacks ? FiberStack::runtimeOwned(storage.sizeInBytes()) : FiberStack(storage);
     }
 
     void createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client, SocketDescriptor& serverSideClient)
@@ -301,7 +316,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
 
         SC_TEST_EXPECT(io.sleep(TimeMs{1}).isError(AsyncFibersResultCategory, AsyncFibersError::FiberContextRequired));
         FileDescriptor invalidFile;
@@ -318,7 +334,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
         } context{&io, &invalidSocket, payload};
         FiberTask  task;
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
         SC_TEST_EXPECT(
             scheduler.spawn(task, stack,
                             FiberTask::Procedure([&context](FiberScheduler&)
@@ -341,14 +357,15 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      firstTask;
-        FiberTask      secondTask;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    firstTask;
+        FiberTask    secondTask;
 
         char       firstStackMemory[64 * 1024]  = {};
         char       secondStackMemory[64 * 1024] = {};
-        FiberStack firstStack({firstStackMemory, sizeof(firstStackMemory)});
-        FiberStack secondStack({secondStackMemory, sizeof(secondStackMemory)});
+        FiberStack firstStack                   = stackForTest({firstStackMemory, sizeof(firstStackMemory)});
+        FiberStack secondStack                  = stackForTest({secondStackMemory, sizeof(secondStackMemory)});
         firstStack.fillHighWaterMark();
         secondStack.fillHighWaterMark();
 
@@ -378,8 +395,10 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(secondTask.isCompleted());
         SC_TEST_EXPECT(firstTask.result());
         SC_TEST_EXPECT(secondTask.result());
-        SC_TEST_EXPECT(firstStack.highWaterUsedBytes() > 0);
-        SC_TEST_EXPECT(secondStack.highWaterUsedBytes() > 0);
+        SC_TEST_EXPECT(firstStack.isRuntimeOwned() ? firstStack.highWaterUsedBytes() == 0
+                                                   : firstStack.highWaterUsedBytes() > 0);
+        SC_TEST_EXPECT(secondStack.isRuntimeOwned() ? secondStack.highWaterUsedBytes() == 0
+                                                    : secondStack.highWaterUsedBytes() > 0);
         SC_TEST_EXPECT(eventLoop.close());
     }
 
@@ -397,7 +416,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
 
         AsyncFiberSocketSendResult emptySendResult;
         emptySendResult.numBytes = 42;
@@ -412,8 +432,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
 
         char       idleStackMemory[64 * 1024]     = {};
         char       completeStackMemory[64 * 1024] = {};
-        FiberStack idleStack({idleStackMemory, sizeof(idleStackMemory)});
-        FiberStack completeStack({completeStackMemory, sizeof(completeStackMemory)});
+        FiberStack idleStack                      = stackForTest({idleStackMemory, sizeof(idleStackMemory)});
+        FiberStack completeStack                  = stackForTest({completeStackMemory, sizeof(completeStackMemory)});
 
         State state;
         state.io = &io;
@@ -464,14 +484,15 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      cpuTask;
-        FiberTask      sleepTask;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    cpuTask;
+        FiberTask    sleepTask;
 
         char       cpuStackMemory[64 * 1024]   = {};
         char       sleepStackMemory[64 * 1024] = {};
-        FiberStack cpuStack({cpuStackMemory, sizeof(cpuStackMemory)});
-        FiberStack sleepStack({sleepStackMemory, sizeof(sleepStackMemory)});
+        FiberStack cpuStack                    = stackForTest({cpuStackMemory, sizeof(cpuStackMemory)});
+        FiberStack sleepStack                  = stackForTest({sleepStackMemory, sizeof(sleepStackMemory)});
 
         State state;
         state.io = &io;
@@ -519,11 +540,12 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io = &io;
@@ -564,7 +586,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
 
         State state;
         state.io = &io;
@@ -573,7 +596,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
         {
             FiberTask  task;
             char       stackMemory[64 * 1024] = {};
-            FiberStack stack({stackMemory, sizeof(stackMemory)});
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             SC_TEST_EXPECT(scheduler.spawn(task, stack,
                                            FiberTask::Procedure(
@@ -604,7 +627,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
         {
             FiberTask  task;
             char       stackMemory[64 * 1024] = {};
-            FiberStack stack({stackMemory, sizeof(stackMemory)});
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             SC_TEST_EXPECT(scheduler.spawn(task, stack,
                                            FiberTask::Procedure(
@@ -653,12 +676,13 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
-        FiberStack        stack({stackMemory, sizeof(stackMemory)});
+        FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.scheduler     = &scheduler;
@@ -734,12 +758,13 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[2];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
-        FiberStack        stack({stackMemory, sizeof(stackMemory)});
+        FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.scheduler = &scheduler;
@@ -810,15 +835,16 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         FiberTask         blockerTask;
         static char       stackMemory[64 * 1024]        = {};
         static char       blockerStackMemory[64 * 1024] = {};
-        FiberStack        stack({stackMemory, sizeof(stackMemory)});
-        FiberStack        blockerStack({blockerStackMemory, sizeof(blockerStackMemory)});
+        FiberStack        stack                         = stackForTest({stackMemory, sizeof(stackMemory)});
+        FiberStack        blockerStack = stackForTest({blockerStackMemory, sizeof(blockerStackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
@@ -911,12 +937,13 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
-        FiberStack        stack({stackMemory, sizeof(stackMemory)});
+        FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
@@ -983,7 +1010,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[NumTasks * 2];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         tasks[NumTasks];
@@ -995,8 +1023,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         State state;
         for (size_t idx = 0; idx < NumTasks; ++idx)
         {
-            state.tasks[idx].io = &io;
-            FiberStack stack({stackMemory[idx], sizeof(stackMemory[idx])});
+            state.tasks[idx].io  = &io;
+            FiberStack stack     = stackForTest({stackMemory[idx], sizeof(stackMemory[idx])});
             TaskState* taskState = &state.tasks[idx];
             SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stack,
                                            FiberTask::Procedure(
@@ -1065,7 +1093,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[NumTasks];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         tasks[NumTasks];
@@ -1080,7 +1109,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
             state.tasks[idx].io       = &io;
             state.tasks[idx].duration = (idx % 2) == 0 ? TimeMs{1} : TimeMs{10 * 1000};
 
-            FiberStack stack({stackMemory[idx], sizeof(stackMemory[idx])});
+            FiberStack stack     = stackForTest({stackMemory[idx], sizeof(stackMemory[idx])});
             TaskState* taskState = &state.tasks[idx];
             SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stack,
                                            FiberTask::Procedure(
@@ -1183,7 +1212,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
             AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
-            FiberScheduler    scheduler;
+            FiberScheduler scheduler;
+            configureScheduler(scheduler);
             AsyncFiberCommand commandStorage[NumTasks * 4];
             AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
             FiberTask         tasks[NumTasks];
@@ -1198,7 +1228,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
                 taskState.io         = &io;
                 taskState.duration   = taskIndex < NumTasks / 2 ? TimeMs{1} : TimeMs{10 * 1000};
 
-                FiberStack stack({stackMemory[taskIndex], sizeof(stackMemory[taskIndex])});
+                FiberStack stack = stackForTest({stackMemory[taskIndex], sizeof(stackMemory[taskIndex])});
                 SC_TEST_EXPECT(
                     scheduler.spawn(tasks[taskIndex], stack,
                                     FiberTask::Procedure(
@@ -1303,15 +1333,16 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[1];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         firstTask;
         FiberTask         secondTask;
         static char       firstStackMemory[64 * 1024]  = {};
         static char       secondStackMemory[64 * 1024] = {};
-        FiberStack        firstStack({firstStackMemory, sizeof(firstStackMemory)});
-        FiberStack        secondStack({secondStackMemory, sizeof(secondStackMemory)});
+        FiberStack        firstStack                   = stackForTest({firstStackMemory, sizeof(firstStackMemory)});
+        FiberStack        secondStack                  = stackForTest({secondStackMemory, sizeof(secondStackMemory)});
 
         State state;
         state.scheduler = &scheduler;
@@ -1408,11 +1439,12 @@ struct SC::AsyncFibersTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io             = &io;
@@ -1471,14 +1503,15 @@ struct SC::AsyncFibersTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      acceptTask;
-        FiberTask      connectTask;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    acceptTask;
+        FiberTask    connectTask;
 
         char       acceptStackMemory[64 * 1024]  = {};
         char       connectStackMemory[64 * 1024] = {};
-        FiberStack acceptStack({acceptStackMemory, sizeof(acceptStackMemory)});
-        FiberStack connectStack({connectStackMemory, sizeof(connectStackMemory)});
+        FiberStack acceptStack                   = stackForTest({acceptStackMemory, sizeof(acceptStackMemory)});
+        FiberStack connectStack                  = stackForTest({connectStackMemory, sizeof(connectStackMemory)});
 
         State state;
         state.io             = &io;
@@ -1533,11 +1566,12 @@ struct SC::AsyncFibersTest : public SC::TestCase
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io         = &io;
@@ -1614,15 +1648,16 @@ struct SC::AsyncFibersTest : public SC::TestCase
             SC_TEST_EXPECT(server.listen(1));
         }
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         acceptTask;
         FiberTask         connectTask;
         static char       acceptStackMemory[64 * 1024]  = {};
         static char       connectStackMemory[64 * 1024] = {};
-        FiberStack        acceptStack({acceptStackMemory, sizeof(acceptStackMemory)});
-        FiberStack        connectStack({connectStackMemory, sizeof(connectStackMemory)});
+        FiberStack        acceptStack                   = stackForTest({acceptStackMemory, sizeof(acceptStackMemory)});
+        FiberStack        connectStack = stackForTest({connectStackMemory, sizeof(connectStackMemory)});
 
         State state;
         state.scheduler      = &scheduler;
@@ -1739,15 +1774,16 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SocketDescriptor serverSideClient;
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         sendTask;
         FiberTask         receiveTask;
         static char       sendStackMemory[64 * 1024]    = {};
         static char       receiveStackMemory[64 * 1024] = {};
-        FiberStack        sendStack({sendStackMemory, sizeof(sendStackMemory)});
-        FiberStack        receiveStack({receiveStackMemory, sizeof(receiveStackMemory)});
+        FiberStack        sendStack                     = stackForTest({sendStackMemory, sizeof(sendStackMemory)});
+        FiberStack        receiveStack = stackForTest({receiveStackMemory, sizeof(receiveStackMemory)});
 
         State state;
         state.scheduler     = &scheduler;
@@ -1875,7 +1911,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SocketDescriptor serverSideClient;
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         sendTask;
@@ -1884,9 +1921,9 @@ struct SC::AsyncFibersTest : public SC::TestCase
         static char       sendStackMemory[64 * 1024]    = {};
         static char       receiveStackMemory[64 * 1024] = {};
         static char       blockerStackMemory[64 * 1024] = {};
-        FiberStack        sendStack({sendStackMemory, sizeof(sendStackMemory)});
-        FiberStack        receiveStack({receiveStackMemory, sizeof(receiveStackMemory)});
-        FiberStack        blockerStack({blockerStackMemory, sizeof(blockerStackMemory)});
+        FiberStack        sendStack                     = stackForTest({sendStackMemory, sizeof(sendStackMemory)});
+        FiberStack        receiveStack = stackForTest({receiveStackMemory, sizeof(receiveStackMemory)});
+        FiberStack        blockerStack = stackForTest({blockerStackMemory, sizeof(blockerStackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
@@ -2027,12 +2064,13 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SocketDescriptor serverSideClient;
         createTCPSocketPair(eventLoop, client, serverSideClient);
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
-        FiberStack        stack({stackMemory, sizeof(stackMemory)});
+        FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
@@ -2107,10 +2145,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             }
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io             = &io;
@@ -2161,10 +2200,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             }
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io             = &io;
@@ -2207,10 +2247,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io     = &io;
@@ -2255,10 +2296,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io     = &io;
@@ -2302,10 +2344,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io     = &io;
@@ -2360,10 +2403,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             }
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io             = &io;
@@ -2402,10 +2446,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io     = &io;
@@ -2447,10 +2492,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
             createTCPSocketPair(eventLoop, client, serverSideClient);
 
             FiberScheduler scheduler;
-            AsyncFiberIO   io(scheduler, eventLoop);
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            configureScheduler(scheduler);
+            AsyncFiberIO io(scheduler, eventLoop);
+            FiberTask    task;
+            char         stackMemory[64 * 1024] = {};
+            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             state.io     = &io;
@@ -2511,13 +2557,14 @@ struct SC::AsyncFibersTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      serverTask;
-        FiberTask      clientTask;
-        char           serverStackMemory[64 * 1024] = {};
-        char           clientStackMemory[64 * 1024] = {};
-        FiberStack     serverStack({serverStackMemory, sizeof(serverStackMemory)});
-        FiberStack     clientStack({clientStackMemory, sizeof(clientStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    serverTask;
+        FiberTask    clientTask;
+        char         serverStackMemory[64 * 1024] = {};
+        char         clientStackMemory[64 * 1024] = {};
+        FiberStack   serverStack                  = stackForTest({serverStackMemory, sizeof(serverStackMemory)});
+        FiberStack   clientStack                  = stackForTest({clientStackMemory, sizeof(clientStackMemory)});
 
         State state;
         state.io             = &io;
@@ -2604,13 +2651,14 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(SocketServer(serverSocket).bind(serverAddress));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      receiveTask;
-        FiberTask      sendTask;
-        char           receiveStackMemory[64 * 1024] = {};
-        char           sendStackMemory[64 * 1024]    = {};
-        FiberStack     receiveStack({receiveStackMemory, sizeof(receiveStackMemory)});
-        FiberStack     sendStack({sendStackMemory, sizeof(sendStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    receiveTask;
+        FiberTask    sendTask;
+        char         receiveStackMemory[64 * 1024] = {};
+        char         sendStackMemory[64 * 1024]    = {};
+        FiberStack   receiveStack                  = stackForTest({receiveStackMemory, sizeof(receiveStackMemory)});
+        FiberStack   sendStack                     = stackForTest({sendStackMemory, sizeof(sendStackMemory)});
 
         State state;
         state.io            = &io;
@@ -2714,13 +2762,14 @@ struct SC::AsyncFibersTest : public SC::TestCase
         }
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      serverTask;
-        FiberTask      clientTask;
-        char           serverStackMemory[64 * 1024] = {};
-        char           clientStackMemory[64 * 1024] = {};
-        FiberStack     serverStack({serverStackMemory, sizeof(serverStackMemory)});
-        FiberStack     clientStack({clientStackMemory, sizeof(clientStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    serverTask;
+        FiberTask    clientTask;
+        char         serverStackMemory[64 * 1024] = {};
+        char         clientStackMemory[64 * 1024] = {};
+        FiberStack   serverStack                  = stackForTest({serverStackMemory, sizeof(serverStackMemory)});
+        FiberStack   clientStack                  = stackForTest({clientStackMemory, sizeof(clientStackMemory)});
 
         State state;
         state.io                     = &io;
@@ -2807,13 +2856,14 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      writeTask;
-        FiberTask      readTask;
-        char           writeStackMemory[64 * 1024] = {};
-        char           readStackMemory[64 * 1024]  = {};
-        FiberStack     writeStack({writeStackMemory, sizeof(writeStackMemory)});
-        FiberStack     readStack({readStackMemory, sizeof(readStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    writeTask;
+        FiberTask    readTask;
+        char         writeStackMemory[64 * 1024] = {};
+        char         readStackMemory[64 * 1024]  = {};
+        FiberStack   writeStack                  = stackForTest({writeStackMemory, sizeof(writeStackMemory)});
+        FiberStack   readStack                   = stackForTest({readStackMemory, sizeof(readStackMemory)});
 
         State state;
         state.io   = &io;
@@ -2904,19 +2954,20 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      writeTask;
-        FiberTask      exactTask;
-        FiberTask      eofTask;
-        FiberTask      offsetTask;
-        char           writeStackMemory[64 * 1024]  = {};
-        char           exactStackMemory[64 * 1024]  = {};
-        char           eofStackMemory[64 * 1024]    = {};
-        char           offsetStackMemory[64 * 1024] = {};
-        FiberStack     writeStack({writeStackMemory, sizeof(writeStackMemory)});
-        FiberStack     exactStack({exactStackMemory, sizeof(exactStackMemory)});
-        FiberStack     eofStack({eofStackMemory, sizeof(eofStackMemory)});
-        FiberStack     offsetStack({offsetStackMemory, sizeof(offsetStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    writeTask;
+        FiberTask    exactTask;
+        FiberTask    eofTask;
+        FiberTask    offsetTask;
+        char         writeStackMemory[64 * 1024]  = {};
+        char         exactStackMemory[64 * 1024]  = {};
+        char         eofStackMemory[64 * 1024]    = {};
+        char         offsetStackMemory[64 * 1024] = {};
+        FiberStack   writeStack                   = stackForTest({writeStackMemory, sizeof(writeStackMemory)});
+        FiberStack   exactStack                   = stackForTest({exactStackMemory, sizeof(exactStackMemory)});
+        FiberStack   eofStack                     = stackForTest({eofStackMemory, sizeof(eofStackMemory)});
+        FiberStack   offsetStack                  = stackForTest({offsetStackMemory, sizeof(offsetStackMemory)});
 
         State state;
         state.io   = &io;
@@ -3044,16 +3095,17 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(file));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      firstWriteTask;
-        FiberTask      secondWriteTask;
-        FiberTask      readTask;
-        char           firstWriteStackMemory[64 * 1024]  = {};
-        char           secondWriteStackMemory[64 * 1024] = {};
-        char           readStackMemory[64 * 1024]        = {};
-        FiberStack     firstWriteStack({firstWriteStackMemory, sizeof(firstWriteStackMemory)});
-        FiberStack     secondWriteStack({secondWriteStackMemory, sizeof(secondWriteStackMemory)});
-        FiberStack     readStack({readStackMemory, sizeof(readStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    firstWriteTask;
+        FiberTask    secondWriteTask;
+        FiberTask    readTask;
+        char         firstWriteStackMemory[64 * 1024]  = {};
+        char         secondWriteStackMemory[64 * 1024] = {};
+        char         readStackMemory[64 * 1024]        = {};
+        FiberStack   firstWriteStack  = stackForTest({firstWriteStackMemory, sizeof(firstWriteStackMemory)});
+        FiberStack   secondWriteStack = stackForTest({secondWriteStackMemory, sizeof(secondWriteStackMemory)});
+        FiberStack   readStack        = stackForTest({readStackMemory, sizeof(readStackMemory)});
 
         State state;
         state.io   = &io;
@@ -3125,10 +3177,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(pipe.readPipe));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
-        char           stackMemory[64 * 1024] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io   = &io;
@@ -3170,10 +3223,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(pipe.readPipe));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
-        char           stackMemory[64 * 1024] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io   = &io;
@@ -3239,13 +3293,14 @@ struct SC::AsyncFibersTest : public SC::TestCase
 #endif
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      successTask;
-        FiberTask      failureTask;
-        char           successStackMemory[64 * 1024] = {};
-        char           failureStackMemory[64 * 1024] = {};
-        FiberStack     successStack({successStackMemory, sizeof(successStackMemory)});
-        FiberStack     failureStack({failureStackMemory, sizeof(failureStackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    successTask;
+        FiberTask    failureTask;
+        char         successStackMemory[64 * 1024] = {};
+        char         failureStackMemory[64 * 1024] = {};
+        FiberStack   successStack                  = stackForTest({successStackMemory, sizeof(successStackMemory)});
+        FiberStack   failureStack                  = stackForTest({failureStackMemory, sizeof(failureStackMemory)});
 
         State state;
         state.io             = &io;
@@ -3297,10 +3352,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(process.launch({"sleep", "0.3"}));
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
-        char           stackMemory[64 * 1024] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io      = &io;
@@ -3379,10 +3435,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
-        char           stackMemory[64 * 1024] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io = &io;
@@ -3418,10 +3475,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
-        char           stackMemory[64 * 1024] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io = &io;
@@ -3468,10 +3526,11 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.create());
 
         FiberScheduler scheduler;
-        AsyncFiberIO   io(scheduler, eventLoop);
-        FiberTask      task;
-        char           stackMemory[64 * 1024] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.io = &io;
@@ -3518,12 +3577,13 @@ struct SC::AsyncFibersTest : public SC::TestCase
         AsyncEventLoop eventLoop;
         SC_TEST_EXPECT(eventLoop.create());
 
-        FiberScheduler    scheduler;
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
         AsyncFiberCommand commandStorage[4];
         AsyncFiberIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
         static char       stackMemory[64 * 1024] = {};
-        FiberStack        stack({stackMemory, sizeof(stackMemory)});
+        FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;

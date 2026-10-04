@@ -144,3 +144,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0037 - Publish job wait intent before backlog checks](fibers-0037-publish-job-wait-intent-before-backlog-checks.md)
 - [FIBERS-0038 - Use portable structured result errors](fibers-0038-use-portable-structured-result-errors.md)
 - [FIBERS-0039 - Prototype Fil-C contexts with explicit runtime-owned stacks](fibers-0039-prototype-filc-contexts-with-explicit-runtime-owned-stacks.md)
+- [FIBERS-0040 - Opt in to thread-pinned runtime-owned scheduling](fibers-0040-opt-in-to-thread-pinned-runtime-owned-scheduling.md)

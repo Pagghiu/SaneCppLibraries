@@ -177,7 +177,7 @@ static constexpr StringView compilerName(const Parameters& parameters)
     switch (parameters.toolchain.family)
     {
     case Toolchain::Clang: return "clang";
-    case Toolchain::FilC: return "filc";
+    case Toolchain::FilC: return parameters.toolchain.filcGlibc ? "filc-glibc"_a8 : "filc"_a8;
     case Toolchain::GCC: return "gcc";
     case Toolchain::MSVC: return "msvc";
     case Toolchain::ClangCL: return "clang-cl";

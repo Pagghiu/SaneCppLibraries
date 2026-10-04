@@ -276,6 +276,15 @@ struct SC::BuildTest : public SC::TestCase
             SC_TEST_EXPECT(cliAction.parameters.architecture == hostArchitecture);
             SC_TEST_EXPECT(cliAction.parameters.toolchain.architecture == hostArchitecture);
             SC_TEST_EXPECT(cliAction.parameters.targetMachine.architecture == hostArchitecture);
+            SC_TEST_EXPECT(not cliAction.parameters.toolchain.filcGlibc);
+
+            StringView filcGlibc[] = {"SCTest", "--toolchain", "filc-glibc"};
+            status                 = Tools::detail::BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(prepareBuildCLIAction(report, {filcGlibc, 3}, Build::Action::Compile, cliAction, status));
+            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(cliAction.parameters.toolchain.family == Build::Toolchain::FilC);
+            SC_TEST_EXPECT(cliAction.parameters.toolchain.filcGlibc);
+            SC_TEST_EXPECT(cliAction.parameters.targetMachine.architecture == hostArchitecture);
 
             StringView mismatchedArchitecture = HostInstructionSet == InstructionSet::ARM64 ? "intel64"_a8 : "arm64"_a8;
             StringView filcMismatchedArch[]   = {"SCTest", "--toolchain", "filc", "--arch", mismatchedArchitecture};

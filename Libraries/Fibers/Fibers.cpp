@@ -2643,6 +2643,10 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
 Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> workerStorage,
                               Span<FiberWorkerThread> threadStorage, const FiberWorkerPoolOptions& options)
 {
+    if (scheduler.usesRuntimeOwnedStacks())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     if (isRunning())
     {
         return Result::Error(FibersResultCategory, FibersError::InvalidState);
@@ -3227,12 +3231,26 @@ FiberStack::FiberStack(Span<char> memory) : stackMemory(memory) {}
 
 FiberStack::FiberStack(Span<char> memory, void* owner) : stackMemory(memory), stackOwner(owner) {}
 
+FiberStack FiberStack::runtimeOwned(size_t sizeInBytes)
+{
+    FiberStack stack({});
+    stack.runtimeStackSize  = sizeInBytes;
+    stack.runtimeOwnedStack = true;
+    return stack;
+}
+
+bool FiberStack::isRuntimeOwned() const { return runtimeOwnedStack; }
+
 Span<char> FiberStack::memory() const { return stackMemory; }
 
-size_t FiberStack::sizeInBytes() const { return stackMemory.sizeInBytes(); }
+size_t FiberStack::sizeInBytes() const { return isRuntimeOwned() ? runtimeStackSize : stackMemory.sizeInBytes(); }
 
 size_t FiberStack::usableSizeInBytes() const
 {
+    if (isRuntimeOwned())
+    {
+        return runtimeStackSize;
+    }
     if (stackMemory.data() == nullptr)
     {
         return 0;
@@ -3256,6 +3274,10 @@ bool FiberStack::isUsable() const { return usableSizeInBytes() >= FiberStackMini
 
 void FiberStack::fillHighWaterMark()
 {
+    if (isRuntimeOwned())
+    {
+        return;
+    }
     char*        data       = stackMemory.data();
     const size_t usableSize = usableSizeInBytes();
     for (size_t idx = 0; idx < usableSize; ++idx)
@@ -3266,6 +3288,10 @@ void FiberStack::fillHighWaterMark()
 
 size_t FiberStack::highWaterUsedBytes() const
 {
+    if (isRuntimeOwned())
+    {
+        return 0;
+    }
     const char*  data       = stackMemory.data();
     const size_t usableSize = usableSizeInBytes();
     if (data == nullptr or usableSize == 0)
@@ -3283,6 +3309,10 @@ size_t FiberStack::highWaterUsedBytes() const
 
 size_t FiberStack::highWaterUnusedBytes() const
 {
+    if (isRuntimeOwned())
+    {
+        return 0;
+    }
     const size_t usableSize = usableSizeInBytes();
     const size_t usedSize   = highWaterUsedBytes();
     return usedSize <= usableSize ? usableSize - usedSize : 0;
@@ -7158,6 +7188,43 @@ bool FiberMutex::removeWaiter(WaitNode& node)
 
 FiberScheduler::FiberScheduler() = default;
 
+bool FiberScheduler::supportsRuntimeOwnedStacks() { return FiberContextOperations::supportsRuntimeOwnedStacks(); }
+
+Result FiberScheduler::enableRuntimeOwnedStacks()
+{
+    if (not FiberContextOperations::supportsRuntimeOwnedStacks())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
+    SC_TRY(checkExecutionThread());
+    LockGuard guard(*this, LockCategory::Control);
+    if (workerPool != nullptr or hasActiveFibers())
+    {
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
+    }
+#if SC_COMPILER_FILC
+    if (runtimeStackThread != nullptr and runtimeStackThread != &fiberContextThreadIdentity)
+    {
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
+    }
+    runtimeStackThread = &fiberContextThreadIdentity;
+#endif
+    return Result(true);
+}
+
+bool FiberScheduler::usesRuntimeOwnedStacks() const { return runtimeStackThread != nullptr; }
+
+Result FiberScheduler::checkExecutionThread() const
+{
+#if SC_COMPILER_FILC
+    if (runtimeStackThread != nullptr and runtimeStackThread != &fiberContextThreadIdentity)
+    {
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
+    }
+#endif
+    return Result(true);
+}
+
 FiberScheduler::~FiberScheduler()
 {
     SC_FIBERS_ASSERT_RELEASE(not hasActiveFibers());
@@ -7241,6 +7308,11 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
 Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
                              const FiberTaskSpawnOptions& options)
 {
+    SC_TRY(checkExecutionThread());
+    if (stack.isRuntimeOwned() != usesRuntimeOwnedStacks())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     if (task.originGroup != nullptr)
     {
         return Result::Error(FibersResultCategory, FibersError::InvalidState);
@@ -7377,7 +7449,10 @@ Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack
     fiberTaskCancellationStore(task.cancelRequested, options.cancellationToken.isCancellationRequested());
     task.suspendInterruptible = false;
 
-    Result createResult = FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task);
+    Result createResult =
+        stack.isRuntimeOwned()
+            ? FiberContextOperations::createRuntimeOwned(task.context(), stack.sizeInBytes(), taskEntry, &task)
+            : FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task);
     if (not createResult)
     {
         task.procedure            = FiberTask::Procedure();
@@ -7479,6 +7554,7 @@ Result FiberScheduler::runOnce()
 
 Result FiberScheduler::runOnce(FiberWorker& worker)
 {
+    SC_TRY(checkExecutionThread());
     FiberTask* task = nullptr;
     {
         LockGuard guard(*this, LockCategory::Ready);
@@ -7500,6 +7576,11 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
 
 Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGroup)
 {
+    SC_TRY(checkExecutionThread());
+    if (usesRuntimeOwnedStacks() and not workerGroup.empty())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     FiberTask* task = nullptr;
     {
         LockGuard guard(*this, LockCategory::Ready);
@@ -7542,6 +7623,11 @@ Result FiberScheduler::runNoWait(FiberWorker& worker) { return runNoWait(worker,
 
 Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWorkers)
 {
+    SC_TRY(checkExecutionThread());
+    if (usesRuntimeOwnedStacks() and not stealWorkers.empty())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     FiberTask* task                 = nullptr;
     const bool configuredDequeOwner = workerPool != nullptr and workerPool->workers.data() == stealWorkers.data() and
                                       workerPool->workers.sizeInElements() == stealWorkers.sizeInElements() and
@@ -7656,6 +7742,7 @@ Result FiberScheduler::runReadyFibers()
 
 Result FiberScheduler::runReadyFibers(FiberWorker& worker)
 {
+    SC_TRY(checkExecutionThread());
     while (hasReadyFibers())
     {
         SC_TRY(runNoWait(worker));
@@ -7665,6 +7752,11 @@ Result FiberScheduler::runReadyFibers(FiberWorker& worker)
 
 Result FiberScheduler::runReadyFibers(FiberWorker& worker, Span<FiberWorker> workerGroup)
 {
+    SC_TRY(checkExecutionThread());
+    if (usesRuntimeOwnedStacks() and not workerGroup.empty())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     while (hasReadyFibers())
     {
         SC_TRY(runNoWait(worker, workerGroup));
@@ -7680,6 +7772,7 @@ Result FiberScheduler::run()
 
 Result FiberScheduler::run(FiberWorker& worker)
 {
+    SC_TRY(checkExecutionThread());
     while (hasActiveFibers())
     {
         SC_TRY(runOnce(worker));
@@ -7689,6 +7782,11 @@ Result FiberScheduler::run(FiberWorker& worker)
 
 Result FiberScheduler::run(FiberWorker& worker, Span<FiberWorker> workerGroup)
 {
+    SC_TRY(checkExecutionThread());
+    if (usesRuntimeOwnedStacks() and not workerGroup.empty())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     while (hasActiveFibers())
     {
         SC_TRY(runOnce(worker, workerGroup));
@@ -7699,6 +7797,10 @@ Result FiberScheduler::run(FiberWorker& worker, Span<FiberWorker> workerGroup)
 Result FiberScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberWorker> workers,
                                           size_t capacityPerWorker)
 {
+    if (usesRuntimeOwnedStacks())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     if (not allocator.isOpen())
     {
         return Result::Error(FibersResultCategory, FibersError::InvalidState);
@@ -7854,18 +7956,25 @@ Result FiberScheduler::yield()
 
 Result FiberScheduler::shutdown()
 {
+    SC_TRY(checkExecutionThread());
     SC_TRY(requestCancelAll());
     return run();
 }
 
 Result FiberScheduler::shutdown(FiberWorker& worker)
 {
+    SC_TRY(checkExecutionThread());
     SC_TRY(requestCancelAll());
     return run(worker);
 }
 
 Result FiberScheduler::shutdown(FiberWorker& worker, Span<FiberWorker> workerGroup)
 {
+    SC_TRY(checkExecutionThread());
+    if (usesRuntimeOwnedStacks() and not workerGroup.empty())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
     SC_TRY(requestCancelAll());
     return run(worker, workerGroup);
 }

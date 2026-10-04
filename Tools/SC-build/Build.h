@@ -187,6 +187,8 @@ struct Toolchain
 
     Platform::Type     platform     = Platform::Unknown;
     Architecture::Type architecture = Architecture::Any;
+
+    bool filcGlibc = false;
 };
 
 /// @brief Controls how the native backend presents build progress and child process output

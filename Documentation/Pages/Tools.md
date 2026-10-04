@@ -155,7 +155,21 @@ To register an existing ARM64 installation, use:
 
 For an Intel64 host, use the corresponding `filc-0.685-linux-x86_64` import directory.
 
-Fil-C runs also prepare package-local `zlib-filc`, `openssl-filc`, `nghttp2-filc` and `curl-filc` libraries and prepend their library directories to
+The separate experimental glibc profile requires the host-matching upstream `/opt/fil` distribution to be
+installed beforehand. SC-Build does not perform privileged installation or replace system libraries:
+
+```bash
+./SC.sh build compile SCTest Debug native --toolchain filc-glibc
+./SC.sh build run SCTest Debug native --toolchain filc-glibc -- --test AsyncFibersTest
+```
+
+This profile uses separate `filc-glibc` output/intermediate directories, `/opt/fil/lib` for runtime dependencies,
+and the bundled libc++abi for TLS destructor registration. It never prepares or loads the rootless package-local
+dependencies. Fiber contexts require explicit runtime-owned stacks and a thread-pinned scheduler opt-in;
+caller-stack/guard-page modes and multi-threaded fiber scheduling remain unsupported. Always-on CI continues
+to use the rootless profile; the glibc profile is currently validated explicitly.
+
+Rootless `--toolchain filc` runs also prepare package-local `zlib-filc`, `openssl-filc`, `nghttp2-filc` and `curl-filc` libraries and prepend their library directories to
 `LD_LIBRARY_PATH`. Host libraries are not ABI-compatible with Fil-C. No system library is replaced.
 
 ```bash
@@ -179,7 +193,7 @@ Cache identity includes source, compiler, port patch and relevant dependency ide
 The experimental Fil-C CI builds SCTest in Release and runs it through `Support/Scripts/RunFilCTLSFixture.sh Release`
 on every push and pull request, manual dispatch, and weekly on the default branch. Both native x86_64 and ARM64
 are checked. Fil-C CI omits SaneHttpGet and single-file library compilation; those retain normal compiler coverage.
-The Posix matrix also tests Ubuntu 26.04 explicitly.
+Regular Linux CI uses Ubuntu 24.04 Debug and Ubuntu 26.04 Release; macOS retains both configurations.
 This native Linux fixture requires OpenSSL capabilities and exercises HttpClient's trusted custom CA, required HTTP/2
 response, wrong CA and hostname rejection. Ordinary runs without fixture variables report an explicit transfer-test
 skip. Its public test-only credentials must never be used for a real service or installed into a system trust store.

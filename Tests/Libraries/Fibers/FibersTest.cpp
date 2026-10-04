@@ -108,7 +108,7 @@ struct SC::FibersTest : public SC::TestCase
 #if SC_COMPILER_FILC
         if (not report.quietMode)
         {
-            report.console.printLine("FibersTest - Skipping stack-switching sections under Fil-C; running job tests");
+            report.console.printLine("FibersTest - Skipping caller-stack and migration sections under Fil-C");
         }
 #endif
         if (test_section("structured errors and formatter"))
@@ -118,6 +118,10 @@ struct SC::FibersTest : public SC::TestCase
         if (test_section("runtime-owned context"))
         {
             runtimeOwnedContext();
+        }
+        if (test_section("runtime-owned scheduler"))
+        {
+            runtimeOwnedScheduler();
         }
 #if !SC_COMPILER_FILC
         if (test_section("context switch"))
@@ -538,6 +542,94 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(thread.join());
         SC_TEST_EXPECT(attempt.result.isError(FibersResultCategory, FibersError::WrongExecutionContext));
 #endif
+    }
+
+    void runtimeOwnedScheduler()
+    {
+        FiberScheduler scheduler;
+        FiberTask      task;
+        FiberStack     stack = FiberStack::runtimeOwned(65536);
+        SC_TEST_EXPECT(stack.isRuntimeOwned());
+        SC_TEST_EXPECT(stack.memory().empty());
+        SC_TEST_EXPECT(stack.sizeInBytes() == 65536);
+        SC_TEST_EXPECT(stack.isUsable());
+        stack.fillHighWaterMark();
+        SC_TEST_EXPECT(stack.highWaterUsedBytes() == 0);
+        SC_TEST_EXPECT(stack.highWaterUnusedBytes() == 0);
+
+        FiberTask::Procedure procedure([](FiberScheduler& scheduler) { return scheduler.yield(); });
+        SC_TEST_EXPECT(
+            scheduler.spawn(task, stack, procedure).isError(FibersResultCategory, FibersError::OperationUnsupported));
+        if (not FiberScheduler::supportsRuntimeOwnedStacks())
+        {
+            SC_TEST_EXPECT(
+                scheduler.enableRuntimeOwnedStacks().isError(FibersResultCategory, FibersError::OperationUnsupported));
+            return;
+        }
+        SC_TEST_EXPECT(scheduler.enableRuntimeOwnedStacks());
+        SC_TEST_EXPECT(scheduler.usesRuntimeOwnedStacks());
+        FiberStack tooSmall = FiberStack::runtimeOwned(0);
+        SC_TEST_EXPECT(
+            scheduler.spawn(task, tooSmall, procedure).isError(FibersResultCategory, FibersError::StorageTooSmall));
+        SC_TEST_EXPECT(not task.isValid());
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(scheduler.spawn(task, stack, procedure));
+        SC_TEST_EXPECT(scheduler.runOnce());
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Ready);
+        SC_TEST_EXPECT(scheduler.readyFiberCount() == 1);
+        SC_TEST_EXPECT(scheduler.enableRuntimeOwnedStacks().isError(FibersResultCategory, FibersError::InvalidState));
+        FiberWorker worker;
+        SC_TEST_EXPECT(
+            scheduler.runOnce(worker, {&worker, 1}).isError(FibersResultCategory, FibersError::OperationUnsupported));
+        FiberWorkerThread workerThread;
+        FiberWorkerPool   pool;
+        SC_TEST_EXPECT(pool.start(scheduler, {&worker, 1}, {&workerThread, 1})
+                           .isError(FibersResultCategory, FibersError::OperationUnsupported));
+        SC_TEST_EXPECT(scheduler.readyFiberCount() == 1);
+
+        struct Attempt
+        {
+            FiberScheduler* scheduler;
+            FiberStack*     stack;
+            bool            rejected     = false;
+            bool            threadExited = false;
+        } attempt{&scheduler, &stack};
+        Attempt* pointer = &attempt;
+        Thread   thread;
+        SC_TEST_EXPECT(thread.start(
+            [pointer](Thread&)
+            {
+                struct ThreadExitProbe
+                {
+                    bool* marker;
+                    ~ThreadExitProbe() { *marker = true; }
+                };
+                thread_local ThreadExitProbe cleanup{&pointer->threadExited};
+                FiberTask                    other;
+                FiberTask::Procedure         procedure([](FiberScheduler&) { return Result(true); });
+                pointer->rejected =
+                    pointer->scheduler->runNoWait().isError(FibersResultCategory,
+                                                            FibersError::WrongExecutionContext) and
+                    pointer->scheduler->shutdown().isError(FibersResultCategory, FibersError::WrongExecutionContext) and
+                    pointer->scheduler->spawn(other, *pointer->stack, procedure)
+                        .isError(FibersResultCategory, FibersError::WrongExecutionContext) and
+                    not other.isValid();
+            }));
+        SC_TEST_EXPECT(thread.join());
+        SC_TEST_EXPECT(attempt.rejected);
+        SC_TEST_EXPECT(attempt.threadExited);
+        SC_TEST_EXPECT(scheduler.readyFiberCount() == 1);
+        SC_TEST_EXPECT(not task.isCancellationRequested());
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(task.result());
+
+        SC_TEST_EXPECT(scheduler.spawn(task, stack, procedure));
+        SC_TEST_EXPECT(scheduler.runOnce());
+        SC_TEST_EXPECT(scheduler.requestCancel(task));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(task.result().isError(FibersResultCategory, FibersError::Cancelled));
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
     }
 
     void schedulerYield()

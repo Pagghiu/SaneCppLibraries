@@ -1505,7 +1505,7 @@ struct SC::Build::NativeBuild
         String curlFilCLibraryPath        = StringEncoding::Utf8;
         String opensslFilCLibraryPath     = StringEncoding::Utf8;
         String nghttp2FilCLibraryPath     = StringEncoding::Utf8;
-        if (action.parameters.toolchain.family == Toolchain::FilC)
+        if (action.parameters.toolchain.family == Toolchain::FilC and not action.parameters.toolchain.filcGlibc)
         {
             Tools::Package zlibPackage;
             SC_TRY(Tools::installZLibFilC(action.parameters.directories.packagesCacheDirectory.view(),
@@ -1546,6 +1546,10 @@ struct SC::Build::NativeBuild
             }
             SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", zlibFilCLibraryPathStorage.view()));
             globalConsole->print("LD_LIBRARY_PATH = {}\n", zlibFilCLibraryPathStorage.view());
+        }
+        else if (action.parameters.toolchain.family == Toolchain::FilC)
+        {
+            SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", "/opt/fil/lib"));
         }
         globalConsole->flush();
         SC_TRY(process.exec({arguments, numArguments}));
@@ -1965,6 +1969,10 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(source.objectPath.view()));
         }
         SC_TRY(appendLinkFlags(commandLine, resolvedProject));
+        if (resolvedProject.parameters->toolchain.filcGlibc)
+        {
+            SC_TRY(commandLine.append("-lc++abi"));
+        }
         if (useCDriverToAvoidGccStdCppRuntime and targetPlatform(resolvedProject.targetContext) == Platform::Linux)
         {
             SC_TRY(commandLine.append("-lm"));
@@ -2736,6 +2744,16 @@ struct SC::Build::NativeBuild
 
     static Result resolvePackagedFilCToolchain(const Parameters& parameters, CompilerAdapter& adapter)
     {
+        if (parameters.toolchain.filcGlibc)
+        {
+            SC_TRY(resolveExecutable(parameters.toolchain.compilerC.view(), "/opt/fil/bin/filcc", adapter.executableC));
+            SC_TRY(resolveExecutable(parameters.toolchain.compilerCpp.view(), "/opt/fil/bin/fil++",
+                                     adapter.executableCpp));
+            SC_TRY(resolveExecutable(parameters.toolchain.linker.view(), adapter.executableCpp.view(),
+                                     adapter.executableLink));
+            SC_TRY(resolveExecutable(parameters.toolchain.archiver.view(), "ar", adapter.executableArchive));
+            return Result(true);
+        }
         Tools::Package filCPackage;
         SC_TRY(Tools::installFilCToolchain(parameters.directories.packagesCacheDirectory.view(),
                                            parameters.directories.packagesInstallDirectory.view(), filCPackage));
@@ -4072,7 +4090,7 @@ struct SC::Build::NativeBuild
                 targetArchitecture(targetContext) != targetContext.hostMachine.architecture)
                 return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
             SC_TRY(resolvePackagedFilCToolchain(parameters, adapter));
-            SC_TRY(adapter.displayName.assign("filc"));
+            SC_TRY(adapter.displayName.assign(toolchain.filcGlibc ? "filc-glibc"_a8 : "filc"_a8));
             break;
         case Toolchain::GCC:
             SC_TRY(resolveExecutable(toolchain.compilerC.view(), "gcc", adapter.executableC));

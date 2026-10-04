@@ -809,6 +809,7 @@ Result AsyncFiberIO::fileWriteImpl(const FileDescriptor& file, Span<const char> 
 
 Result AsyncFiberIO::checkOwnerThread() const
 {
+    SC_TRY(scheduler.checkExecutionThread());
     SC_ASYNC_FIBERS_ASSERT_RELEASE(isOwnerThread());
     if (not isOwnerThread())
         return Result::Error(AsyncFibersResultCategory, AsyncFibersError::WrongOwnerThread);

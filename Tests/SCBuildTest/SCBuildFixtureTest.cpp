@@ -140,7 +140,7 @@ static Result detectCompilerName(const Build::Toolchain& toolchain, StringView& 
     switch (toolchain.family)
     {
     case Build::Toolchain::Clang: compilerName = "clang"; return Result(true);
-    case Build::Toolchain::FilC: compilerName = "filc"; return Result(true);
+    case Build::Toolchain::FilC: compilerName = toolchain.filcGlibc ? "filc-glibc"_a8 : "filc"_a8; return Result(true);
     case Build::Toolchain::GCC: compilerName = "gcc"; return Result(true);
     case Build::Toolchain::LLVMMingw: compilerName = "llvm-mingw"; return Result(true);
     case Build::Toolchain::MSVC: compilerName = "msvc"; return Result(true);

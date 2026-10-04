@@ -180,14 +180,19 @@ struct SC_FIBERS_EXPORT FiberStack
 {
     explicit FiberStack(Span<char> memory);
 
+    //! Fil-C/glibc only: request a hidden runtime-owned stack, not caller storage.
+    static FiberStack  runtimeOwned(size_t sizeInBytes);
+    [[nodiscard]] bool isRuntimeOwned() const;
+
     [[nodiscard]] Span<char> memory() const;
     [[nodiscard]] size_t     sizeInBytes() const;
     [[nodiscard]] size_t     usableSizeInBytes() const;
     [[nodiscard]] size_t     alignmentWasteInBytes() const;
     [[nodiscard]] bool       isUsable() const;
     void                     fillHighWaterMark();
-    [[nodiscard]] size_t     highWaterUsedBytes() const;
-    [[nodiscard]] size_t     highWaterUnusedBytes() const;
+    //! Runtime-owned stacks expose no measurements; both high-water counters return zero.
+    [[nodiscard]] size_t highWaterUsedBytes() const;
+    [[nodiscard]] size_t highWaterUnusedBytes() const;
 
   private:
     friend struct FiberScheduler;
@@ -197,6 +202,9 @@ struct SC_FIBERS_EXPORT FiberStack
 
     Span<char> stackMemory;
     void*      stackOwner = nullptr;
+
+    size_t runtimeStackSize  = 0;
+    bool   runtimeOwnedStack = false;
 };
 
 struct FiberVirtualStackDefinition
@@ -1653,6 +1661,12 @@ struct SC_FIBERS_EXPORT FiberScheduler
     FiberScheduler(const FiberScheduler&)            = delete;
     FiberScheduler& operator=(const FiberScheduler&) = delete;
 
+    //! Opt in before spawning. The scheduler remains bound to this thread and rejects worker pools.
+    static bool          supportsRuntimeOwnedStacks();
+    Result               enableRuntimeOwnedStacks();
+    [[nodiscard]] bool   usesRuntimeOwnedStacks() const;
+    [[nodiscard]] Result checkExecutionThread() const;
+
     Result spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure, FiberCounter* counter = nullptr);
     Result spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure, FiberCancellationToken token,
                  FiberCounter* counter = nullptr);
@@ -1737,6 +1751,8 @@ struct SC_FIBERS_EXPORT FiberScheduler
     mutable size_t injectionLockPeakSpinRetries = 0;
 
     FiberWorkerPool* workerPool = nullptr;
+
+    void* runtimeStackThread = nullptr;
 
     volatile size_t readyFibers       = 0;
     volatile size_t globalReadyFibers = 0;
