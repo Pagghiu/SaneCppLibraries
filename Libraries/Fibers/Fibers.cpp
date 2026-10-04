@@ -3078,6 +3078,11 @@ Result FiberJobWorkerPool::waitIdle()
         if (poolScheduler->hasActiveJobs())
         {
             static_cast<void>(waitForWork(observedGeneration));
+            // An idle observer may consume the signal intended for a worker on this shared event.
+            if (poolScheduler->hasReadyJobs())
+            {
+                wakeAllWorkers();
+            }
         }
     }
     return Result(true);
