@@ -546,6 +546,13 @@ struct SC::FibersTest : public SC::TestCase
 
     void runtimeOwnedScheduler()
     {
+#if SC_PLATFORM_LINUX
+        const char* requireRuntimeStacks = ::getenv("SC_FIBERS_TEST_REQUIRE_RUNTIME_STACKS");
+        if (requireRuntimeStacks != nullptr and requireRuntimeStacks[0] == '1' and requireRuntimeStacks[1] == '\0')
+        {
+            SC_TEST_EXPECT(FiberScheduler::supportsRuntimeOwnedStacks());
+        }
+#endif
         FiberScheduler scheduler;
         FiberTask      task;
         FiberStack     stack = FiberStack::runtimeOwned(65536);

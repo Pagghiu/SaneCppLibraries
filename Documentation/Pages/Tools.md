@@ -167,7 +167,12 @@ This profile uses separate `filc-glibc` output/intermediate directories, `/opt/f
 and the bundled libc++abi for TLS destructor registration. It never prepares or loads the rootless package-local
 dependencies. Fiber contexts require explicit runtime-owned stacks and a thread-pinned scheduler opt-in;
 caller-stack/guard-page modes and multi-threaded fiber scheduling remain unsupported. Always-on CI continues
-to use the rootless profile; the glibc profile is currently validated explicitly.
+to use the rootless profile. The separate `Fil-C Fibers` workflow validates the glibc profile in Release on
+native ARM Linux weekly, on manual dispatch, and on relevant pushes to the experimental `filc` branch,
+without duplicating the always-on matrix. It caches a
+checksum-pinned upstream archive and installs only its `/opt/fil` payload on disposable hosted runners.
+For a preinstalled local distribution, run `./Support/Scripts/RunFilCFiberTests.sh Debug` (or `Release`).
+This runner requires actual runtime-owned stack support; unsupported-path test results cannot pass it.
 
 Rootless `--toolchain filc` runs also prepare package-local `zlib-filc`, `openssl-filc`, `nghttp2-filc` and `curl-filc` libraries and prepend their library directories to
 `LD_LIBRARY_PATH`. Host libraries are not ABI-compatible with Fil-C. No system library is replaced.

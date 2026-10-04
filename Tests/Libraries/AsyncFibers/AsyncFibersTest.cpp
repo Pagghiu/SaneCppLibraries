@@ -13,6 +13,7 @@
 #include "Libraries/Threading/Threading.h"
 
 #include <signal.h>
+#include <stdlib.h>
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -56,6 +57,13 @@ struct SC::AsyncFibersTest : public SC::TestCase
 
     AsyncFibersTest(SC::TestReport& report) : TestCase(report, "AsyncFibersTest")
     {
+#if SC_PLATFORM_LINUX
+        const char* requireRuntimeStacks = ::getenv("SC_FIBERS_TEST_REQUIRE_RUNTIME_STACKS");
+        if (requireRuntimeStacks != nullptr and requireRuntimeStacks[0] == '1' and requireRuntimeStacks[1] == '\0')
+        {
+            SC_TEST_EXPECT(FiberScheduler::supportsRuntimeOwnedStacks());
+        }
+#endif
         if (useRuntimeStacks and not FiberScheduler::supportsRuntimeOwnedStacks())
         {
             if (not report.quietMode)

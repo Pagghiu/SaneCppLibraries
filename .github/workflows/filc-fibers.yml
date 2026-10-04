@@ -1,0 +1,37 @@
+name: Fil-C Fibers
+
+on:
+  push:
+    branches: [filc]
+    paths:
+      - '.github/workflows/filc-fibers.yml'
+      - 'Support/Scripts/*FilC*'
+      - 'Libraries/Fibers/**'
+      - 'Libraries/AsyncFibers/**'
+      - 'Libraries/Foundation/Internal/LibC*.inl'
+      - 'Tests/Libraries/Fibers/**'
+      - 'Tests/Libraries/AsyncFibers/**'
+      - 'Tools/SC-build*'
+      - 'Tools/SC-build/**'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  glibc-fibers:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Cache pinned glibc Fil-C archive
+        uses: actions/cache@v5
+        with:
+          path: _Build/_PackagesCache/filc-glibc
+          key: sc-filc-glibc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Support/Scripts/PrepareFilCGlibcCI.sh') }}
+      - name: Install isolated glibc Fil-C distribution
+        run: ./Support/Scripts/PrepareFilCGlibcCI.sh
+      - name: Validate runtime-owned scheduler and AsyncFibers
+        run: ./Support/Scripts/RunFilCFiberTests.sh Release
