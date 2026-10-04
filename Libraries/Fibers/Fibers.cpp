@@ -3214,7 +3214,9 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
 
         idleSpins                         = 0;
         const uint32_t observedGeneration = prepareToWaitForWork();
-        if ((keepAliveWhenIdle or scheduler.hasActiveJobs()) and not scheduler.hasReadyJobs())
+        // Stop may precede the generation snapshot; idle persistent workers must recheck it here.
+        if (((keepAliveWhenIdle and not isStopRequested()) or scheduler.hasActiveJobs()) and
+            not scheduler.hasReadyJobs())
         {
             const bool wasWoken = waitForPreparedWork(observedGeneration);
             static_cast<void>(wasWoken);

@@ -94,6 +94,8 @@ static constexpr Result fibersTestCheck(bool condition, FibersTestFailure failur
 
 struct SC::FibersTest : public SC::TestCase
 {
+    bool useRuntimeStacks = SC_COMPILER_FILC != 0;
+
     inline void structuredErrorsAndFormatter();
 
     struct ContextState
@@ -105,6 +107,16 @@ struct SC::FibersTest : public SC::TestCase
 
     FibersTest(SC::TestReport& report) : TestCase(report, "FibersTest")
     {
+        bool runRuntimeStackSections = true;
+        if (useRuntimeStacks and not FiberScheduler::supportsRuntimeOwnedStacks())
+        {
+            runRuntimeStackSections = false;
+            if (not report.quietMode)
+            {
+                report.console.printLine(
+                    "FibersTest - Skipping single-thread scheduler sections: runtime-owned stacks unavailable");
+            }
+        }
 #if SC_COMPILER_FILC
         if (not report.quietMode)
         {
@@ -128,11 +140,11 @@ struct SC::FibersTest : public SC::TestCase
         {
             contextSwitch();
         }
-        if (test_section("scheduler yield"))
+#endif
+        if (runRuntimeStackSections and test_section("scheduler yield"))
         {
             schedulerYield();
         }
-#endif
         if (test_section("fiber jobs"))
         {
             fiberJobs();
@@ -169,6 +181,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobWorkerPool();
         }
+        if (test_section("fiber job persistent stop"))
+        {
+            fiberJobPersistentStop();
+        }
 #if !SC_COMPILER_FILC
         if (test_section("explicit worker"))
         {
@@ -202,18 +218,20 @@ struct SC::FibersTest : public SC::TestCase
         {
             suspensionPublicationRaces();
         }
-        if (test_section("task state transition matrix"))
+#endif
+        if (runRuntimeStackSections and test_section("task state transition matrix"))
         {
             taskStateTransitionMatrix();
         }
-        if (test_section("counter wait"))
+        if (runRuntimeStackSections and test_section("counter wait"))
         {
             counterWait();
         }
-        if (test_section("task result"))
+        if (runRuntimeStackSections and test_section("task result"))
         {
             taskResult();
         }
+#if !SC_COMPILER_FILC
         if (test_section("task user data"))
         {
             taskUserData();
@@ -242,30 +260,32 @@ struct SC::FibersTest : public SC::TestCase
         {
             classBackedTaskPoolWorkers();
         }
-        if (test_section("deadlock detection"))
+#endif
+        if (runRuntimeStackSections and test_section("deadlock detection"))
         {
             deadlockDetection();
         }
-        if (test_section("cooperative cancellation"))
+        if (runRuntimeStackSections and test_section("cooperative cancellation"))
         {
             cooperativeCancellation();
         }
-        if (test_section("cancellation token"))
+        if (runRuntimeStackSections and test_section("cancellation token"))
         {
             cancellationToken();
         }
-        if (test_section("scheduler shutdown"))
+        if (runRuntimeStackSections and test_section("scheduler shutdown"))
         {
             schedulerShutdown();
         }
-        if (test_section("cancel waiting task"))
+        if (runRuntimeStackSections and test_section("cancel waiting task"))
         {
             cancelWaitingTask();
         }
-        if (test_section("uninterruptible wait cancellation"))
+        if (runRuntimeStackSections and test_section("uninterruptible wait cancellation"))
         {
             uninterruptibleWaitCancellation();
         }
+#if !SC_COMPILER_FILC
         if (test_section("task group"))
         {
             taskGroup();
@@ -428,35 +448,52 @@ struct SC::FibersTest : public SC::TestCase
         {
             stackClass();
         }
-        if (test_section("fiber event"))
+#endif
+        if (runRuntimeStackSections and test_section("fiber event"))
         {
             fiberEvent();
         }
-        if (test_section("fiber auto-reset event"))
+        if (runRuntimeStackSections and test_section("fiber auto-reset event"))
         {
             fiberAutoResetEvent();
         }
-        if (test_section("fiber semaphore"))
+        if (runRuntimeStackSections and test_section("fiber semaphore"))
         {
             fiberSemaphore();
         }
-        if (test_section("fiber mutex"))
+        if (runRuntimeStackSections and test_section("fiber mutex"))
         {
             fiberMutex();
         }
+#if !SC_COMPILER_FILC
         if (test_section("multi-worker primitives"))
         {
             multiWorkerPrimitives();
         }
-        if (test_section("primitive cancellation"))
+#endif
+        if (runRuntimeStackSections and test_section("primitive cancellation"))
         {
             primitiveCancellation();
         }
+#if !SC_COMPILER_FILC
         if (test_section("worker pool benchmark", TestCase::Execute::OnlyExplicit))
         {
             workerPoolBenchmark();
         }
 #endif
+    }
+
+    void configureScheduler(FiberScheduler& scheduler)
+    {
+        if (useRuntimeStacks)
+        {
+            SC_TEST_EXPECT(scheduler.enableRuntimeOwnedStacks());
+        }
+    }
+
+    FiberStack stackForTest(Span<char> storage)
+    {
+        return useRuntimeStacks ? FiberStack::runtimeOwned(storage.sizeInBytes()) : FiberStack(storage);
     }
 
     static void contextEntry(void* userData)
@@ -649,9 +686,10 @@ struct SC::FibersTest : public SC::TestCase
 
         FiberScheduler scheduler;
         FiberTask      task;
+        configureScheduler(scheduler);
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         SC_TEST_EXPECT(scheduler.yield().isError(FibersResultCategory, FibersError::WrongExecutionContext));
@@ -2002,6 +2040,130 @@ struct SC::FibersTest : public SC::TestCase
         }
     }
 
+    void fiberJobPersistentStop()
+    {
+        struct Watchdog
+        {
+            Atomic<bool>    finished;
+            Atomic<int32_t> cycle;
+            Thread          thread;
+
+            ~Watchdog()
+            {
+                finished.store(true);
+                if (thread.wasStarted())
+                {
+                    (void)thread.join();
+                }
+            }
+        } watchdog;
+        Watchdog* watchdogPointer = &watchdog;
+        SC_TEST_EXPECT(watchdog.thread.start(
+            [watchdogPointer](Thread&)
+            {
+                const Time::Monotonic started = Time::Monotonic::now();
+                while (not watchdogPointer->finished.load())
+                {
+                    if (Time::Monotonic::now().subtractExact(started).ms > 15000)
+                    {
+                        fprintf(stderr, "FibersTest persistent stop exceeded 15 seconds; cycle: %d\n",
+                                watchdogPointer->cycle.load());
+                        fflush(stderr);
+                        abort();
+                    }
+                    Thread::Sleep(10);
+                }
+            }));
+        if (not watchdog.thread.wasStarted())
+        {
+            return;
+        }
+
+        for (int32_t cycle = 0; cycle < 36; ++cycle)
+        {
+            watchdog.cycle.store(cycle);
+            const bool activeDrain = cycle >= 34;
+            const bool waitParked  = cycle >= 32;
+
+            struct State
+            {
+                Atomic<bool> started;
+                Atomic<bool> release;
+            } state;
+            State* statePointer = &state;
+
+            FiberJob                  job;
+            FiberJob*                 readyStorage[1] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[2];
+            FiberJobWorkerThread      threads[2];
+            FiberJobWorkerPool        pool;
+            FiberJobWorkerPoolOptions options;
+            alignas(64) char          allocatorStorage[4096] = {};
+            FiberAllocator            allocator;
+
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = 8;
+            options.idleSpinAttempts       = 0;
+            options.keepAliveWhenIdle      = true;
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            if (activeDrain)
+            {
+                SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
+                                                        [statePointer](FiberJobContext& context)
+                                                        {
+                                                            statePointer->started.store(true);
+                                                            while (not statePointer->release.load())
+                                                            {
+                                                                Thread::Sleep(1);
+                                                            }
+                                                            return context.isCancellationRequested()
+                                                                       ? Result::Error(FibersResultCategory,
+                                                                                       FibersError::Cancelled)
+                                                                       : Result(true);
+                                                        })));
+            }
+            SC_TEST_EXPECT(pool.start(scheduler, workers, threads, options));
+            if (waitParked)
+            {
+                const size_t          expectedParked = activeDrain ? 1 : 2;
+                const Time::Monotonic started        = Time::Monotonic::now();
+                while ((activeDrain and not state.started.load()) or pool.parkedWorkerCount() < expectedParked)
+                {
+                    if (Time::Monotonic::now().subtractExact(started).ms > 2000)
+                    {
+                        break;
+                    }
+                    Thread::Sleep(1);
+                }
+                SC_TEST_EXPECT(pool.parkedWorkerCount() == expectedParked);
+                if (activeDrain)
+                {
+                    SC_TEST_EXPECT(state.started.load());
+                }
+            }
+            SC_TEST_EXPECT(pool.requestStop());
+            if (activeDrain)
+            {
+                SC_TEST_EXPECT(scheduler.hasActiveJobs());
+                SC_TEST_EXPECT(job.isCancellationRequested());
+                state.release.store(true);
+            }
+            SC_TEST_EXPECT(pool.join());
+            SC_TEST_EXPECT(not pool.isRunning());
+            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+            SC_TEST_EXPECT(not scheduler.hasReadyJobs());
+            if (activeDrain)
+            {
+                SC_TEST_EXPECT(job.result().isError(FibersResultCategory, FibersError::Cancelled));
+            }
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(allocator.close());
+        }
+    }
+
     void explicitWorker()
     {
         struct State
@@ -2718,9 +2880,10 @@ struct SC::FibersTest : public SC::TestCase
         FiberScheduler scheduler;
         FiberCounter   counter;
         FiberTask      task;
-        char           stackMemory[FiberStackSize::SixtyFourKiB] = {};
-        FiberStack     stack({stackMemory, sizeof(stackMemory)});
-        State          state;
+        configureScheduler(scheduler);
+        char       stackMemory[FiberStackSize::SixtyFourKiB] = {};
+        FiberStack stack                                     = stackForTest({stackMemory, sizeof(stackMemory)});
+        State      state;
         state.task = &task;
 
         FiberTraceHooks hooks;
@@ -2794,11 +2957,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberCounter   rootCounter;
         FiberTask      parentTask;
         FiberTask      childTask;
+        configureScheduler(scheduler);
 
         char       parentStackMemory[64 * 1024] = {};
         char       childStackMemory[64 * 1024]  = {};
-        FiberStack parentStack({parentStackMemory, sizeof(parentStackMemory)});
-        FiberStack childStack({childStackMemory, sizeof(childStackMemory)});
+        FiberStack parentStack                  = stackForTest({parentStackMemory, sizeof(parentStackMemory)});
+        FiberStack childStack                   = stackForTest({childStackMemory, sizeof(childStackMemory)});
 
         State state;
         state.childTask  = &childTask;
@@ -2840,9 +3004,10 @@ struct SC::FibersTest : public SC::TestCase
     {
         FiberScheduler scheduler;
         FiberTask      task;
+        configureScheduler(scheduler);
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         SC_TEST_EXPECT(scheduler.spawn(
             task, stack,
@@ -3502,9 +3667,10 @@ struct SC::FibersTest : public SC::TestCase
         FiberScheduler scheduler;
         FiberCounter   counter;
         FiberTask      task;
+        configureScheduler(scheduler);
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         scheduler.add(counter);
         SC_TEST_EXPECT(scheduler.spawn(task, stack,
@@ -3539,9 +3705,10 @@ struct SC::FibersTest : public SC::TestCase
 
         FiberScheduler scheduler;
         FiberTask      task;
+        configureScheduler(scheduler);
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.task = &task;
@@ -3588,9 +3755,10 @@ struct SC::FibersTest : public SC::TestCase
             FiberScheduler               scheduler;
             FiberCancellationTokenSource tokenSource;
             FiberTask                    task;
+            configureScheduler(scheduler);
 
             char       stackMemory[64 * 1024] = {};
-            FiberStack stack({stackMemory, sizeof(stackMemory)});
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             State state;
             SC_TEST_EXPECT(not tokenSource.isCancellationRequested());
@@ -3634,9 +3802,10 @@ struct SC::FibersTest : public SC::TestCase
             FiberCancellationTokenSource tokenSource;
             FiberCounter                 counter;
             FiberTask                    waitingTask;
+            configureScheduler(scheduler);
 
             char       stackMemory[64 * 1024] = {};
-            FiberStack stack({stackMemory, sizeof(stackMemory)});
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             scheduler.add(counter);
             SC_TEST_EXPECT(scheduler.spawn(waitingTask, stack,
@@ -3664,9 +3833,10 @@ struct SC::FibersTest : public SC::TestCase
             FiberScheduler               scheduler;
             FiberCancellationTokenSource tokenSource;
             FiberTask                    task;
+            configureScheduler(scheduler);
 
             char       stackMemory[64 * 1024] = {};
-            FiberStack stack({stackMemory, sizeof(stackMemory)});
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
             tokenSource.requestCancel();
             SC_TEST_EXPECT(scheduler.spawn(
@@ -3692,11 +3862,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberCounter   counter;
         FiberTask      yieldingTask;
         FiberTask      waitingTask;
+        configureScheduler(scheduler);
 
         char       yieldingStackMemory[64 * 1024] = {};
         char       waitingStackMemory[64 * 1024]  = {};
-        FiberStack yieldingStack({yieldingStackMemory, sizeof(yieldingStackMemory)});
-        FiberStack waitingStack({waitingStackMemory, sizeof(waitingStackMemory)});
+        FiberStack yieldingStack                  = stackForTest({yieldingStackMemory, sizeof(yieldingStackMemory)});
+        FiberStack waitingStack                   = stackForTest({waitingStackMemory, sizeof(waitingStackMemory)});
 
         State state;
         state.counter = &counter;
@@ -3757,9 +3928,10 @@ struct SC::FibersTest : public SC::TestCase
         FiberScheduler scheduler;
         FiberCounter   counter;
         FiberTask      task;
+        configureScheduler(scheduler);
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         scheduler.add(counter);
         SC_TEST_EXPECT(scheduler.spawn(task, stack,
@@ -3798,11 +3970,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberCounter   counter;
         FiberTask      waiter;
         FiberTask      canceller;
+        configureScheduler(scheduler);
 
         char       waiterStackMemory[64 * 1024]    = {};
         char       cancellerStackMemory[64 * 1024] = {};
-        FiberStack waiterStack({waiterStackMemory, sizeof(waiterStackMemory)});
-        FiberStack cancellerStack({cancellerStackMemory, sizeof(cancellerStackMemory)});
+        FiberStack waiterStack                     = stackForTest({waiterStackMemory, sizeof(waiterStackMemory)});
+        FiberStack cancellerStack                  = stackForTest({cancellerStackMemory, sizeof(cancellerStackMemory)});
 
         State state;
         state.counter = &counter;
@@ -8889,9 +9062,10 @@ struct SC::FibersTest : public SC::TestCase
         FiberScheduler scheduler;
         FiberTask      task;
         FiberEvent     event;
+        configureScheduler(scheduler);
 
         char       stackMemory[64 * 1024] = {};
-        FiberStack stack({stackMemory, sizeof(stackMemory)});
+        FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
         state.event = &event;
@@ -8934,10 +9108,11 @@ struct SC::FibersTest : public SC::TestCase
         FiberTask           firstTask;
         FiberTask           secondTask;
         FiberAutoResetEvent event(true);
-        char                firstStackMemory[64 * 1024]  = {};
-        char                secondStackMemory[64 * 1024] = {};
-        FiberStack          firstStack({firstStackMemory, sizeof(firstStackMemory)});
-        FiberStack          secondStack({secondStackMemory, sizeof(secondStackMemory)});
+        configureScheduler(scheduler);
+        char       firstStackMemory[64 * 1024]  = {};
+        char       secondStackMemory[64 * 1024] = {};
+        FiberStack firstStack                   = stackForTest({firstStackMemory, sizeof(firstStackMemory)});
+        FiberStack secondStack                  = stackForTest({secondStackMemory, sizeof(secondStackMemory)});
 
         SC_TEST_EXPECT(event.isSignaled());
         SC_TEST_EXPECT(event.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
@@ -8990,11 +9165,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberTask      firstTask;
         FiberTask      secondTask;
         FiberSemaphore semaphore;
-        char           firstStackMemory[64 * 1024]  = {};
-        char           secondStackMemory[64 * 1024] = {};
-        FiberStack     firstStack({firstStackMemory, sizeof(firstStackMemory)});
-        FiberStack     secondStack({secondStackMemory, sizeof(secondStackMemory)});
-        State          state;
+        configureScheduler(scheduler);
+        char       firstStackMemory[64 * 1024]  = {};
+        char       secondStackMemory[64 * 1024] = {};
+        FiberStack firstStack                   = stackForTest({firstStackMemory, sizeof(firstStackMemory)});
+        FiberStack secondStack                  = stackForTest({secondStackMemory, sizeof(secondStackMemory)});
+        State      state;
         state.semaphore = &semaphore;
         SC_TEST_EXPECT(semaphore.wait(scheduler).isError(FibersResultCategory, FibersError::WrongExecutionContext));
 
@@ -9042,11 +9218,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberTask      firstTask;
         FiberTask      secondTask;
         FiberMutex     mutex;
+        configureScheduler(scheduler);
 
         char       firstStackMemory[64 * 1024]  = {};
         char       secondStackMemory[64 * 1024] = {};
-        FiberStack firstStack({firstStackMemory, sizeof(firstStackMemory)});
-        FiberStack secondStack({secondStackMemory, sizeof(secondStackMemory)});
+        FiberStack firstStack                   = stackForTest({firstStackMemory, sizeof(firstStackMemory)});
+        FiberStack secondStack                  = stackForTest({secondStackMemory, sizeof(secondStackMemory)});
 
         State state;
         state.mutex                    = &mutex;
@@ -9082,11 +9259,12 @@ struct SC::FibersTest : public SC::TestCase
         FiberTask      ownerTask;
         FiberTask      waiterTask;
         FiberMutex     handoffMutex;
+        configureScheduler(handoffScheduler);
 
         char       ownerStackMemory[64 * 1024]  = {};
         char       waiterStackMemory[64 * 1024] = {};
-        FiberStack ownerStack({ownerStackMemory, sizeof(ownerStackMemory)});
-        FiberStack waiterStack({waiterStackMemory, sizeof(waiterStackMemory)});
+        FiberStack ownerStack                   = stackForTest({ownerStackMemory, sizeof(ownerStackMemory)});
+        FiberStack waiterStack                  = stackForTest({waiterStackMemory, sizeof(waiterStackMemory)});
 
         HandoffState handoffState;
         handoffState.mutex = &handoffMutex;
@@ -9367,9 +9545,10 @@ struct SC::FibersTest : public SC::TestCase
             FiberScheduler scheduler;
             FiberTask      task;
             FiberEvent     event;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
-            State          state;
+            configureScheduler(scheduler);
+            char       stackMemory[64 * 1024] = {};
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
+            State      state;
             state.event = &event;
 
             SC_TEST_EXPECT(scheduler.spawn(task, stack,
@@ -9392,10 +9571,11 @@ struct SC::FibersTest : public SC::TestCase
             FiberScheduler      scheduler;
             FiberTask           tasks[2];
             FiberAutoResetEvent event;
-            char                stackMemory[2][64 * 1024] = {};
-            FiberStack          stacks[2]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+            configureScheduler(scheduler);
+            char       stackMemory[2][64 * 1024] = {};
+            FiberStack stacks[2]                 = {
+                stackForTest({stackMemory[0], sizeof(stackMemory[0])}),
+                stackForTest({stackMemory[1], sizeof(stackMemory[1])}),
             };
             bool                 completed[2]  = {};
             FiberTask::Procedure procedures[2] = {
@@ -9442,9 +9622,10 @@ struct SC::FibersTest : public SC::TestCase
             FiberScheduler scheduler;
             FiberTask      task;
             FiberSemaphore semaphore;
-            char           stackMemory[64 * 1024] = {};
-            FiberStack     stack({stackMemory, sizeof(stackMemory)});
-            State          state;
+            configureScheduler(scheduler);
+            char       stackMemory[64 * 1024] = {};
+            FiberStack stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
+            State      state;
             state.semaphore = &semaphore;
 
             SC_TEST_EXPECT(scheduler.spawn(task, stack,
@@ -9476,11 +9657,12 @@ struct SC::FibersTest : public SC::TestCase
             FiberTask      ownerTask;
             FiberTask      waiterTask;
             FiberMutex     mutex;
-            char           ownerStackMemory[64 * 1024]  = {};
-            char           waiterStackMemory[64 * 1024] = {};
-            FiberStack     ownerStack({ownerStackMemory, sizeof(ownerStackMemory)});
-            FiberStack     waiterStack({waiterStackMemory, sizeof(waiterStackMemory)});
-            State          state;
+            configureScheduler(scheduler);
+            char       ownerStackMemory[64 * 1024]  = {};
+            char       waiterStackMemory[64 * 1024] = {};
+            FiberStack ownerStack                   = stackForTest({ownerStackMemory, sizeof(ownerStackMemory)});
+            FiberStack waiterStack                  = stackForTest({waiterStackMemory, sizeof(waiterStackMemory)});
+            State      state;
             state.mutex = &mutex;
 
             SC_TEST_EXPECT(scheduler.spawn(ownerTask, ownerStack,
