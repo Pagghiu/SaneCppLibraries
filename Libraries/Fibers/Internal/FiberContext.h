@@ -17,7 +17,16 @@ namespace SC
 {
 using FiberContextEntry = void (*)(void*);
 
-#if SC_PLATFORM_WINDOWS
+#if SC_COMPILER_FILC
+struct FiberContextPlatform
+{
+    void* runtimeContext = nullptr;
+    void* ownerThread    = nullptr;
+
+    FiberContextEntry entry    = nullptr;
+    void*             userData = nullptr;
+};
+#elif SC_PLATFORM_WINDOWS
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma warning(push)
 #pragma warning(disable : 4324)
@@ -89,6 +98,11 @@ struct SC_FIBERS_EXPORT FiberContext
 
 struct SC_FIBERS_EXPORT FiberContextOperations
 {
+    //! Experimental Fil-C/glibc contexts allocate hidden stacks and cannot migrate between threads.
+    static bool   supportsRuntimeOwnedStacks();
+    static Result createRuntimeOwned(FiberContext& context, size_t stackSize, FiberContextEntry entry, void* userData);
+    static Result switchToChecked(FiberContext& from, FiberContext& to);
+
     static Result captureCurrent(FiberContext& context);
     static Result create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData);
     static void   switchTo(FiberContext& from, FiberContext& to);

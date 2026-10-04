@@ -41,6 +41,13 @@ extern "C"
 #include <unistd.h>
 #endif
 
+#if SC_COMPILER_FILC && defined(__GLIBC__)
+extern "C"
+{
+#include <pizlonated_runtime.h>
+}
+#endif
+
 namespace SC
 {
 void fiberContextEnter(FiberContextEntry entry, void* userData);
@@ -1744,7 +1751,21 @@ void fiberContextEnter(FiberContextEntry entry, void* userData)
 
 namespace
 {
-#if SC_PLATFORM_WINDOWS
+#if SC_COMPILER_FILC
+static thread_local char fiberContextThreadIdentity;
+
+#if defined(__GLIBC__)
+static thread_local FiberContext* fiberContextStarting = nullptr;
+
+static void fiberContextRuntimeEntry()
+{
+    FiberContext* context = fiberContextStarting;
+    SC_FIBERS_ASSERT_RELEASE(context != nullptr);
+    fiberContextStarting = nullptr;
+    fiberContextEnter(context->platform.entry, context->platform.userData);
+}
+#endif
+#elif SC_PLATFORM_WINDOWS
 static void fiberContextTrampoline(FiberContextEntry entry, void* userData) { SC_fiberContextEnter(entry, userData); }
 #elif SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
 extern "C" void SC_fiberContextTrampoline();
@@ -9492,7 +9513,10 @@ void FiberScheduler::wakeCounterWaitersUnlocked(FiberCounter& counter)
 
 Result FiberContextOperations::captureCurrent(FiberContext& context)
 {
-#if SC_PLATFORM_WINDOWS
+#if SC_COMPILER_FILC
+    context.platform             = {};
+    context.platform.ownerThread = &fiberContextThreadIdentity;
+#elif SC_PLATFORM_WINDOWS
     RtlCaptureContext(&context.platform.context);
 #endif
     context.stackBottom   = nullptr;
@@ -9514,6 +9538,12 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
         return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
     }
 
+#if SC_COMPILER_FILC
+    // Caller storage cannot represent the runtime's hidden, garbage-collected stack.
+    (void)context;
+    (void)userData;
+    return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+#else
     const size_t usableStackSize = fiberStack.usableSizeInBytes();
     char*        stackTop        = stack.data() + stack.sizeInBytes();
     stackTop                     = static_cast<char*>(alignDown(stackTop, FiberStackAlignment));
@@ -9553,6 +9583,72 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
     context.asanFakeStack = nullptr;
     context.initialized   = true;
     return Result(true);
+#endif
+}
+
+bool FiberContextOperations::supportsRuntimeOwnedStacks()
+{
+#if SC_COMPILER_FILC && defined(__GLIBC__)
+    return true;
+#else
+    return false;
+#endif
+}
+
+Result FiberContextOperations::createRuntimeOwned(FiberContext& context, size_t stackSize, FiberContextEntry entry,
+                                                  void* userData)
+{
+    if (entry == nullptr)
+    {
+        return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
+    }
+    if (stackSize < FiberStackMinimumSize)
+    {
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
+    }
+#if SC_COMPILER_FILC && defined(__GLIBC__)
+    context.platform.runtimeContext = zfiber_context_new();
+    context.platform.ownerThread    = &fiberContextThreadIdentity;
+    context.platform.entry          = entry;
+    context.platform.userData       = userData;
+    auto* runtimeContext            = static_cast<zfiber_context*>(context.platform.runtimeContext);
+    zfiber_context_getcontext(runtimeContext);
+    zfiber_context_makecontext(runtimeContext, stackSize, fiberContextRuntimeEntry);
+    context.stackBottom   = nullptr;
+    context.stackSize     = stackSize;
+    context.asanFakeStack = nullptr;
+    context.initialized   = true;
+    return Result(true);
+#else
+    (void)context;
+    (void)userData;
+    return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+#endif
+}
+
+Result FiberContextOperations::switchToChecked(FiberContext& from, FiberContext& to)
+{
+    if (not from.initialized or not to.initialized)
+    {
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
+    }
+#if SC_COMPILER_FILC
+    if (not supportsRuntimeOwnedStacks())
+    {
+        return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
+    }
+    if (from.platform.ownerThread != &fiberContextThreadIdentity or
+        to.platform.ownerThread != &fiberContextThreadIdentity)
+    {
+        return Result::Error(FibersResultCategory, FibersError::WrongExecutionContext);
+    }
+    if (to.platform.runtimeContext == nullptr)
+    {
+        return Result::Error(FibersResultCategory, FibersError::InvalidState);
+    }
+#endif
+    switchTo(from, to);
+    return Result(true);
 }
 
 void FiberContextOperations::switchTo(FiberContext& from, FiberContext& to)
@@ -9561,7 +9657,21 @@ void FiberContextOperations::switchTo(FiberContext& from, FiberContext& to)
     SC_FIBERS_ASSERT_RELEASE(to.initialized);
 
     fiberContextStartSwitch(from, to);
-#if SC_PLATFORM_WINDOWS
+#if SC_COMPILER_FILC && defined(__GLIBC__)
+    SC_FIBERS_ASSERT_RELEASE(from.platform.ownerThread == &fiberContextThreadIdentity);
+    SC_FIBERS_ASSERT_RELEASE(to.platform.ownerThread == &fiberContextThreadIdentity);
+    SC_FIBERS_ASSERT_RELEASE(to.platform.runtimeContext != nullptr);
+    if (from.platform.runtimeContext == nullptr)
+    {
+        from.platform.runtimeContext = zfiber_context_new();
+    }
+    fiberContextStarting = &to;
+    zfiber_context_swapcontext(static_cast<zfiber_context*>(from.platform.runtimeContext),
+                               static_cast<zfiber_context*>(to.platform.runtimeContext));
+    fiberContextStarting = nullptr;
+#elif SC_COMPILER_FILC
+    SC_FIBERS_ASSERT_RELEASE(false);
+#elif SC_PLATFORM_WINDOWS
     from.platform.restoring = 0;
     RtlCaptureContext(&from.platform.context);
     if (from.platform.restoring == 0)

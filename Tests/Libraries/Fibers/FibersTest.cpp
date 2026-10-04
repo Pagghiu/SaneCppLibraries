@@ -115,6 +115,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             structuredErrorsAndFormatter();
         }
+        if (test_section("runtime-owned context"))
+        {
+            runtimeOwnedContext();
+        }
 #if !SC_COMPILER_FILC
         if (test_section("context switch"))
         {
@@ -485,6 +489,55 @@ struct SC::FibersTest : public SC::TestCase
         state.step = 2;
         FiberContextOperations::switchTo(mainContext, fiberContext);
         SC_TEST_EXPECT(state.step == 3);
+    }
+
+    void runtimeOwnedContext()
+    {
+        FiberContext mainContext;
+        FiberContext fiberContext;
+        ContextState state;
+        state.main  = &mainContext;
+        state.fiber = &fiberContext;
+
+        SC_TEST_EXPECT(FiberContextOperations::createRuntimeOwned(fiberContext, 65536, nullptr, &state)
+                           .isError(FibersResultCategory, FibersError::InvalidProcedure));
+        SC_TEST_EXPECT(FiberContextOperations::createRuntimeOwned(fiberContext, 0, contextEntry, &state)
+                           .isError(FibersResultCategory, FibersError::StorageTooSmall));
+        SC_TEST_EXPECT(FiberContextOperations::switchToChecked(mainContext, fiberContext)
+                           .isError(FibersResultCategory, FibersError::InvalidState));
+        if (not FiberContextOperations::supportsRuntimeOwnedStacks())
+        {
+            SC_TEST_EXPECT(FiberContextOperations::createRuntimeOwned(fiberContext, 65536, contextEntry, &state)
+                               .isError(FibersResultCategory, FibersError::OperationUnsupported));
+            return;
+        }
+
+        SC_TEST_EXPECT(FiberContextOperations::captureCurrent(mainContext));
+        SC_TEST_EXPECT(FiberContextOperations::createRuntimeOwned(fiberContext, 65536, contextEntry, &state));
+        SC_TEST_EXPECT(FiberContextOperations::switchToChecked(mainContext, fiberContext));
+        SC_TEST_EXPECT(state.step == 1);
+        state.step = 2;
+        SC_TEST_EXPECT(FiberContextOperations::switchToChecked(mainContext, fiberContext));
+        SC_TEST_EXPECT(state.step == 3);
+
+#if SC_COMPILER_FILC
+        Thread thread;
+        struct SwitchAttempt
+        {
+            FiberContext* from;
+            FiberContext* to;
+            Result        result = Result(true);
+        } attempt{&mainContext, &fiberContext};
+        SwitchAttempt* attemptPointer = &attempt;
+        SC_TEST_EXPECT(thread.start(
+            [attemptPointer](Thread&)
+            {
+                attemptPointer->result =
+                    FiberContextOperations::switchToChecked(*attemptPointer->from, *attemptPointer->to);
+            }));
+        SC_TEST_EXPECT(thread.join());
+        SC_TEST_EXPECT(attempt.result.isError(FibersResultCategory, FibersError::WrongExecutionContext));
+#endif
     }
 
     void schedulerYield()
