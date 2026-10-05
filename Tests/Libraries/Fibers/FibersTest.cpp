@@ -2458,11 +2458,12 @@ struct SC::FibersTest : public SC::TestCase
             return;
         }
 
-        for (int32_t cycle = 0; cycle < 36; ++cycle)
+        for (int32_t cycle = 0; cycle < 72; ++cycle)
         {
             watchdog.cycle.store(cycle);
-            const bool activeDrain = cycle >= 34;
-            const bool waitParked  = cycle >= 32;
+            const int32_t lifecycleCycle = cycle / 2;
+            const bool    activeDrain    = lifecycleCycle >= 34;
+            const bool    waitParked     = lifecycleCycle >= 32;
 
             struct State
             {
@@ -2483,7 +2484,7 @@ struct SC::FibersTest : public SC::TestCase
 
             options.dequeAllocator         = &allocator;
             options.dequeCapacityPerWorker = 8;
-            options.idleSpinAttempts       = 0;
+            options.idleSpinAttempts       = cycle % 2 == 0 ? 0 : 32;
             options.keepAliveWhenIdle      = true;
             SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
             SC_TEST_EXPECT(scheduler.create(readyStorage));

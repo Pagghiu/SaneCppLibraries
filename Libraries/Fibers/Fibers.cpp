@@ -3248,12 +3248,9 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
             idleSpins = 0;
             continue;
         }
-        if (not scheduler.hasActiveJobs())
+        if ((not keepAliveWhenIdle or isStopRequested()) and not scheduler.hasActiveJobs())
         {
-            if (not keepAliveWhenIdle or isStopRequested())
-            {
-                break;
-            }
+            break;
         }
         if (idleSpins < idleSpinAttempts)
         {
