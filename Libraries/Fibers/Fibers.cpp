@@ -2005,6 +2005,8 @@ static bool fiberAtomicCompareExchangeSize(volatile size_t& value, size_t& expec
 #endif
 }
 
+static void fiberJobActivationLock(volatile int32_t& lockValue);
+
 static void fiberJobAddCount(volatile size_t& count, volatile int32_t& activationLock, size_t amount)
 {
     if (amount == 0)
@@ -2020,7 +2022,7 @@ static void fiberJobAddCount(volatile size_t& count, volatile int32_t& activatio
         }
     }
     // A positive-only CAS cannot reactivate a zero domain while a confirming observer holds its gate.
-    fiberSchedulerLock(activationLock);
+    fiberJobActivationLock(activationLock);
     fiberAtomicFetchAddSize(count, amount);
     fiberSchedulerUnlock(activationLock);
 }
@@ -2042,6 +2044,27 @@ static void fiberCpuRelax()
     __asm__ volatile("yield" ::: "memory");
 #else
     __asm__ volatile("pause" ::: "memory");
+#endif
+}
+
+static void fiberJobActivationLock(volatile int32_t& lockValue)
+{
+#if SC_PLATFORM_WINDOWS
+    while (InterlockedCompareExchange(reinterpret_cast<volatile long*>(&lockValue), 1, 0) != 0)
+    {
+        fiberCpuRelax();
+    }
+#else
+    int32_t expected = 0;
+    while (not __atomic_compare_exchange_n(&lockValue, &expected, 1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+    {
+        // Poll a held gate without repeatedly requesting exclusive ownership of its cache line.
+        while (__atomic_load_n(&lockValue, __ATOMIC_RELAXED) != 0)
+        {
+            fiberCpuRelax();
+        }
+        expected = 0;
+    }
 #endif
 }
 
@@ -4122,7 +4145,7 @@ struct FiberJobScheduler::CountActivationLockGuard
 {
     explicit CountActivationLockGuard(const FiberJobScheduler& scheduler) : jobScheduler(scheduler)
     {
-        fiberSchedulerLock(jobScheduler.countActivationLock);
+        fiberJobActivationLock(jobScheduler.countActivationLock);
     }
 
     void lockWorkerActivations()
@@ -4132,7 +4155,7 @@ struct FiberJobScheduler::CountActivationLockGuard
             lockedWorkers = jobScheduler.workerPool->workers;
             for (FiberJobWorker& worker : lockedWorkers)
             {
-                fiberSchedulerLock(worker.countActivationLock);
+                fiberJobActivationLock(worker.countActivationLock);
             }
         }
     }
