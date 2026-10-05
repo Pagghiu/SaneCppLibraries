@@ -11,8 +11,10 @@
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Atomic.h"
 #include "Libraries/Threading/Threading.h"
+#include "Libraries/Time/Time.h"
 
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -95,6 +97,18 @@ struct SC::AsyncFibersTest : public SC::TestCase
         if (test_section("cancel sleep stress"))
         {
             cancelSleepStress();
+        }
+        if (test_section("runtime-owned thread ownership"))
+        {
+            if (FiberScheduler::supportsRuntimeOwnedStacks())
+            {
+                runtimeOwnedThreadOwnership();
+            }
+            else if (not report.quietMode)
+            {
+                report.console.printLine(
+                    "AsyncFibersTest runtime-owned thread ownership - Skipping: runtime-owned stacks are unsupported");
+            }
         }
         if (not useRuntimeStacks and test_section("cross thread sleep"))
         {
@@ -658,6 +672,158 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(state.completed == 0);
         SC_TEST_EXPECT(state.canceled == NumIterations);
         SC_TEST_EXPECT(state.immediateCanceled == NumIterations);
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(eventLoop.close());
+    }
+
+    void runtimeOwnedThreadOwnership()
+    {
+        struct State
+        {
+            AsyncFiberIO* io = nullptr;
+
+            uint64_t startThreadID  = 0;
+            uint64_t resumeThreadID = 0;
+        } state;
+
+        struct ForeignThreadProbe
+        {
+            AsyncFiberIO*   io        = nullptr;
+            FiberScheduler* scheduler = nullptr;
+
+            uint64_t threadID = 0;
+
+            Result ioRunNoWaitResult  = Result(true);
+            Result schedulerRunResult = Result(true);
+        } probe;
+
+        struct Watchdog
+        {
+            Atomic<bool>    finished = false;
+            Atomic<int32_t> phase    = 0;
+            Thread          thread;
+
+            ~Watchdog()
+            {
+                finished.store(true);
+                if (thread.wasStarted())
+                {
+                    (void)thread.join();
+                }
+            }
+        } watchdog;
+        Watchdog* watchdogPointer = &watchdog;
+        SC_TEST_EXPECT(watchdog.thread.start(
+            [watchdogPointer](Thread&)
+            {
+                const Time::Monotonic started = Time::Monotonic::now();
+                while (not watchdogPointer->finished.load())
+                {
+                    if (Time::Monotonic::now().subtractExact(started).ms > 10000)
+                    {
+                        const int32_t phase     = watchdogPointer->phase.load();
+                        const char*   phaseName = "bridge reuse";
+                        switch (phase)
+                        {
+                        case 0: phaseName = "setup"; break;
+                        case 1: phaseName = "owner sleep pending"; break;
+                        case 2: phaseName = "foreign-thread probes"; break;
+                        case 3: phaseName = "owner cancellation drain"; break;
+                        default: break;
+                        }
+                        fprintf(stderr, "AsyncFibersTest runtime-owned thread ownership timed out during %s\n",
+                                phaseName);
+                        fflush(stderr);
+                        abort();
+                    }
+                    Thread::Sleep(10);
+                }
+            }));
+        if (not watchdog.thread.wasStarted())
+        {
+            return;
+        }
+
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+
+        FiberScheduler scheduler;
+        SC_TEST_EXPECT(scheduler.enableRuntimeOwnedStacks());
+        SC_TEST_EXPECT(scheduler.usesRuntimeOwnedStacks());
+        AsyncFiberIO   io(scheduler, eventLoop);
+        FiberTask      task;
+        FiberStack     stack         = FiberStack::runtimeOwned(64 * 1024);
+        State*         statePointer  = &state;
+        const uint64_t ownerThreadID = Thread::CurrentThreadID();
+        state.io                     = &io;
+
+        SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                       FiberTask::Procedure(
+                                           [statePointer](FiberScheduler&)
+                                           {
+                                               statePointer->startThreadID = Thread::CurrentThreadID();
+                                               Result result               = statePointer->io->sleep(TimeMs{60 * 1000});
+                                               statePointer->resumeThreadID = Thread::CurrentThreadID();
+                                               return result;
+                                           })));
+        watchdog.phase.store(1);
+        SC_TEST_EXPECT(io.runNoWait());
+        SC_TEST_EXPECT(task.isActive());
+        SC_TEST_EXPECT(state.startThreadID == ownerThreadID);
+        SC_TEST_EXPECT(state.resumeThreadID == 0);
+        AsyncLoopTimeout* pendingTimer = eventLoop.findEarliestLoopTimeout();
+        SC_TEST_EXPECT(pendingTimer != nullptr);
+
+        probe.io                         = &io;
+        probe.scheduler                  = &scheduler;
+        ForeignThreadProbe* probePointer = &probe;
+        Thread              foreignThread;
+        watchdog.phase.store(2);
+        const Result foreignStarted = foreignThread.start(
+            [probePointer](Thread&)
+            {
+                probePointer->threadID           = Thread::CurrentThreadID();
+                probePointer->ioRunNoWaitResult  = probePointer->io->runNoWait();
+                probePointer->schedulerRunResult = probePointer->scheduler->runNoWait();
+            });
+        SC_TEST_EXPECT(foreignStarted);
+        if (foreignStarted)
+        {
+            SC_TEST_EXPECT(foreignThread.join());
+            SC_TEST_EXPECT(probe.threadID != ownerThreadID);
+            SC_TEST_EXPECT(probe.ioRunNoWaitResult.isError(FibersResultCategory, FibersError::WrongExecutionContext));
+            SC_TEST_EXPECT(probe.schedulerRunResult.isError(FibersResultCategory, FibersError::WrongExecutionContext));
+        }
+        SC_TEST_EXPECT(task.isActive());
+        SC_TEST_EXPECT(state.resumeThreadID == 0);
+        SC_TEST_EXPECT(eventLoop.findEarliestLoopTimeout() == pendingTimer);
+
+        watchdog.phase.store(3);
+        SC_TEST_EXPECT(io.cancelAll());
+        SC_TEST_EXPECT(io.run());
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(task.result().isError(AsyncFibersResultCategory, AsyncFibersError::Cancelled));
+        SC_TEST_EXPECT(state.resumeThreadID == ownerThreadID);
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(eventLoop.findEarliestLoopTimeout() == nullptr);
+
+        state.startThreadID  = 0;
+        state.resumeThreadID = 0;
+        watchdog.phase.store(4);
+        SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                       FiberTask::Procedure(
+                                           [statePointer](FiberScheduler&)
+                                           {
+                                               statePointer->startThreadID  = Thread::CurrentThreadID();
+                                               Result result                = statePointer->io->sleep(TimeMs{1});
+                                               statePointer->resumeThreadID = Thread::CurrentThreadID();
+                                               return result;
+                                           })));
+        SC_TEST_EXPECT(io.run());
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(state.startThreadID == ownerThreadID);
+        SC_TEST_EXPECT(state.resumeThreadID == ownerThreadID);
         SC_TEST_EXPECT(not scheduler.hasActiveFibers());
         SC_TEST_EXPECT(eventLoop.close());
     }
