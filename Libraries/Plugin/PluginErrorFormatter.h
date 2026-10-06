@@ -117,6 +117,7 @@ inline bool appendPluginError(ResultErrorFormatter& formatter, PluginError error
     case PluginError::PluginInitializationFailed: formatter.append("Plugin initialization failed"); break;
     case PluginError::PluginShutdownFailed: formatter.append("Plugin shutdown failed"); break;
     case PluginError::DebuggerUnlockFailed: formatter.append("Failed to unlock debugger file"); break;
+    case PluginError::ReloadUnsupported: formatter.append("Plugin reload is unsupported by this runtime"); break;
     default: return false;
     }
     return true;

@@ -69,6 +69,26 @@ Without `SC::Build`, define the corresponding switches consistently for the host
 
 A plugin metadata block can request `libc` and `libc++` through its `Build` field. `PluginSysroot` then supplies the system include and library paths. That is useful when an extension genuinely needs the standard runtime, but it increases the ABI surface and does not make mismatched host/plugin toolchains safe. `findBestCompiler` and `findBestSysroot` are conveniences for local developer machines, not deployment guarantees; production tooling should be prepared to configure paths explicitly and report discovery failures.
 
+# Experimental Fil-C hosts
+
+Plugins must use the same Fil-C distribution and compatible ABI as the loading executable, not the host
+system compiler. `PluginCompiler::findBestCompiler` requires `SC_FILC_PLUGIN_COMPILER`; the optional
+`SC_FILC_PLUGIN_LINKER` selects a separate linker driver and otherwise defaults to that compiler.
+`SC.sh build run` supplies both from the selected Fil-C toolchain, including `--toolchain filc-glibc`.
+Hosts outside SC-Build may instead configure the public compiler and linker paths explicitly.
+
+Fil-C compiler/linker subprocesses receive an empty `LD_LIBRARY_PATH`. The loading executable's
+instrumented library paths must not contaminate native compiler tools. Additional compiler dependencies
+should be supplied by a launcher that configures its own native environment.
+
+Closing a Fil-C plugin calls its explicit close entry point and releases its instance and logical handle,
+but does not physically unload its module or run unload destructors. Rootless Fil-C can load replaced
+code; every version can remain resident, so repeated hot reload is not a bounded-memory operation.
+Fil-C glibc currently reuses the old module on same-path reload, so `LoadMode::Reload` returns
+`PluginError::ReloadUnsupported` without changing the live plugins. Compile/load/interface tests run for
+both distributions; same-path reload coverage is excluded only for Fil-C glibc. Static-destructor cleanup
+and physical module reclamation must not be assumed on either distribution.
+
 # Relationships and tradeoffs
 
 `Plugin` deliberately delegates adjacent concerns:

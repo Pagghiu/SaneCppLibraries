@@ -49,6 +49,7 @@ enum class PluginError : uint32_t
     PluginInitializationFailed,
     PluginShutdownFailed,
     DebuggerUnlockFailed,
+    ReloadUnsupported,
 };
 
 /// @brief Stable operation or backend stage retained for a Plugin failure.

@@ -507,7 +507,18 @@ struct SC::PluginCompiler::CompilerFinder
 #endif
 SC::ResultPlugin SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 {
-#if SC_PLATFORM_WINDOWS
+#if SC_COMPILER_FILC
+    ProcessEnvironment environment;
+    StringSpan         compilerPath;
+    if (not environment.get("SC_FILC_PLUGIN_COMPILER", compilerPath) or compilerPath.isEmpty())
+        return ResultPlugin(PluginError::CompilerNotFound, PluginErrorDetail::CompilerFindConfiguration);
+    StringSpan linkerPath;
+    if (not environment.get("SC_FILC_PLUGIN_LINKER", linkerPath) or linkerPath.isEmpty())
+        linkerPath = compilerPath;
+    compiler.type = Type::ClangCompiler;
+    if (not compiler.compilerPath.assign(compilerPath) or not compiler.linkerPath.assign(linkerPath))
+        return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
+#elif SC_PLATFORM_WINDOWS
     // TODO: can we use findLatest in order to avoid finding best compiler version...?
     FixedVector<StringPath, 8> rootPaths;
     SC_TRY(VisualStudioPathFinder().findAll(rootPaths))
@@ -671,6 +682,10 @@ SC::ResultPlugin SC::PluginCompiler::compileFile(const PluginDefinition& definit
                                                   PluginErrorDetail::CompilerWriteArguments,
                                                   static_cast<uint32_t>(numberOfArguments));
     Process process;
+#if SC_COMPILER_FILC
+    // Native compiler tools must not load instrumented libraries inherited from the host.
+    SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", ""));
+#endif
     if (type == Type::ClangCompiler)
     {
         SC_TRY(process.exec({arguments, numberOfArguments}, Process::StdOut::Inherit(), Process::StdIn::Inherit(),
@@ -822,6 +837,9 @@ SC::ResultPlugin SC::PluginCompiler::link(const PluginDefinition& definition, co
                                                   PluginErrorDetail::LinkerWriteArguments,
                                                   static_cast<uint32_t>(numberOfStrings));
     Process process;
+#if SC_COMPILER_FILC
+    SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", ""));
+#endif
     if (type == Type::ClangCompiler)
     {
         SC_TRY(process.exec({args, numberOfStrings}, Process::StdOut::Inherit(), Process::StdIn::Inherit(), linkerLog));
@@ -1134,6 +1152,10 @@ SC::ResultPlugin SC::PluginRegistry::loadPlugin(StringSpan identifier, const Plu
     if (res == nullptr)
         return ResultPlugin(PluginError::PluginNotFound, PluginErrorDetail::RegistryFindPlugin);
     PluginDynamicLibrary& lib = *res;
+#if SC_COMPILER_FILC && defined(__GLIBC__)
+    if (loadMode == LoadMode::Reload)
+        return ResultPlugin(PluginError::ReloadUnsupported);
+#endif
     if (loadMode == LoadMode::Reload or not lib.dynamicLibrary.isValid())
     {
         // TODO: Shield against circular dependencies

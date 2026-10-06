@@ -27,6 +27,8 @@ struct SC::detail::SystemDynamicLibraryDefinition
 };
 
 /// @brief Loads dynamic libraries to obtain and invoke functions in current process.
+/// @details Fil-C close releases the logical handle only: module mappings remain resident and unload
+/// destructors are not run. Fil-C glibc may reuse the original module on same-path reload.
 struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDynamicLibraryDefinition>
 {
     /// @brief Loads a dynamic library at given path

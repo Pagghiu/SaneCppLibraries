@@ -1505,6 +1505,13 @@ struct SC::Build::NativeBuild
         String curlFilCLibraryPath        = StringEncoding::Utf8;
         String opensslFilCLibraryPath     = StringEncoding::Utf8;
         String nghttp2FilCLibraryPath     = StringEncoding::Utf8;
+        if (action.parameters.toolchain.family == Toolchain::FilC)
+        {
+            CompilerAdapter pluginAdapter;
+            SC_TRY(resolveCompilerAdapter(action.parameters, targetContext, pluginAdapter));
+            SC_TRY(process.setEnvironment("SC_FILC_PLUGIN_COMPILER", pluginAdapter.executableCpp.view()));
+            SC_TRY(process.setEnvironment("SC_FILC_PLUGIN_LINKER", pluginAdapter.executableLink.view()));
+        }
         if (action.parameters.toolchain.family == Toolchain::FilC and not action.parameters.toolchain.filcGlibc)
         {
             Tools::Package zlibPackage;

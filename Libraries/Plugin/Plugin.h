@@ -224,6 +224,8 @@ struct PluginCompiler
     FixedVector<StringPath, 8> compilerLibraryPaths; ///< Path to compiler library directories
 
     /// @brief Look for best compiler on current system
+    /// @details Fil-C requires SC_FILC_PLUGIN_COMPILER to name the matching instrumented compiler.
+    /// SC_FILC_PLUGIN_LINKER optionally overrides its linker driver. SC-Build supplies both when running.
     /// @param[out] compiler Best compiler found
     /// @return Valid Result if best compiler has been found
     [[nodiscard]] static ResultPlugin findBestCompiler(PluginCompiler& compiler);
@@ -328,6 +330,8 @@ struct PluginRegistry
     /// @param executablePath The loader executable path holding symbols used by the plugin
     /// @param loadMode If to load or force reload of the plugin
     /// @return Valid Result if the plugin has been found, compiled, loaded and inited successfully
+    /// @details Fil-C glibc rejects LoadMode::Reload with PluginError::ReloadUnsupported without changing live plugins.
+    /// Rootless Fil-C reload retains old module mappings; it does not provide bounded-memory module reclamation.
     ResultPlugin loadPlugin(StringSpan identifier, const PluginCompiler& compiler, const PluginSysroot& sysroot,
                             StringSpan executablePath, LoadMode loadMode = LoadMode::Load);
 

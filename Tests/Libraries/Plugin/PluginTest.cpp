@@ -39,6 +39,37 @@ struct SC::PluginTest : public SC::TestCase
     PluginTest(SC::TestReport& report) : TestCase(report, "PluginTest")
     {
         using namespace SC;
+#if SC_COMPILER_FILC
+        if (test_section("Fil-C compiler discovery"))
+        {
+            ProcessEnvironment environment;
+            StringSpan         compilerPath;
+            PluginCompiler     compiler;
+            const ResultPlugin result = PluginCompiler::findBestCompiler(compiler);
+            if (not environment.get("SC_FILC_PLUGIN_COMPILER", compilerPath) or compilerPath.isEmpty())
+            {
+                SC_TEST_EXPECT(result.isError(PluginError::CompilerNotFound));
+                SC_TEST_EXPECT(result.detail == PluginErrorDetail::CompilerFindConfiguration);
+            }
+            else
+            {
+                SC_TEST_EXPECT(result);
+                SC_TEST_EXPECT(compiler.type == PluginCompiler::Type::ClangCompiler);
+                SC_TEST_EXPECT(compiler.compilerPath.view() == compilerPath);
+                StringSpan linkerPath;
+                if (not environment.get("SC_FILC_PLUGIN_LINKER", linkerPath) or linkerPath.isEmpty())
+                    linkerPath = compilerPath;
+                SC_TEST_EXPECT(compiler.linkerPath.view() == linkerPath);
+
+                Process child;
+                SC_TEST_EXPECT(child.setEnvironment("SC_FILC_PLUGIN_COMPILER", ""));
+                SC_TEST_EXPECT(child.setEnvironment("SC_FILC_PLUGIN_LINKER", ""));
+                SC_TEST_EXPECT(child.exec({report.executableFile.view(), "--test", "PluginTest", "--test-section",
+                                           "Fil-C compiler discovery"}));
+                SC_TEST_EXPECT(child.getExitStatus() == 0);
+            }
+        }
+#endif
 #if SC_PLATFORM_WINDOWS
         if (test_section("Visual Studio discovery respects captured output length"))
         {
@@ -105,13 +136,6 @@ struct SC::PluginTest : public SC::TestCase
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
-#if SC_COMPILER_FILC
-            if (not report.quietMode)
-            {
-                report.console.printLine("PluginTest - Skipping plugin compile/load under Fil-C: plugin "
-                                         "toolchain/runtime ABI integration is not implemented");
-            }
-#else
             StringPath sourcePluginsPath;
             SC_TEST_EXPECT(Path::join(sourcePluginsPath, {report.libraryRootDirectory.view(), "Tests", "Libraries",
                                                           "Plugin", "PluginTestDirectory"}));
@@ -156,7 +180,9 @@ struct SC::PluginTest : public SC::TestCase
             const auto   parentItem             = definitions[parentIndex];
             const auto   identifierChildString  = childItem.identity.identifier;
             const auto   identifierParentString = parentItem.identity.identifier;
-            const auto   pluginScriptPath       = childItem.getMainPluginFile().absolutePath;
+#if not SC_COMPILER_FILC || not defined(__GLIBC__)
+            const auto pluginScriptPath = childItem.getMainPluginFile().absolutePath;
+#endif
 
             const StringView identifierChild  = identifierChildString.view();
             const StringView identifierParent = identifierParentString.view();
@@ -259,6 +285,18 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(missingSymbolResult.contextKind == PluginErrorContextKind::None);
 #endif
 
+#if SC_COMPILER_FILC && defined(__GLIBC__)
+            const ResultPlugin reloadResult = registry.loadPlugin(
+                identifierChild, compiler, sysroot, report.executableFile.view(), PluginRegistry::LoadMode::Reload);
+            SC_TEST_EXPECT(reloadResult.isError(PluginError::ReloadUnsupported));
+            SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(pluginParent->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(interface1->multiplyInt(2) == 4);
+            SC_TEST_EXPECT(isPluginOriginal());
+            if (not report.quietMode)
+                report.console.printLine(
+                    "PluginTest - Skipping same-path reload: Fil-C glibc retains the original module");
+#else
             // Modify child plugin to change return value of the exported function
             String sourceContent = StringEncoding::Ascii;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent));
@@ -280,6 +318,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.getSymbol("isPluginOriginal", isPluginOriginal));
             SC_TEST_EXPECT(not isPluginOriginal());
+#endif
 
             // Unload parent plugin
             SC_TEST_EXPECT(registry.unloadPlugin(identifierParent));
@@ -291,17 +330,9 @@ struct SC::PluginTest : public SC::TestCase
             // Cleanup
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierChild));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
-#endif
         }
         if (test_section("PluginCompiler can include C++ headers without linking the C++ runtime"))
         {
-#if SC_COMPILER_FILC
-            if (not report.quietMode)
-            {
-                report.console.printLine("PluginTest - Skipping plugin compile under Fil-C: plugin "
-                                         "toolchain/runtime ABI integration is not implemented");
-            }
-#else
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
@@ -372,7 +403,6 @@ SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
             char                      compilerLogStorage[4096];
             Span<char>                compilerLog = {compilerLogStorage};
             SC_TEST_EXPECT(compiler.compile(definitions[0], sysroot, environment, compilerLog));
-#endif
         }
     }
 
