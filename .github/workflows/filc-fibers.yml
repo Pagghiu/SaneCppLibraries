@@ -8,9 +8,11 @@ on:
       - 'Support/Scripts/*FilC*'
       - 'Libraries/Fibers/**'
       - 'Libraries/AsyncFibers/**'
+      - 'Libraries/Plugin/**'
       - 'Libraries/Foundation/Internal/LibC*.inl'
       - 'Tests/Libraries/Fibers/**'
       - 'Tests/Libraries/AsyncFibers/**'
+      - 'Tests/Libraries/Plugin/**'
       - 'Tools/SC-build*'
       - 'Tools/SC-build/**'
   workflow_dispatch:
@@ -35,3 +37,5 @@ jobs:
         run: ./Support/Scripts/PrepareFilCGlibcCI.sh
       - name: Validate runtime-owned scheduler and AsyncFibers
         run: ./Support/Scripts/RunFilCFiberTests.sh Release
+      - name: Validate plugin compilation and interfaces
+        run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test PluginTest
