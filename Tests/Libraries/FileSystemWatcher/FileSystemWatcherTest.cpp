@@ -53,6 +53,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
         FileSystemWatcher                fileEventsWatcher;
         FileSystemWatcher::FolderWatcher watcher;
+        watcher.notifyCallback = [](const FileSystemWatcher::Notification&) {};
 
         const ResultFileSystemWatcher notInitialized = fileEventsWatcher.watch(watcher, appDirectory);
         SC_TEST_EXPECT(notInitialized.isError(FileSystemWatcherError::NotInitialized));
