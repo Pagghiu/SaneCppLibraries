@@ -106,7 +106,8 @@ struct SC_FIBERS_EXPORT FiberContextOperations
     static Result captureCurrent(FiberContext& context);
     static Result create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData);
     static void   switchTo(FiberContext& from, FiberContext& to);
-    static void   switchToAndFinish(FiberContext& from, FiberContext& to);
+
+    [[noreturn]] static void switchToAndFinish(FiberContext& from, FiberContext& to);
 
   private:
     static void switchTo(FiberContext& from, FiberContext& to, bool finish);

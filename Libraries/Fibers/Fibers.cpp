@@ -5659,9 +5659,6 @@ void FiberScheduler::taskEntry(void* userData)
     SC_FIBERS_ASSERT_RELEASE(worker != nullptr);
     SC_FIBERS_ASSERT_RELEASE(worker->scheduler() == &scheduler);
     FiberContextOperations::switchToAndFinish(task.context(), worker->rootContext());
-
-    SC_FIBERS_ASSERT_RELEASE(false);
-    Assert::unreachable();
 }
 
 FiberTask::FiberTask() = default;
