@@ -42,4 +42,4 @@ jobs:
       - name: Validate plugin compilation and interfaces
         run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test PluginTest
       - name: Validate process launch and signal inheritance
-        run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test ProcessTest --test-section "Process inherited signals"
+        run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test ProcessTest

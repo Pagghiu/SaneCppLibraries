@@ -1554,10 +1554,6 @@ struct SC::Build::NativeBuild
             SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", zlibFilCLibraryPathStorage.view()));
             globalConsole->print("LD_LIBRARY_PATH = {}\n", zlibFilCLibraryPathStorage.view());
         }
-        else if (action.parameters.toolchain.family == Toolchain::FilC)
-        {
-            SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", "/opt/fil/lib"));
-        }
         globalConsole->flush();
         SC_TRY(process.exec({arguments, numArguments}));
         if (process.getExitStatus() != 0)

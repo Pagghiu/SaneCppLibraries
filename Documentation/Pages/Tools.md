@@ -164,8 +164,11 @@ installed beforehand. SC-Build does not perform privileged installation or repla
 ```
 
 This profile uses separate `filc-glibc` output/intermediate directories, `/opt/fil/lib` for runtime dependencies,
-and the bundled libc++abi for TLS destructor registration. It never prepares or loads the rootless package-local
-dependencies. Fiber contexts require explicit runtime-owned stacks and a thread-pinned scheduler opt-in;
+and the bundled libc++abi for TLS destructor registration. The compiler-selected Fil-C loader already searches
+`/opt/fil/lib`; the runner does not inject that path into `LD_LIBRARY_PATH`, so native subprocesses retain their
+normal library lookup. User-provided loader environment variables are still inherited. It never prepares or loads
+the rootless package-local dependencies. Fiber contexts require explicit runtime-owned stacks and a thread-pinned
+scheduler opt-in;
 caller-stack/guard-page modes and multi-threaded fiber scheduling remain unsupported. Always-on CI continues
 to use the rootless profile. The separate `Fil-C Fibers` workflow validates the glibc profile in Release on
 native ARM Linux weekly, on manual dispatch, and on relevant pushes to the experimental `filc` branch,
