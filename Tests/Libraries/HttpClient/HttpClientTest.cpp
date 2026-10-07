@@ -11,6 +11,7 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Threading/Atomic.h"
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
 
@@ -3553,6 +3554,79 @@ struct SC::HttpClientTest : public SC::TestCase
     {
         static constexpr size_t PayloadSize = 8 * 1024 * 1024;
 
+        struct Watchdog
+        {
+            Atomic<bool> finished     = false;
+            Atomic<bool> waitingDrain = false;
+
+            Atomic<int32_t> phase = 0;
+
+            Atomic<int32_t> serverRemaining = 0;
+            Atomic<int32_t> clientReceived  = 0;
+            Atomic<int32_t> responseHeads   = 0;
+            Atomic<int32_t> drainCallbacks  = 0;
+            Atomic<int32_t> writerStop      = 0;
+
+            Atomic<int32_t> requestStartedMs = -1;
+
+            const Time::Monotonic started = Time::Monotonic::now();
+
+            Thread thread;
+
+            void print(const char* reason)
+            {
+                const char* phases[]      = {"setup",        "request start", "transfer",  "operation close",
+                                             "server close", "client close",  "loop close"};
+                const char* writerStops[] = {"not started", "buffer unavailable", "write rejected", "end requested"};
+                fprintf(stderr,
+                        "HttpClientTest async download large %s; last observed phase=%s serverRemaining=%d "
+                        "clientReceived=%d responseHeads=%d waitingDrain=%d drainCallbacks=%d writerStop=%s\n",
+                        reason, phases[phase.load()], serverRemaining.load(), clientReceived.load(),
+                        responseHeads.load(), static_cast<int>(waitingDrain.load()), drainCallbacks.load(),
+                        writerStops[writerStop.load()]);
+                fflush(stderr);
+            }
+
+            ~Watchdog()
+            {
+                finished.store(true);
+                if (thread.wasStarted())
+                {
+                    (void)thread.join();
+                }
+            }
+        } watchdog;
+        watchdog.serverRemaining.store(static_cast<int32_t>(PayloadSize));
+        Watchdog*    watchdogPointer = &watchdog;
+        const Result watchdogStarted = watchdog.thread.start(
+            [watchdogPointer](Thread&)
+            {
+                bool reportedSlow = false;
+                while (not watchdogPointer->finished.load())
+                {
+                    const auto    sinceSetup       = Time::Monotonic::now().subtractExact(watchdogPointer->started).ms;
+                    const int32_t requestStartedMs = watchdogPointer->requestStartedMs.load();
+                    const auto    elapsed          = requestStartedMs < 0 ? sinceSetup : sinceSetup - requestStartedMs;
+                    if (requestStartedMs >= 0 and elapsed > 10000 and not reportedSlow)
+                    {
+                        watchdogPointer->print("exceeded 10 seconds");
+                        reportedSlow = true;
+                    }
+                    // Allow the unchanged 30-second request timeout to report its own error first.
+                    if (elapsed > 45000)
+                    {
+                        watchdogPointer->print("exceeded 45 seconds");
+                        abort();
+                    }
+                    Thread::Sleep(10);
+                }
+            });
+        SC_TEST_EXPECT(watchdogStarted);
+        if (not watchdogStarted)
+        {
+            return;
+        }
+
         using DownloadMemory = AsyncOperationMemory<1024 * 1024, 32, 64, 8, 8192, 16 * 1024>;
         void* memoryStorage  = malloc(sizeof(DownloadMemory));
         SC_TEST_EXPECT(memoryStorage != nullptr);
@@ -3580,8 +3654,12 @@ struct SC::HttpClientTest : public SC::TestCase
         struct LargeResponseWriter
         {
             HttpConnection* connection   = nullptr;
+            Watchdog*       progress     = nullptr;
             size_t          remaining    = 0;
             bool            waitingDrain = false;
+
+            Result lastWriteResult = Result(true);
+            Result endResult       = Result(true);
 
             void start(HttpConnection& client, size_t total)
             {
@@ -3592,6 +3670,7 @@ struct SC::HttpClientTest : public SC::TestCase
 
             void onDrain()
             {
+                progress->drainCallbacks.fetch_add(1);
                 if (waitingDrain)
                 {
                     waitingDrain = false;
@@ -3612,6 +3691,7 @@ struct SC::HttpClientTest : public SC::TestCase
                     Span<char>          data;
                     if (not pool.requestNewBuffer(1, bufferID, data))
                     {
+                        progress->writerStop.store(1);
                         break;
                     }
 
@@ -3626,13 +3706,16 @@ struct SC::HttpClientTest : public SC::TestCase
                     }
                     else
                     {
+                        lastWriteResult = res;
+                        progress->writerStop.store(2);
                         break;
                     }
                 }
 
                 if (remaining == 0)
                 {
-                    (void)connection->response.end();
+                    progress->writerStop.store(3);
+                    endResult = connection->response.end();
                 }
                 else if (not waitingDrain)
                 {
@@ -3641,8 +3724,11 @@ struct SC::HttpClientTest : public SC::TestCase
                         writable.eventDrain.addListener<LargeResponseWriter, &LargeResponseWriter::onDrain>(*this);
                     SC_ASSERT_RELEASE(added);
                 }
+                progress->serverRemaining.store(static_cast<int32_t>(remaining));
+                progress->waitingDrain.store(waitingDrain);
             }
         } writer;
+        writer.progress = &watchdog;
 
         server.server.onRequest = [&writer](HttpConnection& client)
         {
@@ -3671,19 +3757,25 @@ struct SC::HttpClientTest : public SC::TestCase
         struct DownloadContext
         {
             AsyncClientOperation* operation = nullptr;
+            Watchdog*             progress  = nullptr;
 
             size_t* received  = nullptr;
             bool*   completed = nullptr;
             Result* finalRes  = nullptr;
             int*    headCount = nullptr;
 
-            void onHead(HttpClientResponse&) { *headCount += 1; }
+            void onHead(HttpClientResponse&)
+            {
+                *headCount += 1;
+                progress->responseHeads.store(*headCount);
+            }
 
             void onData(AsyncBufferView::ID bufferID)
             {
                 Span<const char> data;
                 SC_ASSERT_RELEASE(operation->getResponseBodyStream().getBuffersPool().getReadableData(bufferID, data));
                 *received += data.sizeInBytes();
+                progress->clientReceived.store(static_cast<int32_t>(*received));
             }
 
             void onEnd() { *completed = true; }
@@ -3693,7 +3785,7 @@ struct SC::HttpClientTest : public SC::TestCase
                 *completed = true;
                 *finalRes  = error;
             }
-        } downloadCtx = {&operation, &received, &completed, &finalRes, &headCount};
+        } downloadCtx = {&operation, &watchdog, &received, &completed, &finalRes, &headCount};
 
         const bool headAdded =
             operation.eventResponseHead.addListener<DownloadContext, &DownloadContext::onHead>(downloadCtx);
@@ -3711,21 +3803,41 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(endAdded);
         SC_TEST_EXPECT(errorAdded);
 
+        watchdog.phase.store(1);
+        watchdog.requestStartedMs.store(
+            static_cast<int32_t>(Time::Monotonic::now().subtractExact(watchdog.started).ms));
         SC_TEST_EXPECT(operation.start(request, response));
+        watchdog.phase.store(2);
         while (not completed)
         {
             SC_TEST_EXPECT(loop.runOnce());
         }
 
+        if (not finalRes)
+        {
+            watchdog.print("terminal error");
+            fprintf(stderr,
+                    "HttpClientTest async download large result=%u/%u received=%llu heads=%d "
+                    "writerRemaining=%llu waitingDrain=%d lastWrite=%u/%u end=%u/%u\n",
+                    finalRes.category().value, finalRes.errorValue(), static_cast<unsigned long long>(received),
+                    headCount, static_cast<unsigned long long>(writer.remaining), static_cast<int>(writer.waitingDrain),
+                    writer.lastWriteResult.category().value, writer.lastWriteResult.errorValue(),
+                    writer.endResult.category().value, writer.endResult.errorValue());
+            fflush(stderr);
+        }
         SC_TEST_EXPECT(finalRes);
         SC_TEST_EXPECT(headCount == 1);
         SC_TEST_EXPECT(received == PayloadSize);
         SC_TEST_EXPECT(response.statusCode == 200);
 
+        watchdog.phase.store(3);
         SC_TEST_EXPECT(operation.close());
+        watchdog.phase.store(4);
         SC_TEST_EXPECT(server.server.stop());
         SC_TEST_EXPECT(server.server.close());
+        watchdog.phase.store(5);
         SC_TEST_EXPECT(client.close());
+        watchdog.phase.store(6);
         SC_TEST_EXPECT(loop.close());
     }
 
