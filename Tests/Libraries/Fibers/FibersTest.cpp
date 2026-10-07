@@ -1384,6 +1384,12 @@ struct SC::FibersTest : public SC::TestCase
             bool*              workerSucceeded = nullptr;
             Atomic<int32_t>    started;
             Atomic<int32_t>    completed;
+            Atomic<int32_t>    barrierWaiters;
+            Atomic<int32_t>    workersLaunched;
+            Atomic<int32_t>    workersExited;
+            Atomic<int32_t>    workersFailed;
+            Atomic<int32_t>    phase;
+            Atomic<int32_t>    joiningWorker{-1};
 
             Result spawnChildren()
             {
@@ -1396,9 +1402,11 @@ struct SC::FibersTest : public SC::TestCase
                                                                      const int32_t ticket = state->started.fetch_add(1);
                                                                      if (ticket < static_cast<int32_t>(NumWorkers))
                                                                      {
+                                                                         state->barrierWaiters.fetch_add(1);
                                                                          while (state->started.load() <
                                                                                 static_cast<int32_t>(NumWorkers))
                                                                          {}
+                                                                         state->barrierWaiters.fetch_sub(1);
                                                                      }
                                                                      state->runCounts[index].fetch_add(1);
                                                                      state->completed.fetch_add(1);
@@ -1425,6 +1433,50 @@ struct SC::FibersTest : public SC::TestCase
         state.runCounts       = runCounts;
         state.workerSucceeded = workerSucceeded;
 
+        struct Watchdog
+        {
+            Atomic<bool> finished;
+            Thread       thread;
+
+            ~Watchdog()
+            {
+                finished.store(true);
+                if (thread.wasStarted())
+                {
+                    (void)thread.join();
+                }
+            }
+        } watchdog;
+        State*    statePointer    = &state;
+        Watchdog* watchdogPointer = &watchdog;
+        SC_TEST_EXPECT(watchdog.thread.start(
+            [statePointer, watchdogPointer](Thread&)
+            {
+                const Time::Monotonic started = Time::Monotonic::now();
+                while (not watchdogPointer->finished.load())
+                {
+                    if (Time::Monotonic::now().subtractExact(started).ms > 30000)
+                    {
+                        const char* phases[] = {"setup", "worker launch", "worker join", "verification", "cleanup"};
+                        fprintf(stderr,
+                                "FibersTest concurrent stealing exceeded 30 seconds; last observed phase=%s "
+                                "joiningWorker=%d workersLaunched=%d workersExited=%d workersFailed=%d "
+                                "jobsStarted=%d jobsCompleted=%d barrierWaiters=%d\n",
+                                phases[statePointer->phase.load()], statePointer->joiningWorker.load(),
+                                statePointer->workersLaunched.load(), statePointer->workersExited.load(),
+                                statePointer->workersFailed.load(), statePointer->started.load(),
+                                statePointer->completed.load(), statePointer->barrierWaiters.load());
+                        fflush(stderr);
+                        abort();
+                    }
+                    Thread::Sleep(10);
+                }
+            }));
+        if (not watchdog.thread.wasStarted())
+        {
+            return;
+        }
+
         for (Atomic<int32_t>& runCount : runCounts)
         {
             runCount.store(0);
@@ -1432,10 +1484,10 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
         SC_TEST_EXPECT(scheduler.create(readyStorage));
         SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, workers, NumChildren));
-        State* statePointer = &state;
         SC_TEST_EXPECT(scheduler.spawn(
             jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&) { return statePointer->spawnChildren(); })));
 
+        state.phase.store(1);
         for (size_t index = 0; index < NumWorkers; ++index)
         {
             State* threadState = &state;
@@ -1450,17 +1502,28 @@ struct SC::FibersTest : public SC::TestCase
                         if (not result)
                         {
                             threadState->workerSucceeded[index] = false;
+                            threadState->workersFailed.fetch_add(1);
+                            threadState->workersExited.fetch_add(1);
                             return;
                         }
                     }
+                    threadState->workersExited.fetch_add(1);
                 }));
+            if (threads[index].wasStarted())
+            {
+                state.workersLaunched.fetch_add(1);
+            }
         }
+        state.phase.store(2);
         for (size_t index = 0; index < NumWorkers; ++index)
         {
+            state.joiningWorker.store(static_cast<int32_t>(index));
             SC_TEST_EXPECT(threads[index].join());
             SC_TEST_EXPECT(workerSucceeded[index]);
         }
 
+        state.joiningWorker.store(-1);
+        state.phase.store(3);
         SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(NumChildren));
         SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumChildren));
         for (Atomic<int32_t>& runCount : runCounts)
@@ -1477,6 +1540,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(stolenJobs > 0);
         SC_TEST_EXPECT(not scheduler.hasReadyJobs());
         SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+        state.phase.store(4);
         scheduler.releaseWorkerDeques(workers);
         SC_TEST_EXPECT(scheduler.close());
         SC_TEST_EXPECT(allocator.close());
