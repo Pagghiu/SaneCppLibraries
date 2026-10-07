@@ -8,14 +8,18 @@ on:
       - 'Support/Scripts/*FilC*'
       - 'Libraries/Fibers/**'
       - 'Libraries/AsyncFibers/**'
+      - 'Libraries/Await/**'
       - 'Libraries/Plugin/**'
       - 'Libraries/Process/**'
       - 'Libraries/Foundation/Internal/LibC*.inl'
       - 'Tests/Libraries/Fibers/**'
       - 'Tests/Libraries/AsyncFibers/**'
+      - 'Tests/Libraries/Await/**'
+      - 'Tests/SCAwaitTest/**'
       - 'Tests/Libraries/Plugin/**'
       - 'Tests/Libraries/Process/**'
       - 'Tools/SC-build*'
+      - 'Tools/SC-Build.cpp'
       - 'Tools/SC-build/**'
   workflow_dispatch:
   schedule:
@@ -43,3 +47,7 @@ jobs:
         run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test PluginTest
       - name: Validate process launch and signal inheritance
         run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test ProcessTest
+      - name: Validate C++20 Await
+        run: |
+          ./SC.sh build compile SCAwaitTest Release native --toolchain filc-glibc
+          ./SC.sh build run SCAwaitTest Release native --toolchain filc-glibc

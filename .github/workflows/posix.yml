@@ -434,6 +434,11 @@ jobs:
           _Build/_Packages/filc_*
         key: ${{ steps.filc-cache.outputs.cache-primary-key }}
 
+    - name: Validate C++20 coroutine shim with Fil-C
+      run: |
+        ./SC.sh build compile SCAwaitCoroutineShimTest Release native --toolchain filc
+        ./SC.sh build run SCAwaitCoroutineShimTest Release native --toolchain filc
+
   timing-summary:
     runs-on: ubuntu-latest
     needs: [build, filc-linux-experimental]

@@ -178,6 +178,20 @@ checksum-pinned upstream archive and installs only its `/opt/fil` payload on dis
 For a preinstalled local distribution, run `./Support/Scripts/RunFilCFiberTests.sh Debug` (or `Release`).
 This runner requires actual runtime-owned stack support; unsupported-path test results cannot pass it.
 
+Fil-C 0.686 also supports the separate experimental C++20 Await target, without linking the C++ standard-library
+runtime. Build before running it:
+
+```bash
+./SC.sh build compile SCAwaitTest Release native --toolchain filc-glibc
+./SC.sh build run SCAwaitTest Release native --toolchain filc-glibc
+```
+
+Use `--toolchain filc` for the rootless profile. The glibc workflow checks full Await in Release; always-on
+rootless CI checks the small no-standard-header coroutine shim to avoid duplicating a full library build.
+Upstream describes coroutine support as initial and notes possible additional stack-overflow panics; see the
+[0.686 release notes](https://github.com/pizlonator/fil-c/releases/tag/v0.686). This does not change the fiber
+stack-ownership or migration restrictions above.
+
 Rootless `--toolchain filc` runs also prepare package-local `zlib-filc`, `openssl-filc`, `nghttp2-filc` and `curl-filc` libraries and prepend their library directories to
 `LD_LIBRARY_PATH`. Host libraries are not ABI-compatible with Fil-C. No system library is replaced.
 

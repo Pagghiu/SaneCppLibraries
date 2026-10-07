@@ -37,7 +37,7 @@ static void* alignPointer(void* pointer, size_t alignment)
 {
     const size_t address        = reinterpret_cast<size_t>(pointer);
     const size_t alignedAddress = (address + alignment - 1) & ~(alignment - 1);
-    return reinterpret_cast<void*>(alignedAddress);
+    return static_cast<char*>(pointer) + (alignedAddress - address);
 }
 
 static size_t alignSize(size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); }

@@ -353,6 +353,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             allocator();
         }
+        if (test_section("allocator alignment"))
+        {
+            allocatorAlignment();
+        }
         if (test_section("allocator exhaustion"))
         {
             allocatorExhaustion();
@@ -4210,6 +4214,58 @@ struct SC::AwaitTest : public SC::TestCase
             ::free(memory);
         }
     };
+
+    void allocatorAlignment()
+    {
+        alignas(64) char storage[4096 + 64] = {};
+
+        int owner = 0;
+
+        auto checkAllocation = [&](AwaitAllocator& allocator, size_t size, size_t alignment) -> void*
+        {
+            void* memory = allocator.allocate(&owner, size, alignment);
+            SC_TEST_EXPECT(memory != nullptr);
+            if (memory != nullptr)
+            {
+                SC_TEST_EXPECT(reinterpret_cast<size_t>(memory) % alignment == 0);
+                void** pointerSlot = static_cast<void**>(memory);
+                *pointerSlot       = &owner;
+                SC_TEST_EXPECT(*pointerSlot == &owner);
+            }
+            return memory;
+        };
+
+        for (size_t offset = 1; offset <= 16; ++offset)
+        {
+            AwaitAllocator fixed;
+            SC_TEST_EXPECT(fixed.createFixed({storage + offset, 4096}));
+            void* first  = checkAllocation(fixed, 64, 16);
+            void* second = checkAllocation(fixed, 64, 64);
+            fixed.release(first);
+            fixed.release(second);
+            SC_TEST_EXPECT(fixed.used() == 0);
+            void* merged = checkAllocation(fixed, 3000, 64);
+            AwaitAllocator::releaseFromAnyAllocator(merged);
+            SC_TEST_EXPECT(fixed.used() == 0);
+            SC_TEST_EXPECT(fixed.close());
+        }
+
+        AwaitAllocator mallocAllocator;
+        SC_TEST_EXPECT(mallocAllocator.createMalloc());
+        void* mallocMemory = checkAllocation(mallocAllocator, 128, 64);
+        AwaitAllocator::releaseFromAnyAllocator(mallocMemory);
+        SC_TEST_EXPECT(mallocAllocator.used() == 0);
+        SC_TEST_EXPECT(mallocAllocator.close());
+
+        TrackingAllocatorInterface tracking;
+        AwaitAllocator             polymorphic;
+        SC_TEST_EXPECT(polymorphic.createPolymorphic(tracking));
+        void* customMemory = checkAllocation(polymorphic, 128, 64);
+        AwaitAllocator::releaseFromAnyAllocator(customMemory);
+        SC_TEST_EXPECT(tracking.numAllocations == 1);
+        SC_TEST_EXPECT(tracking.numReleases == 1);
+        SC_TEST_EXPECT(polymorphic.close());
+    }
 
     void allocator()
     {
