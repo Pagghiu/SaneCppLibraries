@@ -46,6 +46,11 @@ root context, and the facade does not hide allocation or lifetime ownership. Gro
 slots remain retained until group reset as required by FIBERS-0015, while their stack slots still release at
 root-context completion.
 
+AddressSanitizer follows the same lifetime boundary: a terminal context switch destroys the completed fiber's fake
+stack, and its actual stack shadow is unpoisoned only after execution has left that stack. Ordinary yield and suspend
+switches preserve sanitizer state. The completed-stack-storage-reuse regression checks that returned caller storage
+can be overwritten and reused after a task has yielded and completed.
+
 ## Related
 
 - [FIBERS-0002 - Use explicit FiberAllocator storage for scalable runtime memory](fibers-0002-use-explicit-fiberallocator-storage-for-scalable-runtime-memory.md)

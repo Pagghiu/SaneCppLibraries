@@ -11,6 +11,7 @@
 #include "Libraries/Time/Time.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if !SC_PLATFORM_WINDOWS
 #include <signal.h>
@@ -145,6 +146,35 @@ struct SC::FibersTest : public SC::TestCase
         {
             schedulerYield();
         }
+#if !SC_COMPILER_FILC
+        if (test_section("completed stack storage reuse"))
+        {
+            static char stackMemory[64 * 1024];
+            for (size_t iteration = 0; iteration < 2; ++iteration)
+            {
+                FiberScheduler scheduler;
+                FiberTask      task;
+                FiberStack     stack({stackMemory, sizeof(stackMemory)});
+                SC_TEST_EXPECT(scheduler.spawn(
+                    task, stack,
+                    FiberTask::Procedure(
+                        [](FiberScheduler& owner) -> Result
+                        {
+                            volatile char local[32] = {};
+                            local[0]                = 42;
+                            SC_TRY(owner.yield());
+                            return local[0] == 42 ? Result(true)
+                                                  : fibersTestFailure(FibersTestFailure::ContinuationStepMismatch);
+                        })));
+                SC_TEST_EXPECT(scheduler.run());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(task.result());
+                // Returned caller storage must be writable, including the completed fiber's former redzones.
+                ::memset(stackMemory, 0x5a, sizeof(stackMemory));
+                SC_TEST_EXPECT(stackMemory[sizeof(stackMemory) - 1] == 0x5a);
+            }
+        }
+#endif
         if (test_section("fiber jobs"))
         {
             fiberJobs();

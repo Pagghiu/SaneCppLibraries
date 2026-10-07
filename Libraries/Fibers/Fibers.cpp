@@ -238,12 +238,18 @@ static constexpr char FiberStackHighWaterMark = static_cast<char>(0xA5);
 extern "C" void __sanitizer_start_switch_fiber(void** fakeStackSave, const void* bottom, size_t size);
 extern "C" void __sanitizer_finish_switch_fiber(void* fakeStackSave, const void** bottomOld, size_t* sizeOld);
 
-static thread_local FiberContext* fiberContextPreviousContext = nullptr;
+static thread_local FiberContext* fiberContextPreviousContext  = nullptr;
+static thread_local bool          fiberContextPreviousFinished = false;
 
-static void fiberContextStartSwitch(FiberContext& from, FiberContext& to)
+static void fiberContextStartSwitch(FiberContext& from, FiberContext& to, bool finish)
 {
-    fiberContextPreviousContext = &from;
-    __sanitizer_start_switch_fiber(&from.asanFakeStack, to.stackBottom, to.stackSize);
+    fiberContextPreviousContext  = &from;
+    fiberContextPreviousFinished = finish;
+    __sanitizer_start_switch_fiber(finish ? nullptr : &from.asanFakeStack, to.stackBottom, to.stackSize);
+    if (finish)
+    {
+        from.asanFakeStack = nullptr;
+    }
 }
 
 static void fiberContextFinishSwitch(void* fakeStackSave)
@@ -255,11 +261,17 @@ static void fiberContextFinishSwitch(void* fakeStackSave)
     {
         fiberContextPreviousContext->stackBottom = oldStackBottom;
         fiberContextPreviousContext->stackSize   = oldStackSize;
-        fiberContextPreviousContext              = nullptr;
+        if (fiberContextPreviousFinished)
+        {
+            // The completed fiber never unwinds its entry frames. Return its caller-owned storage without stale poison.
+            fiberSanitizerUnpoisonMemory(const_cast<void*>(oldStackBottom), oldStackSize);
+        }
+        fiberContextPreviousContext  = nullptr;
+        fiberContextPreviousFinished = false;
     }
 }
 #else
-static void fiberContextStartSwitch(FiberContext&, FiberContext&) {}
+static void fiberContextStartSwitch(FiberContext&, FiberContext&, bool) {}
 static void fiberContextFinishSwitch(void*) {}
 #endif
 
@@ -5646,7 +5658,7 @@ void FiberScheduler::taskEntry(void* userData)
     FiberWorker* worker = static_cast<FiberWorker*>(task.runningWorker);
     SC_FIBERS_ASSERT_RELEASE(worker != nullptr);
     SC_FIBERS_ASSERT_RELEASE(worker->scheduler() == &scheduler);
-    FiberContextOperations::switchTo(task.context(), worker->rootContext());
+    FiberContextOperations::switchToAndFinish(task.context(), worker->rootContext());
 
     SC_FIBERS_ASSERT_RELEASE(false);
     Assert::unreachable();
@@ -9895,12 +9907,21 @@ Result FiberContextOperations::switchToChecked(FiberContext& from, FiberContext&
     return Result(true);
 }
 
-void FiberContextOperations::switchTo(FiberContext& from, FiberContext& to)
+void FiberContextOperations::switchTo(FiberContext& from, FiberContext& to) { switchTo(from, to, false); }
+
+void FiberContextOperations::switchToAndFinish(FiberContext& from, FiberContext& to)
+{
+    switchTo(from, to, true);
+    SC_FIBERS_ASSERT_RELEASE(false);
+    Assert::unreachable();
+}
+
+void FiberContextOperations::switchTo(FiberContext& from, FiberContext& to, bool finish)
 {
     SC_FIBERS_ASSERT_RELEASE(from.initialized);
     SC_FIBERS_ASSERT_RELEASE(to.initialized);
 
-    fiberContextStartSwitch(from, to);
+    fiberContextStartSwitch(from, to, finish);
 #if SC_COMPILER_FILC && defined(__GLIBC__)
     SC_FIBERS_ASSERT_RELEASE(from.platform.ownerThread == &fiberContextThreadIdentity);
     SC_FIBERS_ASSERT_RELEASE(to.platform.ownerThread == &fiberContextThreadIdentity);
