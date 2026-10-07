@@ -80,80 +80,56 @@ Result HttpAsyncClient::sendRequest(AsyncEventLoop& loop, const RequestOptions& 
 Result HttpAsyncClient::get(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpGET;
-    options.url       = url;
-    options.keepAlive = keepAlive;
+    options.setRequest(HttpParser::Method::HttpGET, url, keepAlive);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::head(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpHEAD;
-    options.url       = url;
-    options.keepAlive = keepAlive;
+    options.setRequest(HttpParser::Method::HttpHEAD, url, keepAlive);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::options(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpOPTIONS;
-    options.url       = url;
-    options.keepAlive = keepAlive;
+    options.setRequest(HttpParser::Method::HttpOPTIONS, url, keepAlive);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::deleteRequest(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpDELETE;
-    options.url       = url;
-    options.keepAlive = keepAlive;
+    options.setRequest(HttpParser::Method::HttpDELETE, url, keepAlive);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::put(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpPUT;
-    options.url       = url;
-    options.keepAlive = keepAlive;
-    options.bodyMode  = RequestOptions::BodyMode::Span;
-    options.body      = body;
+    options.setRequest(HttpParser::Method::HttpPUT, url, keepAlive).setBody(body);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::post(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpPOST;
-    options.url       = url;
-    options.keepAlive = keepAlive;
-    options.bodyMode  = RequestOptions::BodyMode::Span;
-    options.body      = body;
+    options.setRequest(HttpParser::Method::HttpPOST, url, keepAlive).setBody(body);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::patch(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
     RequestOptions options;
-    options.method    = HttpParser::Method::HttpPATCH;
-    options.url       = url;
-    options.keepAlive = keepAlive;
-    options.bodyMode  = RequestOptions::BodyMode::Span;
-    options.body      = body;
+    options.setRequest(HttpParser::Method::HttpPATCH, url, keepAlive).setBody(body);
     return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::postMultipart(AsyncEventLoop& loop, StringSpan url, HttpMultipartWriter& writer, bool keepAlive)
 {
     RequestOptions options;
-    options.method          = HttpParser::Method::HttpPOST;
-    options.url             = url;
-    options.keepAlive       = keepAlive;
-    options.bodyMode        = RequestOptions::BodyMode::Multipart;
-    options.multipartWriter = &writer;
+    options.setRequest(HttpParser::Method::HttpPOST, url, keepAlive).setMultipart(writer);
     return sendRequest(loop, options);
 }
 
