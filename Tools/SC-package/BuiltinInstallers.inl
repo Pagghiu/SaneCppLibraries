@@ -2798,6 +2798,11 @@ int main(void)
     return Result(true);
 }
 
+static Result probeFilCRuntimeDependencyCompiler(StringView compiler, String& version);
+static Result filcRuntimeDependencyReceiptMatches(StringView packageRoot, StringView receiptName, StringView version,
+                                                  StringView variant, StringView source, StringView sourceHash,
+                                                  Span<const PackageReceiptExport> exports, bool& matches);
+
 Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                        StringView importDirectory)
 {
@@ -2824,6 +2829,9 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
 
     String compiler = StringEncoding::Utf8;
     SC_TRY(resolveFilCCompilerPath(filCPackage.installDirectoryLink.view(), "clang", compiler));
+    String compilerVersion = StringEncoding::Utf8;
+    SC_TRY(probeFilCRuntimeDependencyCompiler(compiler.view(), compilerVersion));
+    const StringView variant = HostInstructionSet == InstructionSet::ARM64 ? "linux-arm64"_a8 : "linux-x86_64"_a8;
 
     String buildRoot = StringEncoding::Utf8;
     String sourceDir = StringEncoding::Utf8;
@@ -2838,60 +2846,18 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
     SC_TRY(Path::join(libDir, {package.installDirectoryLink.view(), "lib"}));
     SC_TRY(Path::join(incDir, {package.installDirectoryLink.view(), "include"}));
 
-    if (fs.existsAndIsDirectory(buildRoot.view()))
-    {
-        SC_TRY(fs.removeDirectoriesRecursive(buildRoot.view()));
-    }
-    SC_TRY(removePackageInstallLink(fs, package));
-    SC_TRY(fs.makeDirectoryRecursive(buildRoot.view()));
-    SC_TRY(fs.makeDirectoryRecursive(libDir.view()));
-    SC_TRY(fs.makeDirectoryRecursive(incDir.view()));
-
     String sourceIdentifier = StringEncoding::Utf8;
     String sourceHash       = StringEncoding::Utf8;
     if (not importDirectory.isEmpty())
     {
         SC_TRY(validateZLibSourceDirectory(importDirectory));
-        SC_TRY(sourceDir.assign(importDirectory));
         SC_TRY(StringBuilder::format(sourceIdentifier, "import:{}", importDirectory));
     }
     else
     {
-        SC_TRY(downloadFileHash(packageURL, package.packageLocalFile.view(), Hashing::TypeSHA256, packageHash));
-        SC_TRY(extractTarArchiveFlatteningRoot(package.packageLocalFile.view(), sourceDir.view()));
-        SC_TRY(validateZLibSourceDirectory(sourceDir.view()));
         SC_TRY(sourceIdentifier.assign(packageURL));
         SC_TRY(StringBuilder::format(sourceHash, "sha256:{}", packageHash));
     }
-
-    String repositoryRoot = StringEncoding::Utf8;
-    SC_TRY(resolveRepositoryRoot(repositoryRoot));
-    SC_TRY(runZLibFilCBuild(repositoryRoot.view(), sourceDir.view(), outputDir.view(), intermDir.view()));
-
-    String builtLibrary = StringEncoding::Utf8;
-    String libzSo1      = StringEncoding::Utf8;
-    String libzSo       = StringEncoding::Utf8;
-    SC_TRY(Path::join(builtLibrary, {outputDir.view(), "libz.so"}));
-    SC_TRY(Path::join(libzSo1, {libDir.view(), "libz.so.1"}));
-    SC_TRY(Path::join(libzSo, {libDir.view(), "libz.so"}));
-    if (not fs.existsAndIsFile(builtLibrary.view()))
-        return Result::Error(PackageResultCategory, PackageError::PackageBuildArtifactMissing);
-    SC_TRY(fs.copyFile(builtLibrary.view(), libzSo1.view(), FileSystem::CopyFlags().setOverwrite(true)));
-    SC_TRY(fs.removeLinkIfExists(libzSo.view()));
-    SC_TRY(fs.createSymbolicLink("libz.so.1", libzSo.view()));
-
-    String zlibHeader  = StringEncoding::Utf8;
-    String zconfHeader = StringEncoding::Utf8;
-    String zlibOut     = StringEncoding::Utf8;
-    String zconfOut    = StringEncoding::Utf8;
-    SC_TRY(Path::join(zlibHeader, {sourceDir.view(), "zlib.h"}));
-    SC_TRY(Path::join(zconfHeader, {sourceDir.view(), "zconf.h"}));
-    SC_TRY(Path::join(zlibOut, {incDir.view(), "zlib.h"}));
-    SC_TRY(Path::join(zconfOut, {incDir.view(), "zconf.h"}));
-    SC_TRY(fs.copyFile(zlibHeader.view(), zlibOut.view(), FileSystem::CopyFlags().setOverwrite(true)));
-    SC_TRY(fs.copyFile(zconfHeader.view(), zconfOut.view(), FileSystem::CopyFlags().setOverwrite(true)));
-
-    SC_TRY(runZLibFilCSmoke(compiler.view(), incDir.view(), libDir.view(), buildRoot.view()));
 
     String metadata = StringEncoding::Utf8;
     auto   builder  = StringBuilder::create(metadata);
@@ -2901,8 +2867,10 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
         SC_TRY(builder.append("SC_PACKAGE_HASH={}\n", sourceHash.view()));
     }
     SC_TRY(builder.append("SC_PACKAGE_VERSION={}\n", packageVersion));
+    SC_TRY(builder.append("SC_PACKAGE_VARIANT={}\n", variant));
+    SC_TRY(builder.append("SC_PACKAGE_BUILD_PROFILE=sc-build-filc-release-v1\n"));
+    SC_TRY(builder.append("SC_PACKAGE_COMPILER={}\n", compilerVersion.view()));
     builder.finalize();
-    SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
 
     const PackageReceiptExport exports[] = {
         {PackageExportKind::Library, PackageExport::ZLibShared, "lib/libz.so.1"},
@@ -2914,15 +2882,81 @@ Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesIns
                                                      : PackageCapability::LibraryZLibFilCX86_64,
          "lib/libz.so.1"},
     };
+    String libzSo1           = format("{}/libz.so.1", libDir.view());
+    String libzSo            = format("{}/libz.so", libDir.view());
+    String zlibOut           = format("{}/zlib.h", incDir.view());
+    String zconfOut          = format("{}/zconf.h", incDir.view());
+    String identityPath      = format("{}/sc-zlib-filc-build.txt", package.installDirectoryLink.view());
+    String installedIdentity = StringEncoding::Utf8;
+    String previous          = StringEncoding::Utf8;
+    bool   cacheMatch        = false;
+    // Imported sources can change in place; only the pinned, hashed archive is eligible for reuse.
+    if (importDirectory.isEmpty() and fs.existsAndIsFile(libzSo1.view()) and fs.existsAndIsFile(libzSo.view()) and
+        fs.existsAndIsFile(zlibOut.view()) and fs.existsAndIsFile(zconfOut.view()) and
+        readFileIntoString(package.packageLocalTxt.view(), previous) and previous.view() == metadata.view() and
+        readFileIntoString(identityPath.view(), installedIdentity) and installedIdentity.view() == metadata.view())
+    {
+        SC_TRY(filcRuntimeDependencyReceiptMatches(package.installDirectoryLink.view(), "zlib_filc", packageVersion,
+                                                   variant, sourceIdentifier.view(), sourceHash.view(), exports,
+                                                   cacheMatch));
+    }
+    if (cacheMatch)
+    {
+        return runZLibFilCSmoke(compiler.view(), incDir.view(), libDir.view(), buildRoot.view());
+    }
+
+    if (fs.existsAndIsDirectory(buildRoot.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(buildRoot.view()));
+    }
+    SC_TRY(removePackageInstallLink(fs, package));
+    SC_TRY(fs.makeDirectoryRecursive(buildRoot.view()));
+    SC_TRY(fs.makeDirectoryRecursive(libDir.view()));
+    SC_TRY(fs.makeDirectoryRecursive(incDir.view()));
+
+    if (not importDirectory.isEmpty())
+    {
+        SC_TRY(sourceDir.assign(importDirectory));
+    }
+    else
+    {
+        SC_TRY(downloadFileHash(packageURL, package.packageLocalFile.view(), Hashing::TypeSHA256, packageHash));
+        SC_TRY(extractTarArchiveFlatteningRoot(package.packageLocalFile.view(), sourceDir.view()));
+        SC_TRY(validateZLibSourceDirectory(sourceDir.view()));
+    }
+
+    String repositoryRoot = StringEncoding::Utf8;
+    SC_TRY(resolveRepositoryRoot(repositoryRoot));
+    SC_TRY(runZLibFilCBuild(repositoryRoot.view(), sourceDir.view(), outputDir.view(), intermDir.view()));
+
+    String builtLibrary = StringEncoding::Utf8;
+    SC_TRY(Path::join(builtLibrary, {outputDir.view(), "libz.so"}));
+    if (not fs.existsAndIsFile(builtLibrary.view()))
+        return Result::Error(PackageResultCategory, PackageError::PackageBuildArtifactMissing);
+    SC_TRY(fs.copyFile(builtLibrary.view(), libzSo1.view(), FileSystem::CopyFlags().setOverwrite(true)));
+    SC_TRY(fs.removeLinkIfExists(libzSo.view()));
+    SC_TRY(fs.createSymbolicLink("libz.so.1", libzSo.view()));
+
+    String zlibHeader  = StringEncoding::Utf8;
+    String zconfHeader = StringEncoding::Utf8;
+    SC_TRY(Path::join(zlibHeader, {sourceDir.view(), "zlib.h"}));
+    SC_TRY(Path::join(zconfHeader, {sourceDir.view(), "zconf.h"}));
+    SC_TRY(fs.copyFile(zlibHeader.view(), zlibOut.view(), FileSystem::CopyFlags().setOverwrite(true)));
+    SC_TRY(fs.copyFile(zconfHeader.view(), zconfOut.view(), FileSystem::CopyFlags().setOverwrite(true)));
+
+    SC_TRY(runZLibFilCSmoke(compiler.view(), incDir.view(), libDir.view(), buildRoot.view()));
+
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
+
     static constexpr StringView phases[] = {
         "resolveZLibSource",
         "buildZLibWithSCBuildFilC",
         "validateZLibRuntime",
         "writeReceipt",
     };
-    SC_TRY(writeManualPackageReceipt(package, "zlib_filc", packageVersion,
-                                     HostInstructionSet == InstructionSet::ARM64 ? "linux-arm64"_a8 : "linux-x86_64"_a8,
-                                     sourceIdentifier.view(), sourceHash.view(), exports, phases));
+    SC_TRY(writeManualPackageReceipt(package, "zlib_filc", packageVersion, variant, sourceIdentifier.view(),
+                                     sourceHash.view(), exports, phases));
+    SC_TRY(fs.writeString(identityPath.view(), metadata.view()));
 
     if (fs.existsAndIsDirectory(buildRoot.view()))
     {

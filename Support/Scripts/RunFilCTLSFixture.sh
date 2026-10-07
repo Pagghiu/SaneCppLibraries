@@ -25,7 +25,7 @@ FIXTURES="$REPO_ROOT/Tools/Support/FilCTLSFixture"
 mkdir -p "$REPO_ROOT/_Build/_FilCTLSFixture"
 RUN_DIR=$(mktemp -d "$REPO_ROOT/_Build/_FilCTLSFixture/run.XXXXXXXX")
 mkdir "$RUN_DIR/lib"
-# The SC runner rebuilds zlib. Do not keep its package files loaded across that preparation.
+# Isolate the server's libraries from any package repair performed by the SC runner.
 cp -L "$PACKAGES/openssl_filc/lib/libssl.so.3" "$PACKAGES/openssl_filc/lib/libcrypto.so.3" \
     "$PACKAGES/nghttp2_filc/lib/libnghttp2.so.14" "$PACKAGES/zlib_filc/lib/libz.so" \
     "$PACKAGES/zlib_filc/lib/libz.so.1" "$RUN_DIR/lib/"

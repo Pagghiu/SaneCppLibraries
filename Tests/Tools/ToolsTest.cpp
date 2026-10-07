@@ -212,6 +212,115 @@ struct SupportToolsTest : public TestCase
         testPackageCommands(arguments, args, outputDirectory);
         testPackageReceipts(arguments, args, outputDirectory);
         testPackageOutput(arguments, args, outputDirectory, runHeavySections);
+        testFilCZLibCache(outputDirectory, runHeavySections);
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testFilCZLibCache(StringPath& outputDirectory, bool runHeavySections)
+    {
+#if SC_PLATFORM_LINUX
+        if (not runHeavySections or not test_section("Fil-C zlib warm cache"))
+            return;
+
+        using namespace SC::Tools;
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init("."));
+        String cache   = StringEncoding::Utf8;
+        String install = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(cache, {report.libraryRootDirectory.view(), "_Build/_PackagesCache"}));
+        SC_TEST_EXPECT(Path::join(install, {outputDirectory.view(), "filc-zlib-cache"}));
+
+        Package      package;
+        const Result installed = installZLibFilC(cache.view(), install.view(), package);
+        SC_TEST_EXPECT(installed);
+        if (not installed)
+            return;
+
+        String library  = StringEncoding::Utf8;
+        String header   = StringEncoding::Utf8;
+        String receipt  = StringEncoding::Utf8;
+        String metadata = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(library, {package.installDirectoryLink.view(), "lib/libz.so.1"}));
+        SC_TEST_EXPECT(Path::join(header, {package.installDirectoryLink.view(), "include/zconf.h"}));
+        SC_TEST_EXPECT(Path::join(receipt, {package.installDirectoryLink.view(), PackageReceiptFileName}));
+        SC_TEST_EXPECT(fs.read(package.packageLocalTxt.view(), metadata));
+
+        // A fixed old timestamp makes a rebuild distinguishable even on coarse/shared filesystems.
+        const TimeMs         sentinel{1000};
+        FileSystem::FileStat fileStat;
+        SC_TEST_EXPECT(fs.setLastModifiedTime(library.view(), sentinel));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.stat(library.view(), fileStat));
+        SC_TEST_EXPECT(fileStat.modifiedTime.milliseconds == sentinel.milliseconds);
+
+        String identityPath = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(identityPath, {package.installDirectoryLink.view(), "sc-zlib-filc-build.txt"}));
+        SC_TEST_EXPECT(fs.writeString(identityPath.view(), "different compiler at another prefix"));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.stat(library.view(), fileStat));
+        SC_TEST_EXPECT(fileStat.modifiedTime.milliseconds != sentinel.milliseconds);
+
+        SC_TEST_EXPECT(fs.setLastModifiedTime(library.view(), sentinel));
+        SC_TEST_EXPECT(fs.removeFile(header.view()));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.existsAndIsFile(header.view()));
+        SC_TEST_EXPECT(fs.stat(library.view(), fileStat));
+        SC_TEST_EXPECT(fileStat.modifiedTime.milliseconds != sentinel.milliseconds);
+
+        SC_TEST_EXPECT(fs.setLastModifiedTime(library.view(), sentinel));
+        SC_TEST_EXPECT(fs.writeString(receipt.view(), "{}"));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.stat(library.view(), fileStat));
+        SC_TEST_EXPECT(fileStat.modifiedTime.milliseconds != sentinel.milliseconds);
+
+        SC_TEST_EXPECT(fs.setLastModifiedTime(library.view(), sentinel));
+        SC_TEST_EXPECT(fs.writeString(package.packageLocalTxt.view(), "wrong compiler identity"));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.stat(library.view(), fileStat));
+        SC_TEST_EXPECT(fileStat.modifiedTime.milliseconds != sentinel.milliseconds);
+
+        String backup = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(backup, {install.view(), "saved-libz.so.1"}));
+        SC_TEST_EXPECT(fs.rename(library.view(), backup.view()));
+        SC_TEST_EXPECT(fs.writeString(library.view(), "not an ELF library"));
+        SC_TEST_EXPECT(not installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.removeFile(library.view()));
+        SC_TEST_EXPECT(fs.rename(backup.view(), library.view()));
+
+        SC_TEST_EXPECT(fs.removeFile(library.view()));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        SC_TEST_EXPECT(fs.existsAndIsFile(library.view()));
+
+        String imported = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(imported, {install.view(), "imported-source"}));
+        SC_TEST_EXPECT(fs.makeDirectoryRecursive(imported.view()));
+        Process extract;
+        SC_TEST_EXPECT(extract.exec(
+            {"tar", "-xf", package.packageLocalFile.view(), "--strip-components=1", "-C", imported.view()}));
+        SC_TEST_EXPECT(extract.getExitStatus() == 0);
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package, imported.view()));
+        SC_TEST_EXPECT(fs.setLastModifiedTime(library.view(), sentinel));
+        String importedHeader = StringEncoding::Utf8;
+        String changedHeader  = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(importedHeader, {imported.view(), "zconf.h"}));
+        SC_TEST_EXPECT(fs.read(importedHeader.view(), changedHeader));
+        SC_TEST_EXPECT(StringBuilder::createForAppendingTo(changedHeader).append("\n/* changed import */\n"));
+        SC_TEST_EXPECT(fs.writeString(importedHeader.view(), changedHeader.view()));
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package, imported.view()));
+        SC_TEST_EXPECT(fs.stat(library.view(), fileStat));
+        SC_TEST_EXPECT(fileStat.modifiedTime.milliseconds != sentinel.milliseconds);
+        String installedHeader = StringEncoding::Utf8;
+        SC_TEST_EXPECT(fs.read(header.view(), installedHeader));
+        SC_TEST_EXPECT(StringView(installedHeader.view()).containsString("changed import"));
+
+        // Restore archive metadata in the shared download cache after the imported-source checks.
+        SC_TEST_EXPECT(installZLibFilC(cache.view(), install.view(), package));
+        String restored = StringEncoding::Utf8;
+        SC_TEST_EXPECT(fs.read(package.packageLocalTxt.view(), restored));
+        SC_TEST_EXPECT(restored.view() == metadata.view());
+#else
+        (void)outputDirectory;
+        (void)runHeavySections;
+#endif
     }
 
     // Keep assertion-heavy groups separate: Fil-C compilation scales poorly with one large test function.
