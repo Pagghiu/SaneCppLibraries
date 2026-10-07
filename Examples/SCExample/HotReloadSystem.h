@@ -260,6 +260,14 @@ struct HotReloadSystem
 
     void onFileChange(const FileSystemWatcher::Notification& notification)
     {
+        // Compiler outputs are written beside plugin sources and must not trigger another reload.
+        const StringView path = notification.relativePath;
+        if (path.endsWith(".o") or path.endsWith(".o.tmp") or path.endsWith(".obj") or path.endsWith(".obj.tmp") or
+            path.endsWith(".dylib") or path.endsWith(".dll") or path.endsWith(".so") or path.endsWith(".pdb") or
+            path.endsWith(".lib") or path.endsWith(".exp") or path.endsWith(".ilk"))
+        {
+            return;
+        }
         pendingReload.pending = true;
         pendingReload.lastEvent.snap();
         if (notification.relativePath.isEmpty() or

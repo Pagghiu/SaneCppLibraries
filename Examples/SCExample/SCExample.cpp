@@ -18,6 +18,7 @@
 #include "util/sokol_imgui.h"
 
 #include "HotReloadSystem.h"
+#include <stdio.h>
 
 namespace SC
 {
@@ -373,8 +374,11 @@ sapp_desc sokol_main(int, char*[])
         sg_end_pass();
         sg_commit();
 
-        if (not gModelSystem->runLoopStepInsideSokolApp())
+        const SC::Result loopResult = gModelSystem->runLoopStepInsideSokolApp();
+        if (not loopResult)
         {
+            ::fprintf(stderr, "[SCExample] event loop failed category=%u error=%u\n", loopResult.category().value,
+                      loopResult.errorValue());
             sapp_quit();
         }
     };
