@@ -14,8 +14,22 @@
 #include <string.h>
 
 #if !SC_PLATFORM_WINDOWS
+#include <errno.h>
 #include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#endif
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SC_FIBERS_TEST_ASAN 1
+#endif
+#endif
+#if defined(__SANITIZE_ADDRESS__)
+#define SC_FIBERS_TEST_ASAN 1
+#endif
+#ifndef SC_FIBERS_TEST_ASAN
+#define SC_FIBERS_TEST_ASAN 0
 #endif
 
 #if !SC_PLATFORM_WINDOWS
@@ -108,6 +122,12 @@ struct SC::FibersTest : public SC::TestCase
 
     FibersTest(SC::TestReport& report) : TestCase(report, "FibersTest")
     {
+#if SC_FIBERS_TEST_ASAN && !SC_PLATFORM_WINDOWS && !SC_COMPILER_FILC
+        if (test_section("sanitizer detects overflow after resume"))
+        {
+            sanitizerDetectsOverflowAfterResume();
+        }
+#endif
         bool runRuntimeStackSections = true;
         if (useRuntimeStacks and not FiberScheduler::supportsRuntimeOwnedStacks())
         {
@@ -543,6 +563,81 @@ struct SC::FibersTest : public SC::TestCase
         state.step = 3;
         FiberContextOperations::switchTo(*state.fiber, *state.main);
     }
+
+#if SC_FIBERS_TEST_ASAN && !SC_PLATFORM_WINDOWS && !SC_COMPILER_FILC
+    static SC_FIBERS_TEST_NO_INLINE void sanitizerWritePastEnd(volatile char* memory, size_t size)
+    {
+        memory[size] = 42;
+    }
+
+    void sanitizerDetectsOverflowAfterResume()
+    {
+        int outputPipe[2];
+        SC_TEST_EXPECT(::pipe(outputPipe) == 0);
+        const pid_t child = ::fork();
+        SC_TEST_EXPECT(child >= 0);
+        if (child == 0)
+        {
+            ::close(outputPipe[0]);
+            if (::dup2(outputPipe[1], STDERR_FILENO) < 0)
+                ::_exit(2);
+            ::close(outputPipe[1]);
+            ::alarm(10);
+
+            char                 stackMemory[64 * 1024];
+            FiberStack           stack({stackMemory, sizeof(stackMemory)});
+            FiberScheduler       scheduler;
+            FiberTask            task;
+            FiberTask::Procedure procedure(
+                [](FiberScheduler& owner) -> Result
+                {
+                    volatile char local[32] = {};
+                    SC_TRY(owner.yield());
+                    local[0] = 1;
+
+                    const char checkpoint[] = "Fibers ASan probe resumed\n";
+                    if (::write(STDERR_FILENO, checkpoint, sizeof(checkpoint) - 1) < 0)
+                        ::_exit(2);
+                    sanitizerWritePastEnd(local, sizeof(local));
+                    return Result(true);
+                });
+            Result spawned = scheduler.spawn(task, stack, procedure);
+            if (not spawned or not scheduler.run())
+                ::_exit(2);
+            ::_exit(0);
+        }
+
+        ::close(outputPipe[1]);
+        char   output[8192] = {};
+        size_t used         = 0;
+        char   chunk[512];
+        for (;;)
+        {
+            const ssize_t count = ::read(outputPipe[0], chunk, sizeof(chunk));
+            if (count < 0 and errno == EINTR)
+                continue;
+            SC_TEST_EXPECT(count >= 0);
+            if (count <= 0)
+                break;
+            const size_t remaining = sizeof(output) - 1 - used;
+            const size_t copied    = static_cast<size_t>(count) < remaining ? static_cast<size_t>(count) : remaining;
+            ::memcpy(output + used, chunk, copied);
+            used += copied;
+        }
+        ::close(outputPipe[0]);
+        int   status = 0;
+        pid_t waited;
+        do
+        {
+            waited = ::waitpid(child, &status, 0);
+        } while (waited < 0 and errno == EINTR);
+        SC_TEST_EXPECT(waited == child);
+        SC_TEST_EXPECT((WIFEXITED(status) and WEXITSTATUS(status) != 0) or
+                       (WIFSIGNALED(status) and WTERMSIG(status) == SIGABRT));
+        SC_TEST_EXPECT(::strstr(output, "Fibers ASan probe resumed") != nullptr);
+        SC_TEST_EXPECT(::strstr(output, "ERROR: AddressSanitizer: stack-buffer-overflow") != nullptr);
+    }
+#endif
 
     void contextSwitch()
     {
