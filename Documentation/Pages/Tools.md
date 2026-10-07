@@ -137,11 +137,12 @@ Some large or host-specific tools can be registered from an existing directory i
 ./SC.sh package install qemu --import-directory /opt/qemu-user
 ```
 
-Fil-C 0.685 is available on native Linux Intel64 (`x86_64`) and ARM64 (`aarch64`) hosts. `package install filc`
+Fil-C 0.686 is available on native Linux Intel64 (`x86_64`) and ARM64 (`aarch64`) hosts. `package install filc`
 selects the host-matching archive; an imported compiler must report the matching Linux target triple. The resulting
 toolchain capability is `toolchain.filc.x86_64` or `toolchain.filc.aarch64`, respectively.
 
-Download the host-matching release with:
+Install native `patchelf` first (for example, `sudo apt-get install patchelf` on Ubuntu). The rootless
+release setup uses it to configure its bundled runtime. Download the host-matching release with:
 
 ```bash
 ./SC.sh package install filc
@@ -150,10 +151,10 @@ Download the host-matching release with:
 To register an existing ARM64 installation, use:
 
 ```bash
-./SC.sh package install filc --import-directory /home/user/filc-0.685-linux-aarch64
+./SC.sh package install filc --import-directory /home/user/filc-0.686-linux-aarch64
 ```
 
-For an Intel64 host, use the corresponding `filc-0.685-linux-x86_64` import directory.
+For an Intel64 host, use the corresponding `filc-0.686-linux-x86_64` import directory.
 
 The separate experimental glibc profile requires the host-matching upstream `/opt/fil` distribution to be
 installed beforehand. SC-Build does not perform privileged installation or replace system libraries:

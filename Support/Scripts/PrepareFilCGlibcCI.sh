@@ -12,11 +12,11 @@ fi
 case "$(uname -s):$(uname -m)" in
     Linux:aarch64|Linux:arm64)
         ARCH=aarch64
-        SHA256=e71ea1cffe28c63f7947c9bf2a0d9f39b70c742473561b317b3ebad81b7f980b
+        SHA256=ab3365499571b5e62513247467a7450cd8e02bb915d6bd0b5f49433f25c52cf6
         ;;
     Linux:x86_64)
         ARCH=x86_64
-        SHA256=f7d2d73b17ee9bfff0859ca15b3ca9c10e8501f8d891b0dfa961e81f0390e788
+        SHA256=3a0ba45283ff29668335d288530f35fe69c28ab8d663b4deb8801474825f117a
         ;;
     *) echo "Expected native Linux ARM64 or x86_64" >&2; exit 2 ;;
 esac
@@ -32,7 +32,7 @@ if [[ "$MODE" == --install ]]; then
     fi
 fi
 
-VERSION=0.685
+VERSION=0.686
 NAME="optfil-$VERSION-linux-$ARCH"
 CACHE="$REPO_ROOT/_Build/_PackagesCache/filc-glibc"
 ARCHIVE="$CACHE/$NAME.tar.xz"

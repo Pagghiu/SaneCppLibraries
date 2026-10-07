@@ -347,7 +347,12 @@ jobs:
           sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
     - name: install Fil-C
-      run: ./SC.sh package install filc
+      run: |
+        if ! command -v patchelf >/dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+        fi
+        ./SC.sh package install filc
     - name: verify Fil-C package receipt
       run: ./SC.sh package verify filc
     - name: compile SCTest Release with Fil-C

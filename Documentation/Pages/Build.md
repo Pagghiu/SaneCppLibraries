@@ -116,7 +116,7 @@ and target pair has the same build or run support. Use the command help for the 
 
 # Experimental Fil-C toolchain
 
-On Linux, `--toolchain filc` selects the native host architecture. Fil-C 0.685 packages are available for Intel64
+On Linux, `--toolchain filc` selects the native host architecture. Fil-C 0.686 packages are available for Intel64
 (`x86_64`) and ARM64 (`aarch64`); the imported compiler's target triple must match the host. Fil-C remains toolchain-only
 and does not add a `linux-filc-*` target profile.
 
