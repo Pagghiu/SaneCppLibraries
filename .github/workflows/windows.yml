@@ -138,10 +138,32 @@ jobs:
     - name: Verify OpenSSL 3
       shell: pwsh
       run: |
-        $openSSLExe = "$env:ProgramFiles\Git\usr\bin\openssl.exe"
-        $openSSLDll = "$env:ProgramFiles\Git\mingw64\bin\libcrypto-3-x64.dll"
-        if (-not (Test-Path $openSSLExe) -or -not (Test-Path $openSSLDll)) {
-          throw "The Git for Windows OpenSSL runtime was not found"
+        $gitDirectory = Split-Path (Get-Command git.exe -ErrorAction Stop).Source
+        $gitRoot = $gitDirectory
+        while ($gitRoot -and -not (Test-Path (Join-Path $gitRoot 'git-bash.exe'))) {
+          $gitRoot = Split-Path $gitRoot -Parent
+        }
+        if (-not $gitRoot) {
+          throw "The Git for Windows installation root was not found"
+        }
+
+        $openSSLDll = $null
+        foreach ($runtime in @('ucrt64', 'mingw64')) {
+          $candidate = Join-Path $gitRoot "$runtime\bin\libcrypto-3-x64.dll"
+          if (Test-Path $candidate) {
+            $openSSLDll = $candidate
+            break
+          }
+        }
+        if (-not $openSSLDll) {
+          throw "The Git for Windows OpenSSL runtime was not found under $gitRoot"
+        }
+        $openSSLExe = Join-Path (Split-Path $openSSLDll) 'openssl.exe'
+        if (-not (Test-Path $openSSLExe)) {
+          $openSSLExe = Join-Path $gitRoot 'usr\bin\openssl.exe'
+        }
+        if (-not (Test-Path $openSSLExe)) {
+          throw "The Git for Windows OpenSSL executable was not found under $gitRoot"
         }
 
         $version = & $openSSLExe version
@@ -149,6 +171,8 @@ jobs:
           throw "OpenSSL 3 is required, found: $version"
         }
         Write-Output $version
+        Write-Output "OpenSSL runtime: $openSSLDll"
+        "SC_OPENSSL_DLL=$openSSLDll" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: Restore LLVM package cache
       id: llvm-cache
       if: matrix.config == 'Release'
@@ -209,7 +233,10 @@ jobs:
     - name: Stage OpenSSL 3 runtime
       shell: pwsh
       run: |
-        $openSSLDll = "$env:ProgramFiles\Git\mingw64\bin\libcrypto-3-x64.dll"
+        $openSSLDll = $env:SC_OPENSSL_DLL
+        if (-not $openSSLDll -or -not (Test-Path $openSSLDll)) {
+          throw "The verified OpenSSL runtime was not found"
+        }
 
         $scTest = Get-ChildItem "_Build/_Outputs" -Filter "SCTest.exe" -Recurse |
           Where-Object { $_.Directory.Name -like "*-${{ matrix.config }}" } |
