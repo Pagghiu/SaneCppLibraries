@@ -123,6 +123,8 @@ static size_t roundUpToFiberAllocatorPageSize(size_t size)
     return (size + pageSize - 1) / pageSize * pageSize;
 }
 
+} // namespace
+
 struct FiberVirtualMemory
 {
     void*  memory         = nullptr;
@@ -207,6 +209,8 @@ struct FiberVirtualMemory
     size_t capacity() const { return reservedBytes; }
 };
 
+namespace
+{
 struct FiberAllocationHeader
 {
     FiberAllocator* allocator          = nullptr;
@@ -1802,42 +1806,56 @@ __attribute__((naked)) void SC_fiberContextSwitch(FiberContextPlatform* from, Fi
 extern "C" void SC_fiberContextTrampoline();
 extern "C" void SC_fiberContextSwitch(FiberContextPlatform* from, FiberContextPlatform* to);
 
-__attribute__((naked)) void SC_fiberContextTrampoline()
-{
-    __asm__ __volatile__("mov x0, x19\n"
-                         "mov x1, x20\n"
-                         "bl " SC_FIBER_CONTEXT_ENTER_SYMBOL "\n"
-                         "brk #0\n");
-}
+#define SC_FIBER_ARM64_TRAMPOLINE_ASM                                                                                  \
+    "mov x0, x19\n"                                                                                                    \
+    "mov x1, x20\n"                                                                                                    \
+    "bl " SC_FIBER_CONTEXT_ENTER_SYMBOL "\n"                                                                           \
+    "brk #0\n"
+#define SC_FIBER_ARM64_SWITCH_ASM                                                                                      \
+    "mov x2, sp\n"                                                                                                     \
+    "str x2, [x0, #0]\n"                                                                                               \
+    "stp x19, x20, [x0, #8]\n"                                                                                         \
+    "stp x21, x22, [x0, #24]\n"                                                                                        \
+    "stp x23, x24, [x0, #40]\n"                                                                                        \
+    "stp x25, x26, [x0, #56]\n"                                                                                        \
+    "stp x27, x28, [x0, #72]\n"                                                                                        \
+    "stp x29, x30, [x0, #88]\n"                                                                                        \
+    "stp d8, d9, [x0, #104]\n"                                                                                         \
+    "stp d10, d11, [x0, #120]\n"                                                                                       \
+    "stp d12, d13, [x0, #136]\n"                                                                                       \
+    "stp d14, d15, [x0, #152]\n"                                                                                       \
+    "ldr x2, [x1, #0]\n"                                                                                               \
+    "mov sp, x2\n"                                                                                                     \
+    "ldp x19, x20, [x1, #8]\n"                                                                                         \
+    "ldp x21, x22, [x1, #24]\n"                                                                                        \
+    "ldp x23, x24, [x1, #40]\n"                                                                                        \
+    "ldp x25, x26, [x1, #56]\n"                                                                                        \
+    "ldp x27, x28, [x1, #72]\n"                                                                                        \
+    "ldp x29, x30, [x1, #88]\n"                                                                                        \
+    "ldp d8, d9, [x1, #104]\n"                                                                                         \
+    "ldp d10, d11, [x1, #120]\n"                                                                                       \
+    "ldp d12, d13, [x1, #136]\n"                                                                                       \
+    "ldp d14, d15, [x1, #152]\n"                                                                                       \
+    "ret\n"
 
-__attribute__((naked)) void SC_fiberContextSwitch(FiberContextPlatform* from, FiberContextPlatform* to)
+#if SC_COMPILER_GCC
+// GCC does not support naked functions on AArch64; file-level assembly avoids a compiler prologue.
+__asm__(".text\n.p2align 2\n.global SC_fiberContextTrampoline\n"
+        ".type SC_fiberContextTrampoline, %function\nSC_fiberContextTrampoline:\n" SC_FIBER_ARM64_TRAMPOLINE_ASM
+        ".size SC_fiberContextTrampoline, .-SC_fiberContextTrampoline\n"
+        ".p2align 2\n.global SC_fiberContextSwitch\n"
+        ".type SC_fiberContextSwitch, %function\nSC_fiberContextSwitch:\n" SC_FIBER_ARM64_SWITCH_ASM
+        ".size SC_fiberContextSwitch, .-SC_fiberContextSwitch\n");
+#else
+__attribute__((naked)) void SC_fiberContextTrampoline() { __asm__ __volatile__(SC_FIBER_ARM64_TRAMPOLINE_ASM); }
+
+__attribute__((naked)) void SC_fiberContextSwitch(FiberContextPlatform*, FiberContextPlatform*)
 {
-    __asm__ __volatile__("mov x2, sp\n"
-                         "str x2, [x0, #0]\n"
-                         "stp x19, x20, [x0, #8]\n"
-                         "stp x21, x22, [x0, #24]\n"
-                         "stp x23, x24, [x0, #40]\n"
-                         "stp x25, x26, [x0, #56]\n"
-                         "stp x27, x28, [x0, #72]\n"
-                         "stp x29, x30, [x0, #88]\n"
-                         "stp d8, d9, [x0, #104]\n"
-                         "stp d10, d11, [x0, #120]\n"
-                         "stp d12, d13, [x0, #136]\n"
-                         "stp d14, d15, [x0, #152]\n"
-                         "ldr x2, [x1, #0]\n"
-                         "mov sp, x2\n"
-                         "ldp x19, x20, [x1, #8]\n"
-                         "ldp x21, x22, [x1, #24]\n"
-                         "ldp x23, x24, [x1, #40]\n"
-                         "ldp x25, x26, [x1, #56]\n"
-                         "ldp x27, x28, [x1, #72]\n"
-                         "ldp x29, x30, [x1, #88]\n"
-                         "ldp d8, d9, [x1, #104]\n"
-                         "ldp d10, d11, [x1, #120]\n"
-                         "ldp d12, d13, [x1, #136]\n"
-                         "ldp d14, d15, [x1, #152]\n"
-                         "ret\n");
+    __asm__ __volatile__(SC_FIBER_ARM64_SWITCH_ASM);
 }
+#endif
+#undef SC_FIBER_ARM64_TRAMPOLINE_ASM
+#undef SC_FIBER_ARM64_SWITCH_ASM
 #endif
 
 static thread_local FiberWorker*    currentFiberWorker    = nullptr;

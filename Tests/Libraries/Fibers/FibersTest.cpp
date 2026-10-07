@@ -1455,7 +1455,7 @@ struct SC::FibersTest : public SC::TestCase
                 const Time::Monotonic started = Time::Monotonic::now();
                 while (not watchdogPointer->finished.load())
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 30000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 30000)
                     {
                         const char* phases[] = {"setup", "worker launch", "worker join", "verification", "cleanup"};
                         fprintf(stderr,
@@ -1570,7 +1570,7 @@ struct SC::FibersTest : public SC::TestCase
                 const Time::Monotonic started = Time::Monotonic::now();
                 while (not watchdogPointer->finished.load())
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 30000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 30000)
                     {
                         const char* phases[] = {"scalar fanout",         "batch publication",
                                                 "scalar publication",    "cancellation",
@@ -2134,7 +2134,7 @@ struct SC::FibersTest : public SC::TestCase
                 const Time::Monotonic started = Time::Monotonic::now();
                 while (not statePointer->finished.load())
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 10000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 10000)
                     {
                         const char* phases[] = {"startup", "observer enrollment", "worker parking",
                                                 "publication/completion", "shutdown"};
@@ -2276,7 +2276,7 @@ struct SC::FibersTest : public SC::TestCase
                 const Time::Monotonic started = Time::Monotonic::now();
                 while (not watchdogPointer->finished.load())
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 15000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 15000)
                     {
                         fprintf(stderr, "FibersTest job quiescence exceeded 15 seconds; phase: %d\n",
                                 watchdogPointer->phase.load());
@@ -2507,7 +2507,7 @@ struct SC::FibersTest : public SC::TestCase
                 const Time::Monotonic started = Time::Monotonic::now();
                 while (not watchdogPointer->finished.load())
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 15000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 15000)
                     {
                         fprintf(stderr, "FibersTest persistent stop exceeded 15 seconds; cycle: %d\n",
                                 watchdogPointer->cycle.load());
@@ -2575,7 +2575,7 @@ struct SC::FibersTest : public SC::TestCase
                 const Time::Monotonic started        = Time::Monotonic::now();
                 while ((activeDrain and not state.started.load()) or pool.parkedWorkerCount() < expectedParked)
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 2000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 2000)
                     {
                         break;
                     }

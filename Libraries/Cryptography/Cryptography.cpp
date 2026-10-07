@@ -220,6 +220,8 @@ static void secureClear(Span<uint8_t> bytes)
 }
 
 #if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND
+} // namespace
+
 struct CipherStreamState
 {
     Cryptography::Cipher::Operation operation = Cryptography::Cipher::Operation::Encrypt;
@@ -234,6 +236,8 @@ struct CipherStreamState
     }
 };
 
+namespace
+{
 static size_t cipherEncryptUpdateSize(const CipherStreamState& state, size_t inputSize)
 {
     return (state.pendingSize + inputSize) / AESBlockSize * AESBlockSize;
@@ -1687,7 +1691,7 @@ struct SC::Cryptography::Hmac::Internal
 #elif SC_CRYPTOGRAPHY_LINUX_AF_ALG
 namespace SC
 {
-namespace
+namespace CryptographyAFAlgDetail
 {
 using AeadType   = Cryptography::AeadType;
 using CipherType = Cryptography::CipherType;
@@ -2086,7 +2090,7 @@ struct AFAlgHmacBackend
     }
 };
 
-} // namespace
+} // namespace CryptographyAFAlgDetail
 } // namespace SC
 #endif
 
@@ -2621,7 +2625,7 @@ struct SC::Cryptography::Aead::Internal
     Backend backend = Backend::Native;
     union Storage
     {
-        AFAlgAeadBackend native;
+        CryptographyAFAlgDetail::AFAlgAeadBackend native;
 #if SC_CRYPTOGRAPHY_OPENSSL3
         detail::OpenSSL3AeadBackend openSSL;
 #endif
@@ -2714,7 +2718,7 @@ struct SC::Cryptography::Cipher::Internal
     Backend backend = Backend::Native;
     union Storage
     {
-        AFAlgCipherBackend native;
+        CryptographyAFAlgDetail::AFAlgCipherBackend native;
 #if SC_CRYPTOGRAPHY_OPENSSL3
         detail::OpenSSL3CipherBackend openSSL;
 #endif
@@ -2805,7 +2809,7 @@ struct SC::Cryptography::Hmac::Internal
     Backend backend = Backend::Native;
     union Storage
     {
-        AFAlgHmacBackend native;
+        CryptographyAFAlgDetail::AFAlgHmacBackend native;
 #if SC_CRYPTOGRAPHY_OPENSSL3
         detail::OpenSSL3HmacBackend openSSL;
 #endif

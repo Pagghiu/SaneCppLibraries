@@ -719,7 +719,7 @@ struct SC::AsyncFibersTest : public SC::TestCase
                 const Time::Monotonic started = Time::Monotonic::now();
                 while (not watchdogPointer->finished.load())
                 {
-                    if (Time::Monotonic::now().subtractExact(started).ms > 10000)
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 10000)
                     {
                         const int32_t phase     = watchdogPointer->phase.load();
                         const char*   phaseName = "bridge reuse";

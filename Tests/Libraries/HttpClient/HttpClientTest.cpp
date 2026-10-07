@@ -3604,7 +3604,8 @@ struct SC::HttpClientTest : public SC::TestCase
                 bool reportedSlow = false;
                 while (not watchdogPointer->finished.load())
                 {
-                    const auto    sinceSetup       = Time::Monotonic::now().subtractExact(watchdogPointer->started).ms;
+                    const auto sinceSetup = Time::Monotonic::now().getMonotonicMilliseconds() -
+                                            watchdogPointer->started.getMonotonicMilliseconds();
                     const int32_t requestStartedMs = watchdogPointer->requestStartedMs.load();
                     const auto    elapsed          = requestStartedMs < 0 ? sinceSetup : sinceSetup - requestStartedMs;
                     if (requestStartedMs >= 0 and elapsed > 10000 and not reportedSlow)
@@ -3804,8 +3805,8 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(errorAdded);
 
         watchdog.phase.store(1);
-        watchdog.requestStartedMs.store(
-            static_cast<int32_t>(Time::Monotonic::now().subtractExact(watchdog.started).ms));
+        watchdog.requestStartedMs.store(static_cast<int32_t>(Time::Monotonic::now().getMonotonicMilliseconds() -
+                                                             watchdog.started.getMonotonicMilliseconds()));
         SC_TEST_EXPECT(operation.start(request, response));
         watchdog.phase.store(2);
         while (not completed)
