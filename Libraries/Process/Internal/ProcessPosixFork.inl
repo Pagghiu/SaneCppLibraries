@@ -8,6 +8,9 @@
 #include <stdio.h>  // stdout, stdin
 #include <stdlib.h> // abort
 #include <unistd.h> // pipe fork execl _exit
+#if SC_COMPILER_FILC
+#include <stdfil.h>
+#endif
 #if SC_PLATFORM_APPLE
 #include <crt_externs.h>
 // https://www.gnu.org/software/gnulib/manual/html_node/environ.html
@@ -38,11 +41,6 @@ struct SC::Process::InternalFork
 
     static ResultProcess resetInheritedSignalHandlers()
     {
-#if SC_COMPILER_FILC
-        // Fil-C currently does not support the full pre-exec signal reset sequence we use on native libc builds.
-        // Child processes still exec immediately afterwards, so skip this best-effort cleanup for now.
-        return ResultProcess(true);
-#else
         // For every signal, we restore the default action
         struct sigaction action;
         memset(&action, 0, sizeof(action));
@@ -63,6 +61,11 @@ struct SC::Process::InternalFork
         {
             if (signal == SIGKILL or signal == SIGSTOP)
                 continue; // these signals are not meant to be changed
+#if SC_COMPILER_FILC
+            // Preserve signals reserved by the runtime, including its memory-safety handlers.
+            if (zis_unsafe_signal_for_handlers(signal))
+                continue;
+#endif
 
             res = sigaction(signal, &action, NULL);
             if (res < 0 && errno != EINVAL)
@@ -90,7 +93,6 @@ struct SC::Process::InternalFork
         }
 
         return ResultProcess(true);
-#endif
     }
 };
 

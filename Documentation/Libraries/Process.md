@@ -36,6 +36,13 @@ launched children concurrently.
 
 # One object is one child launch
 
+POSIX executable launches restore default signal dispositions and clear the child thread's inherited
+signal mask before exec. This also applies to ignored signals, whose ignored disposition would otherwise
+survive exec. The parent's dispositions and mask are unchanged. Fil-C leaves runtime-reserved signals
+untouched, using its runtime signal-support predicate rather than a fixed signal list; supported signals
+and mask clearing still follow the normal launch policy. `ProcessFork` is a snapshot primitive and does
+not perform this executable-launch reset.
+
 SC::Process stores the native process handle, exit status, launch options, formatted arguments, environment overrides,
 and any descriptors used for redirection. Configure it, call `exec` for the simple blocking case, or call `launch` and
 later `waitForExitSync` when work must happen between those operations. SC::Result reports launch, pipe, and wait errors;

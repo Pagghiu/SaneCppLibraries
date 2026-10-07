@@ -9,10 +9,12 @@ on:
       - 'Libraries/Fibers/**'
       - 'Libraries/AsyncFibers/**'
       - 'Libraries/Plugin/**'
+      - 'Libraries/Process/**'
       - 'Libraries/Foundation/Internal/LibC*.inl'
       - 'Tests/Libraries/Fibers/**'
       - 'Tests/Libraries/AsyncFibers/**'
       - 'Tests/Libraries/Plugin/**'
+      - 'Tests/Libraries/Process/**'
       - 'Tools/SC-build*'
       - 'Tools/SC-build/**'
   workflow_dispatch:
@@ -39,3 +41,5 @@ jobs:
         run: ./Support/Scripts/RunFilCFiberTests.sh Release
       - name: Validate plugin compilation and interfaces
         run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test PluginTest
+      - name: Validate process launch and signal inheritance
+        run: ./SC.sh build run SCTest Release native --toolchain filc-glibc -- --test ProcessTest --test-section "Process inherited signals"

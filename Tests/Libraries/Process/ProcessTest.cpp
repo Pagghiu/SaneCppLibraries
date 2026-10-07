@@ -3,6 +3,7 @@
 #include "Libraries/Process/Process.h"
 #include "Libraries/Async/Async.h"
 #include "Libraries/Common/CompilerMacrosUnusedResult.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/Common/PlatformType.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/File/File.h"
@@ -14,6 +15,10 @@
 #include "Libraries/Testing/Testing.h"
 
 #include <string.h>
+#if !SC_PLATFORM_WINDOWS
+#include <pthread.h>
+#include <signal.h>
+#endif
 
 namespace SC
 {
@@ -36,6 +41,66 @@ struct SC::ProcessTest : public SC::TestCase
         SC_ASSERT_RELEASE(commandArena.resize(16 * 1024));
         SC_ASSERT_RELEASE(environmentArena.resize(64 * 1024));
         using namespace SC;
+#if !SC_PLATFORM_WINDOWS && !SC_XCTEST
+        if (test_section("Process inherited signals child", Execute::OnlyExplicit))
+        {
+            report.debugBreakOnFailedTest = false;
+            struct sigaction action       = {};
+            sigset_t         mask         = {};
+            SC_TEST_EXPECT(::sigaction(SIGUSR1, nullptr, &action) == 0);
+            SC_TEST_EXPECT(action.sa_handler == SIG_DFL);
+            SC_TEST_EXPECT(::pthread_sigmask(SIG_SETMASK, nullptr, &mask) == 0);
+            SC_TEST_EXPECT(sigismember(&mask, SIGUSR1) == 0);
+        }
+        if (test_section("Process inherited signals"))
+        {
+            struct sigaction ignored = {};
+            ignored.sa_handler       = SIG_IGN;
+            SC_TEST_EXPECT(sigemptyset(&ignored.sa_mask) == 0);
+            struct sigaction originalAction = {};
+            const bool       actionChanged  = ::sigaction(SIGUSR1, &ignored, &originalAction) == 0;
+            SC_TEST_EXPECT(actionChanged);
+            if (not actionChanged)
+                return;
+            auto restoreAction = MakeDeferred(
+                [&]()
+                {
+                    SC_TEST_EXPECT(::sigaction(SIGUSR1, &originalAction, nullptr) == 0);
+                    struct sigaction restored = {};
+                    SC_TEST_EXPECT(::sigaction(SIGUSR1, nullptr, &restored) == 0);
+                    SC_TEST_EXPECT(restored.sa_handler == originalAction.sa_handler);
+                });
+
+            sigset_t blocked;
+            SC_TEST_EXPECT(sigemptyset(&blocked) == 0);
+            SC_TEST_EXPECT(sigaddset(&blocked, SIGUSR1) == 0);
+            sigset_t   originalMask;
+            const bool maskChanged = ::pthread_sigmask(SIG_BLOCK, &blocked, &originalMask) == 0;
+            SC_TEST_EXPECT(maskChanged);
+            if (not maskChanged)
+                return;
+            auto restoreMask = MakeDeferred(
+                [&]()
+                {
+                    SC_TEST_EXPECT(::pthread_sigmask(SIG_SETMASK, &originalMask, nullptr) == 0);
+                    sigset_t restored = {};
+                    SC_TEST_EXPECT(::pthread_sigmask(SIG_SETMASK, nullptr, &restored) == 0);
+                    SC_TEST_EXPECT(sigismember(&restored, SIGUSR1) == sigismember(&originalMask, SIGUSR1));
+                });
+
+            Process child(commandArena.toSpan(), environmentArena.toSpan());
+            SC_TEST_EXPECT(child.exec({report.executableFile.view(), "--test", "ProcessTest", "--test-section",
+                                       "Process inherited signals child"}));
+            SC_TEST_EXPECT(child.getExitStatus() == 0);
+
+            struct sigaction parentAction = {};
+            sigset_t         parentMask   = {};
+            SC_TEST_EXPECT(::sigaction(SIGUSR1, nullptr, &parentAction) == 0);
+            SC_TEST_EXPECT(parentAction.sa_handler == SIG_IGN);
+            SC_TEST_EXPECT(::pthread_sigmask(SIG_SETMASK, nullptr, &parentMask) == 0);
+            SC_TEST_EXPECT(sigismember(&parentMask, SIGUSR1) == 1);
+        }
+#endif
         if (test_section("Process error"))
         {
             processError();
