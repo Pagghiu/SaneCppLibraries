@@ -970,10 +970,24 @@ SC::ResultFile SC::FileDescriptor::openForWriteToDevNull()
 #endif
 }
 
-SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
+namespace
 {
+enum class StandardStream
+{
+    Input,
+    Output,
+    Error
+};
+
+static SC::ResultFile duplicateStandardHandle(SC::FileDescriptor& descriptor, StandardStream stream)
+{
+    using namespace SC;
 #if SC_PLATFORM_WINDOWS
-    HANDLE stdHandle = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    const DWORD standardHandle = stream == StandardStream::Input    ? STD_INPUT_HANDLE
+                                 : stream == StandardStream::Output ? STD_OUTPUT_HANDLE
+                                                                    : STD_ERROR_HANDLE;
+
+    HANDLE stdHandle = ::GetStdHandle(standardHandle);
     if (stdHandle == INVALID_HANDLE_VALUE or stdHandle == nullptr)
     {
         return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::GetStandardHandle,
@@ -987,98 +1001,43 @@ SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            ::GetLastError());
     }
-    if (not assign(duplicated))
+    if (not descriptor.assign(duplicated))
     {
         ::CloseHandle(duplicated);
         return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
     }
     return Result(true);
 #else
-    const int duplicated = ::dup(STDOUT_FILENO);
+    const int standardHandle = stream == StandardStream::Input    ? STDIN_FILENO
+                               : stream == StandardStream::Output ? STDOUT_FILENO
+                                                                  : STDERR_FILENO;
+    const int duplicated     = ::dup(standardHandle);
     if (duplicated == -1)
         return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
                                            static_cast<uint32_t>(errno));
-    if (not assign(duplicated))
+    if (not descriptor.assign(duplicated))
     {
         ::close(duplicated);
         return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
     }
     return Result(true);
 #endif
+}
+} // namespace
+
+SC::ResultFile SC::FileDescriptor::openStdOutDuplicate()
+{
+    return duplicateStandardHandle(*this, StandardStream::Output);
 }
 
 SC::ResultFile SC::FileDescriptor::openStdErrDuplicate()
 {
-#if SC_PLATFORM_WINDOWS
-    HANDLE stdHandle = ::GetStdHandle(STD_ERROR_HANDLE);
-    if (stdHandle == INVALID_HANDLE_VALUE or stdHandle == nullptr)
-    {
-        return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::GetStandardHandle,
-                                           ::GetLastError());
-    }
-    HANDLE duplicated;
-    BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
-                                   DUPLICATE_SAME_ACCESS);
-    if (res == FALSE)
-    {
-        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
-                                           ::GetLastError());
-    }
-    if (not assign(duplicated))
-    {
-        ::CloseHandle(duplicated);
-        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
-    }
-    return Result(true);
-#else
-    const int duplicated = ::dup(STDERR_FILENO);
-    if (duplicated == -1)
-        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
-                                           static_cast<uint32_t>(errno));
-    if (not assign(duplicated))
-    {
-        ::close(duplicated);
-        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
-    }
-    return Result(true);
-#endif
+    return duplicateStandardHandle(*this, StandardStream::Error);
 }
 
 SC::ResultFile SC::FileDescriptor::openStdInDuplicate()
 {
-#if SC_PLATFORM_WINDOWS
-    HANDLE stdHandle = ::GetStdHandle(STD_INPUT_HANDLE);
-    if (stdHandle == INVALID_HANDLE_VALUE or stdHandle == nullptr)
-    {
-        return ResultFile::withNativeError(FileError::InvalidHandle, FileErrorDetail::GetStandardHandle,
-                                           ::GetLastError());
-    }
-    HANDLE duplicated;
-    BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
-                                   DUPLICATE_SAME_ACCESS);
-    if (res == FALSE)
-    {
-        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
-                                           ::GetLastError());
-    }
-    if (not assign(duplicated))
-    {
-        ::CloseHandle(duplicated);
-        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
-    }
-    return Result(true);
-#else
-    const int duplicated = ::dup(STDIN_FILENO);
-    if (duplicated == -1)
-        return ResultFile::withNativeError(FileError::DuplicateFailed, FileErrorDetail::DuplicateStandardHandle,
-                                           static_cast<uint32_t>(errno));
-    if (not assign(duplicated))
-    {
-        ::close(duplicated);
-        return {FileError::InvalidState, FileErrorDetail::DuplicateStandardHandle};
-    }
-    return Result(true);
-#endif
+    return duplicateStandardHandle(*this, StandardStream::Input);
 }
 
 SC::ResultFile SC::FileDescriptor::writeString(StringSpan data) { return write(data.toCharSpan()); }
