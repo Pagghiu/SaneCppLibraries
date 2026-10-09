@@ -2292,405 +2292,214 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.close());
     }
 
+    enum class SocketCancelPhase
+    {
+        BeforeDispatch,
+        AfterFirstRun,
+        Submitted
+    };
+
+    void logSocketCancellationCase(StringSpan operation, SocketCancelPhase phase)
+    {
+        if (not report.quietMode)
+        {
+            const StringSpan phaseName = phase == SocketCancelPhase::BeforeDispatch  ? StringSpan("before dispatch")
+                                         : phase == SocketCancelPhase::AfterFirstRun ? StringSpan("after first run")
+                                                                                     : StringSpan("submitted");
+            report.console.print("\t  socket cancellation: {} / {}\n", operation, phaseName);
+        }
+    }
+
+    void cancelSocketOperationAtPhase(AsyncFiberIO& io, FiberTask& task, bool& canceled, SocketCancelPhase phase)
+    {
+        if (phase == SocketCancelPhase::Submitted)
+        {
+            // Submission is driven separately and may complete before cancellation.
+            cancelSubmittedOperationIfPending(io, task, canceled);
+            return;
+        }
+        if (phase == SocketCancelPhase::AfterFirstRun)
+        {
+            SC_TEST_EXPECT(io.runOnce());
+            SC_TEST_EXPECT(task.isActive());
+        }
+        SC_TEST_EXPECT(io.cancelAll());
+        SC_TEST_EXPECT(io.run());
+        SC_TEST_EXPECT(canceled);
+        if (phase == SocketCancelPhase::BeforeDispatch)
+        {
+            SC_TEST_EXPECT(task.isCompleted());
+        }
+        SC_TEST_EXPECT(not task.result());
+    }
+
+    void cancelSocketAccept(SocketCancelPhase phase, uint16_t basePort)
+    {
+        logSocketCancellationCase("accept", phase);
+        struct State
+        {
+            AsyncFiberIO*     io             = nullptr;
+            SocketDescriptor* serverSocket   = nullptr;
+            SocketDescriptor* acceptedClient = nullptr;
+
+            bool canceled = false;
+        };
+
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+
+        SocketDescriptor serverSocket;
+        SocketDescriptor acceptedClient;
+        uint16_t         tcpPort = report.mapPort(basePort);
+        SocketIPAddress  nativeAddress;
+        SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
+        SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+        {
+            SocketServer server(serverSocket);
+            SC_TEST_EXPECT(server.bind(nativeAddress));
+            SC_TEST_EXPECT(server.listen(1));
+        }
+
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
+
+        State state;
+        state.io             = &io;
+        state.serverSocket   = &serverSocket;
+        state.acceptedClient = &acceptedClient;
+
+        SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler&)
+                                           {
+                                               Result result =
+                                                   state.io->accept(*state.serverSocket, *state.acceptedClient);
+                                               state.canceled = not result;
+                                               return result;
+                                           })));
+        cancelSocketOperationAtPhase(io, task, state.canceled, phase);
+        SC_TEST_EXPECT(serverSocket.close());
+        SC_TEST_EXPECT(eventLoop.close());
+    }
+
+    void cancelSocketReceive(SocketCancelPhase phase)
+    {
+        logSocketCancellationCase("receive", phase);
+        struct State
+        {
+            AsyncFiberIO*     io     = nullptr;
+            SocketDescriptor* socket = nullptr;
+
+            bool canceled = false;
+
+            char buffer[8];
+
+            AsyncFiberSocketReceiveResult receiveResult;
+        };
+
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+
+        SocketDescriptor client;
+        SocketDescriptor serverSideClient;
+        createTCPSocketPair(eventLoop, client, serverSideClient);
+
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
+
+        State state;
+        state.io     = &io;
+        state.socket = &client;
+
+        SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler&)
+                                           {
+                                               Result result  = state.io->receive(*state.socket,
+                                                                                  {state.buffer, sizeof(state.buffer)},
+                                                                                  state.receiveResult);
+                                               state.canceled = not result;
+                                               return result;
+                                           })));
+        cancelSocketOperationAtPhase(io, task, state.canceled, phase);
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(eventLoop.close());
+    }
+
+    void cancelSocketSend(SocketCancelPhase phase, Span<const char> data)
+    {
+        logSocketCancellationCase("send", phase);
+        struct State
+        {
+            AsyncFiberIO*     io     = nullptr;
+            SocketDescriptor* socket = nullptr;
+
+            bool canceled = false;
+
+            Span<const char> data;
+
+            AsyncFiberSocketSendResult sendResult;
+        };
+
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+
+        SocketDescriptor client;
+        SocketDescriptor serverSideClient;
+        createTCPSocketPair(eventLoop, client, serverSideClient);
+
+        FiberScheduler scheduler;
+        configureScheduler(scheduler);
+        AsyncFiberIO io(scheduler, eventLoop);
+        FiberTask    task;
+        char         stackMemory[64 * 1024] = {};
+        FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
+
+        State state;
+        state.io     = &io;
+        state.socket = &client;
+        state.data   = data;
+
+        SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler&)
+                                           {
+                                               Result result =
+                                                   state.io->sendAll(*state.socket, state.data, &state.sendResult);
+                                               state.canceled = not result;
+                                               return result;
+                                           })));
+        cancelSocketOperationAtPhase(io, task, state.canceled, phase);
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(eventLoop.close());
+    }
+
     void cancelSocketOperations()
     {
-        {
-            struct State
-            {
-                AsyncFiberIO*     io             = nullptr;
-                SocketDescriptor* serverSocket   = nullptr;
-                SocketDescriptor* acceptedClient = nullptr;
-                bool              canceled       = false;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor serverSocket;
-            SocketDescriptor acceptedClient;
-            uint16_t         tcpPort = report.mapPort(6053);
-            SocketIPAddress  nativeAddress;
-            SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
-            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-            {
-                SocketServer server(serverSocket);
-                SC_TEST_EXPECT(server.bind(nativeAddress));
-                SC_TEST_EXPECT(server.listen(1));
-            }
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io             = &io;
-            state.serverSocket   = &serverSocket;
-            state.acceptedClient = &acceptedClient;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result =
-                                                       state.io->accept(*state.serverSocket, *state.acceptedClient);
-                                                   state.canceled = not result;
-                                                   return result;
-                                               })));
-            SC_TEST_EXPECT(io.runOnce());
-            SC_TEST_EXPECT(task.isActive());
-            SC_TEST_EXPECT(io.cancelAll());
-            SC_TEST_EXPECT(io.run());
-            SC_TEST_EXPECT(state.canceled);
-            SC_TEST_EXPECT(not task.result());
-            SC_TEST_EXPECT(serverSocket.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
-
-        {
-            struct State
-            {
-                AsyncFiberIO*     io             = nullptr;
-                SocketDescriptor* serverSocket   = nullptr;
-                SocketDescriptor* acceptedClient = nullptr;
-                bool              canceled       = false;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor serverSocket;
-            SocketDescriptor acceptedClient;
-            uint16_t         tcpPort = report.mapPort(6064);
-            SocketIPAddress  nativeAddress;
-            SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
-            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-            {
-                SocketServer server(serverSocket);
-                SC_TEST_EXPECT(server.bind(nativeAddress));
-                SC_TEST_EXPECT(server.listen(1));
-            }
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io             = &io;
-            state.serverSocket   = &serverSocket;
-            state.acceptedClient = &acceptedClient;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result =
-                                                       state.io->accept(*state.serverSocket, *state.acceptedClient);
-                                                   state.canceled = not result;
-                                                   return result;
-                                               })));
-            SC_TEST_EXPECT(io.cancelAll());
-            SC_TEST_EXPECT(io.run());
-            SC_TEST_EXPECT(state.canceled);
-            SC_TEST_EXPECT(task.isCompleted());
-            SC_TEST_EXPECT(not task.result());
-            SC_TEST_EXPECT(serverSocket.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
-
-        {
-            struct State
-            {
-                AsyncFiberIO*                 io       = nullptr;
-                SocketDescriptor*             socket   = nullptr;
-                bool                          canceled = false;
-                char                          buffer[8];
-                AsyncFiberSocketReceiveResult receiveResult;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor client;
-            SocketDescriptor serverSideClient;
-            createTCPSocketPair(eventLoop, client, serverSideClient);
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io     = &io;
-            state.socket = &client;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result = state.io->receive(
-                                                       *state.socket, {state.buffer, sizeof(state.buffer)},
-                                                       state.receiveResult);
-                                                   state.canceled = not result;
-                                                   return result;
-                                               })));
-            SC_TEST_EXPECT(io.runOnce());
-            SC_TEST_EXPECT(task.isActive());
-            SC_TEST_EXPECT(io.cancelAll());
-            SC_TEST_EXPECT(io.run());
-            SC_TEST_EXPECT(state.canceled);
-            SC_TEST_EXPECT(not task.result());
-            SC_TEST_EXPECT(client.close());
-            SC_TEST_EXPECT(serverSideClient.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
-
-        {
-            struct State
-            {
-                AsyncFiberIO*                 io       = nullptr;
-                SocketDescriptor*             socket   = nullptr;
-                bool                          canceled = false;
-                char                          buffer[8];
-                AsyncFiberSocketReceiveResult receiveResult;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor client;
-            SocketDescriptor serverSideClient;
-            createTCPSocketPair(eventLoop, client, serverSideClient);
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io     = &io;
-            state.socket = &client;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result = state.io->receive(
-                                                       *state.socket, {state.buffer, sizeof(state.buffer)},
-                                                       state.receiveResult);
-                                                   state.canceled = not result;
-                                                   return result;
-                                               })));
-            SC_TEST_EXPECT(io.cancelAll());
-            SC_TEST_EXPECT(io.run());
-            SC_TEST_EXPECT(state.canceled);
-            SC_TEST_EXPECT(task.isCompleted());
-            SC_TEST_EXPECT(not task.result());
-            SC_TEST_EXPECT(client.close());
-            SC_TEST_EXPECT(serverSideClient.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
-
-        {
-            struct State
-            {
-                AsyncFiberIO*              io        = nullptr;
-                SocketDescriptor*          socket    = nullptr;
-                bool                       canceled  = false;
-                char                       buffer[5] = {'P', 'I', 'N', 'G', '!'};
-                AsyncFiberSocketSendResult sendResult;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor client;
-            SocketDescriptor serverSideClient;
-            createTCPSocketPair(eventLoop, client, serverSideClient);
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io     = &io;
-            state.socket = &client;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result = state.io->sendAll(
-                                                       *state.socket, {state.buffer, sizeof(state.buffer)},
-                                                       &state.sendResult);
-                                                   state.canceled = not result;
-                                                   return result;
-                                               })));
-            SC_TEST_EXPECT(io.runOnce());
-            SC_TEST_EXPECT(task.isActive());
-            SC_TEST_EXPECT(io.cancelAll());
-            SC_TEST_EXPECT(io.run());
-            SC_TEST_EXPECT(state.canceled);
-            SC_TEST_EXPECT(not task.result());
-            SC_TEST_EXPECT(client.close());
-            SC_TEST_EXPECT(serverSideClient.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
+        cancelSocketAccept(SocketCancelPhase::AfterFirstRun, 6053);
+        cancelSocketAccept(SocketCancelPhase::BeforeDispatch, 6064);
+        cancelSocketReceive(SocketCancelPhase::AfterFirstRun);
+        cancelSocketReceive(SocketCancelPhase::BeforeDispatch);
+        const char data[5] = {'P', 'I', 'N', 'G', '!'};
+        cancelSocketSend(SocketCancelPhase::AfterFirstRun, {data, sizeof(data)});
     }
 
     void cancelActiveSocketOperations()
     {
-        {
-            struct State
-            {
-                AsyncFiberIO*     io                 = nullptr;
-                SocketDescriptor* serverSocket       = nullptr;
-                SocketDescriptor* acceptedClient     = nullptr;
-                bool              completedWithError = false;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor serverSocket;
-            SocketDescriptor acceptedClient;
-            uint16_t         tcpPort = report.mapPort(6056);
-            SocketIPAddress  nativeAddress;
-            SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
-            SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
-            {
-                SocketServer server(serverSocket);
-                SC_TEST_EXPECT(server.bind(nativeAddress));
-                SC_TEST_EXPECT(server.listen(1));
-            }
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io             = &io;
-            state.serverSocket   = &serverSocket;
-            state.acceptedClient = &acceptedClient;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result =
-                                                       state.io->accept(*state.serverSocket, *state.acceptedClient);
-                                                   state.completedWithError = not result;
-                                                   return result;
-                                               })));
-            cancelSubmittedOperationIfPending(io, task, state.completedWithError);
-            SC_TEST_EXPECT(serverSocket.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
-
-        {
-            struct State
-            {
-                AsyncFiberIO*                 io                 = nullptr;
-                SocketDescriptor*             socket             = nullptr;
-                bool                          completedWithError = false;
-                char                          buffer[8];
-                AsyncFiberSocketReceiveResult receiveResult;
-            };
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor client;
-            SocketDescriptor serverSideClient;
-            createTCPSocketPair(eventLoop, client, serverSideClient);
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io     = &io;
-            state.socket = &client;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result = state.io->receive(
-                                                       *state.socket, {state.buffer, sizeof(state.buffer)},
-                                                       state.receiveResult);
-                                                   state.completedWithError = not result;
-                                                   return result;
-                                               })));
-            cancelSubmittedOperationIfPending(io, task, state.completedWithError);
-            SC_TEST_EXPECT(client.close());
-            SC_TEST_EXPECT(serverSideClient.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
-
-        {
-            struct State
-            {
-                AsyncFiberIO*              io     = nullptr;
-                SocketDescriptor*          socket = nullptr;
-                Span<const char>           data;
-                bool                       completedWithError = false;
-                AsyncFiberSocketSendResult sendResult;
-            };
-
-            static char sendBuffer[16 * 1024 * 1024] = {};
-
-            AsyncEventLoop eventLoop;
-            SC_TEST_EXPECT(eventLoop.create());
-
-            SocketDescriptor client;
-            SocketDescriptor serverSideClient;
-            createTCPSocketPair(eventLoop, client, serverSideClient);
-
-            FiberScheduler scheduler;
-            configureScheduler(scheduler);
-            AsyncFiberIO io(scheduler, eventLoop);
-            FiberTask    task;
-            char         stackMemory[64 * 1024] = {};
-            FiberStack   stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
-
-            State state;
-            state.io     = &io;
-            state.socket = &client;
-            state.data   = {sendBuffer, sizeof(sendBuffer)};
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler&)
-                                               {
-                                                   Result result =
-                                                       state.io->sendAll(*state.socket, state.data, &state.sendResult);
-                                                   state.completedWithError = not result;
-                                                   return result;
-                                               })));
-            cancelSubmittedOperationIfPending(io, task, state.completedWithError);
-            SC_TEST_EXPECT(client.close());
-            SC_TEST_EXPECT(serverSideClient.close());
-            SC_TEST_EXPECT(eventLoop.close());
-        }
+        cancelSocketAccept(SocketCancelPhase::Submitted, 6056);
+        cancelSocketReceive(SocketCancelPhase::Submitted);
+        static char sendBuffer[16 * 1024 * 1024] = {};
+        cancelSocketSend(SocketCancelPhase::Submitted, {sendBuffer, sizeof(sendBuffer)});
     }
 
     void multiFiberEcho()
