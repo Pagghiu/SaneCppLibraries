@@ -16,13 +16,6 @@ static constexpr Result AsyncFiberTaskCancelled()
     return Result::Error(AsyncFibersResultCategory, AsyncFibersError::Cancelled);
 }
 
-struct AsyncFiberOperationState
-{
-    AsyncFiberIO* asyncFiber = nullptr;
-    FiberCounter* counter    = nullptr;
-    Result        result     = Result(true);
-};
-
 struct AsyncFiberStartState
 {
     AsyncFiberIO*                     asyncFiber      = nullptr;
@@ -179,86 +172,58 @@ Result AsyncFiberIO::cancelAll()
     return scheduler.requestCancelAll();
 }
 
+template <typename Request, typename Start, typename Complete>
+Result AsyncFiberIO::runSingleOperation(Request& request, Start start, Complete complete)
+{
+    FiberCounter counter;
+    Result       operationResult = Result(true);
+    struct CompletionContext
+    {
+        FiberCounter* counter;
+        Result*       result;
+        Complete*     complete;
+    } context{&counter, &operationResult, &complete};
+
+    request.callback = [this, &context](typename Request::Result& result)
+    {
+        *context.result = (*context.complete)(result);
+        operationFinished();
+        SC_ASYNC_FIBERS_TRUST_RESULT(scheduler.done(*context.counter));
+    };
+    // The start command copies only these pointers; both callables live until startOperation returns.
+    Function<Result(AsyncEventLoop&)> startProcedure = [&request, &start](AsyncEventLoop& eventLoop)
+    { return start(request, eventLoop); };
+    return startOperation(counter, request, operationResult, startProcedure);
+}
+
 Result AsyncFiberIO::sleep(TimeMs duration)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncLoopTimeout         request;
+    AsyncLoopTimeout request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-
-    request.callback = [&state](AsyncLoopTimeout::Result& result)
-    {
-        state.result = result.isValid();
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncLoopTimeout* request = nullptr;
-        TimeMs            duration;
-    };
-    StartContext                      startContext{&request, duration};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, startContext.duration); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [duration](AsyncLoopTimeout& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, duration); },
+        [](AsyncLoopTimeout::Result& result) { return result.isValid(); });
 }
 
 Result AsyncFiberIO::accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSocketAccept        request;
+    AsyncSocketAccept request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-
-    request.callback = [&state, &outClient](AsyncSocketAccept::Result& result)
-    {
-        state.result = result.moveTo(outClient);
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSocketAccept*      request = nullptr;
-        const SocketDescriptor* socket  = nullptr;
-    };
-    StartContext                      startContext{&request, &serverSocket};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.socket); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [&serverSocket](AsyncSocketAccept& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, serverSocket); },
+        [&outClient](AsyncSocketAccept::Result& result) { return result.moveTo(outClient); });
 }
 
 Result AsyncFiberIO::connect(const SocketDescriptor& socket, SocketIPAddress address)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSocketConnect       request;
+    AsyncSocketConnect request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-
-    request.callback = [&state](AsyncSocketConnect::Result& result)
-    {
-        state.result = result.isValid();
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSocketConnect*     request = nullptr;
-        const SocketDescriptor* socket  = nullptr;
-        SocketIPAddress         address;
-    };
-    StartContext                      startContext{&request, &socket, address};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.socket, startContext.address); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [&socket, address](AsyncSocketConnect& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, socket, address); },
+        [](AsyncSocketConnect::Result& result) { return result.isValid(); });
 }
 
 Result AsyncFiberIO::send(const SocketDescriptor& socket, Span<const char> data, AsyncFiberSocketSendResult* outResult)
@@ -273,69 +238,43 @@ Result AsyncFiberIO::send(const SocketDescriptor& socket, Span<const char> data,
         return Result(true);
     }
 
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSocketSend          request;
+    AsyncSocketSend request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
     if (outResult != nullptr)
     {
         outResult->numBytes = 0;
     }
 
-    request.callback = [&state, outResult](AsyncSocketSend::Result& result)
-    {
-        state.result = result.isValid();
-        if (outResult != nullptr and state.result)
+    return runSingleOperation(
+        request, [&socket, data](AsyncSocketSend& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, socket, data); },
+        [outResult](AsyncSocketSend::Result& result)
         {
-            outResult->numBytes = result.completionData.numBytes;
-        }
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSocketSend*        request = nullptr;
-        const SocketDescriptor* socket  = nullptr;
-        Span<const char>        data;
-    };
-    StartContext                      startContext{&request, &socket, data};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.socket, startContext.data); };
-    return startOperation(counter, request, state.result, startProcedure);
+            SC::Result operationResult = result.isValid();
+            if (outResult != nullptr and operationResult)
+            {
+                outResult->numBytes = result.completionData.numBytes;
+            }
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::receive(const SocketDescriptor& socket, Span<char> buffer,
                              AsyncFiberSocketReceiveResult& outResult)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSocketReceive       request;
+    AsyncSocketReceive request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-    outResult        = {};
+    outResult = {};
 
-    request.callback = [&state, &outResult](AsyncSocketReceive::Result& result)
-    {
-        state.result           = result.get(outResult.data);
-        outResult.disconnected = result.completionData.disconnected;
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSocketReceive*     request = nullptr;
-        const SocketDescriptor* socket  = nullptr;
-        Span<char>              buffer;
-    };
-    StartContext                      startContext{&request, &socket, buffer};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.socket, startContext.buffer); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [&socket, buffer](AsyncSocketReceive& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, socket, buffer); },
+        [&outResult](AsyncSocketReceive::Result& result)
+        {
+            SC::Result operationResult = result.get(outResult.data);
+            outResult.disconnected     = result.completionData.disconnected;
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::sendAll(const SocketDescriptor& socket, Span<const char> data,
@@ -439,29 +378,12 @@ Result AsyncFiberIO::filePoll(const FileDescriptor& file)
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TRY(file.get(handle, Result::Error(AsyncFibersResultCategory, AsyncFibersError::InvalidFileHandle)));
 
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncFileReadiness       request;
+    AsyncFileReadiness request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-
-    request.callback = [&state](AsyncFileReadiness::Result& result)
-    {
-        state.result = result.isValid();
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncFileReadiness*    request = nullptr;
-        FileDescriptor::Handle handle  = FileDescriptor::Invalid;
-    };
-    StartContext                      startContext{&request, handle};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, startContext.handle); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [handle](AsyncFileReadiness& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, handle); },
+        [](AsyncFileReadiness::Result& result) { return result.isValid(); });
 }
 
 Result AsyncFiberIO::fileWrite(const FileDescriptor& file, Span<const char> data, AsyncFiberFileWriteResult* outResult)
@@ -490,112 +412,61 @@ Result AsyncFiberIO::fileWriteAllAt(const FileDescriptor& file, uint64_t offset,
 Result AsyncFiberIO::fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
                               AsyncFiberFileSendOptions options, AsyncFiberFileSendResult* outResult)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncFileSend            request;
+    AsyncFileSend request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
     if (outResult != nullptr)
     {
         *outResult = {};
     }
 
-    request.callback = [&state, outResult](AsyncFileSend::Result& result)
-    {
-        state.result = result.isValid();
-        if (outResult != nullptr and state.result)
+    return runSingleOperation(
+        request, [&file, &socket, options](AsyncFileSend& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, file, socket, options.offset, options.length, options.pipeSize); },
+        [outResult](AsyncFileSend::Result& result)
         {
-            outResult->bytesTransferred = result.getBytesTransferred();
-            outResult->usedZeroCopy     = result.usedZeroCopy();
-        }
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncFileSend*            request = nullptr;
-        const FileDescriptor*     file    = nullptr;
-        const SocketDescriptor*   socket  = nullptr;
-        AsyncFiberFileSendOptions options;
-    };
-    StartContext startContext;
-    startContext.request = &request;
-    startContext.file    = &file;
-    startContext.socket  = &socket;
-    startContext.options = options;
-
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    {
-        return startContext.request->start(eventLoop, *startContext.file, *startContext.socket,
-                                           startContext.options.offset, startContext.options.length,
-                                           startContext.options.pipeSize);
-    };
-    return startOperation(counter, request, state.result, startProcedure);
+            SC::Result operationResult = result.isValid();
+            if (outResult != nullptr and operationResult)
+            {
+                outResult->bytesTransferred = result.getBytesTransferred();
+                outResult->usedZeroCopy     = result.usedZeroCopy();
+            }
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::processExit(FileDescriptor::Handle process, AsyncFiberProcessExitResult& outResult)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncProcessExit         request;
+    AsyncProcessExit request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-    outResult        = {};
+    outResult = {};
 
-    request.callback = [&state, &outResult](AsyncProcessExit::Result& result)
-    {
-        state.result = result.get(outResult.exitStatus);
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncProcessExit*      request = nullptr;
-        FileDescriptor::Handle process = FileDescriptor::Invalid;
-    };
-    StartContext                      startContext{&request, process};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, startContext.process); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [process](AsyncProcessExit& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, process); },
+        [&outResult](AsyncProcessExit::Result& result) { return result.get(outResult.exitStatus); });
 }
 
 Result AsyncFiberIO::signal(int signalNumber, AsyncFiberSignalResult& outResult)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSignal              request;
+    AsyncSignal request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-    outResult        = {};
+    outResult = {};
 
-    request.callback = [&state, &outResult](AsyncSignal::Result& result)
-    {
-        state.result            = result.isValid();
-        outResult.signalNumber  = result.completionData.signalNumber;
-        outResult.deliveryCount = result.completionData.deliveryCount;
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSignal*       request = nullptr;
-        int                signal  = 0;
-        AsyncSignalOptions options;
-    };
-    StartContext startContext;
-    startContext.request      = &request;
-    startContext.signal       = signalNumber;
-    startContext.options.mode = AsyncSignalOptions::Mode::OneShot;
-
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, startContext.signal, startContext.options); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request,
+        [signalNumber](AsyncSignal& operation, AsyncEventLoop& eventLoop)
+        {
+            AsyncSignalOptions options;
+            options.mode = AsyncSignalOptions::Mode::OneShot;
+            return operation.start(eventLoop, signalNumber, options);
+        },
+        [&outResult](AsyncSignal::Result& result)
+        {
+            SC::Result operationResult = result.isValid();
+            outResult.signalNumber     = result.completionData.signalNumber;
+            outResult.deliveryCount    = result.completionData.deliveryCount;
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::sendTo(const SocketDescriptor& socket, SocketIPAddress address, Span<const char> data,
@@ -611,70 +482,43 @@ Result AsyncFiberIO::sendTo(const SocketDescriptor& socket, SocketIPAddress addr
         return Result(true);
     }
 
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSocketSendTo        request;
+    AsyncSocketSendTo request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
     if (outResult != nullptr)
     {
         outResult->numBytes = 0;
     }
 
-    request.callback = [&state, outResult](AsyncSocketSendTo::Result& result)
-    {
-        state.result = result.isValid();
-        if (outResult != nullptr and state.result)
+    return runSingleOperation(
+        request, [&socket, address, data](AsyncSocketSendTo& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, socket, address, data); },
+        [outResult](AsyncSocketSendTo::Result& result)
         {
-            outResult->numBytes = result.completionData.numBytes;
-        }
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSocketSendTo*      request = nullptr;
-        const SocketDescriptor* socket  = nullptr;
-        SocketIPAddress         address;
-        Span<const char>        data;
-    };
-    StartContext                      startContext{&request, &socket, address, data};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.socket, startContext.address, startContext.data); };
-    return startOperation(counter, request, state.result, startProcedure);
+            SC::Result operationResult = result.isValid();
+            if (outResult != nullptr and operationResult)
+            {
+                outResult->numBytes = result.completionData.numBytes;
+            }
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
                                  AsyncFiberSocketReceiveFromResult& outResult)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncSocketReceiveFrom   request;
+    AsyncSocketReceiveFrom request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
-    outResult        = {};
+    outResult = {};
 
-    request.callback = [&state, &outResult](AsyncSocketReceiveFrom::Result& result)
-    {
-        state.result            = result.get(outResult.data);
-        outResult.sourceAddress = result.getSourceAddress();
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
-
-    struct StartContext
-    {
-        AsyncSocketReceiveFrom* request = nullptr;
-        const SocketDescriptor* socket  = nullptr;
-        Span<char>              buffer;
-    };
-    StartContext                      startContext{&request, &socket, buffer};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.socket, startContext.buffer); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [&socket, buffer](AsyncSocketReceiveFrom& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, socket, buffer); },
+        [&outResult](AsyncSocketReceiveFrom::Result& result)
+        {
+            SC::Result operationResult = result.get(outResult.data);
+            outResult.sourceAddress    = result.getSourceAddress();
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::fileReadImpl(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult,
@@ -687,36 +531,22 @@ Result AsyncFiberIO::fileReadImpl(const FileDescriptor& file, Span<char> buffer,
 Result AsyncFiberIO::fileReadImpl(const FileDescriptor& file, Span<char> buffer, AsyncFiberFileReadResult& outResult,
                                   uint64_t offset, bool useOffset, AsyncFileRead& request)
 {
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-
-    state.asyncFiber = this;
-    state.counter    = &counter;
-    outResult        = {};
-
-    request.callback = [&state, &outResult](AsyncFileRead::Result& result)
-    {
-        state.result        = result.get(outResult.data);
-        outResult.endOfFile = result.completionData.endOfFile;
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
+    outResult = {};
 
     if (useOffset)
     {
         request.setOffset(offset);
     }
 
-    struct StartContext
-    {
-        AsyncFileRead*        request = nullptr;
-        const FileDescriptor* file    = nullptr;
-        Span<char>            buffer;
-    };
-    StartContext                      startContext{&request, &file, buffer};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.file, startContext.buffer); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [&file, buffer](AsyncFileRead& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, file, buffer); },
+        [&outResult](AsyncFileRead::Result& result)
+        {
+            SC::Result operationResult = result.get(outResult.data);
+            outResult.endOfFile        = result.completionData.endOfFile;
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::fileReadExactImpl(const FileDescriptor& file, Span<char> buffer,
@@ -768,43 +598,30 @@ Result AsyncFiberIO::fileWriteImpl(const FileDescriptor& file, Span<const char> 
         return Result(true);
     }
 
-    FiberCounter             counter;
-    AsyncFiberOperationState state;
-    AsyncFileWrite           request;
+    AsyncFileWrite request;
 
-    state.asyncFiber = this;
-    state.counter    = &counter;
     if (outResult != nullptr)
     {
         outResult->numBytes = 0;
     }
-
-    request.callback = [&state, outResult](AsyncFileWrite::Result& result)
-    {
-        state.result = result.isValid();
-        if (outResult != nullptr and state.result)
-        {
-            state.result = result.get(outResult->numBytes);
-        }
-        state.asyncFiber->operationFinished();
-        SC_ASYNC_FIBERS_TRUST_RESULT(state.asyncFiber->fiberScheduler().done(*state.counter));
-    };
 
     if (useOffset)
     {
         request.setOffset(offset);
     }
 
-    struct StartContext
-    {
-        AsyncFileWrite*       request = nullptr;
-        const FileDescriptor* file    = nullptr;
-        Span<const char>      data;
-    };
-    StartContext                      startContext{&request, &file, data};
-    Function<Result(AsyncEventLoop&)> startProcedure = [&startContext](AsyncEventLoop& eventLoop)
-    { return startContext.request->start(eventLoop, *startContext.file, startContext.data); };
-    return startOperation(counter, request, state.result, startProcedure);
+    return runSingleOperation(
+        request, [&file, data](AsyncFileWrite& operation, AsyncEventLoop& eventLoop)
+        { return operation.start(eventLoop, file, data); },
+        [outResult](AsyncFileWrite::Result& result)
+        {
+            SC::Result operationResult = result.isValid();
+            if (outResult != nullptr and operationResult)
+            {
+                operationResult = result.get(outResult->numBytes);
+            }
+            return operationResult;
+        });
 }
 
 Result AsyncFiberIO::checkOwnerThread() const

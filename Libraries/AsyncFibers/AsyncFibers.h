@@ -178,6 +178,9 @@ struct SC_ASYNC_FIBERS_EXPORT AsyncFiberIO
                              uint64_t offset, bool useOffset);
     Result fileWriteImpl(const FileDescriptor& file, Span<const char> data, AsyncFiberFileWriteResult* outResult,
                          uint64_t offset, bool useOffset);
+    template <typename Request, typename Start, typename Complete>
+    Result runSingleOperation(Request& request, Start start, Complete complete);
+
     Result startOperation(FiberCounter& counter, AsyncRequest& request, Result& operationResult,
                           Function<Result(AsyncEventLoop&)>& startProcedure);
     Result executeStartCommand(void* startState);
