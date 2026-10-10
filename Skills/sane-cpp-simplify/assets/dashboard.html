@@ -2,23 +2,142 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sane C++ · Simplification board</title>
 <style>
-:root{color-scheme:light;--ink:#182b32;--muted:#526971;--line:#d9e2e3;--paper:#f4f7f6;--accent:#087e76;--amber:#99540b;--purple:#7148a5}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,sans-serif}header,main{max-width:1580px;margin:auto;padding:26px 32px}header{padding-bottom:10px}.eyebrow{font-size:12px;letter-spacing:.13em;color:var(--accent);font-weight:750;text-transform:uppercase}h1{font-size:34px;letter-spacing:-1px;margin:7px 0}h2{font-size:19px;margin:0}p{margin:6px 0 12px}.muted{color:var(--muted)}.stats{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}.stat{background:white;border:1px solid var(--line);border-radius:12px;padding:13px 20px;min-width:145px}.stat strong{font-size:25px;display:block}.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end;padding:16px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:15px}label{font-size:12px;font-weight:650;display:grid;gap:5px}input,select,button,textarea{font:inherit;color:inherit;border:1px solid #b7c8cb;border-radius:7px;background:white;padding:8px 10px}input[type=search]{min-width:260px}button{cursor:pointer;font-weight:600}button:hover{border-color:var(--accent);background:#edf7f5}button.primary{background:var(--accent);color:white;border-color:var(--accent)}button:disabled{opacity:.4;cursor:default}.group{margin:22px 0}.group-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.table-wrap{overflow:auto;background:white;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;table-layout:fixed}th{text-align:left;background:#edf2f1;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:10px 13px}td{padding:14px 13px;vertical-align:top;border-top:1px solid var(--line)}.action{width:145px}.title{width:29%}.effect{width:175px}.state{width:145px}.row-title{font-weight:720;font-size:16px}.id{font-size:11px;color:var(--muted);font-family:monospace}.badge{display:inline-block;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:750;background:#e6f3ee;color:#086956;margin-bottom:5px}.badge.explore{background:#eee9fa;color:var(--purple)}.badge.opinion{background:#fff0d4;color:var(--amber)}.badge.blocked{background:#fce7e7;color:#923b3b}.badge.deferred,.badge.rejected,.badge.completed{background:#eef1f2;color:#526971}tr.opinion td:first-child{border-left:4px solid #d79827}tr.explore td:first-child{border-left:4px solid #9270c2}.description{font-size:13px;margin:7px 0}.small{font-size:12px}.saving{font-size:18px;font-weight:750}.question{background:#fff3db;border-radius:6px;padding:9px;margin-top:8px;font-size:13px}.details{margin-top:8px}summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:650}.details p{font-size:13px;margin-top:8px}ul{padding-left:19px}.details li{font-size:12px;overflow-wrap:anywhere}a{color:var(--accent)}.select-action{width:100%;font-size:12px}.note{width:100%;height:58px;margin-top:7px;font-size:12px;resize:vertical}.batch{position:sticky;bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#182b32;color:white;padding:13px 18px;border-radius:12px;box-shadow:0 5px 25px #182b3220;z-index:2}.batch span{flex:1}.batch button{font-size:13px;color:var(--ink)}.batch button.primary{color:white}.archive{margin:32px 0}.archive>summary{font-size:17px}.empty{text-align:center;padding:45px;color:var(--muted)}dialog{width:min(760px,94vw);border:1px solid var(--line);border-radius:12px;padding:24px}dialog::backdrop{background:#182b3270}dialog textarea{width:100%;height:280px;font:13px/1.5 monospace;margin:15px 0}.dialog-actions{display:flex;gap:10px;justify-content:flex-end}.statusline{font-size:12px;min-height:20px}footer{padding:20px 0 40px;font-size:12px;color:var(--muted)}@media(max-width:850px){header,main{padding:18px 12px}h1{font-size:28px}table,tbody{display:block;width:100%}thead{display:none}tr{display:grid;grid-template-columns:1fr 145px;grid-template-areas:"title stage" "desc desc" "benefit action";border-top:1px solid var(--line)}td{border:0;padding:12px;min-width:0}td:nth-child(1){grid-area:stage}td:nth-child(2){grid-area:title}td:nth-child(3){grid-area:desc;padding-top:0}td:nth-child(4){grid-area:benefit}td:nth-child(5){grid-area:action}.table-wrap{overflow:hidden}.stat{min-width:120px;padding:9px 12px}.stats{gap:7px}.controls>*{flex:1}.batch{bottom:5px}}
+:root{color-scheme:light;--ink:#182e37;--muted:#586e78;--line:#dce5e8;--paper:#f3f6f8;--accent:#087e76;--amber:#925208;--purple:#7044ac}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.55 system-ui,sans-serif}
+header,main{max-width:1220px;margin:auto;padding:24px 28px}
+header{padding-bottom:0}
+.eyebrow{font-size:11px;letter-spacing:.14em;color:var(--accent);font-weight:750;text-transform:uppercase}
+h1{font-size:32px;letter-spacing:-1px;margin:6px 0}
+h2{font-size:18px;margin:0}
+p{margin:6px 0 12px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0 0}
+.stat{background:white;border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.stat strong{font-size:26px;display:block}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end;padding:16px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:12px}
+.suggestion{align-items:center;background:#eaf5f2;border-color:#cde2dc}
+.suggestion-copy{flex:1;min-width:230px}
+.suggestion-copy b{display:block;margin-bottom:4px}
+.filters label:first-child{flex:2;min-width:230px}
+.filters label{flex:1;min-width:130px}
+label{font-size:12px;font-weight:650;display:grid;gap:5px}
+input,select,button,textarea{font:inherit;color:inherit;border:1px solid #b8c9cf;border-radius:8px;background:white;padding:8px 11px}
+input,select{width:100%}
+button{cursor:pointer;font-weight:650}
+button:hover{border-color:var(--accent);background:#edf7f5}
+button.primary{background:var(--accent);color:white;border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+:is(button,input,select,textarea,summary):focus-visible{outline:3px solid #3b9cdb;outline-offset:3px}
+.group{margin:24px 0}
+.group-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:12px}
+.cards{display:grid;gap:12px}
+.opportunity{background:white;border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 5px #182e3704;border-left:4px solid #9cb6b5}
+.opportunity.opinion{border-left-color:#d59a2f}
+.opportunity.explore{border-left-color:#9970c6}
+.opportunity.completed,.opportunity.rejected{border-left-color:#b3c1c8}
+.card-head{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+.id{font:11px/1.5 ui-monospace,monospace;color:var(--muted);margin-bottom:5px}
+.row-title{font-weight:750;font-size:19px;line-height:1.35;letter-spacing:-.3px;margin:9px 0 12px}
+.badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;background:#e5f3ed;color:#146751}
+.badge.explore{background:#f0eafa;color:var(--purple)}
+.badge.opinion,.badge.risk-medium,.badge.confidence-medium{background:#fff0d8;color:var(--amber)}
+.badge.blocked,.badge.risk-high,.badge.confidence-low{background:#fce8e9;color:#a03444}
+.badge.risk-low,.badge.confidence-high{background:#e6f3ee;color:#17654f}
+.badge.risk-review{background:#eef0f8;color:#536284}
+.badge.deferred,.badge.rejected,.badge.completed{background:#edf1f4;color:#566b75}
+.card-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:26px}
+.description{font-size:13px;margin:0 0 9px}
+.question{background:#fff7e8;border:1px solid #f2dfb8;border-radius:9px;padding:11px 13px;margin:6px 0 12px;font-size:13px}
+.question b{color:var(--amber)}
+.benefit-strip{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;padding:10px 0;margin-top:2px;border-top:1px solid #edf1f3}
+.saving{font-size:14px;font-weight:750}
+.details{margin-top:10px}
+summary{cursor:pointer;color:var(--accent);font-size:12px;font-weight:700}
+.details p{font-size:12px;margin-top:9px}
+.details li{font-size:12px;overflow-wrap:anywhere}
+ul{padding-left:19px}
+a{color:var(--accent)}
+.decision-editor{border-top:1px solid #edf1f3;padding-top:12px;margin-top:2px}
+.editor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.action-toolbar{display:flex;gap:6px;flex-wrap:wrap}
+.action-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;padding:7px 10px;border-color:#d5e0e4;background:#f8fafb}
+.action-button[aria-pressed=true]{background:#e6f5f1;border-color:var(--accent);color:#076f66;box-shadow:inset 0 0 0 1px var(--accent)}
+.action-button[data-value=defer][aria-pressed=true]{background:#f0f2f6;border-color:#687b8e;color:#4c5f71;box-shadow:inset 0 0 0 1px #687b8e}
+.icon{width:15px;height:15px;flex:none}
+.note-label{display:block;font-weight:600;font-size:12px;color:var(--muted);margin:10px 0 5px}
+.note{display:block;width:100%;min-height:92px;max-height:420px;font:14px/1.6 system-ui,sans-serif;resize:vertical;padding:11px 13px;background:#fbfcfd}
+.note:focus{background:white}
+.note-status{font-size:11px;color:#387367}
+.outcome{font-size:12px;color:var(--muted);margin:7px 0 0}
+.batch{position:sticky;bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#182e37;color:white;padding:12px 16px;border-radius:12px;box-shadow:0 5px 25px #182e3725;z-index:2}
+.batch-copy{flex:1;min-width:180px}
+.batch-copy strong{display:block;font-size:14px}
+.batch-copy small{display:block;font-size:11px;color:#c5d7de}
+.batch button{font-size:12px;color:var(--ink)}
+.batch button.primary{color:white}
+.archive{margin:30px 0}
+.archive>summary{font-size:16px;margin-bottom:12px}
+.empty{text-align:center;padding:36px;color:var(--muted)}
+dialog{width:min(760px,94vw);border:1px solid var(--line);border-radius:14px;padding:24px}
+dialog::backdrop{background:#182e3770}
+dialog textarea{width:100%;height:280px;font:13px/1.5 ui-monospace,monospace;margin:15px 0}
+.dialog-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.statusline{font-size:12px;min-height:20px}
+footer{padding:18px 0 28px;font-size:12px;color:var(--muted)}
+
+@media(max-width:850px){header,main{padding:18px 14px}
+header{padding-bottom:0}
+.card-body{grid-template-columns:1fr;gap:0}
+.opportunity{padding:16px}
+.row-title{font-size:18px}
+.card-head{gap:5px}
+.stats{gap:7px}
+.stat{padding:10px 12px}
+.stat strong{font-size:23px}
+.badge{font-size:10px}
+.batch{bottom:5px}
+}
+
+@media(max-width:480px){header,main{padding:15px 10px}
+h1{font-size:27px}
+.stats{grid-template-columns:repeat(2,1fr)}
+.suggestion-copy{min-width:0;flex-basis:100%}
+.filters label{min-width:125px}
+.filters label:first-child{min-width:100%;flex-basis:100%}
+.action-button{flex:1}
+.action-toolbar{width:100%}
+.batch{gap:8px}
+.batch-copy{min-width:100%;flex-basis:100%}
+.batch button{flex:1}
+.note{min-height:110px}
+}
+
 </style></head><body>
 <header><div class="eyebrow">Sane C++ Libraries / maintenance</div><h1>Simplification board</h1><p class="muted">Review by library. Choose a batch. Keep the reasoning next to the code.</p><div id="meta" class="small muted"></div><div class="stats" id="stats"></div></header>
-<main><section class="controls"><div style="flex:1"><b>Suggested reduction batch</b><div class="small muted"><span id="suggested-description"></span></div></div><button id="suggested">Select suggested batch</button></section><div class="controls"><label>Search<input id="search" type="search" placeholder="Library, function, ID or rationale"></label><label>Area<select id="area"><option value="">All libraries & tools</option></select></label><label>Stage<select id="stage"><option value="">All active</option><option value="ready">Ready to propose</option><option value="explore">Explore first</option><option value="opinion">Your opinion needed</option><option value="blocked">Blocked</option><option value="deferred">Deferred</option></select></label><label>Order<select id="sort"><option value="priority">Recommended priority</option><option value="loc">Estimated LOC reduction</option><option value="decision">Your opinion first</option><option value="area">Library / function</option><option value="confidence">Confidence</option></select></label><label>View<select id="group"><option value="area">Group by library</option><option value="none">Single sortable list</option></select></label><button id="reset">Reset filters</button></div>
+<main><section class="controls"><div class="suggestion-copy"><b>Responses on disk</b><div id="file-status" class="small muted" role="status">Checking saved responses…</div></div><button id="connect-responses">Connect response file</button><button id="save-responses">Save responses to file</button><button id="load-responses">Load responses</button><button id="download-responses">Download responses</button><input id="response-upload" type="file" accept=".json,application/json" hidden></section><section class="controls suggestion"><div class="suggestion-copy"><b>Suggested next batch</b><div class="small muted"><span id="suggested-description"></span></div></div><button id="suggested">Select suggested batch</button></section><div class="controls filters"><label>Search<input id="search" type="search" placeholder="Try 6 v1, HTTP, or allocator"></label><label>Area<select id="area" aria-label="Area"><option value="">All libraries & tools</option></select></label><label>Stage<select id="stage" aria-label="Stage"><option value="">All active</option><option value="ready">Ready to propose</option><option value="explore">Explore first</option><option value="opinion">Your opinion needed</option><option value="blocked">Blocked</option><option value="deferred">Deferred</option></select></label><label>Order<select id="sort" aria-label="Order"><option value="priority">Recommended priority</option><option value="loc">Estimated LOC reduction</option><option value="decision">Your opinion first</option><option value="area">Library / function</option><option value="confidence">Confidence</option></select></label><label>View<select id="group" aria-label="View"><option value="area">Group by library</option><option value="none">Single sortable list</option></select></label><button id="reset">Reset filters</button></div>
 <p class="small muted">Purple = investigate first · Amber = a concrete question for you · Estimates include replacement code; clarity changes may add lines. Expand evidence for risks and validation.</p><div id="active"></div><details class="archive" id="archive"><summary id="archive-label">Completed & closed</summary><div id="closed"></div></details><footer id="footer"></footer>
-<div class="batch"><span id="selection-count">No batch selected</span><button id="clear">Clear selection</button><button class="primary" id="review">Review / copy batch</button></div><div id="storage-status" class="statusline muted"></div></main>
-<dialog id="batch-dialog"><h2>Your selected batch</h2><p class="small muted">Selections and notes are saved in this browser. Copy this message into the chat to authorize it; selecting a row alone does not start work.</p><textarea id="batch-text" aria-label="Batch request"></textarea><div class="dialog-actions"><button id="close-dialog">Close</button><button id="download">Download selections</button><button class="primary" id="copy">Copy request</button></div><p id="copy-status" class="statusline" aria-live="polite"></p></dialog>
+<div class="batch"><div class="batch-copy"><strong id="selection-count">No batch selected</strong><small>Save responses to disk for agents · Send the batch in chat to authorize work</small></div><button id="clear">Clear selection</button><button class="primary" id="review">Review / copy batch</button></div><div id="storage-status" class="statusline muted"></div></main>
+<dialog id="batch-dialog"><h2>Your selected batch</h2><p class="small muted">Save responses to disk to share comments and choices with agents. Copy this message into the chat to authorize it; choosing an action here alone does not start work.</p><textarea id="batch-text" aria-label="Batch request"></textarea><div class="dialog-actions"><button id="close-dialog">Close</button><button id="download">Download selections</button><button class="primary" id="copy">Copy request</button></div><p id="copy-status" class="statusline" aria-live="polite"></p></dialog>
 <script id="data" type="application/json">__OPPORTUNITIES_JSON__</script>
+<script id="responses" type="application/json">__RESPONSES_JSON__</script>
+<script>__RESPONSE_STORE_JS__</script>
 <script>
 'use strict';
 const data=JSON.parse(document.getElementById('data').textContent), $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='sc-simplify-board:'+data.project, closed=i=>['completed','rejected'].includes(i.status);
-let saved={};try{saved=JSON.parse(localStorage.getItem(key)||'{}')}catch(e){$('storage-status').textContent='Browser storage unavailable. Copy or download your batch before closing.'}
+let storageAvailable=true;
+let saved=SCResponseFiles.normalize(JSON.parse($('responses').textContent),data.project);try{saved=SCResponseFiles.merge(saved,JSON.parse(localStorage.getItem(key)||'{}'),true)}catch(e){storageAvailable=false;$('storage-status').textContent='Browser storage unavailable. Copy or download your batch before closing.'}
+// Persist migrated draft timestamps so newer disk saves can supersede them.
+try{localStorage.setItem(key,JSON.stringify(saved))}catch(e){storageAvailable=false}
 for(const i of data.items){if(saved[i.id]?.action==='implement'&&i.status!=='ready')saved[i.id].action=''}
+function saveLabel(s){return !storageAvailable?'Not saved — export before closing':s.note?'Comment saved in this browser':s.action?'Action saved in this browser':'Choose an action for this batch'}
 const stages={ready:'Ready to propose',explore:'Explore first',opinion:'Your opinion',blocked:'Blocked',completed:'Completed',deferred:'Deferred',rejected:'Closed'};
-function persist(){try{localStorage.setItem(key,JSON.stringify(saved))}catch(e){$('storage-status').textContent='Browser storage unavailable. Copy or download your batch before closing.'}selectionCount()}
+function persist(){responseFiles.changed();try{localStorage.setItem(key,JSON.stringify(saved));storageAvailable=true;$('storage-status').textContent=''}catch(e){storageAvailable=false;$('storage-status').textContent='Browser storage unavailable. Copy or download your batch before closing.'}selectionCount()}
 function selected(){return data.items.filter(i=>!closed(i)&&saved[i.id]?.action)}
 function selectionCount(){const n=selected().length;$('selection-count').textContent=n?`${n} item${n===1?'':'s'} in your batch`:'No batch selected';$('review').disabled=!n}
 $('suggested-description').textContent=data.suggested_description||'Select individually below.';
@@ -28,18 +147,41 @@ const active=data.items.filter(i=>!closed(i));
 $('stats').innerHTML=[[active.length,'Open opportunities'],[active.filter(i=>i.status==='opinion').length,'Need your opinion'],[active.filter(i=>i.status==='explore').length,'To explore'],[data.source_reduction,'Source lines removed']].map(([n,l])=>`<div class="stat"><strong>${esc(n)}</strong><span class="small muted">${l}</span></div>`).join('');
 [...new Set(active.map(i=>i.area))].sort().forEach(a=>$('area').add(new Option(a,a)));
 function compare(a,b){const mode=$('sort').value;if(mode==='loc')return (b.loc_max||0)-(a.loc_max||0)||a.priority-b.priority;if(mode==='decision')return Number(b.status==='opinion')-Number(a.status==='opinion')||a.priority-b.priority;if(mode==='area')return a.area.localeCompare(b.area)||a.priority-b.priority;if(mode==='confidence')return ({high:0,medium:1,low:2}[a.confidence]-{high:0,medium:1,low:2}[b.confidence])||a.priority-b.priority;return a.priority-b.priority||a.id.localeCompare(b.id)}
-function row(i){const s=saved[i.id]||{}, actions=i.status==='ready'?[['implement','Implement'],['explore','Explore further'],['defer','Defer']]:[['explore','Explore'],['opinion','Give opinion'],['defer','Defer']];return `<tr class="${esc(i.status)}"><td><span class="badge ${esc(i.status)}">${stages[i.status]}</span><div class="small muted">${esc(i.confidence)} confidence</div><div class="small muted">${esc(i.risk)} risk</div></td><td><div class="id">${esc(i.id)} · ${esc(i.area)}</div><div class="row-title">${esc(i.title)}</div><p class="description"><b>Used for:</b> ${esc(i.purpose)}</p><details class="details"><summary>Code, evidence & validation</summary><p>${esc(i.evidence||'Investigation lead; not yet verified.')}</p><ul>${i.sources.map(s=>`<li><span>${esc(s.path)}</span>${s.line?':'+esc(s.line):''}${s.note?' — '+esc(s.note):''}</li>`).join('')}</ul><p><b>Preserve / risks:</b> ${esc(i.caveat||i.risk)}</p><p><b>Validate:</b> ${esc(i.validation)}</p>${i.commit?`<p><b>Commit:</b> ${esc(i.commit)}</p>`:''}</details></td><td><p class="description"><b>Change:</b> ${esc(i.change)}</p><p class="description"><b>Why:</b> ${esc(i.why)}</p>${i.question?`<div class="question"><b>Your decision:</b> ${esc(i.question)}</div>`:''}</td><td><div class="saving">${esc(i.saving)}</div><p class="small muted">${esc(i.benefit)}</p></td><td>${closed(i)?`<span class="small muted">${esc(i.outcome||stages[i.status])}</span>`:`<select class="select-action" data-action="${esc(i.id)}" aria-label="Action for ${esc(i.id)}"><option value="">Choose action…</option>${actions.map(([v,l])=>`<option value="${v}" ${s.action===v?'selected':''}>${l}</option>`).join('')}</select><textarea class="note" data-note="${esc(i.id)}" aria-label="Note for ${esc(i.id)}" placeholder="Your preference or constraint">${esc(s.note||'')}</textarea>`}</td></tr>`}
-function table(items){return `<div class="table-wrap"><table><thead><tr><th class="state">Stage</th><th class="title">Opportunity / code purpose</th><th>Proposal & reason</th><th class="effect">Benefit</th><th class="action">Your batch</th></tr></thead><tbody>${items.map(row).join('')}</tbody></table></div>`}
-function render(){const q=$('search').value.toLowerCase(),area=$('area').value,stage=$('stage').value;const items=active.filter(i=>(!area||i.area===area)&&(!stage||i.status===stage)&&JSON.stringify(i).toLowerCase().includes(q)).sort(compare);let html='';if($('group').value==='none')html=table(items);else{const groups=new Map();for(const i of items){if(!groups.has(i.area))groups.set(i.area,[]);groups.get(i.area).push(i)}for(const [name,rows] of groups)html+=`<section class="group"><div class="group-head"><h2>${esc(name)}</h2><span class="small muted">${rows.length} ${rows.length===1?'opportunity':'opportunities'}</span></div>${table(rows)}</section>`}$('active').innerHTML=items.length?html:'<div class="empty">No opportunities match these filters.</div>';const history=data.items.filter(closed).sort((a,b)=>a.status.localeCompare(b.status)||a.id.localeCompare(b.id));$('archive-label').textContent=`Completed & closed (${history.length})`;$('closed').innerHTML=table(history);selectionCount()}
+const icons={implement:'<path d="m5 12 4 4L19 6"/>',explore:'<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/>',opinion:'<path d="M20 11a8 8 0 0 1-8 8H4l-2 3V11a9 9 0 0 1 18 0Z"/>',defer:'<path d="M8 5v14M16 5v14"/>',clear:'<path d="m6 6 12 12M18 6 6 18"/>'};
+const icon=name=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
+function card(i){
+ const s=saved[i.id]||{},actions=i.status==='ready'?[['implement','Implement'],['explore','Explore'],['defer','Defer']]:[['explore','Explore'],['opinion','Give opinion'],['defer','Defer']];
+ const risk=['high','medium','low'].includes(i.risk)?i.risk:'review';
+ return `<article class="opportunity ${esc(i.status)}" data-id="${esc(i.id)}" aria-labelledby="title-${esc(i.id)}">
+ <div class="card-head"><div class="id">${esc(i.id)} · ${esc(i.area)}</div><div class="badges"><span class="badge ${esc(i.status)}">${stages[i.status]}</span><span class="badge confidence-${esc(i.confidence)}">${esc(i.confidence)} confidence</span><span class="badge risk-${risk}" title="${esc(i.risk)}">${risk==='review'?'Risk: review':esc(risk)+' risk'}</span></div></div>
+ <h3 class="row-title" id="title-${esc(i.id)}">${esc(i.title)}</h3><div class="card-body"><div><p class="description"><b>Used for:</b> ${esc(i.purpose)}</p><details class="details"><summary>Code, evidence & validation</summary><p>${esc(i.evidence||'Investigation lead; not yet verified.')}</p><ul>${i.sources.map(s=>`<li>${esc(s.path)}${s.line?':'+esc(s.line):''}${s.note?' — '+esc(s.note):''}</li>`).join('')}</ul><p><b>Preserve / risks:</b> ${esc(i.caveat||i.risk)}</p><p><b>Validate:</b> ${esc(i.validation)}</p>${i.commit?`<p><b>Commit:</b> ${esc(i.commit)}</p>`:''}</details></div><div><p class="description"><b>Change:</b> ${esc(i.change)}</p><p class="description"><b>Why:</b> ${esc(i.why)}</p></div></div>
+ ${i.question?`<div class="question"><b>Your decision:</b> ${esc(i.question)}</div>`:''}<div class="benefit-strip"><span class="saving">${esc(i.saving)}</span><span class="small muted">${esc(i.benefit)}</span></div>
+ ${closed(i)?`<p class="outcome">${esc(i.outcome||stages[i.status])}</p>`:`<div class="decision-editor"><div class="editor-top"><div class="action-toolbar" role="group" aria-label="Action for ${esc(i.id)}">${actions.map(([v,l])=>`<button type="button" class="action-button" data-action="${esc(i.id)}" data-value="${v}" aria-label="${l} ${esc(i.id)}" aria-pressed="${s.action===v}">${icon(v)}${l}</button>`).join('')}<button type="button" class="action-button" data-action="${esc(i.id)}" data-value="" aria-label="Clear action for ${esc(i.id)}" title="Clear action; keep your comment">${icon('clear')}</button></div><span class="note-status" data-save-status="${esc(i.id)}">${esc(saveLabel(s))}</span></div><label class="note-label" for="note-${esc(i.id)}">Your comment or constraint</label><textarea id="note-${esc(i.id)}" class="note" rows="3" data-note="${esc(i.id)}" aria-label="Note for ${esc(i.id)}" placeholder="Add context, your preference, or a constraint…">${esc(s.note||'')}</textarea></div>`}</article>`;
+}
+function cards(items){return `<div class="cards">${items.map(card).join('')}</div>`}
+function resizeNote(el){el.style.height='auto';el.style.height=Math.max(92,el.scrollHeight)+'px'}
+const compact=v=>String(v).toLowerCase().replace(/\d+/g,n=>String(Number(n))).replace(/[^a-z0-9]/g,'');
+function matches(i,query){
+ if(!query.trim())return true;
+ const idQuery=compact(query);
+ if(/^(?:r)?\d+[a-z]\d*$/.test(idQuery))return [i.id,...(i.aliases||[])].some(id=>compact(id).includes(idQuery));
+ const words=[i.id,i.area,i.title,i.purpose,i.change,i.why,i.saving,i.benefit,i.status,i.confidence,i.risk,i.evidence,i.validation,i.question,...i.sources.map(s=>s.path),saved[i.id]?.note||''].join(' ').toLowerCase().match(/[a-z0-9]+/g)||[];
+ const hay=words.map(compact).join(' ');
+ return query.toLowerCase().split(/\s+/).filter(Boolean).every(token=>{const q=compact(token);return !q||hay.includes(q)||words.some(word=>{if(q.length<4||word.length>q.length*2)return false;let n=0;for(const c of word)if(c===q[n])n++;return n===q.length})});
+}
+function render(){const q=$('search').value,area=$('area').value,stage=$('stage').value;const items=active.filter(i=>(!area||i.area===area)&&(!stage||i.status===stage)&&matches(i,q)).sort(compare);let html='';if($('group').value==='none')html=cards(items);else{const groups=new Map();for(const i of items){if(!groups.has(i.area))groups.set(i.area,[]);groups.get(i.area).push(i)}for(const [name,rows] of groups)html+=`<section class="group"><div class="group-head"><h2>${esc(name)}</h2><span class="small muted">${rows.length} ${rows.length===1?'opportunity':'opportunities'}</span></div>${cards(rows)}</section>`}$('active').innerHTML=items.length?html:'<div class="empty">No opportunities match these filters.</div>';const history=data.items.filter(closed).sort((a,b)=>a.status.localeCompare(b.status)||a.id.localeCompare(b.id));$('archive-label').textContent=`Completed & closed (${history.length})`;$('closed').innerHTML=cards(history);document.querySelectorAll('.note').forEach(resizeNote);selectionCount()}
 for(const id of ['search','area','stage','sort','group'])$(id).addEventListener(id==='search'?'input':'change',render);
 $('reset').onclick=()=>{$('search').value='';$('area').value='';$('stage').value='';$('sort').value='priority';$('group').value='area';render()};
-document.addEventListener('change',e=>{const id=e.target.dataset.action;if(id){saved[id]={...saved[id],action:e.target.value};persist()}});
-document.addEventListener('input',e=>{const id=e.target.dataset.note;if(id){saved[id]={...saved[id],note:e.target.value};persist()}});
-$('suggested').onclick=()=>{for(const id of (data.suggested_batch||[])){const i=data.items.find(i=>i.id===id);if(i?.status==='ready')saved[id]={...saved[id],action:'implement'}}persist();render()};
-$('clear').onclick=()=>{saved={};persist();render()};
+document.addEventListener('click',e=>{const button=e.target.closest('button[data-action]');if(!button)return;const id=button.dataset.action,value=button.dataset.value;saved[id]={...saved[id],action:saved[id]?.action===value?'':value,updated_at:new Date().toISOString()};persist();button.closest('.decision-editor').querySelector('.note-status').textContent=saveLabel(saved[id]);button.closest('.action-toolbar').querySelectorAll('[data-value]').forEach(b=>{if(b.dataset.value)b.setAttribute('aria-pressed',String(saved[id].action===b.dataset.value))})});
+document.addEventListener('input',e=>{const id=e.target.dataset.note;if(id){saved[id]={...saved[id],note:e.target.value,updated_at:new Date().toISOString()};resizeNote(e.target);persist();e.target.closest('.decision-editor').querySelector('.note-status').textContent=saveLabel(saved[id])}});
+$('suggested').onclick=()=>{for(const id of (data.suggested_batch||[])){const i=data.items.find(i=>i.id===id);if(i?.status==='ready')saved[id]={...saved[id],action:'implement',updated_at:new Date().toISOString()}}persist();render()};
+$('clear').onclick=()=>{for(const entry of Object.values(saved)){entry.action='';entry.updated_at=new Date().toISOString()}persist();render()};
 function batchText(){const lines=['Simplification batch from '+data.updated+':'];for(const i of selected()){const s=saved[i.id],verb={implement:'Approve implementation',explore:'Investigate and propose',opinion:'My opinion on',defer:'Defer'}[s.action];lines.push(`- ${verb} ${i.id}: ${i.title}${s.note?' — '+s.note:''}`)}lines.push('Update the simplification dashboard after this batch. Commit approved implementations separately by area.');return lines.join('\n')}
 $('review').onclick=()=>{$('batch-text').value=batchText();$('copy-status').textContent='';$('batch-dialog').showModal()};$('close-dialog').onclick=()=>$('batch-dialog').close();
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('batch-text').value);$('copy-status').textContent='Copied. Paste into the chat to send.'}catch(e){$('batch-text').select();$('copy-status').textContent='Select and copy the request above.'}};
 $('download').onclick=()=>{const blob=new Blob([JSON.stringify({updated:data.updated,revision:data.revision,selections:selected().map(i=>({id:i.id,...saved[i.id]})),request:$('batch-text').value},null,2)],{type:'application/json'});const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='simplification-batch.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
-$('footer').innerHTML=`${esc(data.summary)} <a href="Log.md">Detailed evidence journal</a> · <a href="opportunities.json">Source data</a>. Board selections stay local to this browser; export them to move between browsers.`;render();
+$('footer').innerHTML=`${esc(data.summary)} <a href="Log.md">Detailed evidence journal</a> · <a href="opportunities.json">Source data</a>. Save simplification-responses.json beside this page so agents can read your responses. This page works offline. Saved actions still need chat authorization.`;
+const responseFiles=SCResponseFiles.connect({project:data.project,revision:data.revision,get:()=>saved,set:entries=>{saved=entries;persist();render()},status:text=>$('file-status').textContent=text});
+$('connect-responses').onclick=()=>responseFiles.open();$('save-responses').onclick=()=>responseFiles.save();$('load-responses').onclick=()=>$('response-upload').click();$('response-upload').onchange=async e=>{const file=e.target.files[0];if(file)await responseFiles.importFile(file);e.target.value=''};$('download-responses').onclick=()=>responseFiles.download();
+render();
 </script></body></html>
