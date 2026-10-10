@@ -828,23 +828,57 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.close());
     }
 
+    struct TwoPhaseWorker
+    {
+        FiberScheduler& scheduler;
+        int             runsPerPhase;
+        Thread          thread;
+
+        Atomic<int32_t> workerRuns   = 0;
+        Result          workerResult = Result(true);
+
+        EventObject initialRunsFinished;
+        EventObject resumeWorker;
+        EventObject workerFinished;
+
+        TwoPhaseWorker(FiberScheduler& scheduler, int runsPerPhase) : scheduler(scheduler), runsPerPhase(runsPerPhase)
+        {}
+
+        void runPhase()
+        {
+            for (int run = 0; run < runsPerPhase and workerResult; ++run)
+            {
+                workerResult = scheduler.runNoWait();
+                if (workerResult)
+                {
+                    ++workerRuns;
+                }
+            }
+        }
+
+        Result start()
+        {
+            return thread.start(
+                [this](Thread&)
+                {
+                    runPhase();
+                    initialRunsFinished.signal();
+                    resumeWorker.wait();
+                    runPhase();
+                    workerFinished.signal();
+                });
+        }
+    };
+
     void crossThreadSleep()
     {
         struct State
         {
-            FiberScheduler* scheduler = nullptr;
-            AsyncFiberIO*   io        = nullptr;
-
-            Atomic<int32_t> workerRuns = 0;
-
-            EventObject initialRunFinished;
-            EventObject resumeWorker;
-            EventObject workerFinished;
+            AsyncFiberIO* io = nullptr;
 
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
             uint64_t resumeThreadID = 0;
-            Result   workerResult   = Result(true);
         };
 
         AsyncEventLoop eventLoop;
@@ -859,7 +893,6 @@ struct SC::AsyncFibersTest : public SC::TestCase
         FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
-        state.scheduler     = &scheduler;
         state.io            = &io;
         state.ownerThreadID = Thread::CurrentThreadID();
 
@@ -873,39 +906,20 @@ struct SC::AsyncFibersTest : public SC::TestCase
                                                return Result(true);
                                            })));
 
-        Thread workerThread;
-        auto   worker = [&state](Thread&)
-        {
-            state.workerResult = state.scheduler->runNoWait();
-            if (state.workerResult)
-            {
-                ++state.workerRuns;
-            }
-            state.initialRunFinished.signal();
-            state.resumeWorker.wait();
-            if (state.workerResult)
-            {
-                state.workerResult = state.scheduler->runNoWait();
-                if (state.workerResult)
-                {
-                    ++state.workerRuns;
-                }
-            }
-            state.workerFinished.signal();
-        };
-        SC_TEST_EXPECT(workerThread.start(worker));
+        TwoPhaseWorker worker(scheduler, 1);
+        SC_TEST_EXPECT(worker.start());
 
-        state.initialRunFinished.wait();
-        SC_TEST_EXPECT(state.workerRuns.load() == 1);
+        worker.initialRunsFinished.wait();
+        SC_TEST_EXPECT(worker.workerRuns.load() == 1);
         while (not scheduler.hasReadyFibers())
         {
             SC_TEST_EXPECT(io.runOwnerOnce());
         }
-        state.resumeWorker.signal();
-        state.workerFinished.wait();
-        SC_TEST_EXPECT(workerThread.join());
-        SC_TEST_EXPECT(state.workerResult);
-        SC_TEST_EXPECT(state.workerRuns.load() == 2);
+        worker.resumeWorker.signal();
+        worker.workerFinished.wait();
+        SC_TEST_EXPECT(worker.thread.join());
+        SC_TEST_EXPECT(worker.workerResult);
+        SC_TEST_EXPECT(worker.workerRuns.load() == 2);
         SC_TEST_EXPECT(task.isCompleted());
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(state.startThreadID != 0);
@@ -1784,25 +1798,18 @@ struct SC::AsyncFibersTest : public SC::TestCase
     {
         struct State
         {
-            FiberScheduler* scheduler = nullptr;
-            AsyncFiberIO*   io        = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             SocketDescriptor* serverSocket   = nullptr;
             SocketDescriptor* acceptedClient = nullptr;
             SocketDescriptor* client         = nullptr;
             SocketIPAddress   address;
 
-            Atomic<int32_t> attempted  = 0;
-            Atomic<int32_t> workerRuns = 0;
-
-            EventObject initialRunsFinished;
-            EventObject resumeWorker;
-            EventObject workerFinished;
+            Atomic<int32_t> attempted = 0;
 
             uint64_t ownerThreadID        = 0;
             uint64_t acceptStartThreadID  = 0;
             uint64_t connectStartThreadID = 0;
-            Result   workerResult         = Result(true);
         };
 
         AsyncEventLoop eventLoop;
@@ -1834,7 +1841,6 @@ struct SC::AsyncFibersTest : public SC::TestCase
         FiberStack        connectStack = stackForTest({connectStackMemory, sizeof(connectStackMemory)});
 
         State state;
-        state.scheduler      = &scheduler;
         state.io             = &io;
         state.serverSocket   = &serverSocket;
         state.acceptedClient = &acceptedClient;
@@ -1859,43 +1865,21 @@ struct SC::AsyncFibersTest : public SC::TestCase
                                                return state.io->connect(*state.client, state.address);
                                            })));
 
-        Thread workerThread;
-        auto   worker = [&state](Thread&)
-        {
-            for (int run = 0; run < 2 and state.workerResult; ++run)
-            {
-                state.workerResult = state.scheduler->runNoWait();
-                if (state.workerResult)
-                {
-                    ++state.workerRuns;
-                }
-            }
-            state.initialRunsFinished.signal();
-            state.resumeWorker.wait();
-            for (int run = 0; run < 2 and state.workerResult; ++run)
-            {
-                state.workerResult = state.scheduler->runNoWait();
-                if (state.workerResult)
-                {
-                    ++state.workerRuns;
-                }
-            }
-            state.workerFinished.signal();
-        };
-        SC_TEST_EXPECT(workerThread.start(worker));
+        TwoPhaseWorker worker(scheduler, 2);
+        SC_TEST_EXPECT(worker.start());
 
-        state.initialRunsFinished.wait();
+        worker.initialRunsFinished.wait();
         SC_TEST_EXPECT(state.attempted.load() == 2);
-        SC_TEST_EXPECT(state.workerRuns.load() == 2);
+        SC_TEST_EXPECT(worker.workerRuns.load() == 2);
         while (scheduler.readyFiberCount() < 2)
         {
             SC_TEST_EXPECT(io.runOwnerOnce());
         }
-        state.resumeWorker.signal();
-        state.workerFinished.wait();
-        SC_TEST_EXPECT(workerThread.join());
-        SC_TEST_EXPECT(state.workerResult);
-        SC_TEST_EXPECT(state.workerRuns.load() == 4);
+        worker.resumeWorker.signal();
+        worker.workerFinished.wait();
+        SC_TEST_EXPECT(worker.thread.join());
+        SC_TEST_EXPECT(worker.workerResult);
+        SC_TEST_EXPECT(worker.workerRuns.load() == 4);
         SC_TEST_EXPECT(acceptTask.isCompleted());
         SC_TEST_EXPECT(connectTask.isCompleted());
         SC_TEST_EXPECT(acceptTask.result());
@@ -1916,23 +1900,16 @@ struct SC::AsyncFibersTest : public SC::TestCase
     {
         struct State
         {
-            FiberScheduler* scheduler = nullptr;
-            AsyncFiberIO*   io        = nullptr;
+            AsyncFiberIO* io = nullptr;
 
             SocketDescriptor* sender   = nullptr;
             SocketDescriptor* receiver = nullptr;
 
-            Atomic<int32_t> attempted  = 0;
-            Atomic<int32_t> workerRuns = 0;
-
-            EventObject initialRunsFinished;
-            EventObject resumeWorker;
-            EventObject workerFinished;
+            Atomic<int32_t> attempted = 0;
 
             uint64_t ownerThreadID        = 0;
             uint64_t sendStartThreadID    = 0;
             uint64_t receiveStartThreadID = 0;
-            Result   workerResult         = Result(true);
 
             char sendBuffer[5]    = {'P', 'O', 'N', 'G', '?'};
             char receiveBuffer[8] = {};
@@ -1960,7 +1937,6 @@ struct SC::AsyncFibersTest : public SC::TestCase
         FiberStack        receiveStack = stackForTest({receiveStackMemory, sizeof(receiveStackMemory)});
 
         State state;
-        state.scheduler     = &scheduler;
         state.io            = &io;
         state.sender        = &client;
         state.receiver      = &serverSideClient;
@@ -1987,43 +1963,21 @@ struct SC::AsyncFibersTest : public SC::TestCase
                                                                      &state.sendResult);
                                            })));
 
-        Thread workerThread;
-        auto   worker = [&state](Thread&)
-        {
-            for (int run = 0; run < 2 and state.workerResult; ++run)
-            {
-                state.workerResult = state.scheduler->runNoWait();
-                if (state.workerResult)
-                {
-                    ++state.workerRuns;
-                }
-            }
-            state.initialRunsFinished.signal();
-            state.resumeWorker.wait();
-            for (int run = 0; run < 2 and state.workerResult; ++run)
-            {
-                state.workerResult = state.scheduler->runNoWait();
-                if (state.workerResult)
-                {
-                    ++state.workerRuns;
-                }
-            }
-            state.workerFinished.signal();
-        };
-        SC_TEST_EXPECT(workerThread.start(worker));
+        TwoPhaseWorker worker(scheduler, 2);
+        SC_TEST_EXPECT(worker.start());
 
-        state.initialRunsFinished.wait();
+        worker.initialRunsFinished.wait();
         SC_TEST_EXPECT(state.attempted.load() == 2);
-        SC_TEST_EXPECT(state.workerRuns.load() == 2);
+        SC_TEST_EXPECT(worker.workerRuns.load() == 2);
         while (scheduler.readyFiberCount() < 2)
         {
             SC_TEST_EXPECT(io.runOwnerOnce());
         }
-        state.resumeWorker.signal();
-        state.workerFinished.wait();
-        SC_TEST_EXPECT(workerThread.join());
-        SC_TEST_EXPECT(state.workerResult);
-        SC_TEST_EXPECT(state.workerRuns.load() == 4);
+        worker.resumeWorker.signal();
+        worker.workerFinished.wait();
+        SC_TEST_EXPECT(worker.thread.join());
+        SC_TEST_EXPECT(worker.workerResult);
+        SC_TEST_EXPECT(worker.workerRuns.load() == 4);
         SC_TEST_EXPECT(sendTask.isCompleted());
         SC_TEST_EXPECT(receiveTask.isCompleted());
         SC_TEST_EXPECT(sendTask.result());
