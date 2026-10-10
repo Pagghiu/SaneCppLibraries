@@ -2381,9 +2381,32 @@ struct SC::FibersTest : public SC::TestCase
     {
         struct Watchdog
         {
-            Atomic<bool>    finished;
-            Atomic<int32_t> phase;
-            Thread          thread;
+            Atomic<bool> finished;
+            enum Operation
+            {
+                Setup,
+                JobEntry,
+                SamplerJoin,
+                ObserverJoin,
+                IdleWait,
+                PoolJoin,
+                Cleanup,
+                ObserverPark
+            };
+            Atomic<int32_t> progress;
+            Atomic<int32_t> workerCount;
+            Atomic<int32_t> item;
+            Atomic<int32_t> operation;
+
+            void begin(size_t workers, size_t index, Operation next)
+            {
+                workerCount.store(static_cast<int32_t>(workers));
+                item.store(static_cast<int32_t>(index));
+                operation.store(next);
+            }
+            void advanced() { progress.fetch_add(1); }
+
+            Thread thread;
 
             ~Watchdog()
             {
@@ -2398,13 +2421,26 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(watchdog.thread.start(
             [watchdogPointer](Thread&)
             {
-                const Time::Monotonic started = Time::Monotonic::now();
+                int64_t lastProgress = Time::Monotonic::now().getMonotonicMilliseconds();
+                int32_t observed     = watchdogPointer->progress.load();
                 while (not watchdogPointer->finished.load())
                 {
-                    if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 15000)
+                    const int64_t now      = Time::Monotonic::now().getMonotonicMilliseconds();
+                    const int32_t progress = watchdogPointer->progress.load();
+                    if (progress != observed)
                     {
-                        fprintf(stderr, "FibersTest job quiescence exceeded 15 seconds; phase: %d\n",
-                                watchdogPointer->phase.load());
+                        observed     = progress;
+                        lastProgress = now;
+                    }
+                    else if (now - lastProgress > 15000)
+                    {
+                        const char* operations[] = {"setup",     "job entry", "sampler join", "observer join",
+                                                    "idle wait", "pool join", "cleanup",      "observer park"};
+                        fprintf(stderr,
+                                "FibersTest job quiescence made no progress for 15 seconds; "
+                                "workers=%d job-ordinal/wave=%d operation=%s progress=%d\n",
+                                watchdogPointer->workerCount.load(), watchdogPointer->item.load(),
+                                operations[watchdogPointer->operation.load()], observed);
                         fflush(stderr);
                         abort();
                     }
@@ -2419,7 +2455,7 @@ struct SC::FibersTest : public SC::TestCase
         const size_t workerCounts[] = {1, 2, 4};
         for (size_t numWorkers : workerCounts)
         {
-            watchdog.phase.store(static_cast<int32_t>(numWorkers));
+            watchdog.begin(numWorkers, 0, Watchdog::Setup);
             static constexpr size_t NumJobs = 128;
             struct State
             {
@@ -2467,11 +2503,13 @@ struct SC::FibersTest : public SC::TestCase
                                                     return Result(true);
                                                 }));
             };
+            watchdog.begin(numWorkers, 0, Watchdog::JobEntry);
             SC_TEST_EXPECT(submit(jobs[0]));
             while (state.entered.load() != 1)
             {
                 Thread::Sleep(1);
             }
+            watchdog.advanced();
             state.continuouslyActive.store(true);
             SC_TEST_EXPECT(observer.start(
                 [&pool, statePointer](Thread&)
@@ -2500,34 +2538,46 @@ struct SC::FibersTest : public SC::TestCase
             for (size_t index = 1; index < NumJobs; ++index)
             {
                 // Accept the successor before allowing its predecessor to finish: there is no idle instant.
+                watchdog.begin(numWorkers, index, Watchdog::JobEntry);
                 SC_TEST_EXPECT(submit(jobs[index]));
                 state.releaseThrough.store(static_cast<int32_t>(index - 1));
                 while (state.entered.load() != static_cast<int32_t>(index + 1))
                 {
                     Thread::Sleep(1);
                 }
+                watchdog.advanced();
             }
+            watchdog.begin(numWorkers, NumJobs - 1, Watchdog::SamplerJoin);
             state.continuouslyActive.store(false);
             SC_TEST_EXPECT(sampler.join());
+            watchdog.advanced();
+            watchdog.begin(numWorkers, NumJobs - 1, Watchdog::ObserverJoin);
             state.releaseThrough.store(static_cast<int32_t>(NumJobs - 1));
             SC_TEST_EXPECT(observer.join());
+            watchdog.advanced();
             SC_TEST_EXPECT(not state.falseZero.load());
             SC_TEST_EXPECT(not state.prematureIdle.load());
+            watchdog.begin(numWorkers, NumJobs - 1, Watchdog::IdleWait);
             SC_TEST_EXPECT(pool.waitIdle());
+            watchdog.advanced();
             for (FiberJob& job : jobs)
             {
                 SC_TEST_EXPECT(job.result());
             }
             SC_TEST_EXPECT(scheduler.activeJobCount() == 0);
             SC_TEST_EXPECT(scheduler.readyJobCount() == 0);
+            watchdog.begin(numWorkers, NumJobs - 1, Watchdog::PoolJoin);
             SC_TEST_EXPECT(pool.requestStop());
             SC_TEST_EXPECT(pool.join());
+            watchdog.advanced();
+            watchdog.begin(numWorkers, NumJobs - 1, Watchdog::Cleanup);
             SC_TEST_EXPECT(allocator.used() == 0);
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());
+            watchdog.advanced();
         }
 
-        watchdog.phase.store(5);
+        watchdog.begin(4, 0, Watchdog::Setup);
         {
             struct State
             {
@@ -2553,12 +2603,11 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(pool.start(scheduler, workers, threads, options));
             for (size_t wave = 0; wave < 32; ++wave)
             {
-                const int32_t wavePhase = 100 + static_cast<int32_t>(wave * 10);
                 state.entered.store(0);
                 state.release.store(false);
                 for (size_t index = 0; index < 4; ++index)
                 {
-                    watchdog.phase.store(wavePhase + static_cast<int32_t>(index));
+                    watchdog.begin(4, wave * 4 + index, Watchdog::JobEntry);
                     SC_TEST_EXPECT(scheduler.spawn(jobs[index], FiberJob::Procedure(
                                                                     [statePointer](FiberJobContext&)
                                                                     {
@@ -2574,11 +2623,12 @@ struct SC::FibersTest : public SC::TestCase
                     {
                         Thread::Sleep(1);
                     }
+                    watchdog.advanced();
                 }
                 SC_TEST_EXPECT(scheduler.activeJobCount() == 4);
                 SC_TEST_EXPECT(scheduler.readyJobCount() == 0);
                 Thread observer;
-                watchdog.phase.store(wavePhase + 4);
+                watchdog.begin(4, wave, Watchdog::ObserverPark);
                 SC_TEST_EXPECT(observer.start(
                     [&pool](Thread&)
                     {
@@ -2591,20 +2641,26 @@ struct SC::FibersTest : public SC::TestCase
                 {
                     Thread::Sleep(1);
                 }
+                watchdog.advanced();
                 state.release.store(true);
-                watchdog.phase.store(wavePhase + 5);
+                watchdog.begin(4, wave, Watchdog::ObserverJoin);
                 SC_TEST_EXPECT(observer.join());
+                watchdog.advanced();
                 SC_TEST_EXPECT(scheduler.activeJobCount() == 0);
                 for (FiberJob& job : jobs)
                 {
                     SC_TEST_EXPECT(job.result());
                 }
             }
+            watchdog.begin(4, 31, Watchdog::PoolJoin);
             SC_TEST_EXPECT(pool.requestStop());
             SC_TEST_EXPECT(pool.join());
+            watchdog.advanced();
+            watchdog.begin(4, 31, Watchdog::Cleanup);
             SC_TEST_EXPECT(allocator.used() == 0);
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());
+            watchdog.advanced();
         }
     }
 
