@@ -946,29 +946,51 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(client.close());
     }
 
-    void blockingGet()
+    template <typename Respond, typename ExecuteClient>
+    void runBlockingScenario(Respond respond, ExecuteClient executeClient)
     {
         AsyncEventLoop loop;
         SC_TEST_EXPECT(loop.create());
-
         TestServer server(loop);
         SC_TEST_EXPECT(server.start(report));
-        server.server.onRequest = [this](HttpConnection& client)
+        server.server.onRequest = respond;
+
+        struct WorkerContext
         {
-            SC_TEST_EXPECT(client.request.getParser().method == HttpParser::Method::HttpGET);
-            SC_TEST_EXPECT(client.response.startResponse(200));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
-            SC_TEST_EXPECT(client.response.sendHeaders());
-            SC_TEST_EXPECT(client.response.getWritableStream().write("Hello GET"));
-            SC_TEST_EXPECT(client.response.end());
-        };
+            TestServer*    server;
+            ExecuteClient* execute;
+        } context{&server, &executeClient};
+
         Thread clientThread;
         SC_TEST_EXPECT(clientThread.start(
-            [&](Thread&)
+            [this, &context](Thread&)
             {
                 HttpClient client;
                 SC_TEST_EXPECT(client.init());
+                (*context.execute)(context.server->endpoint.view());
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(context.server->scheduleStop());
+            }));
+        SC_TEST_EXPECT(loop.run());
+        (void)clientThread.join();
+        SC_TEST_EXPECT(server.server.close());
+        SC_TEST_EXPECT(loop.close());
+    }
 
+    void blockingGet()
+    {
+        runBlockingScenario(
+            [this](HttpConnection& client)
+            {
+                SC_TEST_EXPECT(client.request.getParser().method == HttpParser::Method::HttpGET);
+                SC_TEST_EXPECT(client.response.startResponse(200));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
+                SC_TEST_EXPECT(client.response.sendHeaders());
+                SC_TEST_EXPECT(client.response.getWritableStream().write("Hello GET"));
+                SC_TEST_EXPECT(client.response.end());
+            },
+            [this](StringView endpoint)
+            {
                 CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
 
                 HttpClientRequest  request;
@@ -976,19 +998,12 @@ struct SC::HttpClientTest : public SC::TestCase
                 char               body[1024] = {};
                 size_t             bodyLength = 0;
 
-                request.url = server.endpoint.view();
+                request.url = endpoint;
                 SC_TEST_EXPECT(
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
                 SC_TEST_EXPECT(response.statusCode == 200);
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "Hello GET");
-                SC_TEST_EXPECT(client.close());
-                SC_TEST_EXPECT(server.scheduleStop());
-            }));
-
-        SC_TEST_EXPECT(loop.run());
-        (void)clientThread.join();
-        SC_TEST_EXPECT(server.server.close());
-        SC_TEST_EXPECT(loop.close());
+            });
     }
 
     void httpsAndHttp2LocalFixture()
@@ -1059,27 +1074,17 @@ struct SC::HttpClientTest : public SC::TestCase
 
     void blockingResponseBufferOverflow()
     {
-        AsyncEventLoop loop;
-        SC_TEST_EXPECT(loop.create());
-
-        TestServer server(loop);
-        SC_TEST_EXPECT(server.start(report));
-        server.server.onRequest = [this](HttpConnection& client)
-        {
-            SC_TEST_EXPECT(client.response.startResponse(200));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
-            SC_TEST_EXPECT(client.response.sendHeaders());
-            SC_TEST_EXPECT(client.response.getWritableStream().write("Hello GET"));
-            SC_TEST_EXPECT(client.response.end());
-        };
-
-        Thread clientThread;
-        SC_TEST_EXPECT(clientThread.start(
-            [&](Thread&)
+        runBlockingScenario(
+            [this](HttpConnection& client)
             {
-                HttpClient client;
-                SC_TEST_EXPECT(client.init());
-
+                SC_TEST_EXPECT(client.response.startResponse(200));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
+                SC_TEST_EXPECT(client.response.sendHeaders());
+                SC_TEST_EXPECT(client.response.getWritableStream().write("Hello GET"));
+                SC_TEST_EXPECT(client.response.end());
+            },
+            [this](StringView endpoint)
+            {
                 CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
 
                 HttpClientRequest  request;
@@ -1087,47 +1092,30 @@ struct SC::HttpClientTest : public SC::TestCase
                 char               body[4]    = {};
                 size_t             bodyLength = 0;
 
-                request.url = server.endpoint.view();
+                request.url = endpoint;
                 SC_TEST_EXPECT(
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory)
                         .isError(HttpClientResultCategory, HttpClientError::BlockingResponseBodyBufferTooSmall));
                 SC_TEST_EXPECT(bodyLength == sizeof(body));
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "Hell");
-                SC_TEST_EXPECT(client.close());
-                SC_TEST_EXPECT(server.scheduleStop());
-            }));
-
-        SC_TEST_EXPECT(loop.run());
-        (void)clientThread.join();
-        SC_TEST_EXPECT(server.server.close());
-        SC_TEST_EXPECT(loop.close());
+            });
     }
 
     void blockingResponseHeaderBufferOverflow()
     {
-        AsyncEventLoop loop;
-        SC_TEST_EXPECT(loop.create());
-
-        TestServer server(loop);
-        SC_TEST_EXPECT(server.start(report));
-        server.server.onRequest = [this](HttpConnection& client)
-        {
-            SC_TEST_EXPECT(client.response.startResponse(200));
-            SC_TEST_EXPECT(client.response.addHeader("X-Large-Header"_a8,
-                                                     "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"_a8));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "2"_a8));
-            SC_TEST_EXPECT(client.response.sendHeaders());
-            SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
-            SC_TEST_EXPECT(client.response.end());
-        };
-
-        Thread clientThread;
-        SC_TEST_EXPECT(clientThread.start(
-            [&](Thread&)
+        runBlockingScenario(
+            [this](HttpConnection& client)
             {
-                HttpClient client;
-                SC_TEST_EXPECT(client.init());
-
+                SC_TEST_EXPECT(client.response.startResponse(200));
+                SC_TEST_EXPECT(client.response.addHeader("X-Large-Header"_a8,
+                                                         "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"_a8));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "2"_a8));
+                SC_TEST_EXPECT(client.response.sendHeaders());
+                SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
+                SC_TEST_EXPECT(client.response.end());
+            },
+            [this](StringView endpoint)
+            {
                 CoreOperationMemory<64 * 1024, 8, 16, 24, 16 * 1024> memory;
 
                 HttpClientRequest  request;
@@ -1135,46 +1123,29 @@ struct SC::HttpClientTest : public SC::TestCase
                 char               body[16]   = {};
                 size_t             bodyLength = 0;
 
-                request.url = server.endpoint.view();
+                request.url = endpoint;
                 SC_TEST_EXPECT(
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory)
                         .isError(HttpClientResultCategory, HttpClientError::ResponseHeadersTooSmall));
                 SC_TEST_EXPECT(response.headersLength <= response.headers.sizeInBytes());
-                SC_TEST_EXPECT(client.close());
-                SC_TEST_EXPECT(server.scheduleStop());
-            }));
-
-        SC_TEST_EXPECT(loop.run());
-        (void)clientThread.join();
-        SC_TEST_EXPECT(server.server.close());
-        SC_TEST_EXPECT(loop.close());
+            });
     }
 
     void blockingPost()
     {
-        AsyncEventLoop loop;
-        SC_TEST_EXPECT(loop.create());
-
-        TestServer server(loop);
-        SC_TEST_EXPECT(server.start(report));
-        server.server.onRequest = [this](HttpConnection& client)
-        {
-            SC_TEST_EXPECT(client.request.getParser().method == HttpParser::Method::HttpPOST);
-            SC_TEST_EXPECT(client.request.getBodyBytesRemaining() == 9);
-            SC_TEST_EXPECT(client.response.startResponse(200));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "2"_a8));
-            SC_TEST_EXPECT(client.response.sendHeaders());
-            SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
-            SC_TEST_EXPECT(client.response.end());
-        };
-
-        Thread clientThread;
-        SC_TEST_EXPECT(clientThread.start(
-            [&](Thread&)
+        runBlockingScenario(
+            [this](HttpConnection& client)
             {
-                HttpClient client;
-                SC_TEST_EXPECT(client.init());
-
+                SC_TEST_EXPECT(client.request.getParser().method == HttpParser::Method::HttpPOST);
+                SC_TEST_EXPECT(client.request.getBodyBytesRemaining() == 9);
+                SC_TEST_EXPECT(client.response.startResponse(200));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "2"_a8));
+                SC_TEST_EXPECT(client.response.sendHeaders());
+                SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
+                SC_TEST_EXPECT(client.response.end());
+            },
+            [this](StringView endpoint)
+            {
                 CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
 
                 HttpClientRequest  request;
@@ -1182,7 +1153,7 @@ struct SC::HttpClientTest : public SC::TestCase
                 char               body[1024] = {};
                 size_t             bodyLength = 0;
 
-                request.url        = server.endpoint.view();
+                request.url        = endpoint;
                 request.method     = HttpClientRequest::HttpPOST;
                 request.body.bytes = {"HelloBody", 9};
 
@@ -1190,50 +1161,33 @@ struct SC::HttpClientTest : public SC::TestCase
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
                 SC_TEST_EXPECT(response.statusCode == 200);
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "OK");
-                SC_TEST_EXPECT(client.close());
-                SC_TEST_EXPECT(server.scheduleStop());
-            }));
-
-        SC_TEST_EXPECT(loop.run());
-        (void)clientThread.join();
-        SC_TEST_EXPECT(server.server.close());
-        SC_TEST_EXPECT(loop.close());
+            });
     }
 
     void blockingCustomHeaders()
     {
-        AsyncEventLoop loop;
-        SC_TEST_EXPECT(loop.create());
-
-        TestServer server(loop);
-        SC_TEST_EXPECT(server.start(report));
-        server.server.onRequest = [this](HttpConnection& client)
-        {
-            StringView headerName;
-            SC_TEST_EXPECT(client.request.getHeader("X-Test"_a8, headerName));
-            SC_TEST_EXPECT(headerName == "HeaderValue");
-            StringView emptyHeader;
-            SC_TEST_EXPECT(client.request.getHeader("X-Empty-Request"_a8, emptyHeader));
-            SC_TEST_EXPECT(emptyHeader.sizeInBytes() == 0);
-
-            SC_TEST_EXPECT(client.response.startResponse(200));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "0"_a8));
-            SC_TEST_EXPECT(client.response.sendHeaders());
-            SC_TEST_EXPECT(client.response.end());
-        };
-
-        Thread clientThread;
-        SC_TEST_EXPECT(clientThread.start(
-            [&](Thread&)
+        runBlockingScenario(
+            [this](HttpConnection& client)
             {
-                HttpClient client;
-                SC_TEST_EXPECT(client.init());
+                StringView headerName;
+                SC_TEST_EXPECT(client.request.getHeader("X-Test"_a8, headerName));
+                SC_TEST_EXPECT(headerName == "HeaderValue");
+                StringView emptyHeader;
+                SC_TEST_EXPECT(client.request.getHeader("X-Empty-Request"_a8, emptyHeader));
+                SC_TEST_EXPECT(emptyHeader.sizeInBytes() == 0);
 
+                SC_TEST_EXPECT(client.response.startResponse(200));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "0"_a8));
+                SC_TEST_EXPECT(client.response.sendHeaders());
+                SC_TEST_EXPECT(client.response.end());
+            },
+            [this](StringView endpoint)
+            {
                 CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
 
                 HttpClientHeader  headers[] = {{"X-Test"_a8, "HeaderValue"_a8}, {"X-Empty-Request"_a8, ""_a8}};
                 HttpClientRequest request;
-                request.url     = server.endpoint.view();
+                request.url     = endpoint;
                 request.headers = headers;
 
                 HttpClientResponse response;
@@ -1243,14 +1197,7 @@ struct SC::HttpClientTest : public SC::TestCase
                 SC_TEST_EXPECT(
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
                 SC_TEST_EXPECT(response.statusCode == 200);
-                SC_TEST_EXPECT(client.close());
-                SC_TEST_EXPECT(server.scheduleStop());
-            }));
-
-        SC_TEST_EXPECT(loop.run());
-        (void)clientThread.join();
-        SC_TEST_EXPECT(server.server.close());
-        SC_TEST_EXPECT(loop.close());
+            });
     }
 
     void requestHeaderValidation()
@@ -1609,37 +1556,27 @@ struct SC::HttpClientTest : public SC::TestCase
 
     void contentCodingPolicy()
     {
-        AsyncEventLoop loop;
-        SC_TEST_EXPECT(loop.create());
-
-        TestServer server(loop);
-        SC_TEST_EXPECT(server.start(report));
-        server.server.onRequest = [this](HttpConnection& client)
-        {
-            StringView acceptEncoding;
-            SC_TEST_EXPECT(client.request.getHeader("Accept-Encoding"_a8, acceptEncoding));
-            SC_TEST_EXPECT(acceptEncoding == "sc-test"_a8);
-
-            SC_TEST_EXPECT(client.response.startResponse(200));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Encoding"_a8, "sc-test"_a8));
-            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "4"_a8));
-            SC_TEST_EXPECT(client.response.sendHeaders());
-            SC_TEST_EXPECT(client.response.getWritableStream().write("RAW!"));
-            SC_TEST_EXPECT(client.response.end());
-        };
-
-        Thread clientThread;
-        SC_TEST_EXPECT(clientThread.start(
-            [&](Thread&)
+        runBlockingScenario(
+            [this](HttpConnection& client)
             {
-                HttpClient client;
-                SC_TEST_EXPECT(client.init());
+                StringView acceptEncoding;
+                SC_TEST_EXPECT(client.request.getHeader("Accept-Encoding"_a8, acceptEncoding));
+                SC_TEST_EXPECT(acceptEncoding == "sc-test"_a8);
 
+                SC_TEST_EXPECT(client.response.startResponse(200));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Encoding"_a8, "sc-test"_a8));
+                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "4"_a8));
+                SC_TEST_EXPECT(client.response.sendHeaders());
+                SC_TEST_EXPECT(client.response.getWritableStream().write("RAW!"));
+                SC_TEST_EXPECT(client.response.end());
+            },
+            [this](StringView endpoint)
+            {
                 CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
 
                 HttpClientHeader  header = {"Accept-Encoding"_a8, "sc-test"_a8};
                 HttpClientRequest request;
-                request.url     = server.endpoint.view();
+                request.url     = endpoint;
                 request.headers = {&header, 1};
 
                 HttpClientResponse response;
@@ -1659,14 +1596,7 @@ struct SC::HttpClientTest : public SC::TestCase
                 SC_TEST_EXPECT(contentCoding.name == "sc-test"_a8);
                 SC_TEST_EXPECT(contentCoding.type == HttpClientContentCoding::Unknown);
                 SC_TEST_EXPECT(not response.getNextContentCoding(contentCodingIterator, contentCoding));
-                SC_TEST_EXPECT(client.close());
-                SC_TEST_EXPECT(server.scheduleStop());
-            }));
-
-        SC_TEST_EXPECT(loop.run());
-        (void)clientThread.join();
-        SC_TEST_EXPECT(server.server.close());
-        SC_TEST_EXPECT(loop.close());
+            });
     }
 
     void sessionLayer()
