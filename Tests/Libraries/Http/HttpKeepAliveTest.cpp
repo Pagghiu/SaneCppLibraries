@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "HttpTestClient.h"
+#include "HttpStreamTestHelpers.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -18,60 +18,113 @@ struct SC::HttpKeepAliveTest : public SC::TestCase
     {
         if (test_section("keep-alive multiple requests"))
         {
-            keepAliveMultipleRequests();
+            runScenario(6160, 3, true, -1, 0, false);
         }
         if (test_section("keep-alive disabled by response"))
         {
-            keepAliveDisabledByResponse();
+            runScenario(6161, 1, true, 0, 0, true);
         }
         if (test_section("keep-alive max requests"))
         {
-            keepAliveMaxRequests();
+            runScenario(6162, 2, true, -1, 2, true);
         }
         if (test_section("keep-alive server default disabled"))
         {
-            keepAliveServerDefaultDisabled();
+            runScenario(6163, 1, false, -1, 0, true);
+            // An explicit response override must win, including after each response reset.
+            runScenario(6164, 3, false, 1, 0, false);
         }
     }
 
-    void keepAliveMultipleRequests();
-    void keepAliveDisabledByResponse();
-    void keepAliveMaxRequests();
-    void keepAliveServerDefaultDisabled();
+    // responseOverride: -1 leaves the server default intact, 0 disables, 1 enables persistence.
+    void runScenario(uint16_t port, int requests, bool defaultKeepAlive, int responseOverride, uint32_t maxRequests,
+                     bool terminal);
 };
 
-void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
+void SC::HttpKeepAliveTest::runScenario(uint16_t port, int requests, bool defaultKeepAlive, int responseOverride,
+                                        uint32_t maxRequests, bool terminal)
 {
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create());
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
 
-    constexpr int MAX_CONNECTIONS = 10; // Enough connection not to risk getting keep-alive forcefully disabled
-    constexpr int REQUEST_SLICES  = 2;
-    constexpr int REQUEST_SIZE    = 1 * 1024;
-    constexpr int HEADER_SIZE     = 8 * 1024;
+    // A single pool slot would itself force keep-alive off.
+    using ServerConnection = HttpAsyncConnection<2, 2, 8 * 1024, 1024>;
+    ServerConnection connections[2];
+    HttpAsyncServer  server;
+    SC_TEST_EXPECT(server.init(Span<ServerConnection>(connections)));
+    server.setDefaultKeepAlive(defaultKeepAlive);
+    server.setMaxRequestsPerConnection(maxRequests);
 
-    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE, REQUEST_SIZE>;
-    HttpConnectionType connections[MAX_CONNECTIONS];
+    HttpAsyncClientConnection<2, 2, 8 * 1024, 1024> clientStorage;
 
-    HttpAsyncServer httpServer;
-    const uint16_t  serverPort = report.mapPort(6160);
-    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+    HttpAsyncClient client;
+    SC_TEST_EXPECT(client.init(clientStorage));
 
+    HttpTestHelpers::ResponseCollector collector;
+
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/test", report.mapPort(port)));
+
+    AsyncLoopTimeout deferredStep;
+    AsyncLoopTimeout deadline;
     struct Context
     {
-        HttpKeepAliveTest* self;
-        int                numServerRequests  = 0;
-        int                numClientResponses = 0;
-        AsyncEventLoop*    eventLoop;
-        HttpAsyncServer*   httpServer;
-        String             requestURL = StringEncoding::Ascii;
-    } ctx = {this, 0, 0, &eventLoop, &httpServer};
+        AsyncEventLoop&  loop;
+        HttpAsyncServer& server;
+        HttpAsyncClient& client;
 
-    httpServer.onRequest = [&ctx, this](HttpConnection& client)
+        HttpTestHelpers::ResponseCollector& collector;
+
+        String& url;
+
+        AsyncLoopTimeout& deferredStep;
+
+        int requests;
+        int responseOverride;
+
+        bool defaultKeepAlive;
+        bool terminal;
+
+        int accepted        = 0;
+        int serverRequests  = 0;
+        int clientResponses = 0;
+        int shutdowns       = 0;
+        int shutdownOrdinal = 0;
+
+        HttpConnection* acceptedConnection = nullptr;
+
+        bool finished = false;
+        bool timedOut = false;
+    } ctx = {loop,         server,   client,           collector,        url,
+             deferredStep, requests, responseOverride, defaultKeepAlive, terminal};
+
+    server.setTransportSetup({[&ctx](HttpAsyncServerTransportSetup& setup) -> Result
+                              {
+                                  ctx.accepted++;
+                                  ctx.acceptedConnection = setup.connection;
+                                  setup.complete(Result(true));
+                                  return Result(true);
+                              }});
+    server.setTransportShutdown({[&ctx](HttpConnection& connection, Function<void(Result)> complete) -> Result
+                                 {
+                                     ctx.shutdowns++;
+                                     ctx.shutdownOrdinal = static_cast<int>(connection.requestCount + 1);
+                                     complete(Result(true));
+                                     return Result(true);
+                                 }});
+    server.onRequest = [this, &ctx](HttpConnection& connection)
     {
-        ctx.numServerRequests++;
-        HttpResponse& response = client.response;
+        SC_TEST_EXPECT(ctx.accepted == 1);
+        SC_TEST_EXPECT(&connection == ctx.acceptedConnection);
+        SC_TEST_EXPECT(connection.requestCount == static_cast<uint32_t>(ctx.serverRequests));
+        ctx.serverRequests++;
+
+        HttpResponse& response = connection.response;
+        SC_TEST_EXPECT(response.getKeepAlive() == ctx.defaultKeepAlive);
+        if (ctx.responseOverride >= 0)
+        {
+            response.setKeepAlive(ctx.responseOverride != 0);
+        }
         SC_TEST_EXPECT(response.startResponse(200));
         SC_TEST_EXPECT(response.addHeader("Content-Length", "2"));
         SC_TEST_EXPECT(response.sendHeaders());
@@ -79,245 +132,88 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
         SC_TEST_EXPECT(response.end());
     };
 
-    // Make 3 sequential requests on the same connection
-    HttpTestClient client;
-    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://127.0.0.1:{}/test", serverPort));
-
-    client.callback = [&ctx, this](HttpTestClient& c)
+    // Never start another request from inside the response body's end notification.
+    ctx.deferredStep.callback = [this, &ctx](AsyncLoopTimeout::Result&)
     {
-        ctx.numClientResponses++;
-        StringView response(c.getResponse());
-        SC_TEST_EXPECT(response.containsString("OK"));
-
-        if (ctx.numClientResponses < 3)
+        ctx.collector.detach();
+        if (ctx.clientResponses < ctx.requests)
         {
-            // Make another request (reusing same client)
-            SC_TEST_EXPECT(c.get(*ctx.eventLoop, ctx.requestURL.view(), true));
+            SC_TEST_EXPECT(ctx.client.get(ctx.loop, ctx.url.view(), true));
+        }
+        else if (not ctx.terminal or ctx.server.getConnections().getNumActiveConnections() == 0)
+        {
+            ctx.finished = true;
+            ctx.loop.interrupt();
         }
         else
         {
-            SC_TEST_EXPECT(ctx.httpServer->stop());
+            SC_TEST_EXPECT(ctx.deferredStep.start(ctx.loop, TimeMs{1}));
         }
     };
-
-    SC_TEST_EXPECT(client.get(eventLoop, ctx.requestURL.view()));
-    AsyncLoopTimeout timeout;
-    timeout.callback = [this](AsyncLoopTimeout::Result&)
-    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
-    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
-    eventLoop.excludeFromActiveCount(timeout);
-    SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(httpServer.close());
-
-    // Verify 3 requests were handled
-    SC_TEST_EXPECT(ctx.numServerRequests == 3);
-    SC_TEST_EXPECT(ctx.numClientResponses == 3);
-    SC_TEST_EXPECT(eventLoop.close());
-}
-
-void SC::HttpKeepAliveTest::keepAliveDisabledByResponse()
-{
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create());
-
-    constexpr int MAX_CONNECTIONS = 2;
-    constexpr int REQUEST_SLICES  = 2;
-    constexpr int REQUEST_SIZE    = 1 * 1024;
-    constexpr int HEADER_SIZE     = 8 * 1024;
-
-    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE, REQUEST_SIZE>;
-    HttpConnectionType connections[MAX_CONNECTIONS];
-
-    HttpAsyncServer httpServer;
-    const uint16_t  serverPort = report.mapPort(6161);
-    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
-
-    struct Context
+    ctx.client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
     {
-        HttpKeepAliveTest* self;
-        int                numServerRequests  = 0;
-        int                numClientResponses = 0;
-        HttpAsyncServer*   httpServer;
-    } ctx = {this, 0, 0, &httpServer};
-
-    httpServer.onRequest = [&ctx, this](HttpConnection& client)
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completed)
+                             {
+                                 SC_TEST_EXPECT(completed.getParser().statusCode == 200);
+                                 const bool expectedKeepAlive =
+                                     ctx.responseOverride < 0 ? ctx.defaultKeepAlive : ctx.responseOverride != 0;
+                                 SC_TEST_EXPECT(completed.getKeepAlive() == expectedKeepAlive);
+                                 SC_TEST_EXPECT(StringView(ctx.collector.view()) == "OK");
+                                 ctx.clientResponses++;
+                                 SC_TEST_EXPECT(ctx.serverRequests == ctx.clientResponses);
+                                 SC_TEST_EXPECT(ctx.deferredStep.start(ctx.loop, TimeMs{0}));
+                             });
+    };
+    auto onError = [this, &loop](Result result)
     {
-        ctx.numServerRequests++;
-        HttpResponse& response = client.response;
-        response.setKeepAlive(false); // Force close
-        SC_TEST_EXPECT(response.startResponse(200));
-        SC_TEST_EXPECT(response.addHeader("Content-Length", "2"));
-        SC_TEST_EXPECT(response.sendHeaders());
-        SC_TEST_EXPECT(response.getWritableStream().write("OK"));
-        SC_TEST_EXPECT(response.end());
+        SC_TEST_EXPECT(result);
+        loop.interrupt();
+    };
+    server.onError    = onError;
+    client.onError    = onError;
+    deadline.callback = [&ctx, &loop](AsyncLoopTimeout::Result&)
+    {
+        ctx.timedOut = true;
+        loop.interrupt();
     };
 
-    HttpTestClient client;
-    String         requestURL = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://127.0.0.1:{}/test", serverPort));
+    SC_TEST_EXPECT(server.start(loop, "127.0.0.1", report.mapPort(port)));
+    // Keep the deadline counted so a stalled listener is interrupted deterministically.
+    SC_TEST_EXPECT(deadline.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view(), true));
+    SC_TEST_EXPECT(loop.run());
 
-    client.callback = [&ctx, this](HttpTestClient& c)
+    SC_TEST_EXPECT(not ctx.timedOut);
+    SC_TEST_EXPECT(ctx.finished);
+    SC_TEST_EXPECT(ctx.accepted == 1);
+    SC_TEST_EXPECT(ctx.serverRequests == requests);
+    SC_TEST_EXPECT(ctx.clientResponses == requests);
+    SC_TEST_EXPECT(ctx.shutdowns == (terminal ? 1 : 0));
+    if (terminal)
     {
-        ctx.numClientResponses++;
-        StringView response(c.getResponse());
-        SC_TEST_EXPECT(response.containsString("OK"));
-        SC_TEST_EXPECT(ctx.httpServer->stop());
-    };
-
-    SC_TEST_EXPECT(client.get(eventLoop, requestURL.view()));
-    AsyncLoopTimeout timeout;
-    timeout.callback = [this](AsyncLoopTimeout::Result&)
-    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
-    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
-    eventLoop.excludeFromActiveCount(timeout);
-    SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(httpServer.close());
-
-    // Connection was closed, only 1 request
-    SC_TEST_EXPECT(ctx.numServerRequests == 1);
-    SC_TEST_EXPECT(ctx.numClientResponses == 1);
-    SC_TEST_EXPECT(eventLoop.close());
-}
-
-void SC::HttpKeepAliveTest::keepAliveMaxRequests()
-{
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create());
-
-    constexpr int MAX_CONNECTIONS = 2;
-    constexpr int REQUEST_SLICES  = 2;
-    constexpr int REQUEST_SIZE    = 1 * 1024;
-    constexpr int HEADER_SIZE     = 8 * 1024;
-
-    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE, REQUEST_SIZE>;
-    HttpConnectionType connections[MAX_CONNECTIONS];
-
-    HttpAsyncServer httpServer;
-    const uint16_t  serverPort = report.mapPort(6162);
-    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    httpServer.setMaxRequestsPerConnection(2); // Max 2 requests per connection
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
-
-    struct Context
+        // This observes the server shutdown path and slot deactivation, not peer EOF.
+        SC_TEST_EXPECT(ctx.shutdownOrdinal == requests);
+        SC_TEST_EXPECT(server.getConnections().getNumActiveConnections() == 0);
+    }
+    else
     {
-        HttpKeepAliveTest* self;
-        int                numServerRequests  = 0;
-        int                numClientResponses = 0;
-        AsyncEventLoop*    eventLoop;
-        HttpAsyncServer*   httpServer;
-        String             requestURL = StringEncoding::Ascii;
-    } ctx = {this, 0, 0, &eventLoop, &httpServer};
+        SC_TEST_EXPECT(server.getConnections().getNumActiveConnections() == 1);
+    }
 
-    httpServer.onRequest = [&ctx, this](HttpConnection& client)
+    collector.detach();
+    if (not deadline.isFree())
     {
-        ctx.numServerRequests++;
-        HttpResponse& response = client.response;
-        SC_TEST_EXPECT(response.startResponse(200));
-        SC_TEST_EXPECT(response.addHeader("Content-Length", "2"));
-        SC_TEST_EXPECT(response.sendHeaders());
-        SC_TEST_EXPECT(response.getWritableStream().write("OK"));
-        SC_TEST_EXPECT(response.end());
-    };
-
-    HttpTestClient client;
-    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://127.0.0.1:{}/test", serverPort));
-
-    client.callback = [&ctx, this](HttpTestClient& c)
+        SC_TEST_EXPECT(deadline.stop(loop));
+    }
+    if (not deferredStep.isFree())
     {
-        ctx.numClientResponses++;
-        StringView response(c.getResponse());
-        SC_TEST_EXPECT(response.containsString("OK"));
-
-        if (ctx.numClientResponses < 2)
-        {
-            // Make another request
-            SC_TEST_EXPECT(c.get(*ctx.eventLoop, ctx.requestURL.view(), true));
-        }
-        else
-        {
-            SC_TEST_EXPECT(ctx.httpServer->stop());
-        }
-    };
-
-    SC_TEST_EXPECT(client.get(eventLoop, ctx.requestURL.view()));
-    AsyncLoopTimeout timeout;
-    timeout.callback = [this](AsyncLoopTimeout::Result&)
-    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
-    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
-    eventLoop.excludeFromActiveCount(timeout);
-    SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(httpServer.close());
-
-    // Max 2 requests enforced
-    SC_TEST_EXPECT(ctx.numServerRequests == 2);
-    SC_TEST_EXPECT(ctx.numClientResponses == 2);
-    SC_TEST_EXPECT(eventLoop.close());
-}
-
-void SC::HttpKeepAliveTest::keepAliveServerDefaultDisabled()
-{
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create());
-
-    constexpr int MAX_CONNECTIONS = 2;
-    constexpr int REQUEST_SLICES  = 2;
-    constexpr int REQUEST_SIZE    = 1 * 1024;
-    constexpr int HEADER_SIZE     = 8 * 1024;
-
-    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE, REQUEST_SIZE>;
-    HttpConnectionType connections[MAX_CONNECTIONS];
-
-    HttpAsyncServer httpServer;
-    const uint16_t  serverPort = report.mapPort(6163);
-    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    httpServer.setDefaultKeepAlive(false); // Disable keep-alive server-wide
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
-
-    struct Context
-    {
-        HttpKeepAliveTest* self;
-        int                numServerRequests  = 0;
-        int                numClientResponses = 0;
-        HttpAsyncServer*   httpServer;
-    } ctx = {this, 0, 0, &httpServer};
-
-    httpServer.onRequest = [&ctx, this](HttpConnection& client)
-    {
-        ctx.numServerRequests++;
-        HttpResponse& response = client.response;
-        SC_TEST_EXPECT(response.startResponse(200));
-        SC_TEST_EXPECT(response.addHeader("Content-Length", "2"));
-        SC_TEST_EXPECT(response.sendHeaders());
-        SC_TEST_EXPECT(response.getWritableStream().write("OK"));
-        SC_TEST_EXPECT(response.end());
-    };
-
-    HttpTestClient client;
-    String         requestURL = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://127.0.0.1:{}/test", serverPort));
-
-    client.callback = [&ctx, this](HttpTestClient& c)
-    {
-        ctx.numClientResponses++;
-        StringView response(c.getResponse());
-        SC_TEST_EXPECT(response.containsString("OK"));
-        SC_TEST_EXPECT(ctx.httpServer->stop());
-    };
-
-    SC_TEST_EXPECT(client.get(eventLoop, requestURL.view()));
-    AsyncLoopTimeout timeout;
-    timeout.callback = [this](AsyncLoopTimeout::Result&)
-    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
-    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
-    eventLoop.excludeFromActiveCount(timeout);
-    SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(httpServer.close());
-
-    // Server default is no keep-alive, only 1 request
-    SC_TEST_EXPECT(ctx.numServerRequests == 1);
-    SC_TEST_EXPECT(ctx.numClientResponses == 1);
-    SC_TEST_EXPECT(eventLoop.close());
+        SC_TEST_EXPECT(deferredStep.stop(loop));
+    }
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(server.stop());
+    SC_TEST_EXPECT(server.close());
+    SC_TEST_EXPECT(loop.close());
 }
 
 namespace SC

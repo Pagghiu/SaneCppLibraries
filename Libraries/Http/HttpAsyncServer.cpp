@@ -321,6 +321,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
     {
         client.response.grabUnusedHeaderMemory(client.request);
         client.response.reset();
+        client.response.setKeepAlive(defaultKeepAlive);
 
         // Both with and without body we should stop listening to data events
         SC_HTTP_ASSERT_RELEASE(
