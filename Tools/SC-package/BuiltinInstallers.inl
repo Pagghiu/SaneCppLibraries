@@ -1129,7 +1129,7 @@ static Result testQEMUPackageRoot(StringView packageRoot, String* detectedTarget
     return Result(true);
 }
 
-struct QEMUPackageInstallOptions
+struct ImportPackageInstallOptions
 {
     StringView importDirectory;
 };
@@ -1140,84 +1140,7 @@ struct MSVCPackageInstallOptions
     StringView wineExecutable;
 };
 
-struct FilCPackageInstallOptions
-{
-    StringView importDirectory;
-};
-
-struct ZLibFilCPackageInstallOptions
-{
-    StringView importDirectory;
-};
-
-static Result parseQEMUPackageInstallOptions(Span<const StringView> arguments, QEMUPackageInstallOptions& options)
-{
-    options = {};
-    if (arguments.sizeInElements() <= 1)
-    {
-        return Result(true);
-    }
-
-    for (size_t idx = 1; idx < arguments.sizeInElements(); ++idx)
-    {
-        const StringView argument = arguments[idx];
-        if (argument == "--import-directory")
-        {
-            if (idx + 1 >= arguments.sizeInElements())
-                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryValueMissing);
-            options.importDirectory = arguments[++idx];
-        }
-        else if (argument.startsWith("--"))
-        {
-            return Result::Error(PackageResultCategory, PackageError::UnknownInstallOption);
-        }
-        else if (options.importDirectory.isEmpty())
-        {
-            options.importDirectory = argument;
-        }
-        else
-        {
-            return Result::Error(PackageResultCategory, PackageError::UnexpectedInstallArgument);
-        }
-    }
-    return Result(true);
-}
-
-static Result parseFilCPackageInstallOptions(Span<const StringView> arguments, FilCPackageInstallOptions& options)
-{
-    options = {};
-    if (arguments.sizeInElements() <= 1)
-    {
-        return Result(true);
-    }
-
-    for (size_t idx = 1; idx < arguments.sizeInElements(); ++idx)
-    {
-        const StringView argument = arguments[idx];
-        if (argument == "--import-directory")
-        {
-            if (idx + 1 >= arguments.sizeInElements())
-                return Result::Error(PackageResultCategory, PackageError::ImportDirectoryValueMissing);
-            options.importDirectory = arguments[++idx];
-        }
-        else if (argument.startsWith("--"))
-        {
-            return Result::Error(PackageResultCategory, PackageError::UnknownInstallOption);
-        }
-        else if (options.importDirectory.isEmpty())
-        {
-            options.importDirectory = argument;
-        }
-        else
-        {
-            return Result::Error(PackageResultCategory, PackageError::UnexpectedInstallArgument);
-        }
-    }
-    return Result(true);
-}
-
-static Result parseZLibFilCPackageInstallOptions(Span<const StringView>         arguments,
-                                                 ZLibFilCPackageInstallOptions& options)
+static Result parseImportPackageInstallOptions(Span<const StringView> arguments, ImportPackageInstallOptions& options)
 {
     options = {};
     if (arguments.sizeInElements() <= 1)

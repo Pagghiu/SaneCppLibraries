@@ -1255,6 +1255,34 @@ struct SupportToolsTest : public TestCase
         using namespace SC::Tools;
         using namespace SC::Tools::detail;
 
+        if (test_section("import package option errors"))
+        {
+            arguments.tool           = "package";
+            arguments.action         = "install";
+            const StringView names[] = {"qemu", "filc", "zlib-filc"};
+            for (StringView name : names)
+            {
+                args[0]             = name;
+                args[1]             = "--import-directory";
+                arguments.arguments = {args, 2};
+                SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory,
+                                                                 PackageError::ImportDirectoryValueMissing));
+                args[1] = "--unknown";
+                SC_TEST_EXPECT(
+                    runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnknownInstallOption));
+                args[1]             = "first-import";
+                args[2]             = "extra-import";
+                arguments.arguments = {args, 3};
+                SC_TEST_EXPECT(
+                    runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnexpectedInstallArgument));
+                args[1]             = "--import-directory";
+                args[2]             = "first-import";
+                args[3]             = "extra-import";
+                arguments.arguments = {args, 4};
+                SC_TEST_EXPECT(
+                    runPackageTool(arguments).isError(PackageResultCategory, PackageError::UnexpectedInstallArgument));
+            }
+        }
         if (test_section("install filc rejects missing import-directory value"))
         {
             arguments.tool      = "package";

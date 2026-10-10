@@ -3305,8 +3305,13 @@ struct SCBuildFixtureTest : public SC::TestCase
                                                  "install",
                                                  {}};
 
-            StringView packageArgumentsStorage[] = {"filc", "--import-directory", importRoot.view()};
-            toolArguments.arguments              = {packageArgumentsStorage, 3};
+            StringView packageArgumentsStorage[] = {"filc",
+                                                    "missing-positional-import",
+                                                    "--import-directory",
+                                                    "missing-named-import",
+                                                    "--import-directory",
+                                                    importRoot.view()};
+            toolArguments.arguments              = {packageArgumentsStorage, 6};
 
             Tools::Package package;
             SC_TEST_EXPECT(Tools::runPackageTool(toolArguments, &package));

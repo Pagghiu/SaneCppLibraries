@@ -30,23 +30,23 @@ static Result installLLVMEntry(StringView cache, StringView install, Package& pa
 
 static Result installQEMUEntry(StringView cache, StringView install, Package& package, Span<const StringView> arguments)
 {
-    QEMUPackageInstallOptions options;
-    SC_TRY(parseQEMUPackageInstallOptions(arguments, options));
+    ImportPackageInstallOptions options;
+    SC_TRY(parseImportPackageInstallOptions(arguments, options));
     return installQEMURunner(cache, install, package, options.importDirectory);
 }
 
 static Result installFilCEntry(StringView cache, StringView install, Package& package, Span<const StringView> arguments)
 {
-    FilCPackageInstallOptions options;
-    SC_TRY(parseFilCPackageInstallOptions(arguments, options));
+    ImportPackageInstallOptions options;
+    SC_TRY(parseImportPackageInstallOptions(arguments, options));
     return installFilCToolchain(cache, install, package, options.importDirectory);
 }
 
 static Result installZLibFilCEntry(StringView cache, StringView install, Package& package,
                                    Span<const StringView> arguments)
 {
-    ZLibFilCPackageInstallOptions options;
-    SC_TRY(parseZLibFilCPackageInstallOptions(arguments, options));
+    ImportPackageInstallOptions options;
+    SC_TRY(parseImportPackageInstallOptions(arguments, options));
     return installZLibFilC(cache, install, package, options.importDirectory);
 }
 
