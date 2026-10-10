@@ -350,70 +350,41 @@ static Result writeLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPat
     return Result(true);
 }
 
-static Result writeOutputProducingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath)
-{
-    String scriptContents = StringEncoding::Utf8;
-    SC_TRY(StringBuilder::format(scriptContents,
-                                 "#!/bin/sh\n"
-                                 "printf '%s\\n' \"$*\" >> \"{}\"\n"
-                                 "out=''\n"
-                                 "prev=''\n"
-                                 "for arg in \"$@\"; do\n"
-                                 "  if [ \"$prev\" = '-o' ]; then\n"
-                                 "    out=\"$arg\"\n"
-                                 "    prev=''\n"
-                                 "    continue\n"
-                                 "  fi\n"
-                                 "  case \"$arg\" in\n"
-                                 "    -o) prev='-o' ;;\n"
-                                 "  esac\n"
-                                 "done\n"
-                                 "if [ -n \"$out\" ]; then\n"
-                                 "  /bin/mkdir -p \"$(/usr/bin/dirname \"$out\")\"\n"
-                                 "  : > \"$out\"\n"
-                                 "fi\n"
-                                 "exit 0\n",
-                                 logPath));
-    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
-    SC_TRY(fs.chmod(scriptPath, 0755u));
-    return Result(true);
-}
-
-#if SC_PLATFORM_APPLE
-static Result writeVersionedOutputProducingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
-                                                         StringView versionText)
+static Result writeOutputProducingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                                StringView versionText = {})
 {
     String scriptContents = StringEncoding::Utf8;
     auto   builder        = StringBuilder::create(scriptContents);
     SC_TRY(builder.append("#!/bin/sh\n"));
     SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
-    SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
-    SC_TRY(builder.append("  printf '%s\\n' '{}'\n", versionText));
-    SC_TRY(builder.append("  exit 0\n"));
-    SC_TRY(builder.append("fi\n"));
-    SC_TRY(builder.append("out=''\n"));
-    SC_TRY(builder.append("prev=''\n"));
-    SC_TRY(builder.append("for arg in \"$@\"; do\n"));
-    SC_TRY(builder.append("  if [ \"$prev\" = '-o' ]; then\n"));
-    SC_TRY(builder.append("    out=\"$arg\"\n"));
-    SC_TRY(builder.append("    prev=''\n"));
-    SC_TRY(builder.append("    continue\n"));
-    SC_TRY(builder.append("  fi\n"));
-    SC_TRY(builder.append("  case \"$arg\" in\n"));
-    SC_TRY(builder.append("    -o) prev='-o' ;;\n"));
-    SC_TRY(builder.append("  esac\n"));
-    SC_TRY(builder.append("done\n"));
-    SC_TRY(builder.append("if [ -n \"$out\" ]; then\n"));
-    SC_TRY(builder.append("  /bin/mkdir -p \"$(/usr/bin/dirname \"$out\")\"\n"));
-    SC_TRY(builder.append("  : > \"$out\"\n"));
-    SC_TRY(builder.append("fi\n"));
-    SC_TRY(builder.append("exit 0\n"));
+    if (not versionText.isEmpty())
+    {
+        SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
+        SC_TRY(builder.append("  printf '%s\\n' '{}'\n", versionText));
+        SC_TRY(builder.append("  exit 0\nfi\n"));
+    }
+    SC_TRY(builder.append("out=''\n"
+                          "prev=''\n"
+                          "for arg in \"$@\"; do\n"
+                          "  if [ \"$prev\" = '-o' ]; then\n"
+                          "    out=\"$arg\"\n"
+                          "    prev=''\n"
+                          "    continue\n"
+                          "  fi\n"
+                          "  case \"$arg\" in\n"
+                          "    -o) prev='-o' ;;\n"
+                          "  esac\n"
+                          "done\n"
+                          "if [ -n \"$out\" ]; then\n"
+                          "  /bin/mkdir -p \"$(/usr/bin/dirname \"$out\")\"\n"
+                          "  : > \"$out\"\n"
+                          "fi\n"
+                          "exit 0\n"));
     builder.finalize();
     SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
     SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
 }
-#endif
 
 #if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
 static Result writeVersionedLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
@@ -2328,6 +2299,95 @@ static Result verifyNoSCExportsFromExecutable(StringView executablePath, StringV
     return Result(true);
 #endif
 }
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+static Result createNoisyCompileAction(TestReport& report, StringView fixtureName, StringView message,
+                                       Build::OutputMode::Type outputMode, Build::Action& action)
+{
+    String             buildRoot = StringEncoding::Utf8;
+    Build::Directories directories;
+    SC_TRY(createFixtureDirectories(report, buildRoot, directories));
+
+    FileSystem fs;
+    SC_TRY(fs.init(report.libraryRootDirectory.view()));
+
+    String sourceRoot    = StringEncoding::Utf8;
+    String toolchainRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(sourceRoot, {buildRoot.view(), fixtureName}));
+    SC_TRY(Path::join(toolchainRoot, {sourceRoot.view(), "Toolchain"}));
+    String sourceContents = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(
+        sourceContents, "#include <stdio.h>\nint main()\n{{\n    puts(\"{}\");\n    return 0;\n}}\n", message));
+    SC_TRY(writeSourceFixture(fs, sourceRoot.view(), sourceContents.view()));
+    SC_TRY(fs.makeDirectoryRecursive(toolchainRoot.view()));
+    SC_TRY(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+    String hostCompilerC   = StringEncoding::Utf8;
+    String hostCompilerCpp = StringEncoding::Utf8;
+    String hostArchiver    = StringEncoding::Utf8;
+    SC_TRY(resolveHostToolPath("clang", hostCompilerC));
+    SC_TRY(resolveHostToolPath("clang++", hostCompilerCpp));
+    SC_TRY(resolveHostToolPath("ar", hostArchiver));
+
+    String compilerLogPath = StringEncoding::Utf8;
+    String compilerWrapper = StringEncoding::Utf8;
+    SC_TRY(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+    SC_TRY(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+    SC_TRY(fs.writeString(compilerLogPath.view(), ""));
+    SC_TRY(writeNoisyToolWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view(), hostCompilerCpp.view(),
+                                       "noisy compiler stdout", "noisy compiler stderr"));
+
+    action                                 = makeNativeCompileAction(directories, HeaderFixtureProjectName);
+    action.parameters.toolchain.family     = Build::Toolchain::CustomDriver;
+    action.parameters.execution.outputMode = outputMode;
+    SC_TRY(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+    SC_TRY(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+    SC_TRY(action.parameters.toolchain.linker.assign(hostCompilerCpp.view()));
+    SC_TRY(action.parameters.toolchain.archiver.assign(hostArchiver.view()));
+
+    return Result(true);
+}
+
+struct LinuxTargetFixture
+{
+    FileSystem    fs;
+    Build::Action action;
+    String        compilerLogPath = StringEncoding::Utf8;
+    String        linkerLogPath   = StringEncoding::Utf8;
+    String        sysroot         = StringEncoding::Utf8;
+
+    Result init(TestReport& report, StringView toolchainName, StringView sysrootName,
+                Build::TargetEnvironment::Type environment, Build::Architecture::Type architecture)
+    {
+        String             buildRoot = StringEncoding::Utf8;
+        Build::Directories directories;
+        SC_TRY(createFixtureDirectories(report, buildRoot, directories));
+        SC_TRY(fs.init(report.libraryRootDirectory.view()));
+        String toolchainRoot   = StringEncoding::Utf8;
+        String compilerWrapper = StringEncoding::Utf8;
+        String linkerWrapper   = StringEncoding::Utf8;
+        SC_TRY(Path::join(toolchainRoot, {buildRoot.view(), toolchainName}));
+        SC_TRY(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+        SC_TRY(Path::join(linkerLogPath, {toolchainRoot.view(), "linker.log"}));
+        SC_TRY(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+        SC_TRY(Path::join(linkerWrapper, {toolchainRoot.view(), "linker.sh"}));
+        SC_TRY(Path::join(sysroot, {buildRoot.view(), "sysroots", sysrootName}));
+        SC_TRY(fs.makeDirectoryRecursive(toolchainRoot.view()));
+        SC_TRY(fs.makeDirectoryRecursive(sysroot.view()));
+        SC_TRY(fs.writeString(compilerLogPath.view(), ""));
+        SC_TRY(fs.writeString(linkerLogPath.view(), ""));
+        SC_TRY(writeOutputProducingWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view()));
+        SC_TRY(writeOutputProducingWrapperScript(fs, linkerWrapper.view(), linkerLogPath.view()));
+        action                             = makeNativeCompileAction(directories, FixtureProjectName);
+        action.parameters.toolchain.family = Build::Toolchain::CustomDriver;
+        SC_TRY(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+        SC_TRY(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+        SC_TRY(action.parameters.toolchain.linker.assign(linkerWrapper.view()));
+        SC_TRY(configureLinuxTargetAction(action, environment, architecture, sysroot.view()));
+        return Result(true);
+    }
+};
+#endif
+
 } // namespace
 
 struct SCBuildFixtureTest : public SC::TestCase
@@ -4612,50 +4672,9 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend suppresses successful compile noise in normal mode"))
         {
-            String             buildRoot = StringEncoding::Utf8;
-            Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
-
-            FileSystem fs;
-            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
-
-            String sourceRoot    = StringEncoding::Utf8;
-            String toolchainRoot = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "NormalOutputModeFixture"}));
-            SC_TRUST_RESULT(Path::join(toolchainRoot, {sourceRoot.view(), "Toolchain"}));
-            SC_TRUST_RESULT(writeSourceFixture(fs, sourceRoot.view(),
-                                               "#include <stdio.h>\n"
-                                               "int main()\n"
-                                               "{\n"
-                                               "    puts(\"normal-output-mode\");\n"
-                                               "    return 0;\n"
-                                               "}\n"));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
-            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
-
-            String hostCompilerC   = StringEncoding::Utf8;
-            String hostCompilerCpp = StringEncoding::Utf8;
-            String hostArchiver    = StringEncoding::Utf8;
-            SC_TRUST_RESULT(resolveHostToolPath("clang", hostCompilerC));
-            SC_TRUST_RESULT(resolveHostToolPath("clang++", hostCompilerCpp));
-            SC_TRUST_RESULT(resolveHostToolPath("ar", hostArchiver));
-
-            String compilerLogPath = StringEncoding::Utf8;
-            String compilerWrapper = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
-            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
-            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
-            SC_TRUST_RESULT(writeNoisyToolWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view(),
-                                                        hostCompilerCpp.view(), "noisy compiler stdout",
-                                                        "noisy compiler stderr"));
-
-            Build::Action action                   = makeNativeCompileAction(directories, HeaderFixtureProjectName);
-            action.parameters.toolchain.family     = Build::Toolchain::CustomDriver;
-            action.parameters.execution.outputMode = Build::OutputMode::Normal;
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(hostCompilerCpp.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(hostArchiver.view()));
+            Build::Action action;
+            SC_TRUST_RESULT(createNoisyCompileAction(report, "NormalOutputModeFixture", "normal-output-mode",
+                                                     Build::OutputMode::Normal, action));
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
@@ -4669,50 +4688,9 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend prints successful compile noise in verbose mode"))
         {
-            String             buildRoot = StringEncoding::Utf8;
-            Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
-
-            FileSystem fs;
-            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
-
-            String sourceRoot    = StringEncoding::Utf8;
-            String toolchainRoot = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "VerboseOutputModeFixture"}));
-            SC_TRUST_RESULT(Path::join(toolchainRoot, {sourceRoot.view(), "Toolchain"}));
-            SC_TRUST_RESULT(writeSourceFixture(fs, sourceRoot.view(),
-                                               "#include <stdio.h>\n"
-                                               "int main()\n"
-                                               "{\n"
-                                               "    puts(\"verbose-output-mode\");\n"
-                                               "    return 0;\n"
-                                               "}\n"));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
-            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
-
-            String hostCompilerC   = StringEncoding::Utf8;
-            String hostCompilerCpp = StringEncoding::Utf8;
-            String hostArchiver    = StringEncoding::Utf8;
-            SC_TRUST_RESULT(resolveHostToolPath("clang", hostCompilerC));
-            SC_TRUST_RESULT(resolveHostToolPath("clang++", hostCompilerCpp));
-            SC_TRUST_RESULT(resolveHostToolPath("ar", hostArchiver));
-
-            String compilerLogPath = StringEncoding::Utf8;
-            String compilerWrapper = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
-            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
-            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
-            SC_TRUST_RESULT(writeNoisyToolWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view(),
-                                                        hostCompilerCpp.view(), "noisy compiler stdout",
-                                                        "noisy compiler stderr"));
-
-            Build::Action action                   = makeNativeCompileAction(directories, HeaderFixtureProjectName);
-            action.parameters.toolchain.family     = Build::Toolchain::CustomDriver;
-            action.parameters.execution.outputMode = Build::OutputMode::Verbose;
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(hostCompilerCpp.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(hostArchiver.view()));
+            Build::Action action;
+            SC_TRUST_RESULT(createNoisyCompileAction(report, "VerboseOutputModeFixture", "verbose-output-mode",
+                                                     Build::OutputMode::Verbose, action));
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
@@ -4923,102 +4901,42 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend shapes Linux musl target profiles for custom driver toolchains"))
         {
-            String             buildRoot = StringEncoding::Utf8;
-            Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            LinuxTargetFixture fixture;
+            SC_TRUST_RESULT(fixture.init(report, "LinuxMuslToolchain", "linux-musl",
+                                         Build::TargetEnvironment::LinuxMusl, Build::Architecture::Arm64));
 
-            FileSystem fs;
-            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
-
-            String toolchainRoot   = StringEncoding::Utf8;
-            String compilerLogPath = StringEncoding::Utf8;
-            String compilerWrapper = StringEncoding::Utf8;
-            String linkerLogPath   = StringEncoding::Utf8;
-            String linkerWrapper   = StringEncoding::Utf8;
-            String sysroot         = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(toolchainRoot, {buildRoot.view(), "LinuxMuslToolchain"}));
-            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
-            SC_TRUST_RESULT(Path::join(linkerLogPath, {toolchainRoot.view(), "linker.log"}));
-            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
-            SC_TRUST_RESULT(Path::join(linkerWrapper, {toolchainRoot.view(), "linker.sh"}));
-            SC_TRUST_RESULT(Path::join(sysroot, {buildRoot.view(), "sysroots", "linux-musl"}));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(sysroot.view()));
-            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
-            SC_TRUST_RESULT(fs.writeString(linkerLogPath.view(), ""));
-            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view()));
-            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, linkerWrapper.view(), linkerLogPath.view()));
-
-            Build::Action action               = makeNativeCompileAction(directories, FixtureProjectName);
-            action.parameters.toolchain.family = Build::Toolchain::CustomDriver;
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(linkerWrapper.view()));
-            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl,
-                                                       Build::Architecture::Arm64, sysroot.view()));
-
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
+            SC_TEST_EXPECT(Build::Action::execute(fixture.action, configureTinyConsoleProgram));
 
             String compilerLog = StringEncoding::Utf8;
             String linkerLog   = StringEncoding::Utf8;
-            SC_TRUST_RESULT(fs.read(compilerLogPath.view(), compilerLog));
-            SC_TRUST_RESULT(fs.read(linkerLogPath.view(), linkerLog));
+            SC_TRUST_RESULT(fixture.fs.read(fixture.compilerLogPath.view(), compilerLog));
+            SC_TRUST_RESULT(fixture.fs.read(fixture.linkerLogPath.view(), linkerLog));
             SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("-target aarch64-unknown-linux-musl"));
             SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("--sysroot"));
-            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString(fixture.sysroot.view()));
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("-target aarch64-unknown-linux-musl"));
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("--sysroot"));
-            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(fixture.sysroot.view()));
         }
 
         if (test_section("native backend shapes Linux glibc target profiles for custom driver toolchains"))
         {
-            String             buildRoot = StringEncoding::Utf8;
-            Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            LinuxTargetFixture fixture;
+            SC_TRUST_RESULT(fixture.init(report, "LinuxGlibcToolchain", "linux-glibc",
+                                         Build::TargetEnvironment::LinuxGlibc, Build::Architecture::Intel64));
 
-            FileSystem fs;
-            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
-
-            String toolchainRoot   = StringEncoding::Utf8;
-            String compilerLogPath = StringEncoding::Utf8;
-            String compilerWrapper = StringEncoding::Utf8;
-            String linkerLogPath   = StringEncoding::Utf8;
-            String linkerWrapper   = StringEncoding::Utf8;
-            String sysroot         = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(toolchainRoot, {buildRoot.view(), "LinuxGlibcToolchain"}));
-            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
-            SC_TRUST_RESULT(Path::join(linkerLogPath, {toolchainRoot.view(), "linker.log"}));
-            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
-            SC_TRUST_RESULT(Path::join(linkerWrapper, {toolchainRoot.view(), "linker.sh"}));
-            SC_TRUST_RESULT(Path::join(sysroot, {buildRoot.view(), "sysroots", "linux-glibc"}));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(sysroot.view()));
-            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
-            SC_TRUST_RESULT(fs.writeString(linkerLogPath.view(), ""));
-            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view()));
-            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, linkerWrapper.view(), linkerLogPath.view()));
-
-            Build::Action action               = makeNativeCompileAction(directories, FixtureProjectName);
-            action.parameters.toolchain.family = Build::Toolchain::CustomDriver;
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
-            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(linkerWrapper.view()));
-            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc,
-                                                       Build::Architecture::Intel64, sysroot.view()));
-
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
+            SC_TEST_EXPECT(Build::Action::execute(fixture.action, configureTinyConsoleProgram));
 
             String compilerLog = StringEncoding::Utf8;
             String linkerLog   = StringEncoding::Utf8;
-            SC_TRUST_RESULT(fs.read(compilerLogPath.view(), compilerLog));
-            SC_TRUST_RESULT(fs.read(linkerLogPath.view(), linkerLog));
+            SC_TRUST_RESULT(fixture.fs.read(fixture.compilerLogPath.view(), compilerLog));
+            SC_TRUST_RESULT(fixture.fs.read(fixture.linkerLogPath.view(), linkerLog));
             SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("-target x86_64-unknown-linux-gnu"));
             SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("--sysroot"));
-            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString(fixture.sysroot.view()));
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("-target x86_64-unknown-linux-gnu"));
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("--sysroot"));
-            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(fixture.sysroot.view()));
         }
 #endif
 
@@ -5195,12 +5113,12 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/lib"));
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
             SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
-                                                                       "LLVM archive tool"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(), "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                              "clang version 20.1.8"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(), "LLVM archive tool"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
@@ -5267,12 +5185,12 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0"));
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib"));
             SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
-                                                                       "LLVM archive tool"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(), "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                              "clang version 20.1.8"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(), "LLVM archive tool"));
             SC_TRUST_RESULT(writeSysrootFile("{}/lib/ld-musl-x86_64.so.1"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/include/stdio.h"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/include/linux/io_uring.h"));
@@ -5346,12 +5264,12 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/lib"));
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
             SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
-                                                                       "LLVM archive tool"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(), "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                              "clang version 20.1.8"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(), "LLVM archive tool"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
@@ -5435,12 +5353,12 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
             SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
             SC_TRUST_RESULT(fs.writeString(qemuLogPath.view(), ""));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
-                                                                       "clang version 20.1.8"));
-            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
-                                                                       "LLVM archive tool"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(), "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                              "clang version 20.1.8"));
+            SC_TRUST_RESULT(
+                writeOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(), "LLVM archive tool"));
             SC_TRUST_RESULT(writeVersionedLoggingOnlyWrapperScript(fs, qemuPath.view(), qemuLogPath.view()));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
             SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
