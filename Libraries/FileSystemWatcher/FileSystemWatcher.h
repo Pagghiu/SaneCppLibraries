@@ -196,6 +196,7 @@ struct FileSystemWatcher
       protected:
 #if SC_PLATFORM_APPLE
         virtual Result appleStartWakeUp()       = 0;
+        virtual Result appleStopWakeUp()        = 0;
         virtual void   appleSignalEventObject() = 0;
         virtual Result appleWakeUpAndWait()     = 0;
 
@@ -291,10 +292,27 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
             return Result::Error(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized);
         T_AsyncLoopWakeUp& wakeUp = asyncWakeUp;
         wakeUp.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
-        return wakeUp.start(*eventLoop, eventObject);
+        return wakeUp.start(*eventLoop);
     }
 
     virtual void appleSignalEventObject() override { eventObject.signal(); }
+
+    virtual Result appleStopWakeUp() override
+    {
+        notificationGeneration++;
+        if (not asyncWakeUp.isFree())
+        {
+            SC_TRY(asyncWakeUp.stop(*eventLoop));
+            while (not asyncWakeUp.isFree())
+            {
+                SC_TRY(eventLoop->runNoWait());
+            }
+        }
+        // The producer is quiescent now; consume any unused refresh/close handoff signal.
+        eventObject.signal();
+        eventObject.wait();
+        return Result(true);
+    }
 
     virtual Result appleWakeUpAndWait() override
     {
@@ -305,9 +323,16 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 
     void onEventLoopNotification(typename T_AsyncLoopWakeUp::Result& result)
     {
-        fileSystemWatcher->asyncNotify(nullptr);
+        const size_t generation = notificationGeneration;
         result.reactivateRequest(true);
+        fileSystemWatcher->asyncNotify(nullptr);
+        if (generation == notificationGeneration)
+        {
+            eventObject.signal();
+        }
     }
+
+    size_t notificationGeneration = 0;
 
     T_AsyncLoopWakeUp asyncWakeUp = {};
     T_EventObject     eventObject = {};

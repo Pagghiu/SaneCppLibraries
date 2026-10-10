@@ -31,6 +31,7 @@ struct SC::FileSystemWatcher::Internal
     Notification   notification;
     FolderWatcher* watcher;
     FSWAtomicBool  closing;
+    FSWAtomicBool  refreshing;
 
     //...
     //! [OpaqueDefinition1Snippet]
@@ -96,6 +97,10 @@ struct SC::FileSystemWatcher::Internal
             // Wait for thread to finish
             SC_TRY(pollingThread.join());
             releaseResources();
+        }
+        if (eventLoopRunner)
+        {
+            SC_TRY(eventLoopRunner->appleStopWakeUp());
         }
         return ResultFileSystemWatcher(true);
     }
@@ -236,7 +241,20 @@ struct SC::FileSystemWatcher::Internal
         {
             SC_TRY(initThread());
         }
+        // A pending notification may be waiting for the caller's event loop. Release that
+        // handoff before synchronously waiting for the FSEvents thread to refresh its stream.
+        refreshing.exchange(true);
+        if (eventLoopRunner)
+        {
+            eventLoopRunner->appleSignalEventObject();
+        }
         wakeUpFSEventThread();
+        if (eventLoopRunner)
+        {
+            SC_TRY(eventLoopRunner->appleStopWakeUp());
+            SC_TRY(eventLoopRunner->appleStartWakeUp());
+        }
+        refreshing.exchange(false);
         return signalReturnCode;
     }
     static constexpr int EVENT_MODIFIED = kFSEventStreamEventFlagItemChangeOwner |   //
@@ -300,6 +318,10 @@ struct SC::FileSystemWatcher::Internal
 
     static void notify(const StringSpan path, Internal& internal, const FSEventStreamEventFlags flags)
     {
+        if (internal.refreshing.load() or internal.closing.load())
+        {
+            return;
+        }
         internal.notification.fullPath = path;
 
         const bool isDirectory = flags & kFSEventStreamEventFlagItemIsDir;
@@ -352,7 +374,7 @@ struct SC::FileSystemWatcher::Internal
 
                     internal.watcher = watcher;
                     const Result res = eventLoopRunner.appleWakeUpAndWait();
-                    if (internal.closing.load())
+                    if (internal.closing.load() or internal.refreshing.load())
                     {
                         break;
                     }
@@ -409,5 +431,9 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 
 void SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
 {
-    internal.get().watcher->notifyCallback(internal.get().notification);
+    Internal& impl = internal.get();
+    if (not impl.refreshing.load() and not impl.closing.load() and impl.watcher->parent == this)
+    {
+        impl.watcher->notifyCallback(impl.notification);
+    }
 }

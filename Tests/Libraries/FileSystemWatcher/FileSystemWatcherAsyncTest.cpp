@@ -26,6 +26,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopWatchClose(appDirectory);
         eventLoopWaitTimeout();
         eventLoopWatchStop(appDirectory);
+        eventLoopStopPendingNotification(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
     }
 
@@ -338,6 +339,94 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path1.view()));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path2.view()));
         }
+    }
+
+    void eventLoopStopPendingNotification(const StringView appDirectory)
+    {
+#if SC_PLATFORM_APPLE
+        if (not test_section("AsyncEventLoop stop with pending notification"))
+            return;
+
+        struct Runner : FileSystemWatcherAsyncT<AsyncEventLoop>
+        {
+            Atomic<bool> notificationEntered = false;
+
+            Result appleWakeUpAndWait() override
+            {
+                notificationEntered.store(true);
+                return FileSystemWatcherAsyncT<AsyncEventLoop>::appleWakeUpAndWait();
+            }
+        } runner;
+        AsyncEventLoop eventLoop;
+        SC_TEST_EXPECT(eventLoop.create());
+        runner.init(eventLoop);
+        FileSystemWatcher fileEventsWatcher;
+        SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        SC_TEST_EXPECT(fs.makeDirectoryIfNotExists({"__pending_notification"}));
+        StringPath path;
+        SC_TEST_EXPECT(Path::join(path, {appDirectory, "__pending_notification"}));
+        FileSystemWatcher::FolderWatcher watcher;
+        int                              callbacks = 0;
+        watcher.notifyCallback                     = [&](const FileSystemWatcher::Notification&) { callbacks++; };
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(fs.write("__pending_notification/test.txt", "content"));
+        for (int idx = 0; idx < 5000 and not runner.notificationEntered.load(); ++idx)
+        {
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(runner.notificationEntered.load());
+        SC_TEST_EXPECT(watcher.stopWatching());
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+        SC_TEST_EXPECT(callbacks == 0);
+
+        runner.notificationEntered.store(false);
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(fs.write("__pending_notification/rewatched.txt", "content"));
+        SC_TEST_EXPECT(runUntil(eventLoop, [&] { return callbacks > 0; }));
+        struct CallbackStop
+        {
+            FileSystemWatcher::FolderWatcher& watcher;
+
+            int& callbacks;
+            bool stopped = false;
+        } callbackStop{watcher, callbacks};
+        watcher.notifyCallback = [this, &callbackStop](const FileSystemWatcher::Notification&)
+        {
+            callbackStop.callbacks++;
+            SC_TEST_EXPECT(callbackStop.watcher.stopWatching());
+            callbackStop.stopped = true;
+        };
+        SC_TEST_EXPECT(fs.write("__pending_notification/callback_stop.txt", "content"));
+        SC_TEST_EXPECT(runUntil(eventLoop, [&] { return callbackStop.stopped; }));
+        watcher.notifyCallback = [&](const FileSystemWatcher::Notification&) { callbacks++; };
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
+        submitQueuedWatcher(eventLoop);
+        const int callbacksBeforeRestart = callbacks;
+        SC_TEST_EXPECT(fs.write("__pending_notification/restarted.txt", "content"));
+        SC_TEST_EXPECT(runUntil(eventLoop, [&] { return callbacks > callbacksBeforeRestart; }));
+        const int callbacksBeforeClose = callbacks;
+        runner.notificationEntered.store(false);
+        SC_TEST_EXPECT(fs.write("__pending_notification/close.txt", "content"));
+        for (int idx = 0; idx < 5000 and not runner.notificationEntered.load(); ++idx)
+        {
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(runner.notificationEntered.load());
+        SC_TEST_EXPECT(fileEventsWatcher.close());
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+        SC_TEST_EXPECT(callbacks == callbacksBeforeClose);
+        SC_TEST_EXPECT(eventLoop.close());
+        SC_TEST_EXPECT(fs.removeFiles({"__pending_notification/test.txt", "__pending_notification/rewatched.txt",
+                                       "__pending_notification/callback_stop.txt",
+                                       "__pending_notification/restarted.txt", "__pending_notification/close.txt"}));
+        SC_TEST_EXPECT(fs.removeEmptyDirectory("__pending_notification"));
+#else
+        (void)appDirectory;
+#endif
     }
 
     void eventLoopCloseMultipleWatchers(const StringView appDirectory)
