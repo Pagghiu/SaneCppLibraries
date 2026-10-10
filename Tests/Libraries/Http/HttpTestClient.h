@@ -8,6 +8,9 @@
 #include "Libraries/Socket/Socket.h"
 namespace SC
 {
+struct HttpURLParser;
+struct HttpStringAppend;
+
 //! @defgroup group_http Http
 //! @copybrief library_http (see @ref library_http for more details)
 
@@ -55,6 +58,12 @@ struct HttpTestClient
     [[nodiscard]] StringSpan getResponse() const;
 
   private:
+    static Result parseURL(StringSpan url, HttpURLParser& parsed);
+    static Result appendRequestPrefix(HttpStringAppend& sb, StringSpan method, StringSpan path);
+
+    Result createSocket(const HttpURLParser& parsed, SocketIPAddress& endpoint);
+    void   resetResponse(bool noBody);
+
     void startWaiting(AsyncSocketSend::Result& result);
     void startSendingHeaders(AsyncSocketConnect::Result& result);
     void startSendingHeadersOnExistingConnection();

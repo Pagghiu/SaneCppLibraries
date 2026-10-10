@@ -5,6 +5,45 @@
 #include "Libraries/Http/HttpURLParser.h"
 #include <stdio.h> // snprintf
 
+SC::Result SC::HttpTestClient::parseURL(StringSpan url, HttpURLParser& parsed)
+{
+    SC_TRY(parsed.parse(url));
+    if (parsed.protocol != "http")
+        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
+    return Result(true);
+}
+
+SC::Result SC::HttpTestClient::createSocket(const HttpURLParser& parsed, SocketIPAddress& endpoint)
+{
+    // TODO: Make DNS Resolution asynchronous
+    char       buffer[256];
+    Span<char> ipAddress = {buffer};
+    SC_TRY(SocketDNS::resolveDNS(parsed.hostname, ipAddress))
+    SC_TRY(endpoint.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, parsed.port));
+    return eventLoop->createAsyncTCPSocket(endpoint.getAddressFamily(), clientSocket);
+}
+
+SC::Result SC::HttpTestClient::appendRequestPrefix(HttpStringAppend& sb, StringSpan method, StringSpan path)
+{
+    SC_TRY(sb.append(method));
+    SC_TRY(sb.append(path));
+    SC_TRY(sb.append(" HTTP/1.1\r\n"));
+    SC_TRY(sb.append("User-agent: SC\r\n"));
+    SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+    return Result(true);
+}
+
+void SC::HttpTestClient::resetResponse(bool noBody)
+{
+    parser            = {};
+    parser.type       = HttpParser::Type::Response;
+    receivedBytes     = 0;
+    parsedBytes       = 0;
+    contentLen        = 0;
+    headersReceived   = false;
+    responseHasNoBody = noBody;
+}
+
 SC::Result SC::HttpTestClient::get(AsyncEventLoop& loop, StringSpan url, bool keepOpen)
 {
     eventLoop          = &loop;
@@ -12,29 +51,17 @@ SC::Result SC::HttpTestClient::get(AsyncEventLoop& loop, StringSpan url, bool ke
 
     // Parse URL
     HttpURLParser urlParser;
-    SC_TRY(urlParser.parse(url));
-    if (urlParser.protocol != "http")
-        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
+    SC_TRY(parseURL(url, urlParser));
 
     // Reset state for new request
-    parser            = {};
-    parser.type       = HttpParser::Type::Response;
-    receivedBytes     = 0;
-    parsedBytes       = 0;
-    contentLen        = 0;
-    headersReceived   = false;
-    responseHasNoBody = false;
+    resetResponse(false);
 
     {
         GrowableBuffer<decltype(content)> gb = {content};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
         sb.clear();
-        SC_TRY(sb.append("GET "));
-        SC_TRY(sb.append(urlParser.path));
-        SC_TRY(sb.append(" HTTP/1.1\r\n"));
-        SC_TRY(sb.append("User-agent: SC\r\n"));
-        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        SC_TRY(appendRequestPrefix(sb, "GET ", urlParser.path));
         if (keepConnectionOpen)
         {
             SC_TRY(sb.append("Connection: keep-alive\r\n"));
@@ -46,15 +73,8 @@ SC::Result SC::HttpTestClient::get(AsyncEventLoop& loop, StringSpan url, bool ke
     // If we don't have an active connection or we're not keeping connections open, create a new one
     if (not hasActiveConnection or not keepConnectionOpen)
     {
-        uint16_t port;
-        // TODO: Make DNS Resolution asynchronous
-        char       buffer[256];
-        Span<char> ipAddress = {buffer};
-        SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
-        port = urlParser.port;
         SocketIPAddress localHost;
-        SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
-        SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+        SC_TRY(createSocket(urlParser, localHost));
         hasActiveConnection = true;
 
         connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
@@ -75,40 +95,22 @@ SC::Result SC::HttpTestClient::head(AsyncEventLoop& loop, StringSpan url)
     keepConnectionOpen = false;
 
     HttpURLParser urlParser;
-    SC_TRY(urlParser.parse(url));
-    if (urlParser.protocol != "http")
-        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
+    SC_TRY(parseURL(url, urlParser));
 
-    parser            = {};
-    parser.type       = HttpParser::Type::Response;
-    receivedBytes     = 0;
-    parsedBytes       = 0;
-    contentLen        = 0;
-    headersReceived   = false;
-    responseHasNoBody = true;
+    resetResponse(true);
 
     {
         GrowableBuffer<decltype(content)> gb = {content};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
         sb.clear();
-        SC_TRY(sb.append("HEAD "));
-        SC_TRY(sb.append(urlParser.path));
-        SC_TRY(sb.append(" HTTP/1.1\r\n"));
-        SC_TRY(sb.append("User-agent: SC\r\n"));
-        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        SC_TRY(appendRequestPrefix(sb, "HEAD ", urlParser.path));
         SC_TRY(sb.append("\r\n"));
         headerBytes = content.size();
     }
 
-    uint16_t   port;
-    char       buffer[256];
-    Span<char> ipAddress = {buffer};
-    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
-    port = urlParser.port;
     SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
-    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+    SC_TRY(createSocket(urlParser, localHost));
     hasActiveConnection = true;
 
     connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
@@ -121,30 +123,17 @@ SC::Result SC::HttpTestClient::put(AsyncEventLoop& loop, StringSpan url, StringS
     eventLoop         = &loop;
     responseHasNoBody = false;
 
-    uint16_t      port;
     HttpURLParser urlParser;
-    SC_TRY(urlParser.parse(url));
-    if (urlParser.protocol != "http")
-        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
-    // TODO: Make DNS Resolution asynchronous
-    char       buffer[256];
-    Span<char> ipAddress = {buffer};
-    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
-    port = urlParser.port;
+    SC_TRY(parseURL(url, urlParser));
     SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
-    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+    SC_TRY(createSocket(urlParser, localHost));
 
     {
         GrowableBuffer<decltype(content)> gb = {content};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
         sb.clear();
-        SC_TRY(sb.append("PUT "));
-        SC_TRY(sb.append(urlParser.path));
-        SC_TRY(sb.append(" HTTP/1.1\r\n"));
-        SC_TRY(sb.append("User-agent: SC\r\n"));
-        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        SC_TRY(appendRequestPrefix(sb, "PUT ", urlParser.path));
         char contentLengthBuffer[32];
         ::snprintf(contentLengthBuffer, sizeof(contentLengthBuffer), "%zu", body.sizeInBytes());
         StringSpan cl({contentLengthBuffer, ::strlen(contentLengthBuffer)}, false, StringEncoding::Ascii);
@@ -169,19 +158,10 @@ SC::Result SC::HttpTestClient::postMultipart(AsyncEventLoop& loop, StringSpan ur
     eventLoop         = &loop;
     responseHasNoBody = false;
 
-    uint16_t      port;
     HttpURLParser urlParser;
-    SC_TRY(urlParser.parse(url));
-    if (urlParser.protocol != "http")
-        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
-    // TODO: Make DNS Resolution asynchronous
-    char       buffer[256];
-    Span<char> ipAddress = {buffer};
-    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
-    port = urlParser.port;
+    SC_TRY(parseURL(url, urlParser));
     SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
-    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+    SC_TRY(createSocket(urlParser, localHost));
 
     // Generate a unique boundary
     StringSpan boundary    = "----SCFormBoundary7MA4YWxkTrZu0gW";
@@ -212,11 +192,7 @@ SC::Result SC::HttpTestClient::postMultipart(AsyncEventLoop& loop, StringSpan ur
         bodySize += 4 + boundaryLen + 4;       // \r\n--boundary--\r\n
 
         // Build HTTP headers
-        SC_TRY(sb.append("POST "));
-        SC_TRY(sb.append(urlParser.path));
-        SC_TRY(sb.append(" HTTP/1.1\r\n"));
-        SC_TRY(sb.append("User-agent: SC\r\n"));
-        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        SC_TRY(appendRequestPrefix(sb, "POST ", urlParser.path));
         SC_TRY(sb.append("Content-Type: multipart/form-data; boundary="));
         SC_TRY(sb.append(boundary));
         SC_TRY(sb.append("\r\n"));
@@ -258,18 +234,10 @@ SC::Result SC::HttpTestClient::sendRaw(AsyncEventLoop& loop, StringSpan url, Str
     bodyDelay = {};
     eventLoop = &loop;
 
-    uint16_t      port;
     HttpURLParser urlParser;
-    SC_TRY(urlParser.parse(url));
-    if (urlParser.protocol != "http")
-        return Result::Error(HttpResultCategory, HttpError::UnsupportedProtocol);
-    char       buffer[256];
-    Span<char> ipAddress = {buffer};
-    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
-    port = urlParser.port;
+    SC_TRY(parseURL(url, urlParser));
     SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
-    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+    SC_TRY(createSocket(urlParser, localHost));
 
     {
         GrowableBuffer<decltype(content)> gb = {content};
@@ -281,13 +249,7 @@ SC::Result SC::HttpTestClient::sendRaw(AsyncEventLoop& loop, StringSpan url, Str
     }
 
     connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
-    parser              = {};
-    parser.type         = HttpParser::Type::Response;
-    receivedBytes       = 0;
-    parsedBytes         = 0;
-    contentLen          = 0;
-    headersReceived     = false;
-    responseHasNoBody   = false;
+    resetResponse(false);
     keepConnectionOpen  = false;
     hasActiveConnection = false;
     return connectAsync.start(*eventLoop, clientSocket, localHost);
@@ -302,21 +264,7 @@ void SC::HttpTestClient::startSendingHeaders(AsyncSocketConnect::Result& result)
 {
     (void)(result);
 
-    Span<const char> toSend;
-    if (headerBytes < content.size() and bodyDelay.milliseconds > 0)
-    {
-        // Sending out the body in a separate async send after delay just for testing purposes
-        SC_ASSERT_RELEASE(content.toSpanConst().sliceStartLength(0, headerBytes, toSend));
-        sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startWaiting>(*this);
-    }
-    else
-    {
-        // Send it all
-        toSend = content.toSpanConst();
-        sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startReceiveResponse>(*this);
-    }
-    auto res = sendAsync.start(*eventLoop, clientSocket, toSend);
-    SC_ASSERT_RELEASE(res);
+    startSendingHeadersOnExistingConnection();
 }
 
 void SC::HttpTestClient::startSendingHeadersOnExistingConnection()
