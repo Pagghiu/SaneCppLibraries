@@ -99,6 +99,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
 {
     HttpAsyncClientTest(SC::TestReport& report) : TestCase(report, "HttpAsyncClientTest")
     {
+        if (test_section("collector completion lifetime"))
+        {
+            collectorCompletionLifetime();
+        }
         if (test_section("basic GET"))
         {
             basicGet();
@@ -217,6 +221,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         }
     }
 
+    void collectorCompletionLifetime();
     void basicGet();
     void headResponse();
     void commonMethodWrappers();
@@ -247,6 +252,66 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void gzipRequestCompression();
     void multipartUpload();
 };
+
+void SC::HttpAsyncClientTest::collectorCompletionLifetime()
+{
+    ChunkedBodyStream stream;
+    struct Response : HttpAsyncClientResponse
+    {
+        Response(AsyncReadableStream& source) { attachReadableStream(source); }
+    } response(stream);
+
+    ResponseCollector collector;
+    struct Observer
+    {
+        ResponseCollector*       collector;
+        HttpAsyncClientResponse* received                = nullptr;
+        int                      completions             = 0;
+        bool                     invocationActive        = false;
+        bool                     destroyedWhileExecuting = false;
+    } observer = {&collector};
+
+    struct Completion
+    {
+        Observer* observer;
+        bool      executing = false;
+
+        Completion(Observer& state) : observer(&state) {}
+        Completion(const Completion& other) : observer(other.observer) {}
+        ~Completion()
+        {
+            if (executing and observer->invocationActive)
+                observer->destroyedWhileExecuting = true;
+        }
+
+        void operator()(HttpAsyncClientResponse& received)
+        {
+            // Keep only automatic state after detach, even when testing the broken implementation.
+            Observer* state         = observer;
+            executing               = true;
+            state->invocationActive = true;
+            state->collector->detach();
+            state->received = &received;
+            state->completions++;
+            state->invocationActive = false;
+        }
+    };
+
+    for (int cycle = 1; cycle <= 2; ++cycle)
+    {
+        collector.attach(response, Completion(observer));
+        SC_TEST_EXPECT(collector.append(StringSpan("body").toCharSpan()));
+        stream.eventEnd.emit();
+        SC_TEST_EXPECT(not observer.destroyedWhileExecuting);
+        SC_TEST_EXPECT(observer.received == &response);
+        SC_TEST_EXPECT(observer.completions == cycle);
+        SC_TEST_EXPECT(collector.readable == nullptr and collector.response == nullptr);
+        SC_TEST_EXPECT(not collector.onEnd.isValid());
+        SC_TEST_EXPECT(collector.view() == "body");
+        stream.eventEnd.emit();
+        SC_TEST_EXPECT(observer.completions == cycle);
+    }
+}
 
 void SC::HttpAsyncClientTest::requestOptionBodyHelpers()
 {

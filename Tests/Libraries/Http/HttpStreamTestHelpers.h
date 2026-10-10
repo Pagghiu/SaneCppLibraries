@@ -74,7 +74,9 @@ struct ResponseCollector
         SC_ASSERT_RELEASE(response != nullptr);
         if (onEnd.isValid())
         {
-            onEnd(*response);
+            // detach() may clear onEnd while this callback is executing. Keep its listener valid until then.
+            auto completion = onEnd;
+            completion(*response);
         }
     }
 
