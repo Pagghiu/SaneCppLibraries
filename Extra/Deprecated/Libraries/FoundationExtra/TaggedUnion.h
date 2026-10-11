@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Libraries/Common/AlignedStorage.h"
-#include "../../Libraries/Common/InitializerList.h"
-#include "../../Libraries/Common/PlacementNew.h"
+#include "../../../../Libraries/Common/AlignedStorage.h"
+#include "../../../../Libraries/Common/InitializerList.h"
+#include "../../../../Libraries/Common/PlacementNew.h"
 #include "TypeList.h"
 namespace SC
 {
@@ -33,7 +33,7 @@ struct SC::TaggedType
 /// @tparam Union with `FieldTypes` = `TypeList<TaggedType<EnumType, EnumValue, Type>, ...>`
 ///
 /// Example:
-/// \snippet Extra/Deprecated/Libraries/FoundationExtra/FoundationExtra/TaggedUnionTest.cpp TaggedUnionTestSnippet
+/// \snippet Extra/Deprecated/Tests/FoundationExtra/TaggedUnionTest.cpp TaggedUnionTestSnippet
 template <typename Union>
 struct SC::TaggedUnion
 {

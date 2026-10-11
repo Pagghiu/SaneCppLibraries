@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Libraries/Containers/VectorMap.h"
+#include "../../../../Libraries/Containers/VectorMap.h"
 namespace SC
 {
 template <typename Type, typename Union>
@@ -15,7 +15,7 @@ struct TaggedMap;
 /// @tparam Union with `FieldTypes` = `TypeList<TaggedType<EnumType, EnumValue, Type>, ...>`
 ///
 /// Example:
-/// \snippet Extra/Deprecated/Libraries/FoundationExtra/FoundationExtra/TaggedMapTest.cpp TaggedMapTestSnippet
+/// \snippet Extra/Deprecated/Tests/FoundationExtra/TaggedMapTest.cpp TaggedMapTestSnippet
 template <typename Type, typename Union>
 struct SC::TaggedMap
 {
