@@ -2835,7 +2835,9 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
         scheduler.workerPool = this;
     }
 
+#if not SC_PLATFORM_WINDOWS
     Span<char> stackGrowthSignalStackStorage = options.stackGrowthSignalStackStorage;
+#endif
     for (size_t idx = 0; idx < threads.sizeInElements(); ++idx)
     {
         FiberWorker& worker = workers[idx];
