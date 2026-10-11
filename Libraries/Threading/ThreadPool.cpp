@@ -34,8 +34,13 @@ struct SC::ThreadPool::WorkerThread
                 task->function();
             }
 
-            // 3. Signal completion of the task
-            signalCompletedTask(threadPool, task);
+            // 3. Release task storage before its notification. Only the local copy may be accessed afterward.
+            {
+                auto afterRelease = releaseTask(threadPool, task);
+                if (afterRelease.isValid())
+                    afterRelease();
+            }
+            finishExecution(threadPool);
         }
     }
 
@@ -82,19 +87,30 @@ struct SC::ThreadPool::WorkerThread
         return true;
     }
 
-    static void signalCompletedTask(ThreadPool& threadPool, Task* task)
+    static Function<void()> releaseTask(ThreadPool& threadPool, Task* task)
     {
-        // Function is entirely protected by the mutex
+        Function<void()> afterRelease;
+        if (task)
+            afterRelease = task->afterRelease;
         threadPool.poolMutex.lock();
         if (task)
         {
             task->threadPool = nullptr; // free the task
             task->next       = nullptr;
         }
+        threadPool.taskCompleted.broadcast();
+        threadPool.poolMutex.unlock();
+        return afterRelease;
+    }
+
+    static void finishExecution(ThreadPool& threadPool)
+    {
+        // Pool shutdown must also wait for release notifications, even if they have destroyed their Task.
+        threadPool.poolMutex.lock();
         threadPool.numRunningTasks--;
         if (not threadPool.stopRequested) // stopRequested handling happens in waitForAvailableTask
         {
-            threadPool.taskCompleted.signal();
+            threadPool.taskCompleted.broadcast();
         }
         threadPool.poolMutex.unlock();
     }

@@ -16,6 +16,13 @@ struct SC_THREADING_EXPORT ThreadPoolTask
 {
 
     Function<void()> function; ///< Function that will be executed during the task
+
+    /// Optional worker notification after an executed task node is released. Discarded queued tasks do not notify. A
+    /// copy is invoked, so it may destroy or requeue this Task. waitForTask waits for node release;
+    /// waitForAllTasks/destroy also join this notification. Keep it nonblocking with respect to the pool itself: do not
+    /// wait for or destroy this pool from here.
+    Function<void()> afterRelease;
+
   private:
     friend struct ThreadPool;
     ThreadPool*     threadPool = nullptr;
@@ -51,10 +58,10 @@ struct SC_THREADING_EXPORT ThreadPool
     /// @brief Queue a task (that should not be already in use)
     ResultThreading queueTask(Task& task);
 
-    /// @brief Blocks execution until all queued and pending tasks will be fully completed
+    /// @brief Blocks execution until all queued tasks and their afterRelease notifications have completed
     ResultThreading waitForAllTasks();
 
-    /// @brief Blocks execution until all queued and pending tasks will be fully completed
+    /// @brief Blocks until this task's function finishes and its node is released, before its optional notification
     ResultThreading waitForTask(Task& task);
 
   private:

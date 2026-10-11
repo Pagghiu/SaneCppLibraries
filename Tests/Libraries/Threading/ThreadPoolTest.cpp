@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Threading/ThreadPool.h"
+#include "Libraries/Common/PlacementNew.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -12,6 +13,7 @@ struct SC::ThreadPoolTest : public SC::TestCase
 {
     inline void testThreadPool();
     inline void testThreadPoolErrors();
+    void        testReleaseNotification();
 
     ThreadPoolTest(SC::TestReport& report) : TestCase(report, "ThreadPoolTest")
     {
@@ -19,6 +21,9 @@ struct SC::ThreadPoolTest : public SC::TestCase
         {
             testThreadPool();
         }
+
+        if (test_section("release notification can destroy and reuse task"))
+            testReleaseNotification();
 
         if (test_section("ThreadPool errors"))
         {
@@ -80,6 +85,42 @@ void SC::ThreadPoolTest::testThreadPool()
     // as stack objects are reclaimed in inverse declaration order
     SC_TEST_EXPECT(threadPool.destroy());
     //! [threadPoolSnippet]
+}
+
+void SC::ThreadPoolTest::testReleaseNotification()
+{
+    using Task = ThreadPool::Task;
+    alignas(Task) char storage[sizeof(Task)];
+    auto*              task = reinterpret_cast<Task*>(storage);
+    placementNew(*task);
+    ThreadPool pool;
+    SC_TEST_EXPECT(pool.create(1));
+    struct State
+    {
+        ThreadPool* pool;
+        Task*       task;
+        int         bodies   = 0;
+        int         releases = 0;
+        Result      queued{false};
+        uint64_t    worker = 0;
+    } state{&pool, task};
+    task->function     = [&state]() { ++state.bodies; };
+    task->afterRelease = [&state]()
+    {
+        ++state.releases;
+        state.worker = Thread::CurrentThreadID();
+        // The callback runs from a local copy, after the pool's final access to the old Task object.
+        state.task->~Task();
+        placementNew(*state.task);
+        state.task->function = [&state]() { ++state.bodies; };
+        state.queued         = state.pool->queueTask(*state.task);
+    };
+    SC_TEST_EXPECT(pool.queueTask(*task));
+    SC_TEST_EXPECT(pool.waitForAllTasks());
+    SC_TEST_EXPECT(state.queued and state.bodies == 2 and state.releases == 1);
+    SC_TEST_EXPECT(state.worker != Thread::CurrentThreadID());
+    task->~Task();
+    SC_TEST_EXPECT(pool.destroy());
 }
 
 void SC::ThreadPoolTest::testThreadPoolErrors()
