@@ -6,7 +6,9 @@
 #ifdef _WIN32
 #include <Windows.h>
 #include <stdlib.h>
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "Advapi32.lib")
+#endif
 #else
 #include <dlfcn.h>
 #endif
