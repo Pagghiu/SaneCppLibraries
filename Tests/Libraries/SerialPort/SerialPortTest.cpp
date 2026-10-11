@@ -15,9 +15,6 @@
 
 #if !SC_PLATFORM_WINDOWS
 #include <errno.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <unistd.h>
 #endif
 
 namespace SC
@@ -43,43 +40,6 @@ static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<c
 #if SC_PLATFORM_WINDOWS
 using SerialPortTestHelpers::resolveWindowsCom0ComPorts;
 using SerialPortTestHelpers::WindowsCom0ComPorts;
-#endif
-
-#if !SC_PLATFORM_WINDOWS
-struct PosixPTYPair
-{
-    SC::FileDescriptor master;
-    SC::StringPath     slavePath;
-
-    SC::Result create()
-    {
-        int openFlags = O_RDWR | O_NOCTTY;
-#ifdef O_CLOEXEC
-        openFlags |= O_CLOEXEC;
-#endif
-        int masterFd;
-        do
-        {
-            masterFd = ::posix_openpt(openFlags);
-        } while (masterFd == -1 and errno == EINTR);
-        SC_TRY(SC::Result(masterFd != -1));
-
-        if (::grantpt(masterFd) != 0 or ::unlockpt(masterFd) != 0)
-        {
-            (void)::close(masterFd);
-            return SC::Result(false);
-        }
-        const char* slaveName = ::ptsname(masterFd);
-        if (slaveName == nullptr)
-        {
-            (void)::close(masterFd);
-            return SC::Result(false);
-        }
-        SC_TRY(master.assign(masterFd));
-        SC_TRY(slavePath.assign(SC::StringSpan::fromNullTerminated(slaveName, SC::StringEncoding::Native)));
-        return SC::Result(true);
-    }
-};
 #endif
 } // namespace
 
@@ -278,8 +238,9 @@ void SC::SerialPortTest::structuredErrorsAndFormatter()
 #if !SC_PLATFORM_WINDOWS
 void SC::SerialPortTest::posixPTYOpenConfigureReadback()
 {
-    PosixPTYPair pair;
-    SC_TEST_EXPECT(pair.create());
+    FileDescriptor master;
+    StringPath     slavePath;
+    SC_TEST_EXPECT(SerialPortTestHelpers::createPosixPTYPair(master, slavePath));
 
     SerialOpenOptions options;
     options.blocking             = true;
@@ -290,7 +251,7 @@ void SC::SerialPortTest::posixPTYOpenConfigureReadback()
     options.settings.flowControl = SerialSettings::FlowControl::None;
 
     SerialDescriptor serial;
-    SC_TEST_EXPECT(serial.open(pair.slavePath.view(), options));
+    SC_TEST_EXPECT(serial.open(slavePath.view(), options));
 
     SerialSettings readback;
     SC_TEST_EXPECT(serial.getSettings(readback));
@@ -310,7 +271,7 @@ void SC::SerialPortTest::posixPTYOpenConfigureReadback()
     SC_TEST_EXPECT(readback.stopBits == updated.stopBits);
 
     const char fromPeer[] = {'P', 'I', 'N', 'G'};
-    SC_TEST_EXPECT(pair.master.write({fromPeer, sizeof(fromPeer)}));
+    SC_TEST_EXPECT(master.write({fromPeer, sizeof(fromPeer)}));
     char receivedBySerial[4] = {0};
     SC_TEST_EXPECT(readExactDescriptor(serial, {receivedBySerial, sizeof(receivedBySerial)}));
     SC_TEST_EXPECT(::memcmp(receivedBySerial, fromPeer, sizeof(fromPeer)) == 0);
@@ -318,7 +279,7 @@ void SC::SerialPortTest::posixPTYOpenConfigureReadback()
     const char fromSerial[] = {'P', 'O', 'N', 'G'};
     SC_TEST_EXPECT(serial.write({fromSerial, sizeof(fromSerial)}));
     char receivedByPeer[4] = {0};
-    SC_TEST_EXPECT(readExactDescriptor(pair.master, {receivedByPeer, sizeof(receivedByPeer)}));
+    SC_TEST_EXPECT(readExactDescriptor(master, {receivedByPeer, sizeof(receivedByPeer)}));
     SC_TEST_EXPECT(::memcmp(receivedByPeer, fromSerial, sizeof(fromSerial)) == 0);
 }
 #else

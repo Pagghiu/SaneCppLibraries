@@ -11,11 +11,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <wchar.h>
-#else
-#include <errno.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <unistd.h>
 #endif
 
 namespace
@@ -90,34 +85,14 @@ struct AsyncSerialVirtualEndpoint
             return peerAssigned;
         }
 #else
-        int openFlags = O_RDWR | O_NOCTTY;
-#ifdef O_CLOEXEC
-        openFlags |= O_CLOEXEC;
-#endif
-        int masterFd;
-        do
-        {
-            masterFd = ::posix_openpt(openFlags);
-        } while (masterFd == -1 and errno == EINTR);
-        if (masterFd == -1)
-            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointCreateFailed);
-
-        if (::grantpt(masterFd) != 0 or ::unlockpt(masterFd) != 0)
-        {
-            (void)::close(masterFd);
-            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointPrepareFailed);
-        }
-        const char* slavePath = ::ptsname(masterFd);
-        if (slavePath == nullptr)
-        {
-            (void)::close(masterFd);
-            return SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointNameUnavailable);
-        }
-
-        SC_TRY(peer.assign(masterFd));
+        SC::StringPath slavePath;
+        SC_TRY(SerialPortTestHelpers::createPosixPTYPair(
+            peer, slavePath, SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointCreateFailed),
+            SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointPrepareFailed),
+            SC::asyncTestFailure(SC::AsyncTestFailure::VirtualEndpointNameUnavailable)));
         SC::SerialOpenOptions options;
         options.blocking = false;
-        SC_TRY(serial.open(SC::StringSpan::fromNullTerminated(slavePath, SC::StringEncoding::Native), options));
+        SC_TRY(serial.open(slavePath.view(), options));
 #endif
         return SC::Result(true);
     }
