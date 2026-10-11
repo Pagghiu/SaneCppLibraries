@@ -353,7 +353,8 @@ SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& pa
 
     if (parameters.platform == Platform::Windows)
     {
-        SC_TRY(project.addLinkLibraries({"Advapi32", "Dbghelp", "Mswsock", "ntdll", "Rstrtmgr", "Winhttp", "Ws2_32"}));
+        SC_TRY(project.addLinkLibraries(
+            {"Advapi32", "bcrypt", "Dbghelp", "Mswsock", "ntdll", "Rstrtmgr", "Winhttp", "Ws2_32"}));
     }
     else
     {
