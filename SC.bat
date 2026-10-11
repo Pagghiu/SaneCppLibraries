@@ -74,9 +74,19 @@ mkdir "%BOOTSTRAP_ROOT%\_Build\_Tools\Windows" 2>nul
 if not exist "%BOOTSTRAP_EXE%" (
     set build_bootstrap=1
 ) else (
-    for %%f in ("%BOOTSTRAP_ROOT%\Tools\ToolsBootstrap.c") do set source_time=%%~tf
-    for %%f in ("%BOOTSTRAP_EXE%") do set exe_time=%%~tf
-    if "!source_time!" gtr "!exe_time!" (set build_bootstrap=1) else (set build_bootstrap=0)
+    @REM Compare chronological metadata, including seconds, independently of the Windows locale.
+    set "BOOTSTRAP_SOURCE=%BOOTSTRAP_ROOT%\Tools\ToolsBootstrap.c"
+    powershell.exe -NoLogo -NoProfile -NonInteractive -Command "try { $source = Get-Item -LiteralPath $env:BOOTSTRAP_SOURCE -ErrorAction Stop; $exe = Get-Item -LiteralPath $env:BOOTSTRAP_EXE -ErrorAction Stop; if ($source.LastWriteTimeUtc -gt $exe.LastWriteTimeUtc) { exit 10 }; exit 0 } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 20 }"
+    set "freshness_status=!errorlevel!"
+    if !freshness_status! equ 10 (
+        set build_bootstrap=1
+    ) else if !freshness_status! equ 0 (
+        set build_bootstrap=0
+    ) else (
+        echo Failed to check ToolsBootstrap freshness 1>&2
+        set "BOOTSTRAP_EXIT=1"
+        goto bootstrap_end
+    )
 )
 
 if !build_bootstrap! equ 1 (

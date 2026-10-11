@@ -1668,6 +1668,7 @@ static Result captureBootstrapScriptCommand(const BootstrapSyntheticCheckout& ch
     SC_TRY(stdoutFile.close());
     SC_TRY(stderrFile.close());
     SC_TRY(fs.read(stdoutPath.view(), capturedOutput.stdOut));
+    SC_TRY(fs.read(stderrPath.view(), capturedOutput.stdErr));
 #else
     SC_TRY(process.setWorkingDirectory(checkout.root.view()));
     SC_TRY(process.exec({processArguments, numArguments}, capturedOutput.stdOut, {}, capturedOutput.stdErr));
@@ -2520,6 +2521,92 @@ struct SCBuildFixtureTest : public SC::TestCase
         }
 
 #if SC_PLATFORM_WINDOWS
+        if (test_section("bootstrap script compares chronological timestamps and captures stderr on Windows"))
+        {
+            BootstrapSyntheticCheckout checkout;
+            SmallString<64>            caseName;
+            SC_TRUST_RESULT(
+                StringBuilder::format(caseName, "bootstrap-freshness-{}", Time::Realtime::now().milliseconds));
+            SC_TRUST_RESULT(createBootstrapSyntheticCheckout(report, caseName.view(), checkout));
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(checkout.root.view()));
+            String sourcePath     = StringEncoding::Utf8;
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourcePath, {checkout.root.view(), "Tools", "ToolsBootstrap.c"}));
+            SC_TRUST_RESULT(Path::join(executablePath,
+                                       {checkout.root.view(), "_Build", "_Tools", "Windows", "ToolsBootstrap.exe"}));
+            String source = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(sourcePath.view(), source));
+            SC_TRUST_RESULT(StringBuilder::createForAppendingTo(source).append(
+                "\n#pragma message(\"BOOTSTRAP_FRESHNESS_COMPILED\")\n"));
+            SC_TRUST_RESULT(fs.writeString(sourcePath.view(), source.view()));
+
+            // Exercise a missing executable before this fixture launches it, avoiding image-deletion semantics.
+            SC_TRUST_RESULT(fs.removeFile(executablePath.view()));
+            StringSpan            commandArguments[] = {"bootstrap-probe", "verify"};
+            CapturedProcessOutput warmRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, warmRun));
+            SC_TRUST_RESULT(appendBootstrapProbeCommonChecks(warmRun, "SC-bootstrap-probe", {}));
+            SC_TEST_EXPECT(StringView(warmRun.stdOut.view()).containsString("BOOTSTRAP_FRESHNESS_COMPILED"));
+
+            struct FreshnessCase
+            {
+                StringSpan name;
+                int64_t    executableTime;
+                int64_t    sourceTime;
+                bool       rebuild;
+            };
+            // UTC: 21 June / 8 October, then 8 October 12:00:10 / 12:00:20 (same localized minute).
+            const FreshnessCase cases[] = {
+                {"older executable with larger localized day", 1782043210000LL, 1791460810000LL, true},
+                {"newer source within the same minute", 1791460810000LL, 1791460820000LL, true},
+                {"up-to-date executable", 1791460820000LL, 1791460810000LL, false},
+            };
+            for (const FreshnessCase& freshness : cases)
+            {
+                if (not report.quietMode)
+                {
+                    report.console.print("Bootstrap freshness: {}\n", freshness.name);
+                }
+                SC_TRUST_RESULT(fs.setLastModifiedTime(executablePath.view(), TimeMs{freshness.executableTime}));
+                SC_TRUST_RESULT(fs.setLastModifiedTime(sourcePath.view(), TimeMs{freshness.sourceTime}));
+                FileSystem::FileStat before;
+                SC_TRUST_RESULT(fs.stat(executablePath.view(), before));
+                CapturedProcessOutput output;
+                SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, output));
+                SC_TRUST_RESULT(appendBootstrapProbeCommonChecks(output, "SC-bootstrap-probe", {}));
+                FileSystem::FileStat after;
+                SC_TRUST_RESULT(fs.stat(executablePath.view(), after));
+                SC_TEST_EXPECT((after.modifiedTime.milliseconds != before.modifiedTime.milliseconds) ==
+                               freshness.rebuild);
+                SC_TEST_EXPECT(StringView(output.stdOut.view()).containsString("BOOTSTRAP_FRESHNESS_COMPILED") ==
+                               freshness.rebuild);
+                SC_TEST_EXPECT(not bootstrapOutputContainsCompileStep(output));
+            }
+
+            SC_TRUST_RESULT(fs.writeString(checkout.builtInToolSource.view(),
+                                           "#include <stdio.h>\n"
+                                           "int bootstrapProbeMain(int, const wchar_t* const*) {\n"
+                                           "fputs(\"BOOTSTRAP_CHILD_STDOUT\\n\", stdout);\n"
+                                           "fputs(\"BOOTSTRAP_CHILD_STDERR\\n\", stderr); return 37; }\n"));
+            // Keep shared-filesystem clock skew from hiding the deliberate child source change.
+            SC_TRUST_RESULT(fs.setLastModifiedTime(checkout.builtInToolSource.view(),
+                                                   TimeMs{Time::Realtime::now().milliseconds + 2000}));
+            CapturedProcessOutput failedChild;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, failedChild));
+            SC_TEST_EXPECT(failedChild.exitStatus != 0);
+            SC_TEST_EXPECT(StringView(failedChild.stdOut.view()).containsString("BOOTSTRAP_CHILD_STDOUT\n"));
+            SC_TEST_EXPECT(StringView(failedChild.stdErr.view()).containsString("BOOTSTRAP_CHILD_STDERR\n"));
+            SC_TEST_EXPECT(StringView(failedChild.stdErr.view()).containsString("execution failed with code 1"));
+
+            SC_TRUST_RESULT(fs.removeFile(sourcePath.view()));
+            CapturedProcessOutput missingMetadata;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, missingMetadata));
+            SC_TEST_EXPECT(missingMetadata.exitStatus != 0);
+            SC_TEST_EXPECT(not StringView(missingMetadata.stdOut.view()).containsString("BOOTSTRAP_CHILD_STDOUT"));
+            SC_TEST_EXPECT(not missingMetadata.stdErr.isEmpty());
+        }
+
         if (test_section("bootstrap script runs long custom probe path on Windows"))
         {
             BootstrapSyntheticCheckout checkout;
