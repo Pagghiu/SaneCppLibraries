@@ -5,6 +5,7 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringFormat.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Time/Time.h"
 #include "Tools/SC-build.h"
 #include "Tools/SC-build/BuildCLI.h"
 #include "Tools/SC-build/BuildErrorFormatter.h"
@@ -43,6 +44,29 @@ static bool shouldRunHeavySupportToolsTests()
     ProcessEnvironment environment;
     StringSpan         value;
     return environment.get("SC_RUN_HEAVY_SUPPORT_TOOLS_TESTS", value) and not value.isEmpty() and value != "0";
+}
+
+// Only exclusive creation establishes ownership; candidate labels may collide across processes or VMs.
+static ResultFileSystem claimSupportToolsScratch(FileSystem& fs, StringView parent, uint64_t seed, StringPath& owned)
+{
+    owned = {};
+    SC_TRY(fs.makeDirectoryRecursive(parent));
+    ResultFileSystem lastCollision = FileSystemError::EntryAlreadyExists;
+    for (uint32_t attempt = 0; attempt != 128; ++attempt)
+    {
+        StringPath candidate;
+        SC_TRY(StringBuilder::format(candidate, "{0}/SupportToolsTest-{1}-{2}", parent, seed, attempt));
+        const ResultFileSystem created = fs.makeDirectory(candidate.view());
+        if (created)
+        {
+            owned = candidate;
+            return created;
+        }
+        if (not created.isError(FileSystemError::EntryAlreadyExists))
+            return created;
+        lastCollision = created;
+    }
+    return lastCollision;
 }
 
 static Result configureEmptyBuildDefinition(Build::Definition&, const Build::Parameters&) { return Result(true); }
@@ -178,19 +202,31 @@ struct SupportToolsTest : public TestCase
 {
     SupportToolsTest(SC::TestReport& report) : TestCase(report, "SupportToolsTest")
     {
+        if (not report.isTestEnabled("SupportToolsTest"))
+            return;
+
         using namespace SC::Tools;
         using namespace SC::Tools::detail;
         StringPath outputDirectory;
-        (void)StringBuilder::format(outputDirectory, "{0}/_Build/_TestScratch/SupportToolsTest",
-                                    report.libraryRootDirectory);
         {
-            FileSystem fs;
-            SC_TEST_EXPECT(fs.init("."));
-            if (fs.existsAndIsDirectory(outputDirectory.view()))
-            {
-                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(outputDirectory.view()));
-            }
-            SC_TEST_EXPECT(fs.makeDirectoryRecursive(outputDirectory.view()));
+            FileSystem   fs;
+            StringPath   parent;
+            const Result initialized = fs.init(".");
+            SC_TEST_EXPECT(initialized);
+            if (not initialized)
+                return;
+            const bool formatted =
+                StringBuilder::format(parent, "{0}/_Build/_TestScratch", report.libraryRootDirectory);
+            SC_TEST_EXPECT(formatted);
+            if (not formatted)
+                return;
+            const ResultFileSystem claimed = claimSupportToolsScratch(
+                fs, parent.view(), static_cast<uint64_t>(Time::Realtime::now().milliseconds), outputDirectory);
+            SC_TEST_EXPECT(claimed);
+            if (not claimed)
+                return;
+            if (not report.quietMode)
+                report.console.print("SupportToolsTest scratch: {}\n", outputDirectory.view());
         }
         Tool::Arguments arguments{*globalConsole,
                                   report.libraryRootDirectory,
@@ -213,6 +249,69 @@ struct SupportToolsTest : public TestCase
         testPackageReceipts(arguments, args, outputDirectory);
         testPackageOutput(arguments, args, outputDirectory, runHeavySections);
         testFilCZLibCache(outputDirectory, runHeavySections);
+        testScratchIsolation(outputDirectory);
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testScratchIsolation(StringPath& outputDirectory)
+    {
+        if (not test_section("scratch claims isolate package fixtures"))
+            return;
+
+        // Setup errors retain fixtures for inspection under this run's owned root.
+        const auto regression = [&]() -> Result
+        {
+            using namespace SC::Tools;
+            FileSystem fs;
+            SC_TRY(fs.init("."));
+            StringPath parent;
+            SC_TRY(StringBuilder::format(parent, "{}/scratch-claims", outputDirectory));
+            SC_TRY(fs.makeDirectory(parent.view()));
+
+            StringPath first;
+            StringPath second;
+            SC_TRY(claimSupportToolsScratch(fs, parent.view(), 42, first));
+            String packageRoot = StringEncoding::Utf8;
+            String sentinel    = StringEncoding::Utf8;
+            SC_TRY(Path::join(packageRoot, {first.view(), "package"}));
+            SC_TRY(Path::join(sentinel, {packageRoot.view(), "bin", "fake-tool"}));
+            const PackageReceiptExport exports[] = {{PackageExportKind::Tool, "fake-tool", "bin/fake-tool"}};
+            SC_TRY(writePackageReceiptFixture(packageRoot.view(), "scratch-sentinel", exports));
+            SC_TRY(claimSupportToolsScratch(fs, parent.view(), 42, second));
+            SC_TEST_EXPECT(first.view() != second.view());
+            String bytes = StringEncoding::Utf8;
+            SC_TRY(fs.read(sentinel.view(), bytes));
+            SC_TEST_EXPECT(bytes.view() == "fake");
+            SC_TRY(fs.removeDirectoriesRecursive(second.view()));
+            String resolved = StringEncoding::Utf8;
+            SC_TRY(resolvePackageExportPath(packageRoot.view(), "fake-tool", resolved));
+            SC_TEST_EXPECT(resolved.view() == sentinel.view());
+            SC_TRY(fs.read(resolved.view(), bytes));
+            SC_TEST_EXPECT(bytes.view() == "fake");
+
+            StringPath collision;
+            StringPath third;
+            SC_TRY(StringBuilder::format(collision, "{}/SupportToolsTest-43-0", parent));
+            SC_TRY(fs.writeString(collision.view(), "foreign"));
+            SC_TRY(claimSupportToolsScratch(fs, parent.view(), 43, third));
+            SC_TEST_EXPECT(third.view() != collision.view());
+            SC_TRY(fs.read(collision.view(), bytes));
+            SC_TEST_EXPECT(bytes.view() == "foreign");
+
+            StringPath fileParent;
+            StringPath unclaimed;
+            SC_TRY(StringBuilder::format(fileParent, "{}/file-parent", parent));
+            SC_TRY(fs.writeString(fileParent.view(), "parent sentinel"));
+            SC_TRY(unclaimed.assign("stale candidate"));
+            const ResultFileSystem failed = claimSupportToolsScratch(fs, fileParent.view(), 44, unclaimed);
+            SC_TEST_EXPECT(not failed);
+            SC_TEST_EXPECT(not failed.isError(FileSystemError::EntryAlreadyExists));
+            SC_TEST_EXPECT(unclaimed.isEmpty());
+            SC_TRY(fs.read(fileParent.view(), bytes));
+            SC_TEST_EXPECT(bytes.view() == "parent sentinel");
+            SC_TRY(fs.removeDirectoriesRecursive(parent.view()));
+            return Result(true);
+        };
+        SC_TEST_EXPECT(regression());
     }
 
     SC_TOOLS_TEST_NO_INLINE void testFilCZLibCache(StringPath& outputDirectory, bool runHeavySections)
