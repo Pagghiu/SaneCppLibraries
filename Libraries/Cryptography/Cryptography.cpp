@@ -45,7 +45,9 @@
 #define STATUS_AUTH_TAG_MISMATCH 0xC000A002
 #endif
 
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "bcrypt.lib")
+#endif
 #elif SC_PLATFORM_LINUX
 #include <errno.h>
 #include <sys/random.h>
