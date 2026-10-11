@@ -433,7 +433,7 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32
                                                                           Reflection::TypeInfo property,
                                                                           Span<char> object, Span<char>& itemBegin)
 {
-    for (uint32_t index = 0; index < vectorVtable.sizeInBytes(); ++index)
+    for (uint32_t index = 0; index < vectorVtable.sizeInElements(); ++index)
     {
         if (vectorVtable.data()[index].linkID == linkID)
         {
@@ -448,7 +448,7 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::getSegmentSpan(uint32
                                                                           Span<const char>     object,
                                                                           Span<const char>&    itemBegin)
 {
-    for (uint32_t index = 0; index < vectorVtable.sizeInBytes(); ++index)
+    for (uint32_t index = 0; index < vectorVtable.sizeInElements(); ++index)
     {
         if (vectorVtable.data()[index].linkID == linkID)
         {
@@ -463,7 +463,7 @@ bool SC::detail::SerializationBinaryTypeErasedArrayAccess::resize(uint32_t linkI
                                                                   Initialize      initialize,
                                                                   DropExcessItems dropExcessItems)
 {
-    for (uint32_t index = 0; index < vectorVtable.sizeInBytes(); ++index)
+    for (uint32_t index = 0; index < vectorVtable.sizeInElements(); ++index)
     {
         if (vectorVtable.data()[index].linkID == linkID)
         {
