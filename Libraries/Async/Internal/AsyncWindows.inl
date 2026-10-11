@@ -9,6 +9,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include "../../Common/CompilerMinMax.h"
+
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "Mswsock.lib") // TransmitFile
 #endif
@@ -1042,7 +1044,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         while (bytesSent < totalBytesToSend)
         {
-            DWORD toRead    = static_cast<DWORD>(min(totalBytesToSend - bytesSent, BUFFER_SIZE));
+            DWORD toRead    = static_cast<DWORD>((SC::min)(totalBytesToSend - bytesSent, BUFFER_SIZE));
             DWORD bytesRead = 0;
             BOOL  readRes   = ::ReadFile(async.fileHandle, buffer, toRead, &bytesRead, nullptr);
             if (not readRes)
