@@ -286,28 +286,50 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
         fileWrite[1].executeOn(fileWriteTask); // executed second
     }
 
-    fileWrite[0].callback = [&](AsyncFileWrite::Result& res)
+    int completionCount[2] = {};
+    fileWrite[0].callback  = [&](AsyncFileWrite::Result& res)
     {
         size_t writtenBytes = 0;
         SC_TEST_EXPECT(res.get(writtenBytes));
         SC_TEST_EXPECT(writtenBytes == 8);
+        completionCount[0]++;
     };
     fileWrite[1].callback = [&](AsyncFileWrite::Result& res)
     {
         size_t writtenBytes = 0;
         SC_TEST_EXPECT(res.get(writtenBytes));
         SC_TEST_EXPECT(writtenBytes == 8);
+        completionCount[1]++;
     };
     fileWrite[0].handle = handle;
     fileWrite[1].handle = handle;
 
     // TODO: Find a way to reliably test partial gather writes
-    Span<const char> buffers1[] = {{"PING", 4}, {"PONG", 4}};
+    Span<const char> buffers1[] = {{"PING", 4}, {}, {"PONG", 4}, {}};
     SC_TEST_EXPECT(fileWrite[0].start(eventLoop, buffers1));
-    Span<const char> buffers2[] = {{"PENG", 4}, {"PANG", 4}};
+    Span<const char> buffers2[] = {{"PENG", 4}, {}, {"PANG", 4}, {}};
     SC_TEST_EXPECT(fileWrite[1].start(eventLoop, buffers2));
 
     SC_TEST_EXPECT(eventLoop.run());
+
+    SC_TEST_EXPECT(completionCount[0] == 1 and completionCount[1] == 1);
+    FileDescriptor reader;
+    SC_TEST_EXPECT(reader.open(filePath.view(), FileOpen::Read));
+    char       appendedBytes[16] = {};
+    Span<char> appendedContents;
+    SC_TEST_EXPECT(reader.read(appendedBytes, appendedContents));
+    SC_TEST_EXPECT(StringView(appendedContents, false, StringEncoding::Ascii) == "PINGPONGPENGPANG");
+    SC_TEST_EXPECT(reader.close());
+
+    // Reuse both requests at explicit offsets. Each vector segment must advance the range,
+    // skip empty entries, and deliver exactly one terminal callback per request.
+    fileWrite[0].setOffset(0);
+    fileWrite[1].setOffset(8);
+    SC_TEST_EXPECT(fileWrite[0].start(eventLoop, buffers1));
+    SC_TEST_EXPECT(fileWrite[1].start(eventLoop, buffers2));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(completionCount[0] == 2 and completionCount[1] == 2);
 
     SC_TEST_EXPECT(fd.close());
 

@@ -815,7 +815,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         const FileDescriptor::Handle fileDescriptor = async.handle;
 
-        DWORD numBytes;
+        DWORD numBytes = 0;
         if (func(fileDescriptor, buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
         {
             DWORD lastError = ::GetLastError();
@@ -866,15 +866,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 }
             }
         }
-        else
-        {
-            if (synchronous == false)
-            {
-                // Async operation finished synchronously, must flag a manual completion to avoid waiting forever
-                SC_ASYNC_ASSERT_RELEASE(eventLoop != nullptr);
-                async.flags |= Internal::Flag_ManualCompletion;
-            }
-        }
+        // A successful overlapped call still queues an IOCP packet. Association does not enable
+        // FILE_SKIP_COMPLETION_PORT_ON_SUCCESS, so only immediate EOF above needs manual completion.
 
         readBytes = static_cast<size_t>(numBytes);
         return Result(true);
@@ -953,68 +946,75 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         return executeOperation(async, completionData, false, &eventLoop); // synchronous == false
     }
 
+    static Span<const char> remainingFileWriteBuffer(const AsyncFileWrite& async)
+    {
+        size_t prefix = async.totalBytesWritten;
+        for (const auto buffer : async.buffers)
+        {
+            if (prefix < buffer.sizeInBytes())
+            {
+                return {buffer.data() + prefix, buffer.sizeInBytes() - prefix};
+            }
+            prefix -= buffer.sizeInBytes(); // Also skip empty vector entries.
+        }
+        return {};
+    }
+
     static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData,
                                    bool synchronous = true, AsyncEventLoop* eventLoop = nullptr)
     {
-        // TODO: Do the same as AsyncFileRead
-        // To write to the end of file, specify both the Offset and OffsetHigh members of the OVERLAPPED structure as
-        // 0xFFFFFFFF. This is functionally equivalent to previously calling the CreateFile function to open hFile using
-        // FILE_APPEND_DATA access.
         if (async.singleBuffer)
         {
             return executeFileOperation(&::WriteFile, async, eventLoop, async.buffer, synchronous,
                                         completionData.numBytes, nullptr, AsyncError::FileWriteFailed);
         }
-        else
-        {
-            size_t currentBufferIndex  = 0;
-            size_t partialBytesWritten = 0;
 
-            while (partialBytesWritten < async.totalBytesWritten)
-            {
-                partialBytesWritten += async.buffers[currentBufferIndex].sizeInBytes();
-                currentBufferIndex += 1;
-            }
-            SC_ASYNC_ASSERT_RELEASE(partialBytesWritten == async.totalBytesWritten); // Sanity check
-            while (currentBufferIndex < async.buffers.sizeInElements())
-            {
-                size_t writtenBytes;
-                auto   buffer = async.buffers[currentBufferIndex];
-                SC_TRY(executeFileOperation(&::WriteFile, async, eventLoop, buffer, synchronous, writtenBytes, nullptr,
-                                            AsyncError::FileWriteFailed));
-                currentBufferIndex += 1;
-                async.totalBytesWritten += buffer.sizeInBytes(); // writtenBytes could be == 0 in async case
-                if (synchronous == false)
-                    break; // The same OVERLAPPED cannot be re-used to queue multiple concurrent writes
-            }
-            completionData.numBytes = async.totalBytesWritten; // completeAsync will not be called in the sync case
-            return Result(true);
+        while (not remainingFileWriteBuffer(async).empty())
+        {
+            const auto     buffer         = remainingFileWriteBuffer(async);
+            const uint64_t originalOffset = async.offset;
+            if (async.useOffset)
+                async.offset += async.totalBytesWritten;
+
+            size_t       writtenBytes = 0;
+            const Result status       = executeFileOperation(&::WriteFile, async, eventLoop, buffer, synchronous,
+                                                             writtenBytes, nullptr, AsyncError::FileWriteFailed);
+
+            async.offset            = originalOffset;
+            completionData.numBytes = async.totalBytesWritten;
+            SC_TRY(status);
+            if (not synchronous)
+                return Result(true); // Credit the actual count only after IOCP completion.
+
+            if (writtenBytes == 0 or writtenBytes > buffer.sizeInBytes())
+                return Result::Error(AsyncResultCategory, AsyncError::FileWriteIncomplete);
+            async.totalBytesWritten += writtenBytes;
         }
+        completionData.numBytes = async.totalBytesWritten;
+        return Result(true);
     }
 
     static Result completeAsync(AsyncFileWrite::Result& result)
     {
         AsyncFileWrite& async = result.getAsync();
         if (async.singleBuffer)
-        {
             return completeFileOperation(result, nullptr, AsyncError::FileWriteFailed);
-        }
-        else
+
+        const Result status            = completeFileOperation(result, nullptr, AsyncError::FileWriteFailed);
+        const size_t transferred       = result.completionData.numBytes;
+        result.completionData.numBytes = async.totalBytesWritten;
+        SC_TRY(status);
+        if (transferred == 0 or transferred > remainingFileWriteBuffer(async).sizeInBytes())
+            return Result::Error(AsyncResultCategory, AsyncError::FileWriteIncomplete);
+
+        async.totalBytesWritten += transferred;
+        result.completionData.numBytes = async.totalBytesWritten;
+        if (not remainingFileWriteBuffer(async).empty())
         {
-            if (async.totalBytesWritten == Internal::getSummedSizeOfBuffers(async))
-            {
-                SC_TRY(completeFileOperation(result, nullptr, AsyncError::FileWriteFailed));
-                // Write correct numBytes, as completeFileOperation will consider only last write
-                result.completionData.numBytes = async.totalBytesWritten;
-            }
-            else
-            {
-                // Partial Write
-                result.shouldCallCallback = false;
-                result.reactivateRequest(true);
-            }
-            return Result(true);
+            result.shouldCallCallback = false;
+            result.reactivateRequest(true);
         }
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------
