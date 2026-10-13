@@ -627,42 +627,34 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileSend& async)
     {
-        if (async.splicePipe.readPipe.isValid() == false)
+        if (not async.splicePipe.readPipe.isValid())
         {
             PipeOptions options;
-            options.blocking = false; // We need non-blocking for splice
+            options.blocking = false;
             SC_TRY(async.splicePipe.createPipe(options));
-            if (async.pipeBufferSize != 0)
-            {
-                // We likely don't need to resize as default is large enough (16 buffers (64KB))
-                // fcntl(async.splicePipe.readPipe.handle, F_SETPIPE_SZ, async.pipeBufferSize);
-            }
         }
 
-        io_uring_sqe* submission1;
-        io_uring_sqe* submission2;
-        SC_TRY(getNewSubmission(eventLoop, submission1));
-        SC_TRY(getNewSubmission(eventLoop, submission2));
-        // Splice from file to pipe
-        const int fdIn = async.fileHandle;
-        int       fdPipeW;
-        SC_TRY(async.splicePipe.writePipe.get(fdPipeW,
-                                              Result::Error(AsyncResultCategory, AsyncError::InvalidTransferPipe)));
-        AsyncLinuxIOUring::prepSplice(submission1, fdIn, async.offset, fdPipeW, -1,
-                                      static_cast<unsigned int>(async.length - async.bytesSent), 0);
-        AsyncLinuxIOUring::setData(submission1, nullptr); // Ignore completion of the first part
-
-        submission1->flags |= IOSQE_IO_LINK;
-
-        // Splice from pipe to socket
-        int fdPipeR;
-        SC_TRY(async.splicePipe.readPipe.get(fdPipeR,
-                                             Result::Error(AsyncResultCategory, AsyncError::InvalidTransferPipe)));
-        const int fdOut = async.socketHandle;
-        AsyncLinuxIOUring::prepSplice(submission2, fdPipeR, -1, fdOut, -1,
-                                      static_cast<unsigned int>(async.length - async.bytesSent), 0);
-        AsyncLinuxIOUring::setData(submission2, &async);
-
+        io_uring_sqe* submission;
+        SC_TRY(getNewSubmission(eventLoop, submission));
+        int pipeHandle;
+        if (async.spliceBytesPending == 0)
+        {
+            SC_TRY(async.splicePipe.writePipe.get(pipeHandle,
+                                                  Result::Error(AsyncResultCategory, AsyncError::InvalidTransferPipe)));
+            const size_t remaining = async.length - async.bytesSent;
+            const size_t chunk     = remaining > 64 * 1024 ? 64 * 1024 : remaining;
+            AsyncLinuxIOUring::prepSplice(submission, async.fileHandle, async.offset, pipeHandle, -1,
+                                          static_cast<unsigned int>(chunk), 0);
+        }
+        else
+        {
+            SC_TRY(async.splicePipe.readPipe.get(pipeHandle,
+                                                 Result::Error(AsyncResultCategory, AsyncError::InvalidTransferPipe)));
+            AsyncLinuxIOUring::prepSplice(submission, pipeHandle, -1, async.socketHandle, -1,
+                                          static_cast<unsigned int>(async.spliceBytesPending), 0);
+        }
+        // Observe each stage: the file can supply fewer bytes than the requested range at EOF.
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -670,26 +662,33 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         AsyncFileSend& async = result.getAsync();
 
-        // Check for error in the second completion (the one we care about)
-        int32_t res = events[result.eventIndex].res;
+        result.completionData.bytesTransferred = async.bytesSent;
+        result.completionData.usedZeroCopy     = async.bytesSent > 0;
+        const int32_t res                      = events[result.eventIndex].res;
         if (res < 0)
-        {
             return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
-        }
+        if (res == 0)
+            return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
 
-        const size_t bytesTransferred = static_cast<size_t>(res);
-        async.bytesSent += bytesTransferred;
-        async.offset += bytesTransferred;
-
-        if (async.bytesSent == async.length)
+        const size_t transferred = static_cast<size_t>(res);
+        if (async.spliceBytesPending == 0)
         {
-            result.completionData.bytesTransferred = async.bytesSent;
-            return Result(true);
+            async.spliceBytesPending = transferred;
         }
         else
         {
-            return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
+            SC_ASYNC_ASSERT_RELEASE(transferred <= async.spliceBytesPending);
+            async.spliceBytesPending -= transferred;
+            async.bytesSent += transferred;
+            async.offset += transferred;
+            result.completionData.bytesTransferred = async.bytesSent;
+            result.completionData.usedZeroCopy     = true;
+            if (async.bytesSent == async.length)
+                return Result(true);
         }
+        result.shouldCallCallback = false;
+        result.reactivateRequest(true);
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------

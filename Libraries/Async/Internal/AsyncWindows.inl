@@ -1027,9 +1027,10 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         // This is the synchronous fallback for thread pool mode.
         // Files used here should be opened with blocking = true.
 
-        size_t totalBytesToSend = async.length;
-        size_t bytesSent        = 0;
-        bool   usedZeroCopy     = false;
+        const size_t totalBytesToSend = async.length;
+
+        completionData  = {};
+        async.bytesSent = 0;
 
         // Seek to offset if needed
         LARGE_INTEGER offset;
@@ -1042,9 +1043,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         constexpr size_t BUFFER_SIZE = 64 * 1024; // 64KB buffer
         char             buffer[BUFFER_SIZE];
 
-        while (bytesSent < totalBytesToSend)
+        while (async.bytesSent < totalBytesToSend)
         {
-            DWORD toRead    = static_cast<DWORD>((SC::min)(totalBytesToSend - bytesSent, BUFFER_SIZE));
+            DWORD toRead    = static_cast<DWORD>((SC::min)(totalBytesToSend - async.bytesSent, BUFFER_SIZE));
             DWORD bytesRead = 0;
             BOOL  readRes   = ::ReadFile(async.fileHandle, buffer, toRead, &bytesRead, nullptr);
             if (not readRes)
@@ -1053,7 +1054,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
             if (bytesRead == 0)
             {
-                break; // EOF
+                return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
             }
 
             // Write to socket
@@ -1069,14 +1070,14 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 {
                     return Result::Error(AsyncResultCategory, AsyncError::SocketSendFailed);
                 }
+                if (sent == 0)
+                    return Result::Error(AsyncResultCategory, AsyncError::SocketSendIncomplete);
                 written += sent;
+                async.bytesSent += sent;
+                completionData.bytesTransferred = async.bytesSent;
             }
-
-            bytesSent += written;
         }
 
-        completionData.bytesTransferred = bytesSent;
-        completionData.usedZeroCopy     = usedZeroCopy;
         return Result(true);
     }
 
@@ -1153,13 +1154,16 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         DWORD flags       = 0;
         BOOL  success     = ::WSAGetOverlappedResult(async.socketHandle, &winOverlapped, &transferred, FALSE, &flags);
 
+        async.bytesSent                        = transferred;
+        result.completionData.bytesTransferred = transferred;
+        result.completionData.usedZeroCopy     = transferred > 0;
         if (not success)
         {
             return Result::Error(AsyncResultCategory, AsyncError::FileSendFailed);
         }
 
-        result.completionData.bytesTransferred = transferred;
-        result.completionData.usedZeroCopy     = true; // TransmitFile uses zero-copy when possible
+        if (transferred != async.length)
+            return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
         return Result(true);
     }
 

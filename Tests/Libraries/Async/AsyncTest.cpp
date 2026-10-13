@@ -185,6 +185,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileSend(false); // do not use thread-pool
             fileSend(true);  // use thread-pool
         }
+        if (test_section("file send EOF worker"))
+            fileSend(true, true);
+        if (test_section("file send EOF native"))
+            fileSend(false, true);
         if (test_section("file readiness"))
         {
             fileReadiness();

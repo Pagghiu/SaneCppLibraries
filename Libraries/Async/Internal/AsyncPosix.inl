@@ -1243,7 +1243,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             PosixSendFile::sendFile(async.socketHandle, async.fileHandle, async.offset, async.length, notImplemented);
 
         if (notImplemented)
-
         {
             return Result::Error(AsyncResultCategory, AsyncError::OperationUnsupported);
         }
@@ -1251,8 +1250,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         if (res >= 0)
         {
             async.bytesSent += static_cast<size_t>(res);
-            // Check if we are done
-            if (async.bytesSent == async.length)
+            // Complete immediately at EOF too; completeAsync reports the incomplete range.
+            if (async.bytesSent == async.length or res == 0)
             {
                 async.flags |= Internal::Flag_ManualCompletion; // Ended synchronously
                 return Result(true);
@@ -1283,6 +1282,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         AsyncFileSend& async = result.getAsync();
 
+        result.completionData.bytesTransferred = async.bytesSent;
+        result.completionData.usedZeroCopy     = async.bytesSent > 0;
+
         if (async.bytesSent < async.length)
         {
             bool    notImplemented;
@@ -1290,9 +1292,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                                                   async.length - async.bytesSent, notImplemented);
 
             if (res >= 0)
-
             {
                 async.bytesSent += static_cast<size_t>(res);
+                result.completionData.bytesTransferred = async.bytesSent;
+                result.completionData.usedZeroCopy     = async.bytesSent > 0;
+                if (res == 0)
+                    return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
             }
             else
             {
@@ -1321,6 +1326,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result executeOperation(AsyncFileSend& async, AsyncFileSend::CompletionData& completionData)
     {
+        completionData.bytesTransferred = async.bytesSent;
+        completionData.usedZeroCopy     = async.bytesSent > 0;
         while (async.bytesSent < async.length)
         {
             bool    notImplemented;
@@ -1330,6 +1337,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             if (res >= 0)
             {
                 async.bytesSent += static_cast<size_t>(res);
+                completionData.bytesTransferred = async.bytesSent;
+                completionData.usedZeroCopy     = async.bytesSent > 0;
+                if (res == 0)
+                    return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
             }
             else
             {

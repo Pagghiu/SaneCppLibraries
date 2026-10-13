@@ -696,7 +696,11 @@ SC::Result SC::AsyncFileSend::start(AsyncEventLoop& eventLoop, const FileDescrip
     SC_TRY(file.get(fileHandle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
     SC_TRY(socket.get(socketHandle, SC::Result::Error(AsyncResultCategory, AsyncError::InvalidSocketHandle)));
 #if SC_PLATFORM_LINUX
-    pipeBufferSize = pipeSize;
+    // A cancelled splice may leave unread pipe data. Discard it before starting an independent range.
+    if (splicePipe.readPipe.isValid() or splicePipe.writePipe.isValid())
+        SC_TRY(splicePipe.close());
+    spliceBytesPending = 0;
+    pipeBufferSize     = pipeSize;
 #else
     (void)(pipeSize);
 #endif
@@ -2114,6 +2118,16 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
     {}
 
     template <typename T>
+    static void preserveFileSendProgress(T&)
+    {}
+
+    static void preserveFileSendProgress(AsyncFileSend::Result& result)
+    {
+        // Activation/watcher failures can bypass kernel completion; retain the known completed prefix.
+        result.completionData.bytesTransferred = result.getAsync().bytesSent;
+    }
+
+    template <typename T>
     SC::Result operator()(T& async)
     {
         using AsyncType       = T;
@@ -2136,6 +2150,7 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
                 result.returnCode = Result(kernelEvents.completeAsync(result));
             }
         }
+        preserveFileSendProgress(result);
         auto callback = result.getAsync().callback; // copy callback to allow it releasing the request
         if (result.shouldCallCallback and callback.isValid())
         {

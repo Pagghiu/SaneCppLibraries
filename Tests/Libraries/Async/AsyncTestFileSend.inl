@@ -7,6 +7,7 @@
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Path.h"
 #include <memory.h> // memcmp
+#include <stdlib.h> // abort (independent regression failsafe)
 
 struct SC::AsyncTest::FileSendContext
 {
@@ -21,7 +22,7 @@ struct SC::AsyncTest::FileSendContext
     SocketDescriptor acceptedSocket;
 };
 
-void SC::AsyncTest::fileSend(bool useThreadPool)
+void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF)
 {
     // 1. Create ThreadPool and tasks
     ThreadPool threadPool;
@@ -114,21 +115,55 @@ void SC::AsyncTest::fileSend(bool useThreadPool)
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
     }
 
+    struct EOFGuard
+    {
+        StringSpan   path;
+        Atomic<bool> completed    = false;
+        Atomic<bool> forcedGrowth = false;
+        Result       status{true};
+        bool         complete = false;
+        bool         zeroCopy = false;
+    } eofGuard{filePath.view()};
+    Thread guard;
+    if (pastEOF)
+    {
+        SC_TEST_EXPECT(guard.start(
+            [&eofGuard](Thread&)
+            {
+                for (int attempt = 0; attempt < 100 and not eofGuard.completed.load(); ++attempt)
+                    Thread::Sleep(10);
+                if (not eofGuard.completed.load())
+                {
+                    // Release the old EOF busy loop without relying on its owner-loop watchdog.
+                    eofGuard.forcedGrowth.store(true);
+                    FileDescriptor append;
+                    if (not append.open(eofGuard.path, FileOpen::Append) or
+                        not append.write(StringView("++").toCharSpan()))
+                        ::abort();
+                }
+            }));
+    }
+
     // 7. Create and run AsyncFileSend
     AsyncFileSend     asyncFileSend;
     AsyncTaskSequence asyncTask;
 
-    asyncFileSend.callback = [this, &ctx](AsyncFileSend::Result& result)
+    asyncFileSend.callback = [&ctx, &eofGuard](AsyncFileSend::Result& result)
     {
-        ctx.bytesSent = result.getBytesTransferred();
-        ctx.sendDone  = true;
+        ctx.bytesSent     = result.getBytesTransferred();
+        ctx.sendDone      = true;
+        eofGuard.status   = result.isValid();
+        eofGuard.complete = result.isComplete();
+        eofGuard.zeroCopy = result.usedZeroCopy();
+        eofGuard.completed.store(true);
     };
 
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncFileSend.executeOn(asyncTask, threadPool));
+        SC_TEST_EXPECT(asyncFileSend.executeOn(asyncTask, threadPool, AsyncThreadPoolMode::ForceThreadPool));
     }
-    SC_TEST_EXPECT(asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, 0, sizeof(testContent) - 1));
+    SC_TEST_EXPECT(
+        asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, 0, sizeof(testContent) - 1 + (pastEOF ? 2 : 0)));
 
     // 8. Receive the data on client socket
     AsyncSocketReceive asyncReceive;
@@ -144,15 +179,41 @@ void SC::AsyncTest::fileSend(bool useThreadPool)
         }
         ctx.receiveDone = true;
     };
-    SC_TEST_EXPECT(asyncReceive.start(eventLoop, clientSocket, {ctx.receiveBuffer, sizeof(ctx.receiveBuffer)}));
+    if (not pastEOF)
+        SC_TEST_EXPECT(asyncReceive.start(eventLoop, clientSocket, {ctx.receiveBuffer, sizeof(ctx.receiveBuffer)}));
 
     // Run until both send and receive complete
     SC_TEST_EXPECT(eventLoop.run());
 
-    // Verify results
-    SC_TEST_EXPECT(ctx.bytesSent == sizeof(testContent) - 1);
-    SC_TEST_EXPECT(ctx.bytesReceived == sizeof(testContent) - 1);
-    SC_TEST_EXPECT(memcmp(ctx.receiveBuffer, testContent, sizeof(testContent) - 1) == 0);
+    // Join before any failing expectation can leave the fixture.
+    if (pastEOF)
+    {
+        SC_TEST_EXPECT(guard.join());
+        SC_TEST_EXPECT(not eofGuard.forcedGrowth.load());
+        SC_TEST_EXPECT(not eofGuard.status and not eofGuard.complete and ctx.sendDone);
+        SC_TEST_EXPECT(ctx.bytesSent <= sizeof(testContent) - 1);
+#if SC_PLATFORM_WINDOWS
+        if (useThreadPool)
+#endif
+        {
+            SC_TEST_EXPECT(eofGuard.status.isError(AsyncResultCategory, AsyncError::FileSendIncomplete));
+            SC_TEST_EXPECT(ctx.bytesSent == sizeof(testContent) - 1);
+        }
+    }
+    else
+    {
+        SC_TEST_EXPECT(eofGuard.status and eofGuard.complete and ctx.sendDone);
+        SC_TEST_EXPECT(ctx.bytesSent == sizeof(testContent) - 1);
+        SC_TEST_EXPECT(ctx.bytesReceived == sizeof(testContent) - 1);
+        SC_TEST_EXPECT(memcmp(ctx.receiveBuffer, testContent, sizeof(testContent) - 1) == 0);
+    }
+
+#if SC_PLATFORM_WINDOWS
+    if (useThreadPool)
+        SC_TEST_EXPECT(not eofGuard.zeroCopy);
+    else
+#endif
+        SC_TEST_EXPECT(ctx.bytesSent == 0 or eofGuard.zeroCopy);
 
     // 9. Cleanup
     SC_TEST_EXPECT(fd.close());

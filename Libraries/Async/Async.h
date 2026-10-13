@@ -1094,8 +1094,8 @@ struct SC_ASYNC_EXPORT AsyncFileSend : public AsyncRequest
 
     struct CompletionData : public AsyncCompletionData
     {
-        size_t bytesTransferred = 0;     ///< Number of bytes successfully sent
-        bool   usedZeroCopy     = false; ///< True if zero-copy mechanism was used
+        size_t bytesTransferred = 0;     ///< Known completed prefix, including on error
+        bool   usedZeroCopy     = false; ///< Backend used a zero-copy mechanism; not a physical-copy guarantee
     };
 
     struct Result : public AsyncResultOf<AsyncFileSend, CompletionData>
@@ -1117,11 +1117,11 @@ struct SC_ASYNC_EXPORT AsyncFileSend : public AsyncRequest
 
     using AsyncRequest::start;
 
-    /// @brief Start the file send operation
+    /// @brief Start file send. Zero progress reports FileSendIncomplete; native API failures retain their error.
     /// @param eventLoop The event loop to use
     /// @param file The file descriptor (must be open for reading).
     ///             For true async I/O (without thread pool), open with `FileOpen::blocking = false`.
-    ///             When using thread pool, either blocking mode works.
+    ///             On Windows, thread-pool fallback requires blocking = true.
     /// @param socket The socket descriptor (must be connected)
     /// @param offset File offset to start reading from (0 for beginning)
     /// @param length Number of bytes to send. Must be greater than 0.
@@ -1145,8 +1145,9 @@ struct SC_ASYNC_EXPORT AsyncFileSend : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #elif SC_PLATFORM_LINUX
-    size_t         pipeBufferSize = 0; ///< Optional size of the splice pipe (0 = default)
-    PipeDescriptor splicePipe;         ///< Pipe used for splice operations
+    size_t         pipeBufferSize = 0;     ///< Optional size of the splice pipe (0 = default)
+    PipeDescriptor splicePipe;             ///< Pipe used for splice operations
+    size_t         spliceBytesPending = 0; ///< Bytes read into the pipe but not yet sent
 #endif
 };
 
