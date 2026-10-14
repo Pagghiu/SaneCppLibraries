@@ -76,9 +76,10 @@ struct SC::AsyncTest : public SC::TestCase
     void fileReadWrite(bool useThreadPool);
     void fileEndOfFile(bool useThreadPool);
     void fileWriteMultiple(bool useThreadPool);
-    void fileSend(bool useThreadPool, bool pastEOF = false);
+    void fileSend(bool useThreadPool, bool pastEOF = false, bool cancelFirst = false);
     void fileReadiness();
     void fileReadinessCancel();
+    void fileReadCancelQuiescence(bool drainBeforeCancel = false);
     void externalCompletionManual();
     void fileClose();
     void serialReadWrite();

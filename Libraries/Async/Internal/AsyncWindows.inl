@@ -335,6 +335,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         if (async != nullptr and async->state == AsyncRequest::State::Cancelling)
         {
             async->flags &= ~Internal::Flag_WaitingKernelCancel;
+            async->flags |= Internal::Flag_KernelCompletionDrained;
             if (async->type == AsyncRequest::Type::ExternalCompletion)
             {
                 AsyncExternalCompletion& external  = *static_cast<AsyncExternalCompletion*>(async);
@@ -798,6 +799,43 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
         }
         return res;
+    }
+
+    static Result cancelNativeTransfer(AsyncEventLoop& eventLoop, AsyncRequest& async, HANDLE handle,
+                                       OVERLAPPED& overlapped)
+    {
+        // A completion batch can be dispatched after logical stop but before this deferred phase.
+        if (async.flags & Internal::Flag_KernelCompletionDrained)
+            return Result(true);
+        if (::CancelIoEx(handle, &overlapped) == FALSE and ::GetLastError() != ERROR_NOT_FOUND)
+            return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
+        // Every active overlapped submission has one IOCP packet, even if cancellation loses
+        // to completion (ERROR_NOT_FOUND). Do not release request/buffer storage before draining it.
+        async.flags |= Internal::Flag_WaitingKernelCancel;
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        return Result(true);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& loop, AsyncFileRead& async)
+    {
+        return cancelNativeTransfer(loop, async, async.handle, async.overlapped.get().overlapped);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& loop, AsyncFileWrite& async)
+    {
+        return cancelNativeTransfer(loop, async, async.handle, async.overlapped.get().overlapped);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& loop, AsyncFileSend& async)
+    {
+        return cancelNativeTransfer(loop, async, reinterpret_cast<HANDLE>(async.socketHandle),
+                                    async.overlapped.get().overlapped);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& loop, AsyncSocketSend& async)
+    {
+        return cancelNativeTransfer(loop, async, reinterpret_cast<HANDLE>(async.handle),
+                                    async.overlapped.get().overlapped);
     }
 
     //-------------------------------------------------------------------------------------------------------

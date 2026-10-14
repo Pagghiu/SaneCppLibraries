@@ -5,6 +5,7 @@
 #include "AsyncTestFile.inl"
 #include "AsyncTestFileSend.inl"
 #include "AsyncTestFileSystemOperation.inl"
+#include "AsyncTestFileWindows.inl"
 #include "AsyncTestLoop.inl"
 #include "AsyncTestLoopTimeout.inl"
 #include "AsyncTestLoopWakeUp.inl"
@@ -189,6 +190,16 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileSend(true, true);
         if (test_section("file send EOF native"))
             fileSend(false, true);
+#if SC_PLATFORM_LINUX
+        if (test_section("file send cancel and reuse splice pipe"))
+            fileSend(false, false, true);
+#endif
+#if SC_PLATFORM_WINDOWS
+        if (test_section("native file cancellation is quiescent"))
+            fileReadCancelQuiescence();
+        if (test_section("native completion drained before cancellation submission"))
+            fileReadCancelQuiescence(true);
+#endif
         if (test_section("file readiness"))
         {
             fileReadiness();

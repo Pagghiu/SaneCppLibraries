@@ -22,8 +22,17 @@ struct SC::AsyncTest::FileSendContext
     SocketDescriptor acceptedSocket;
 };
 
-void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF)
+void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
 {
+    if (cancelFirst)
+    {
+#if SC_PLATFORM_LINUX
+        if (options.apiType != AsyncEventLoop::Options::ApiType::ForceUseIoUring)
+            return;
+#else
+        return;
+#endif
+    }
     // 1. Create ThreadPool and tasks
     ThreadPool threadPool;
     if (useThreadPool)
@@ -148,7 +157,30 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF)
     AsyncFileSend     asyncFileSend;
     AsyncTaskSequence asyncTask;
 
-    asyncFileSend.callback = [&ctx, &eofGuard](AsyncFileSend::Result& result)
+#if SC_PLATFORM_LINUX
+    if (cancelFirst)
+    {
+        bool earlyCompletion   = false;
+        asyncFileSend.callback = [&earlyCompletion](AsyncFileSend::Result&) { earlyCompletion = true; };
+        SC_TEST_EXPECT(asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, 0, sizeof(testContent) - 1));
+        alignas(uint64_t) uint8_t storage[8192];
+        AsyncKernelEvents         events;
+        events.eventsMemory = storage;
+        // Dispatch only the file-to-pipe stage. No pipe-to-socket submission has been driven yet.
+        SC_TEST_EXPECT(eventLoop.submitRequests(events));
+        SC_TEST_EXPECT(eventLoop.blockingPoll(events));
+        SC_TEST_EXPECT(eventLoop.dispatchCompletions(events));
+        SC_TEST_EXPECT(not earlyCompletion and asyncFileSend.bytesSent == 0);
+        bool                         stopped      = false;
+        Function<void(AsyncResult&)> afterStopped = [&stopped](AsyncResult&) { stopped = true; };
+        SC_TEST_EXPECT(asyncFileSend.stop(eventLoop, &afterStopped));
+        SC_TEST_EXPECT(eventLoop.run());
+        SC_TEST_EXPECT(stopped and asyncFileSend.isFree());
+    }
+#endif
+    const size_t rangeOffset = cancelFirst ? 2 : 0;
+    const size_t rangeLength = sizeof(testContent) - 1 - (cancelFirst ? 4 : 0);
+    asyncFileSend.callback   = [&ctx, &eofGuard](AsyncFileSend::Result& result)
     {
         ctx.bytesSent     = result.getBytesTransferred();
         ctx.sendDone      = true;
@@ -162,8 +194,8 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF)
     {
         SC_TEST_EXPECT(asyncFileSend.executeOn(asyncTask, threadPool, AsyncThreadPoolMode::ForceThreadPool));
     }
-    SC_TEST_EXPECT(
-        asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, 0, sizeof(testContent) - 1 + (pastEOF ? 2 : 0)));
+    SC_TEST_EXPECT(asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, static_cast<int64_t>(rangeOffset),
+                                       rangeLength + (pastEOF ? 2 : 0)));
 
     // 8. Receive the data on client socket
     AsyncSocketReceive asyncReceive;
@@ -203,9 +235,9 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF)
     else
     {
         SC_TEST_EXPECT(eofGuard.status and eofGuard.complete and ctx.sendDone);
-        SC_TEST_EXPECT(ctx.bytesSent == sizeof(testContent) - 1);
-        SC_TEST_EXPECT(ctx.bytesReceived == sizeof(testContent) - 1);
-        SC_TEST_EXPECT(memcmp(ctx.receiveBuffer, testContent, sizeof(testContent) - 1) == 0);
+        SC_TEST_EXPECT(ctx.bytesSent == rangeLength);
+        SC_TEST_EXPECT(ctx.bytesReceived == rangeLength);
+        SC_TEST_EXPECT(memcmp(ctx.receiveBuffer, testContent + rangeOffset, rangeLength) == 0);
     }
 
 #if SC_PLATFORM_WINDOWS
