@@ -845,7 +845,25 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result executeFileOperation(Func func, T& async, AsyncEventLoop* eventLoop, decltype(T::buffer) buffer,
                                        bool synchronous, size_t& readBytes, bool* endOfFile, AsyncError operationError)
     {
-        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
+        // Worker I/O owns its completion. An associated descriptor must not also enqueue
+        // an IOCP packet referencing request storage after the worker publishes completion.
+        OVERLAPPED workerOverlapped = {};
+        HANDLE     workerEvent      = nullptr;
+        auto       closeWorkerEvent = MakeDeferred(
+            [&]
+            {
+                if (workerEvent)
+                    ::CloseHandle(workerEvent);
+            });
+        if (synchronous)
+        {
+            workerEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            if (not workerEvent)
+                return Result::Error(AsyncResultCategory, operationError);
+            // A valid event with the low bit set suppresses completion-port notification.
+            workerOverlapped.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(workerEvent) | 1);
+        }
+        OVERLAPPED& overlapped = synchronous ? workerOverlapped : async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
         overlapped.OffsetHigh  = static_cast<DWORD>((async.offset >> 32) & 0xffffffff);
 

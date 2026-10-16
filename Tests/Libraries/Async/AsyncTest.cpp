@@ -195,6 +195,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileSend(false, false, true);
 #endif
 #if SC_PLATFORM_WINDOWS
+        if (test_section("forced worker associated file completes once"))
+            fileWorkerAssociatedCompletion();
         if (test_section("native file cancellation is quiescent"))
             fileReadCancelQuiescence();
         if (test_section("native completion drained before cancellation submission"))

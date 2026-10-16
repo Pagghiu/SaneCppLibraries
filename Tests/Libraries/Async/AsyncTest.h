@@ -79,6 +79,7 @@ struct SC::AsyncTest : public SC::TestCase
     void fileSend(bool useThreadPool, bool pastEOF = false, bool cancelFirst = false);
     void fileReadiness();
     void fileReadinessCancel();
+    void fileWorkerAssociatedCompletion();
     void fileReadCancelQuiescence(bool drainBeforeCancel = false);
     void externalCompletionManual();
     void fileClose();

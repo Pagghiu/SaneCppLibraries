@@ -95,4 +95,115 @@ void SC::AsyncTest::fileReadCancelQuiescence(bool drainBeforeCancel)
     finished.store(true);
     SC_TEST_EXPECT(deadline.join());
 }
+
+void SC::AsyncTest::fileWorkerAssociatedCompletion()
+{
+    Atomic<bool> finished = false;
+    Atomic<int>  phase    = 0;
+    Thread       deadline;
+    SC_TEST_EXPECT(deadline.start(
+        [&finished, &phase](Thread&)
+        {
+            const auto started = Time::Monotonic::now();
+            while (not finished.load() and
+                   Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() < 8000)
+                Thread::Sleep(10);
+            if (not finished.load())
+            {
+                fprintf(stderr, "Associated worker deadline: phase %d\n", phase.load());
+                fflush(stderr);
+                ::ExitProcess(124);
+            }
+        }));
+    AsyncEventLoop loop;
+    ThreadPool     pool;
+    SC_TEST_EXPECT(loop.create());
+    SC_TEST_EXPECT(pool.create(1));
+    StringPath path;
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncAssociatedWorker.txt"}));
+    FileDescriptor file;
+    FileOpen       mode;
+    mode.mode     = FileOpen::WriteRead;
+    mode.blocking = false;
+    SC_TEST_EXPECT(file.open(path.view(), mode));
+    SC_TEST_EXPECT(loop.associateExternallyCreatedFileDescriptor(file));
+    AsyncFileWrite write;
+    int            writes = 0;
+    write.callback        = [this, &writes](AsyncFileWrite::Result& result)
+    {
+        size_t bytes = 0;
+        SC_TEST_EXPECT(result.get(bytes));
+        SC_TEST_EXPECT(bytes == 6);
+        ++writes;
+    };
+    write.setOffset(0);
+    SC_TEST_EXPECT(write.start(loop, file, StringView("native").toCharSpan()));
+    phase.store(1);
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(writes == 1 and write.isFree());
+    AsyncTaskSequence task;
+    SC_TEST_EXPECT(write.executeOn(task, pool, AsyncThreadPoolMode::ForceThreadPool));
+    SC_TEST_EXPECT(write.start(loop, file, StringView("worker").toCharSpan()));
+    alignas(uint64_t) uint8_t storage[8192];
+    AsyncKernelEvents         events;
+    events.eventsMemory = storage;
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    phase.store(2);
+    SC_TEST_EXPECT(pool.waitForAllTasks());
+    phase.store(3);
+    SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    phase.store(4);
+    SC_TEST_EXPECT(writes == 2 and write.isFree());
+    // Force a kernel poll after manual worker completion. It must not redispatch the same request.
+    AsyncLoopTimeout poll;
+    SC_TEST_EXPECT(poll.start(loop, {1}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(writes == 2 and write.isFree());
+    // The shared worker path must also isolate each vector element and read completion.
+    Span<const char> vectors[] = {StringView("wo").toCharSpan(), StringView("rk").toCharSpan(),
+                                  StringView("er").toCharSpan()};
+    phase.store(5);
+    SC_TEST_EXPECT(write.start(loop, file, vectors));
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    SC_TEST_EXPECT(pool.waitForAllTasks());
+    SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    SC_TEST_EXPECT(writes == 3 and write.isFree());
+    SC_TEST_EXPECT(poll.start(loop, {1}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(writes == 3 and write.isFree());
+
+    char          loan[6] = {};
+    AsyncFileRead read;
+    int           reads = 0;
+    read.callback       = [this, &reads](AsyncFileRead::Result& result)
+    {
+        Span<char> received;
+        SC_TEST_EXPECT(result.get(received));
+        SC_TEST_EXPECT(received.sizeInBytes() == 6);
+        SC_TEST_EXPECT(StringView(received, false, StringEncoding::Ascii) == "worker");
+        ++reads;
+    };
+    read.setOffset(0);
+    phase.store(6);
+    SC_TEST_EXPECT(read.start(loop, file, loan));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(reads == 1 and read.isFree());
+    AsyncTaskSequence readTask;
+    SC_TEST_EXPECT(read.executeOn(readTask, pool, AsyncThreadPoolMode::ForceThreadPool));
+    SC_TEST_EXPECT(read.start(loop, file, loan));
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    phase.store(7);
+    SC_TEST_EXPECT(pool.waitForAllTasks());
+    SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    SC_TEST_EXPECT(reads == 2 and read.isFree());
+    SC_TEST_EXPECT(poll.start(loop, {1}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(reads == 2 and read.isFree());
+    SC_TEST_EXPECT(file.close());
+    SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
+    SC_TEST_EXPECT(loop.close());
+    SC_TEST_EXPECT(pool.destroy());
+    finished.store(true);
+    SC_TEST_EXPECT(deadline.join());
+}
 #endif
