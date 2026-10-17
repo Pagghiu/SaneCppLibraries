@@ -17,6 +17,7 @@ struct AsyncExecutionScheduler;
 struct AsyncExecutionConnection;
 struct AsyncExecutionReadResult;
 struct AsyncExecutionLineResult;
+struct AsyncExecutionFileSendResult;
 template <typename Setup>
 struct AsyncExecutionSender;
 /// Native request addressing is delegated unless useOffset is true. Use explicit offsets for portable file ranges.
@@ -29,6 +30,18 @@ struct AsyncExecutionFileOptions
 };
 using AsyncExecutionFileReadOptions  = AsyncExecutionFileOptions;
 using AsyncExecutionFileWriteOptions = AsyncExecutionFileOptions;
+
+/// A single explicit file range. NativePreferred uses the backend file-send mechanism; force a pool explicitly.
+struct AsyncExecutionFileSendOptions
+{
+    int64_t offset   = 0;
+    size_t  length   = 0;
+    size_t  pipeSize = 0;
+
+    ThreadPool* threadPool = nullptr;
+
+    AsyncThreadPoolMode threadPoolMode = AsyncThreadPoolMode::NativePreferred;
+};
 
 namespace detail
 {
@@ -47,6 +60,7 @@ struct AsyncExecutionFileWrite;
 struct AsyncExecutionFileWriteBuffers;
 struct AsyncExecutionFileReadMany;
 struct AsyncExecutionFileWriteAll;
+struct AsyncExecutionFileSend;
 struct AsyncExecutionWork;
 struct AsyncExecutionCommand
 {
@@ -171,6 +185,11 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
                                                                    ThreadPool& pool, uint64_t offset = 0);
     AsyncExecutionSender<detail::AsyncExecutionFileWrite> fileWrite(const FileDescriptor& file, Span<const char> data,
                                                                     ThreadPool& pool, uint64_t offset = 0);
+
+    AsyncExecutionSender<detail::AsyncExecutionFileSend> fileSend(const FileDescriptor&         file,
+                                                                  const SocketDescriptor&       socket,
+                                                                  AsyncExecutionFileSendOptions options  = {},
+                                                                  AsyncExecutionFileSendResult* progress = nullptr);
 
     AsyncExecutionSender<detail::AsyncExecutionWork> work(ThreadPool& pool, Function<Result()> procedure);
 
@@ -337,6 +356,13 @@ struct AsyncExecutionLineResult
     Span<char> line;
     bool       disconnected = false;
     bool       lineComplete = false;
+};
+
+struct AsyncExecutionFileSendResult
+{
+    size_t bytesTransferred = 0;
+    bool   usedZeroCopy     = false;
+    bool   complete         = false;
 };
 
 namespace detail
@@ -585,6 +611,24 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileWriteAll
     Value value(Request::Result&) const { return transferred; }
 };
 
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileSend
+{
+    using Request = AsyncFileSend;
+    using Value   = AsyncExecutionFileSendResult;
+
+    const FileDescriptor&   file;
+    const SocketDescriptor& socket;
+
+    AsyncExecutionFileSendOptions options;
+
+    Value* progress = nullptr;
+
+    void         initialize();
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
+    void         observe(Request::Result& result);
+    static Value value(Request::Result& result);
+};
+
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionWork
 {
     using Request = AsyncLoopWork;
@@ -744,6 +788,8 @@ struct AsyncExecutionOperation
     void complete(typename Request::Result& result) noexcept
     {
         // Completion may destroy this operation. Never access any member after signaling the receiver.
+        if constexpr (requires { setup.observe(result); })
+            setup.observe(result); // Preserve native progress even on error or a concurrent stop.
         Result     status  = result.isValid();
         const bool stopped = stopRequested();
         if constexpr (requires { setup.advance(result); })

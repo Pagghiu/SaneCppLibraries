@@ -93,6 +93,11 @@ struct AsyncExecutionTest : TestCase
 
         if (test_section("borrowed file ranges and complete transfers"))
             fileRanges();
+        if (test_section("borrowed file send native and forced pool"))
+        {
+            fileSenders(false);
+            fileSenders(true);
+        }
         if (test_section("native pipe file transfers"))
             filePipes();
         if (test_section("borrowed TCP accept connect and scatter transfers"))
@@ -272,6 +277,127 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pool.waitForAllTasks());
         SC_TEST_EXPECT(file.close());
         SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+        SC_TEST_EXPECT(pool.destroy());
+    }
+
+    void fileSenders(bool forcePool)
+    {
+        AsyncEventLoop loop;
+        ThreadPool     pool;
+        SC_TEST_EXPECT(loop.create());
+        SC_TEST_EXPECT(pool.create(1));
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        SocketDescriptor         listener, client;
+        AsyncExecutionConnection accepted;
+        SC_TEST_EXPECT(tcpPair(context, listener, client, accepted, report.mapPort(uint16_t(5115 + forcePool))));
+        StringPath path;
+        SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionFileSend.txt"}));
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(fs.write(path.view(), StringView("xxpayloadyy").toCharSpan()));
+        FileDescriptor file;
+        FileOpen       openMode;
+        openMode.mode     = FileOpen::Read;
+        openMode.blocking = forcePool;
+        SC_TEST_EXPECT(file.open(path.view(), openMode));
+        if (not forcePool)
+            SC_TEST_EXPECT(loop.associateExternallyCreatedFileDescriptor(file));
+        AsyncExecutionFileSendOptions options;
+        options.offset     = 2;
+        options.length     = 7;
+        options.threadPool = &pool;
+        options.threadPoolMode =
+            forcePool ? AsyncThreadPoolMode::ForceThreadPool : AsyncThreadPoolMode::NativePreferred;
+        AsyncExecutionFileSendResult sent, progress{99, true, true};
+        char                         reply[7];
+        AsyncExecutionReadResult     read;
+        auto                         transfer = context.fileSend(file, client, options, &progress);
+        SC_TEST_EXPECT(progress.bytesTransferred == 99);
+        SC_TEST_EXPECT(consumeBounded(
+            context, ex::when_all(move(transfer), context.receiveExact(accepted.socket, reply)), sent, read));
+        SC_TEST_EXPECT(sent.bytesTransferred == 7 and sent.complete and progress.complete);
+        SC_TEST_EXPECT(progress.bytesTransferred == 7 and read.data.sizeInBytes() == 7 and
+                       memcmp(reply, "payload", 7) == 0);
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(sent.usedZeroCopy == not forcePool);
+#else
+        SC_TEST_EXPECT(sent.usedZeroCopy);
+#endif
+        // Cross the native splice pipe/chunk boundary with an independent explicit range.
+        SC_TEST_EXPECT(file.close());
+        AsyncExecutionBuffer source, received;
+        SC_TEST_EXPECT(source.resize(131081));
+        SC_TEST_EXPECT(received.resize(131075));
+        for (size_t index = 0; index < source.size(); ++index)
+            source.bytes()[index] = static_cast<char>('a' + index % 23);
+        SC_TEST_EXPECT(fs.write(path.view(), source.bytes()));
+        SC_TEST_EXPECT(file.open(path.view(), openMode));
+        if (not forcePool)
+            SC_TEST_EXPECT(loop.associateExternallyCreatedFileDescriptor(file));
+        options.offset = 3;
+        options.length = received.size();
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.fileSend(file, client, options, &progress),
+                                                   context.receiveExact(accepted.socket, received.bytes())),
+                                      sent, read));
+        SC_TEST_EXPECT(sent.complete and sent.bytesTransferred == received.size() and progress.complete);
+        SC_TEST_EXPECT(read.data.sizeInBytes() == received.size() and
+                       memcmp(source.bytes().data() + 3, received.bytes().data(), received.size()) == 0);
+        auto invalidOptions   = options;
+        invalidOptions.offset = -1;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(file, client, invalidOptions))
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::InvalidFileOffset));
+        invalidOptions.offset = int64_t(uint64_t(-1) >> 1);
+        invalidOptions.length = 2;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(file, client, invalidOptions))
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::InvalidFileOffset));
+        invalidOptions        = options;
+        invalidOptions.length = 2147483647;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(file, client, invalidOptions))
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow));
+        invalidOptions        = options;
+        invalidOptions.length = 0;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(file, client, invalidOptions))
+                           .isError(AsyncResultCategory, AsyncError::EmptyTransfer));
+        invalidOptions                = options;
+        invalidOptions.threadPoolMode = AsyncThreadPoolMode::ForceThreadPool;
+        invalidOptions.threadPool     = nullptr;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(file, client, invalidOptions))
+                           .isError(AsyncResultCategory, AsyncError::MissingThreadPool));
+        FileDescriptor   invalidFile;
+        SocketDescriptor invalidSocket;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(invalidFile, client, options))
+                           .isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+        SC_TEST_EXPECT(consumeBounded(context, context.fileSend(file, invalidSocket, options))
+                           .isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+        ExecutionStopSource stop;
+        stop.request_stop();
+        progress = {99, true, true};
+        SC_TEST_EXPECT(
+            context.runIntoWithStop(context.fileSend(file, client, options, &progress), stop.get_token(), sent)
+                .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(progress.bytesTransferred == 0 and not progress.complete and not progress.usedZeroCopy);
+        options.offset   = static_cast<int64_t>(source.size() - 2);
+        options.length   = 4;
+        const Result eof = consumeBounded(context, context.fileSend(file, client, options, &progress), sent);
+        SC_TEST_EXPECT(not eof and not eof.isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(progress.bytesTransferred <= 2 and not progress.complete);
+#if SC_PLATFORM_WINDOWS
+        if (forcePool)
+#endif
+        {
+            SC_TEST_EXPECT(eof.isError(AsyncResultCategory, AsyncError::FileSendIncomplete));
+            SC_TEST_EXPECT(progress.bytesTransferred == 2);
+        }
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(file.close());
+        SC_TEST_EXPECT(accepted.socket.close());
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(listener.close());
+        SC_TEST_EXPECT(fs.removeFile(path.view()));
         SC_TEST_EXPECT(context.close());
         SC_TEST_EXPECT(loop.close());
         SC_TEST_EXPECT(pool.destroy());

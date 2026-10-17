@@ -575,6 +575,40 @@ Result detail::AsyncExecutionFileWriteAll::advanceBytes(size_t count)
     return Result(true);
 }
 
+void detail::AsyncExecutionFileSend::initialize()
+{
+    if (progress)
+        *progress = {};
+}
+
+Result detail::AsyncExecutionFileSend::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
+{
+    if (options.offset < 0 or uint64_t(options.length) > AsyncExecutionMaximumFileOffset - uint64_t(options.offset))
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::InvalidFileOffset);
+    // TransmitFile's maximum includes any framing; this adapter sends only the selected file range.
+    if (uint64_t(options.length) > 2147483646ULL)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
+    if (options.threadPoolMode == AsyncThreadPoolMode::ForceThreadPool)
+    {
+        if (options.threadPool == nullptr)
+            return Result::Error(AsyncResultCategory, AsyncError::MissingThreadPool);
+        SC_TRY(request.executeOn(task, *options.threadPool, options.threadPoolMode));
+    }
+    // Every supported backend has native file-send support, including Windows TransmitFile.
+    return request.start(loop, file, socket, options.offset, options.length, options.pipeSize);
+}
+
+void detail::AsyncExecutionFileSend::observe(Request::Result& result)
+{
+    if (progress)
+        *progress = value(result);
+}
+
+detail::AsyncExecutionFileSend::Value detail::AsyncExecutionFileSend::value(Request::Result& result)
+{
+    return {result.getBytesTransferred(), result.usedZeroCopy(), result.isComplete()};
+}
+
 Result detail::AsyncExecutionWork::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
 {
     request.work = work;
@@ -854,6 +888,13 @@ AsyncExecutionSender<detail::AsyncExecutionReceive> AsyncExecutionContext::recei
                                                                                    Span<char>              buffer)
 {
     return AsyncExecutionSender<detail::AsyncExecutionReceive>{*this, {socket, buffer}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileSend> AsyncExecutionContext::fileSend(
+    const FileDescriptor& file, const SocketDescriptor& socket, AsyncExecutionFileSendOptions options,
+    AsyncExecutionFileSendResult* progress)
+{
+    return {*this, {file, socket, options, progress}};
 }
 
 AsyncExecutionSender<detail::AsyncExecutionFileRead> AsyncExecutionContext::fileRead(

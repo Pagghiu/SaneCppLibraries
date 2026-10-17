@@ -55,6 +55,22 @@ SC_TRY(context.runInto(
 // read.data aliases buffer and contains its full requested range.
 ```
 
+## Borrowed file-to-socket transfer
+
+`fileSend(file, socket, options[, progress])` sends one explicit range and emits `AsyncExecutionFileSendResult`: bytesTransferred, usedZeroCopy and complete. The file, socket and optional progress remain borrowed through terminal completion. Native errors stay in the error channel; optional progress preserves the known native prefix on error. Cancellation joins the request; a cancelled native operation that supplies no byte count does not produce an invented progress count.
+
+```cpp
+SC::AsyncExecutionFileSendResult sent;
+SC::AsyncExecutionReadResult received;
+SC_TRY(context.runInto(ex::when_all(
+    context.fileSend(file, client, {.offset = 128, .length = sizeof(reply)}),
+    context.receiveExact(peer, reply)), sent, received));
+```
+
+Options mirror the explicit offset/length and pipe-size hint used by the other adapters, with optional threadPool and threadPoolMode. NativePreferred uses the native file-send mechanism even when a pool is supplied: sendfile on POSIX, staged splice on Linux io_uring, and TransmitFile on Windows. ForceThreadPool requires a pool; Windows worker fallback needs a blocking file and uses copied I/O, while POSIX workers can still use sendfile. Worker cancellation waits for completion. The Windows worker's seek changes the descriptor cursor, so concurrent independent readers need separate descriptors.
+
+Ranges must be nonnegative and fit signed 64-bit offsets. This single native transfer is bounded to 2,147,483,646 bytes, the portable TransmitFile limit; compose consecutive ranges for larger transfers. Length zero reports EmptyTransfer. A zero-byte completion before the full range produces FileSendIncomplete. Native API failures, including immediate EOF failures, retain their existing identity. usedZeroCopy reports the backend mechanism for an observed prefix, not a physical memory-copy guarantee. A successful value is complete; failure details belong to Result and optional progress.
+
 ## Standard composition and returned values
 
 The SC blocking consumer supplies the loop scheduler through `get_scheduler` and `get_start_scheduler`, and forwards the supplied stop token. This supports both forms of standard `on`: temporary work on another scheduler and restoration to the calling loop. `starts_on` changes where a sender starts; `continues_on` changes where its completion continues. I/O senders still submit and complete on their context's loop, even when started on a worker.
@@ -182,7 +198,7 @@ The following matrix describes implemented APIs and keeps remaining gaps explici
 | One-shot file read | AsyncFileRead | fileRead / fileReadAt | fileRead with options | fileRead / fileReadAt; optional pool/offset options; legacy pool overload keeps absolute default 0 |
 | Fill read buffer | Repeat AsyncFileRead | fileReadExact / fileReadExactAt | fileReadUntilFullOrEOF | fileReadExact[At] / fileReadUntilFullOrEOF, distinct early-EOF contracts |
 | File write | AsyncFileWrite | fileWrite[At], fileWriteAll[At] | fileWrite, optional options/output and buffer spans | fileWrite[At] / fileWriteAll[At], scalar/vector, optional progress |
-| File-to-socket transfer | AsyncFileSend | fileSend | fileSend | Missing |
+| File-to-socket transfer | AsyncFileSend | fileSend | fileSend | fileSend; explicit range, native/forced pool, result and optional error progress |
 | File readiness | AsyncFileReadiness | filePoll | filePoll | Missing |
 | Process / signal | AsyncProcessExit / AsyncSignal | processExit / signal | processExit / signal | Missing |
 | Wake-up / external completion | AsyncLoopWakeUp / AsyncExternalCompletion | Internal command wake-up; no operation API | wakeUp; no external-completion wrapper | Internal dispatcher; no operation API |
@@ -289,3 +305,8 @@ Regenerated amalgamation and all single-file Release builds passed. Enabled-prov
 ## Borrowed file step validation (2026-10-18)
 
 Optional file options, explicit ranges, exact/fill EOF behavior, complete vector/chunk writes and native pipe cancellation passed dedicated Debug/Release tests on macOS and Windows (851 assertions each) and Linux (875/3038, including variable polling assertions). Default SCTest suites passed in both configurations on all three platforms. The associated Windows backend correction has independent callback-layer coverage for append contents, explicit vector offsets, empty entries, reuse and terminal callback counts; its final focused tests passed both configurations everywhere. Amalgamation, all single-file Release builds, enabled-provider separate-consumer linking, enabled/disabled SC.cpp compilation and dependency/category checks passed. BuildTest remains excluded; this is the borrowed read/write step, not validation of the remaining fileSend/UDP/filesystem/scope roadmap.
+
+
+## Borrowed file-send step validation (2026-10-18)
+
+Dedicated Debug/Release suites passed on macOS (941/941 assertions), Linux (961/3540, including variable polling counts) and Windows (939/939). Coverage joins native/forced-pool sending with exact receiving, verifies nonzero ranges through 131075 bytes, preserves known early-EOF progress, checks invalid ranges/descriptors and pre-stop initialization, and closes borrowed resources after quiescence. The underlying Async correction also passed native/forced-worker EOF regressions and default Debug/Release suites on all three platforms; its Linux callback suite iterated epoll and io_uring. Amalgamation, all single-file Release builds, enabled-provider two-TU linking and enabled/disabled SC.cpp compilation passed. Explicit busy-pool/native-file and active-cancellation/reuse file-group checks remain a separate next gate; this does not complete the broader primitive/scope roadmap.
