@@ -19,6 +19,17 @@ struct AsyncExecutionReadResult;
 struct AsyncExecutionLineResult;
 template <typename Setup>
 struct AsyncExecutionSender;
+/// Native request addressing is delegated unless useOffset is true. Use explicit offsets for portable file ranges.
+struct AsyncExecutionFileOptions
+{
+    ThreadPool*         threadPool     = nullptr;
+    uint64_t            offset         = 0;
+    bool                useOffset      = false;
+    AsyncThreadPoolMode threadPoolMode = AsyncThreadPoolMode::NativePreferred;
+};
+using AsyncExecutionFileReadOptions  = AsyncExecutionFileOptions;
+using AsyncExecutionFileWriteOptions = AsyncExecutionFileOptions;
+
 namespace detail
 {
 struct AsyncExecutionTimer;
@@ -33,6 +44,9 @@ struct AsyncExecutionSendAll;
 struct AsyncExecutionReceive;
 struct AsyncExecutionFileRead;
 struct AsyncExecutionFileWrite;
+struct AsyncExecutionFileWriteBuffers;
+struct AsyncExecutionFileReadMany;
+struct AsyncExecutionFileWriteAll;
 struct AsyncExecutionWork;
 struct AsyncExecutionCommand
 {
@@ -108,6 +122,51 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
                                                                          Span<char>                buffer,
                                                                          AsyncExecutionLineResult* progress = nullptr);
 
+    AsyncExecutionSender<detail::AsyncExecutionFileRead>     fileRead(const FileDescriptor& file, Span<char> buffer,
+                                                                      AsyncExecutionFileReadOptions options = {});
+    AsyncExecutionSender<detail::AsyncExecutionFileRead>     fileReadAt(const FileDescriptor& file, uint64_t offset,
+                                                                        Span<char>                    buffer,
+                                                                        AsyncExecutionFileReadOptions options = {});
+    AsyncExecutionSender<detail::AsyncExecutionFileReadMany> fileReadExact(
+        const FileDescriptor& file, Span<char> buffer, AsyncExecutionFileReadOptions options = {},
+        AsyncExecutionReadResult* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionFileReadMany> fileReadExactAt(
+        const FileDescriptor& file, uint64_t offset, Span<char> buffer, AsyncExecutionFileReadOptions options = {},
+        AsyncExecutionReadResult* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionFileReadMany> fileReadUntilFullOrEOF(
+        const FileDescriptor& file, Span<char> buffer, AsyncExecutionFileReadOptions options = {},
+        AsyncExecutionReadResult* progress = nullptr);
+
+    AsyncExecutionSender<detail::AsyncExecutionFileWrite> fileWrite(const FileDescriptor& file, Span<const char> data,
+                                                                    AsyncExecutionFileWriteOptions options = {});
+    AsyncExecutionSender<detail::AsyncExecutionFileWriteBuffers> fileWrite(const FileDescriptor&          file,
+                                                                           Span<Span<const char>>         data,
+                                                                           AsyncExecutionFileWriteOptions options = {});
+    AsyncExecutionSender<detail::AsyncExecutionFileWrite> fileWriteAt(const FileDescriptor& file, uint64_t offset,
+                                                                      Span<const char>               data,
+                                                                      AsyncExecutionFileWriteOptions options = {});
+    AsyncExecutionSender<detail::AsyncExecutionFileWriteBuffers> fileWriteAt(
+        const FileDescriptor& file, uint64_t offset, Span<Span<const char>> data,
+        AsyncExecutionFileWriteOptions options = {});
+
+    AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> fileWriteAll(const FileDescriptor&          file,
+                                                                          Span<const char>               data,
+                                                                          AsyncExecutionFileWriteOptions options = {},
+                                                                          size_t* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> fileWriteAll(const FileDescriptor&          file,
+                                                                          Span<Span<const char>>         data,
+                                                                          AsyncExecutionFileWriteOptions options = {},
+                                                                          size_t* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> fileWriteAllAt(const FileDescriptor& file, uint64_t offset,
+                                                                            Span<const char>               data,
+                                                                            AsyncExecutionFileWriteOptions options = {},
+                                                                            size_t* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> fileWriteAllAt(const FileDescriptor& file, uint64_t offset,
+                                                                            Span<Span<const char>>         data,
+                                                                            AsyncExecutionFileWriteOptions options = {},
+                                                                            size_t* progress = nullptr);
+
+    /// Compatibility forms retain the prototype's absolute-offset addressing and native-preferred pool.
     AsyncExecutionSender<detail::AsyncExecutionFileRead>  fileRead(const FileDescriptor& file, Span<char> buffer,
                                                                    ThreadPool& pool, uint64_t offset = 0);
     AsyncExecutionSender<detail::AsyncExecutionFileWrite> fileWrite(const FileDescriptor& file, Span<const char> data,
@@ -442,24 +501,88 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileRead
 {
     using Request = AsyncFileRead;
     using Value   = AsyncExecutionReadResult;
-    const FileDescriptor& file;
-    Span<char>            buffer;
-    ThreadPool&           pool;
-    uint64_t              offset;
-    Result                submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
-    static Value          value(Request::Result& result);
+    const FileDescriptor&         file;
+    Span<char>                    buffer;
+    AsyncExecutionFileReadOptions options;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
+    static Value value(Request::Result& result);
 };
 
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileWrite
 {
     using Request = AsyncFileWrite;
     using Value   = size_t;
-    const FileDescriptor& file;
-    Span<const char>      data;
-    ThreadPool&           pool;
-    uint64_t              offset;
-    Result                submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
-    static Value          value(Request::Result& result) { return result.completionData.numBytes; }
+    const FileDescriptor&          file;
+    Span<const char>               data;
+    AsyncExecutionFileWriteOptions options;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
+    static Value value(Request::Result& result) { return result.completionData.numBytes; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileWriteBuffers
+{
+    using Request = AsyncFileWrite;
+    using Value   = size_t;
+    const FileDescriptor&          file;
+    Span<Span<const char>>         data;
+    AsyncExecutionFileWriteOptions options;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
+    static Value value(Request::Result& result) { return result.completionData.numBytes; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileReadMany
+{
+    using Request = AsyncFileRead;
+    using Value   = AsyncExecutionReadResult;
+    const FileDescriptor&         file;
+    Span<char>                    buffer;
+    AsyncExecutionFileReadOptions options;
+    Value*                        progress    = nullptr;
+    bool                          requireFull = false;
+
+    size_t received  = 0;
+    bool   endOfFile = false;
+    Result initialization{true};
+
+    void   initialize();
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
+    Result advance(Request::Result& result);
+    Result advanceBytes(size_t count, bool ended);
+    bool   hasRemaining() const { return not endOfFile and received < buffer.sizeInBytes(); }
+    bool   completesImmediately() const { return initialization and buffer.empty(); }
+    Value  immediateValue() { return {{buffer.data(), 0}, false}; }
+    Value  value(Request::Result&) { return {{buffer.data(), received}, endOfFile}; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileWriteAll
+{
+    using Request = AsyncFileWrite;
+    using Value   = size_t;
+    const FileDescriptor&          file;
+    Span<const char>               data;
+    Span<Span<const char>>         buffers;
+    AsyncExecutionFileWriteOptions options;
+    size_t*                        progress     = nullptr;
+    bool                           singleBuffer = true;
+
+    size_t index       = 0;
+    size_t offset      = 0;
+    size_t transferred = 0;
+    Result initialization{true};
+
+    void   initialize();
+    Result remaining(Span<const char>& output) const;
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const;
+    Result advance(Request::Result& result);
+    Result advanceBytes(size_t count);
+    void   findNextBuffer();
+    bool  hasRemaining() const { return singleBuffer ? offset < data.sizeInBytes() : index < buffers.sizeInElements(); }
+    bool  completesImmediately() const { return initialization and not hasRemaining(); }
+    Value immediateValue() const { return transferred; }
+    Value value(Request::Result&) const { return transferred; }
 };
 
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionWork

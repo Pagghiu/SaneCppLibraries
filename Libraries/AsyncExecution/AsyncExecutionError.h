@@ -16,6 +16,9 @@ enum class AsyncExecutionError : uint32_t
     ReceiveLineBufferExhausted,
     EmptyReceiveBuffer,
     TransferSizeOverflow,
+    InvalidFileOffset,
+    UnexpectedEndOfFile,
+    FileReadNoProgress,
 };
 static constexpr ResultCategory AsyncExecutionResultCategory = ResultCategory(23);
 } // namespace SC

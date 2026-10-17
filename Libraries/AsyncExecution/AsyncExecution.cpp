@@ -12,6 +12,38 @@ namespace detail
 {
 static void* AsyncExecutionReallocate(void* memory, size_t bytes) noexcept { return ::realloc(memory, bytes); }
 static void  AsyncExecutionRelease(void* memory) noexcept { ::free(memory); }
+
+static constexpr uint64_t AsyncExecutionMaximumFileOffset = uint64_t(-1) >> 1;
+static constexpr size_t   AsyncExecutionFileChunk         = 16384;
+
+static Result AsyncExecutionValidateFileRange(const AsyncExecutionFileOptions& options, size_t bytes)
+{
+    if (options.useOffset and (options.offset > AsyncExecutionMaximumFileOffset or
+                               uint64_t(bytes) > AsyncExecutionMaximumFileOffset - options.offset))
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::InvalidFileOffset);
+    if (options.threadPoolMode == AsyncThreadPoolMode::ForceThreadPool and options.threadPool == nullptr)
+        return Result::Error(AsyncResultCategory, AsyncError::MissingThreadPool);
+    return Result(true);
+}
+
+static Result AsyncExecutionValidateSingleFileTransfer(size_t bytes)
+{
+    if (uint64_t(bytes) > uint64_t(uint32_t(-1)))
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
+    return Result(true);
+}
+
+template <typename Request>
+static Result AsyncExecutionPrepareFile(Request& request, AsyncTaskSequence& task,
+                                        const AsyncExecutionFileOptions& options, size_t transferred = 0)
+{
+    SC_TRY(AsyncExecutionValidateFileRange(options, transferred));
+    if (options.useOffset)
+        request.setOffset(options.offset + transferred);
+    if (options.threadPool)
+        SC_TRY(request.executeOn(task, *options.threadPool, options.threadPoolMode));
+    return Result(true);
+}
 } // namespace detail
 
 AsyncExecutionContext::AsyncExecutionContext(AsyncEventLoop& loop) : loop(loop) {}
@@ -389,16 +421,158 @@ Result detail::AsyncExecutionReceive::submit(Request& request, AsyncEventLoop& l
 
 Result detail::AsyncExecutionFileRead::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
 {
-    request.setOffset(offset);
-    SC_TRY(request.executeOn(task, pool));
+    SC_TRY(AsyncExecutionValidateSingleFileTransfer(buffer.sizeInBytes()));
+    SC_TRY(AsyncExecutionValidateFileRange(options, buffer.sizeInBytes()));
+    SC_TRY(AsyncExecutionPrepareFile(request, task, options));
     return request.start(loop, file, buffer);
 }
 
 Result detail::AsyncExecutionFileWrite::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
 {
-    request.setOffset(offset);
-    SC_TRY(request.executeOn(task, pool));
+    SC_TRY(AsyncExecutionValidateSingleFileTransfer(data.sizeInBytes()));
+    SC_TRY(AsyncExecutionValidateFileRange(options, data.sizeInBytes()));
+    SC_TRY(AsyncExecutionPrepareFile(request, task, options));
     return request.start(loop, file, data);
+}
+
+Result detail::AsyncExecutionFileWriteBuffers::submit(Request& request, AsyncEventLoop& loop,
+                                                      AsyncTaskSequence& task) const
+{
+    size_t first = 0, total = 0;
+    for (const auto& part : data)
+    {
+        if (part.sizeInBytes() > size_t(-1) - total)
+            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
+        total += part.sizeInBytes();
+    }
+    while (first < data.sizeInElements() and data[first].empty())
+        ++first;
+    if (first == data.sizeInElements())
+        return Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
+    SC_TRY(AsyncExecutionValidateSingleFileTransfer(total));
+    SC_TRY(AsyncExecutionValidateFileRange(options, total));
+    SC_TRY(AsyncExecutionPrepareFile(request, task, options));
+    Span<Span<const char>> remaining;
+    SC_TRY(data.sliceStart(first, remaining));
+    return request.start(loop, file, remaining);
+}
+
+void detail::AsyncExecutionFileReadMany::initialize()
+{
+    received  = 0;
+    endOfFile = false;
+    if (progress)
+        *progress = {};
+    initialization = buffer.empty() ? Result(true) : AsyncExecutionValidateFileRange(options, buffer.sizeInBytes());
+}
+
+Result detail::AsyncExecutionFileReadMany::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
+{
+    SC_TRY(initialization);
+    Span<char> remaining;
+    SC_TRY(buffer.sliceStart(received, remaining));
+    Span<char> chunk;
+    SC_TRY(remaining.sliceStartLength(
+        0, remaining.sizeInBytes() > AsyncExecutionFileChunk ? AsyncExecutionFileChunk : remaining.sizeInBytes(),
+        chunk));
+    SC_TRY(AsyncExecutionPrepareFile(request, task, options, received));
+    return request.start(loop, file, chunk);
+}
+
+Result detail::AsyncExecutionFileReadMany::advance(Request::Result& result)
+{
+    Span<char> chunk;
+    SC_TRY(result.get(chunk));
+    return advanceBytes(chunk.sizeInBytes(), result.isEnded());
+}
+
+Result detail::AsyncExecutionFileReadMany::advanceBytes(size_t count, bool ended)
+{
+    if (count > buffer.sizeInBytes() - received)
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    received += count;
+    endOfFile = ended;
+    if (progress)
+        *progress = {{buffer.data(), received}, endOfFile};
+    if (received < buffer.sizeInBytes())
+    {
+        if (ended and requireFull)
+            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::UnexpectedEndOfFile);
+        if (not ended and count == 0)
+            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::FileReadNoProgress);
+    }
+    return Result(true);
+}
+
+void detail::AsyncExecutionFileWriteAll::initialize()
+{
+    index = offset = transferred = 0;
+    if (progress)
+        *progress = 0;
+    size_t total   = singleBuffer ? data.sizeInBytes() : 0;
+    initialization = Result(true);
+    if (not singleBuffer)
+    {
+        for (const auto& part : buffers)
+        {
+            if (part.sizeInBytes() > size_t(-1) - total)
+            {
+                initialization = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
+                return;
+            }
+            total += part.sizeInBytes();
+        }
+        findNextBuffer();
+    }
+    if (total != 0)
+        initialization = AsyncExecutionValidateFileRange(options, total);
+}
+
+void detail::AsyncExecutionFileWriteAll::findNextBuffer()
+{
+    while (index < buffers.sizeInElements() and offset == buffers[index].sizeInBytes())
+    {
+        ++index;
+        offset = 0;
+    }
+}
+
+Result detail::AsyncExecutionFileWriteAll::remaining(Span<const char>& output) const
+{
+    if (not hasRemaining())
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    return Result((singleBuffer ? data : buffers[index]).sliceStart(offset, output));
+}
+
+Result detail::AsyncExecutionFileWriteAll::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
+{
+    SC_TRY(initialization);
+    Span<const char> rest, chunk;
+    SC_TRY(remaining(rest));
+    SC_TRY(rest.sliceStartLength(
+        0, rest.sizeInBytes() > AsyncExecutionFileChunk ? AsyncExecutionFileChunk : rest.sizeInBytes(), chunk));
+    SC_TRY(AsyncExecutionPrepareFile(request, task, options, transferred));
+    return request.start(loop, file, chunk);
+}
+
+Result detail::AsyncExecutionFileWriteAll::advance(Request::Result& result)
+{
+    return advanceBytes(result.completionData.numBytes);
+}
+
+Result detail::AsyncExecutionFileWriteAll::advanceBytes(size_t count)
+{
+    Span<const char> rest;
+    SC_TRY(remaining(rest));
+    if (count == 0 or count > rest.sizeInBytes())
+        return Result::Error(AsyncResultCategory, AsyncError::FileWriteIncomplete);
+    offset += count;
+    transferred += count;
+    if (progress)
+        *progress = transferred;
+    if (not singleBuffer)
+        findNextBuffer();
+    return Result(true);
 }
 
 Result detail::AsyncExecutionWork::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
@@ -682,11 +856,106 @@ AsyncExecutionSender<detail::AsyncExecutionReceive> AsyncExecutionContext::recei
     return AsyncExecutionSender<detail::AsyncExecutionReceive>{*this, {socket, buffer}};
 }
 
+AsyncExecutionSender<detail::AsyncExecutionFileRead> AsyncExecutionContext::fileRead(
+    const FileDescriptor& file, Span<char> buffer, AsyncExecutionFileReadOptions options)
+{
+    return {*this, {file, buffer, options}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileRead> AsyncExecutionContext::fileReadAt(
+    const FileDescriptor& file, uint64_t offset, Span<char> buffer, AsyncExecutionFileReadOptions options)
+{
+    options.useOffset = true;
+    options.offset    = offset;
+    return fileRead(file, buffer, options);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileReadMany> AsyncExecutionContext::fileReadExact(
+    const FileDescriptor& file, Span<char> buffer, AsyncExecutionFileReadOptions options,
+    AsyncExecutionReadResult* progress)
+{
+    return {*this, {file, buffer, options, progress, true}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileReadMany> AsyncExecutionContext::fileReadExactAt(
+    const FileDescriptor& file, uint64_t offset, Span<char> buffer, AsyncExecutionFileReadOptions options,
+    AsyncExecutionReadResult* progress)
+{
+    options.useOffset = true;
+    options.offset    = offset;
+    return fileReadExact(file, buffer, options, progress);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileReadMany> AsyncExecutionContext::fileReadUntilFullOrEOF(
+    const FileDescriptor& file, Span<char> buffer, AsyncExecutionFileReadOptions options,
+    AsyncExecutionReadResult* progress)
+{
+    return {*this, {file, buffer, options, progress, false}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWrite> AsyncExecutionContext::fileWrite(
+    const FileDescriptor& file, Span<const char> data, AsyncExecutionFileWriteOptions options)
+{
+    return {*this, {file, data, options}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWriteBuffers> AsyncExecutionContext::fileWrite(
+    const FileDescriptor& file, Span<Span<const char>> data, AsyncExecutionFileWriteOptions options)
+{
+    return {*this, {file, data, options}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWrite> AsyncExecutionContext::fileWriteAt(
+    const FileDescriptor& file, uint64_t offset, Span<const char> data, AsyncExecutionFileWriteOptions options)
+{
+    options.useOffset = true;
+    options.offset    = offset;
+    return fileWrite(file, data, options);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWriteBuffers> AsyncExecutionContext::fileWriteAt(
+    const FileDescriptor& file, uint64_t offset, Span<Span<const char>> data, AsyncExecutionFileWriteOptions options)
+{
+    options.useOffset = true;
+    options.offset    = offset;
+    return fileWrite(file, data, options);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> AsyncExecutionContext::fileWriteAll(
+    const FileDescriptor& file, Span<const char> data, AsyncExecutionFileWriteOptions options, size_t* progress)
+{
+    return {*this, {file, data, {}, options, progress, true}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> AsyncExecutionContext::fileWriteAll(
+    const FileDescriptor& file, Span<Span<const char>> data, AsyncExecutionFileWriteOptions options, size_t* progress)
+{
+    return {*this, {file, {}, data, options, progress, false}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> AsyncExecutionContext::fileWriteAllAt(
+    const FileDescriptor& file, uint64_t offset, Span<const char> data, AsyncExecutionFileWriteOptions options,
+    size_t* progress)
+{
+    options.useOffset = true;
+    options.offset    = offset;
+    return fileWriteAll(file, data, options, progress);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFileWriteAll> AsyncExecutionContext::fileWriteAllAt(
+    const FileDescriptor& file, uint64_t offset, Span<Span<const char>> data, AsyncExecutionFileWriteOptions options,
+    size_t* progress)
+{
+    options.useOffset = true;
+    options.offset    = offset;
+    return fileWriteAll(file, data, options, progress);
+}
+
 AsyncExecutionSender<detail::AsyncExecutionFileRead> AsyncExecutionContext::fileRead(const FileDescriptor& file,
                                                                                      Span<char>            buffer,
                                                                                      ThreadPool& pool, uint64_t offset)
 {
-    return AsyncExecutionSender<detail::AsyncExecutionFileRead>{*this, {file, buffer, pool, offset}};
+    return fileRead(file, buffer, AsyncExecutionFileReadOptions{&pool, offset, true});
 }
 
 AsyncExecutionSender<detail::AsyncExecutionFileWrite> AsyncExecutionContext::fileWrite(const FileDescriptor& file,
@@ -694,7 +963,7 @@ AsyncExecutionSender<detail::AsyncExecutionFileWrite> AsyncExecutionContext::fil
                                                                                        ThreadPool&           pool,
                                                                                        uint64_t              offset)
 {
-    return AsyncExecutionSender<detail::AsyncExecutionFileWrite>{*this, {file, data, pool, offset}};
+    return fileWrite(file, data, AsyncExecutionFileWriteOptions{&pool, offset, true});
 }
 
 AsyncExecutionSender<detail::AsyncExecutionWork> AsyncExecutionContext::work(ThreadPool&        pool,

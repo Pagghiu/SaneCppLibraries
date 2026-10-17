@@ -33,9 +33,27 @@ getScheduler returns the event-loop scheduler. getPoolScheduler returns a worker
 
 Create an AsyncExecutionContext with an existing loop, call context.create(), then context.close() before closing the loop. Its counted dispatcher keeps run alive; a terminal receiver normally interrupts the loop. Each immovable operation owns its native request inline. Borrowed buffers, descriptors and pools must outlive completion.
 
-Factories include sleep, accept/connect, send/sendAll (contiguous or scatter/gather), receive/receiveExact/receiveLine, fileRead, fileWrite and work. The one-shot send/read/write operations may transfer partial data; sendAll retries. read results contain a span and an EOF flag. The low-level file senders prefer native Async I/O where available and take an explicit fallback pool.
+Factories include sleep, accept/connect, send/sendAll (contiguous or scatter/gather), receive/receiveExact/receiveLine, borrowed file read/write helpers and work. The one-shot send/read/write operations may transfer partial data; complete-transfer helpers retry. Read results contain a span and an EOF flag. Borrowed file senders accept optional native-preferred or forced-pool options.
 
 Cross-thread start posts to the owner dispatcher. Stop callbacks request owner-thread cancellation of pending native operations; terminal stopped notification waits for quiescence. Active worker functions cannot be preempted; cancellation waits for actual completion. Original operation errors retain their identity. A terminal notification may destroy operation storage. Context/runtime lifetime must extend past all producers and operation completions.
+
+## Borrowed file operations
+
+`fileRead(file, buffer, options)` emits `AsyncExecutionReadResult`; `fileWrite(file, data, options)` emits a byte count and accepts contiguous or scatter/gather input. They preserve native completion counts and errors. `AsyncExecutionFileOptions` (also named `AsyncExecutionFileReadOptions` and `AsyncExecutionFileWriteOptions`) contains an optional borrowed threadPool, offset/useOffset, and threadPoolMode. NativePreferred uses the backend's native file support when available; ForceThreadPool requires a pool. Pipes normally use no pool and no offset, with nonblocking descriptors associated with the loop.
+
+`fileReadAt` and `fileWriteAt` select absolute offsets. Default options delegate addressing to the native request, as Await/Fibers do: this does not promise a shared portable descriptor cursor. Use explicit ranges for portable independent regular-file operations. Legacy calls taking a pool and optional offset retain absolute-offset semantics (default zero).
+
+`fileReadExact` fills the span or emits UnexpectedEndOfFile on early EOF; `fileReadUntilFullOrEOF` instead succeeds with the partial span and endOfFile. Both reject successful zero progress without EOF. `fileWriteAll` consumes all scalar/vector data, skipping empty entries and retrying actual completed bytes. Complete transfers use chunks of at most 16 KiB and advance explicit offsets by observed bytes. At-style exact-read and complete-write forms are available. Empty complete transfers succeed without I/O; one-shot requests retain Async's EmptyBuffer behavior.
+
+One-shot transfer sizes are bounded to 32 bits. Explicit ranges must fit the signed 64-bit file-offset domain. Optional progress storage reports completed chunks before error/stopped and stays borrowed until terminal completion. File descriptors, pools, payloads and vector metadata remain live and unchanged by the caller until quiescence. Cancellation of active pool I/O waits for the worker; it cannot undo I/O side effects.
+
+```cpp
+SC::AsyncExecutionFileOptions options{&pool};
+SC::AsyncExecutionReadResult read;
+SC_TRY(context.runInto(
+    context.fileReadExactAt(file, 128, buffer, options), read));
+// read.data aliases buffer and contains its full requested range.
+```
 
 ## Standard composition and returned values
 
@@ -161,9 +179,9 @@ The following matrix describes implemented APIs and keeps remaining gaps explici
 | Scatter/gather send | AsyncSocketSend buffer spans | Missing | send / sendAll overloads | send / sendAll overloads; metadata and payloads remain borrowed |
 | Exact / line receive | Repeat AsyncSocketReceive | Missing | receiveExact / receiveLine | receiveExact / receiveLine, optional progress on error/stopped |
 | UDP datagrams | AsyncSocketSendTo / ReceiveFrom | sendTo / receiveFrom, IP addresses | sendTo / receiveFrom, IP/general addresses | Missing |
-| One-shot file read | AsyncFileRead | fileRead / fileReadAt | fileRead with options | fileRead; explicit pool, absolute offset default 0 |
-| Fill read buffer | Repeat AsyncFileRead | fileReadExact / fileReadExactAt | fileReadUntilFullOrEOF | Missing |
-| File write | AsyncFileWrite | fileWrite[At], fileWriteAll[At] | fileWrite, optional options/output and buffer spans | fileWrite; explicit pool, absolute offset default 0 |
+| One-shot file read | AsyncFileRead | fileRead / fileReadAt | fileRead with options | fileRead / fileReadAt; optional pool/offset options; legacy pool overload keeps absolute default 0 |
+| Fill read buffer | Repeat AsyncFileRead | fileReadExact / fileReadExactAt | fileReadUntilFullOrEOF | fileReadExact[At] / fileReadUntilFullOrEOF, distinct early-EOF contracts |
+| File write | AsyncFileWrite | fileWrite[At], fileWriteAll[At] | fileWrite, optional options/output and buffer spans | fileWrite[At] / fileWriteAll[At], scalar/vector, optional progress |
 | File-to-socket transfer | AsyncFileSend | fileSend | fileSend | Missing |
 | File readiness | AsyncFileReadiness | filePoll | filePoll | Missing |
 | Process / signal | AsyncProcessExit / AsyncSignal | processExit / signal | processExit / signal | Missing |
@@ -180,7 +198,7 @@ Important existing differences must be retained until an explicit compatibility 
 
 - Fibers fileReadExact reports UnexpectedEndOfFile if the buffer cannot be filled. Await fileReadUntilFullOrEOF succeeds with a shorter span and endOfFile. These are different operations, not aliases.
 - Await receiveExact errors on disconnect before the requested count and on zero progress. receiveLine returns lineComplete and disconnect state separately. Fibers currently has neither helper.
-- AsyncExecution's current file factories always set an absolute offset (default zero) and take an explicit pool. Await options distinguish current position from an explicit offset with useOffset and allow a fallback pool; Fibers uses At-suffixed methods for explicit offsets. Evolution must not silently map default zero to current position.
+- AsyncExecution's legacy explicit-pool overloads retain absolute-offset default zero. New options and At-style methods expose the same explicit-offset choice as Await/Fibers. Default addressing delegates to the native request; it adds no shared portable descriptor-cursor guarantee.
 - Current Fibers fileWriteAll[At] delegates to the same implementation as fileWrite[At]. A stronger complete-transfer contract needs independent verification; the name alone is insufficient evidence.
 - Await and Fibers map cancellation into their own Result categories. Await cancellation helpers set the cancelled result before stopping a request and resume after its stop callback; Fibers waitForOperation stops/quiesces the request and then returns its cancellation result. Those active-cancellation paths favor cancellation, while an already completed operation is not retroactively rewritten. Cross-adapter cancellation/error race tests are still needed before claiming fully equivalent precedence. AsyncExecution observes stop before submission, waits for running pool work to finish, and preserves operation errors over stop on failed completion. Cross-layer cancellation precedence remains an explicit comparison point rather than a claim of identical implementation.
 
@@ -266,3 +284,8 @@ The demo creates two input files, starts two loopback fixture peers and joins th
 The M1–M4 evolution passed dedicated tests in Debug/Release on macOS arm64, Linux arm64 and Windows x64/MSVC using the pinned external stdexec provider. The final macOS/Windows dedicated suites passed 780 assertions per configuration; Linux counts varied with polling. Default SCTest Debug/Release, Base64 TCP success/failure demonstrations, and the four-style echo normal/forced-stall runs passed on all three platforms. Opt-in BuildTest was excluded.
 
 Regenerated amalgamation and all single-file Release builds passed. Enabled-provider separate-consumer/implementation linking and enabled/disabled SC.cpp compilation passed; these are compile/link checks. No native standard-library sender conformance, forced Linux backend matrix or Windows IDE export success is claimed. Broader file/UDP/process/signal/readiness/filesystem and structured-scope evolution remains separate work.
+
+
+## Borrowed file step validation (2026-10-18)
+
+Optional file options, explicit ranges, exact/fill EOF behavior, complete vector/chunk writes and native pipe cancellation passed dedicated Debug/Release tests on macOS and Windows (851 assertions each) and Linux (875/3038, including variable polling assertions). Default SCTest suites passed in both configurations on all three platforms. The associated Windows backend correction has independent callback-layer coverage for append contents, explicit vector offsets, empty entries, reuse and terminal callback counts; its final focused tests passed both configurations everywhere. Amalgamation, all single-file Release builds, enabled-provider separate-consumer linking, enabled/disabled SC.cpp compilation and dependency/category checks passed. BuildTest remains excluded; this is the borrowed read/write step, not validation of the remaining fileSend/UDP/filesystem/scope roadmap.

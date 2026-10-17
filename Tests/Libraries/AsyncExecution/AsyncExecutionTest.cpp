@@ -12,6 +12,10 @@
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
+#ifdef SC_ASYNC_EXECUTION_TRACE_FILE_IO
+#include <stdio.h>
+#include <stdlib.h>
+#endif
 
 namespace SC
 {
@@ -90,6 +94,10 @@ struct AsyncExecutionTest : TestCase
         static_assert(ex::operation_state<Operation>);
         static_assert(not std::is_move_constructible_v<Operation>);
 
+        if (test_section("borrowed file ranges and complete transfers"))
+            fileRanges();
+        if (test_section("native pipe file transfers"))
+            filePipes();
         if (test_section("borrowed TCP accept connect and scatter transfers"))
             borrowedTCP();
         if (test_section("TCP exact and line receive boundaries"))
@@ -165,6 +173,191 @@ struct AsyncExecutionTest : TestCase
         auto connect =
             generalAddress ? context.connect(client, SocketAddress(address)) : context.connect(client, address);
         return consumeBounded(context, ex::when_all(context.accept(listener), move(connect)), accepted);
+    }
+
+    void fileRanges()
+    {
+        AsyncEventLoop loop;
+        ThreadPool     pool;
+        SC_TEST_EXPECT(loop.create());
+        SC_TEST_EXPECT(pool.create(1));
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        StringPath path;
+        SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionRanges.txt"}));
+        FileDescriptor file;
+        SC_TEST_EXPECT(file.open(path.view(), FileOpen::WriteRead));
+        SC_TEST_EXPECT(file.write(StringView("......").toCharSpan()));
+        AsyncExecutionFileOptions options{&pool};
+        size_t                    written = 0;
+        SC_TEST_EXPECT(
+            consumeBounded(context, context.fileWriteAt(file, 1, StringView("AB").toCharSpan(), options), written));
+        SC_TEST_EXPECT(written == 2);
+        Span<const char> parts[] = {{}, StringView("C").toCharSpan(), {}, StringView("DE").toCharSpan(), {}};
+        SC_TEST_EXPECT(consumeBounded(context, context.fileWriteAt(file, 3, parts, options), written));
+        SC_TEST_EXPECT(written == 3 and parts[1].sizeInBytes() == 1 and parts[3].sizeInBytes() == 2);
+        char                     small[6] = {};
+        AsyncExecutionReadResult result;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadExactAt(file, 0, small, options), result));
+        SC_TEST_EXPECT(result.data.sizeInBytes() == 6 and memcmp(small, ".ABCDE", 6) == 0);
+        char                     extra[8] = {};
+        AsyncExecutionReadResult progress;
+        options.useOffset = true;
+        options.offset    = 2;
+        SC_TEST_EXPECT(
+            consumeBounded(context, context.fileReadUntilFullOrEOF(file, extra, options, &progress), result));
+        SC_TEST_EXPECT(result.data.sizeInBytes() == 4 and result.endOfFile and progress.endOfFile);
+        SC_TEST_EXPECT(memcmp(extra, "BCDE", 4) == 0);
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadExact(file, extra, options, &progress), result)
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::UnexpectedEndOfFile));
+        SC_TEST_EXPECT(progress.data.sizeInBytes() == 4 and progress.endOfFile);
+        AsyncExecutionBuffer source, reply;
+        SC_TEST_EXPECT(source.resize(35000));
+        SC_TEST_EXPECT(reply.resize(35000));
+        for (size_t index = 0; index < source.size(); ++index)
+            source.bytes()[index] = static_cast<char>('A' + index % 23);
+        const auto       bytes        = source.bytes();
+        Span<const char> largeParts[] = {{bytes.data(), 18000}, {}, {bytes.data() + 18000, 17000}};
+        size_t           transferred  = 99;
+        auto             write        = context.fileWriteAllAt(file, 0, largeParts, options, &transferred);
+        SC_TEST_EXPECT(transferred == 99);
+        SC_TEST_EXPECT(consumeBounded(context, move(write), written));
+        SC_TEST_EXPECT(written == 35000 and transferred == 35000);
+        SC_TEST_EXPECT(largeParts[0].sizeInBytes() == 18000 and largeParts[2].sizeInBytes() == 17000);
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadExactAt(file, 0, reply.bytes(), options), result));
+        SC_TEST_EXPECT(result.data.sizeInBytes() == 35000 and
+                       memcmp(source.bytes().data(), reply.bytes().data(), 35000) == 0);
+        SC_TEST_EXPECT(consumeBounded(
+            context, context.fileWriteAllAt(file, 35000, StringView("!").toCharSpan(), options), written));
+        char last[1];
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadAt(file, 35000, last, options), result));
+        SC_TEST_EXPECT(last[0] == '!' and written == 1);
+        // Legacy calls remain absolute-offset, native-preferred operations.
+        SC_TEST_EXPECT(consumeBounded(context, context.fileWrite(file, StringView("L").toCharSpan(), pool), written));
+        SC_TEST_EXPECT(consumeBounded(context, context.fileRead(file, last, pool), result));
+        SC_TEST_EXPECT(last[0] == 'L');
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadAt(file, uint64_t(-1), last, options))
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::InvalidFileOffset));
+        AsyncExecutionFileOptions missingPool;
+        missingPool.threadPoolMode = AsyncThreadPoolMode::ForceThreadPool;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileRead(file, last, missingPool))
+                           .isError(AsyncResultCategory, AsyncError::MissingThreadPool));
+        FileDescriptor invalid;
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadExact(invalid, Span<char>{}), result));
+        SC_TEST_EXPECT(result.data.empty() and not result.endOfFile);
+        SC_TEST_EXPECT(consumeBounded(context, context.fileWriteAll(invalid, Span<const char>{}), written));
+        SC_TEST_EXPECT(written == 0);
+        SC_TEST_EXPECT(consumeBounded(context, context.fileRead(invalid, last))
+                           .isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+        SC_TEST_EXPECT(consumeBounded(context, context.fileWrite(invalid, StringView("x").toCharSpan()))
+                           .isError(AsyncResultCategory, AsyncError::InvalidFileHandle));
+        if constexpr (sizeof(size_t) > sizeof(uint32_t))
+        {
+            Span<const char> oversized{last, size_t(uint64_t(1) << 32)};
+            SC_TEST_EXPECT(consumeBounded(context, context.fileWrite(file, oversized, options))
+                               .isError(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow));
+        }
+        detail::AsyncExecutionFileReadMany exact{invalid, extra, {}, &progress, true};
+        exact.initialize();
+        SC_TEST_EXPECT(exact.advanceBytes(0, false).isError(AsyncExecutionResultCategory,
+                                                            AsyncExecutionError::FileReadNoProgress));
+        SC_TEST_EXPECT(exact.advanceBytes(2, true).isError(AsyncExecutionResultCategory,
+                                                           AsyncExecutionError::UnexpectedEndOfFile));
+        SC_TEST_EXPECT(progress.data.sizeInBytes() == 2 and progress.endOfFile);
+        size_t                             partial = 0;
+        detail::AsyncExecutionFileWriteAll cursor{invalid, StringView("abcd").toCharSpan(), {}, {}, &partial, true};
+        cursor.initialize();
+        SC_TEST_EXPECT(cursor.advanceBytes(1));
+        SC_TEST_EXPECT(cursor.advanceBytes(0).isError(AsyncResultCategory, AsyncError::FileWriteIncomplete));
+        SC_TEST_EXPECT(cursor.advanceBytes(4).isError(AsyncResultCategory, AsyncError::FileWriteIncomplete));
+        SC_TEST_EXPECT(cursor.advanceBytes(3));
+        SC_TEST_EXPECT(partial == 4 and not cursor.hasRemaining());
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(file.close());
+        SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+        SC_TEST_EXPECT(pool.destroy());
+    }
+
+    void filePipes()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+#ifdef SC_ASYNC_EXECUTION_TRACE_FILE_IO
+        Atomic<bool> traceFinished = false;
+        Thread       traceGuard;
+        SC_TEST_EXPECT(traceGuard.start(
+            [&traceFinished](Thread&)
+            {
+                for (int i = 0; i < 800 and not traceFinished.load(); ++i)
+                    Thread::Sleep(10);
+                if (not traceFinished.load())
+                {
+                    printf("independent native-pipe trace deadline reached\n");
+                    fflush(stdout);
+                    ::_Exit(124);
+                }
+            }));
+        AsyncEventLoopListeners traceListeners;
+        traceListeners.beforeBlockingPoll = [](AsyncEventLoop&)
+        {
+            static int count = 0;
+            if (count++ < 12)
+            {
+                printf("pipe trace: before poll\n");
+                fflush(stdout);
+            }
+        };
+        traceListeners.afterBlockingPoll = [](AsyncEventLoop&)
+        {
+            static int count = 0;
+            if (count++ < 12)
+            {
+                printf("pipe trace: after poll\n");
+                fflush(stdout);
+            }
+        };
+        loop.setListeners(&traceListeners);
+#endif
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        PipeDescriptor pipe;
+        PipeOptions    options;
+        options.blocking = false;
+        SC_TEST_EXPECT(pipe.createPipe(options));
+        SC_TEST_EXPECT(loop.associateExternallyCreatedFileDescriptor(pipe.readPipe));
+        SC_TEST_EXPECT(loop.associateExternallyCreatedFileDescriptor(pipe.writePipe));
+        Span<const char>         parts[]   = {{}, StringView("pi").toCharSpan(), {}, StringView("pe").toCharSpan(), {}};
+        char                     buffer[4] = {};
+        size_t                   written   = 0;
+        AsyncExecutionReadResult read;
+        SC_TEST_EXPECT(consumeBounded(
+            context,
+            ex::when_all(context.fileWrite(pipe.writePipe, parts), context.fileReadExact(pipe.readPipe, buffer)),
+            written, read));
+        SC_TEST_EXPECT(written == 4 and read.data.sizeInBytes() == 4 and memcmp(buffer, "pipe", 4) == 0);
+        ExecutionOutcome outcome;
+        outcome.loop = &loop;
+        ExecutionStopSource stop;
+        auto                operation =
+            ex::connect(context.fileReadExact(pipe.readPipe, buffer), ExecutionReceiver{outcome, stop.get_token()});
+        ex::start(operation);
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(not operation.request.usesThreadPool() and not operation.request.isFree());
+        Thread canceller;
+        SC_TEST_EXPECT(canceller.start([&](Thread&) { stop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(outcome.stopped == 1 and outcome.values == 0 and operation.request.isFree());
+        SC_TEST_EXPECT(pipe.close());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+#ifdef SC_ASYNC_EXECUTION_TRACE_FILE_IO
+        traceFinished.store(true);
+        SC_TEST_EXPECT(traceGuard.join());
+#endif
     }
 
     void borrowedTCP()
