@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Async/Async.cpp"
+#include "Libraries/AsyncExecution/AsyncExecution.cpp"
 #include "Libraries/AsyncFibers/AsyncFibers.cpp"
 #include "Libraries/AsyncStreams/AsyncStreams.cpp"
 #include "Libraries/Containers/Containers.cpp"

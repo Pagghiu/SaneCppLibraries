@@ -19,6 +19,25 @@
             "Threading"
         ]
     },
+    "AsyncExecution": {
+        "direct_dependencies": [
+            "Async",
+            "Strings",
+            "Threading"
+        ],
+        "minimal_dependencies": [
+            "Async",
+            "Strings"
+        ],
+        "all_dependencies": [
+            "Async",
+            "Strings",
+            "File",
+            "FileSystem",
+            "Socket",
+            "Threading"
+        ]
+    },
     "AsyncFibers": {
         "direct_dependencies": [
             "Async",
