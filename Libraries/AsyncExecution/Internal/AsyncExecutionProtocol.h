@@ -31,3 +31,8 @@ namespace AsyncExecutionProtocol = std::execution;
 #ifndef SC_ASYNC_EXECUTION_AVAILABLE
 #define SC_ASYNC_EXECUTION_AVAILABLE 0
 #endif
+
+#if SC_ASYNC_EXECUTION_AVAILABLE
+#include <type_traits>
+#include <utility>
+#endif

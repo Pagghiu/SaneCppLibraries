@@ -40,7 +40,8 @@ Result AsyncExecutionContext::close()
 {
     if (not accepting.load())
         return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
-    if (Thread::CurrentThreadID() != ownerThread or dispatching or delivering.load() != 0 or outstanding.load() != 0)
+    if (Thread::CurrentThreadID() != ownerThread or running or dispatching or delivering.load() != 0 or
+        outstanding.load() != 0)
         return Result::Error(AsyncResultCategory, AsyncError::ActiveRequestsRemain);
     // Callers must stop submitting and join producer threads before closing the context.
     accepting.store(false);
@@ -131,9 +132,7 @@ Result detail::AsyncExecutionPoolTicket::submit(AsyncExecutionContext& context, 
     struct Ticket
     {
         ThreadPoolTask         task;
-        AsyncExecutionCommand  cleanup;
         AsyncExecutionContext* context;
-        ThreadPool*            pool;
         void*                  operation;
         Notify                 notify;
     };
@@ -145,22 +144,18 @@ Result detail::AsyncExecutionPoolTicket::submit(AsyncExecutionContext& context, 
     ticket->operation         = operation;
     ticket->notify            = notify;
     ticket->context           = &context;
-    ticket->pool              = &pool;
-    ticket->cleanup.operation = ticket;
-    ticket->cleanup.execute   = [](AsyncExecutionCommand& command) noexcept
+    ticket->task.function     = []() {};
+    ticket->task.afterRelease = [ticket]()
     {
-        auto* ticket = static_cast<Ticket*>(command.operation);
-        // ThreadPool accesses its Task after the callback returns. Reclaim only after that access finishes.
-        SC_ASYNC_TRUST_RESULT(ticket->pool->waitForTask(ticket->task));
-        ticket->context->outstanding.fetch_sub(1);
+        // The pool no longer accesses the task node. Reclaim before receiver delivery, which may destroy its
+        // operation or close the context. The pool itself remains alive through this notification's return.
+        auto*      context   = ticket->context;
+        auto*      operation = ticket->operation;
+        const auto notify    = ticket->notify;
         ticket->~Ticket();
         AsyncExecutionRelease(ticket);
-    };
-    ticket->task.function = [ticket]()
-    {
-        // Queue reclamation first: run() cannot observe terminal completion before this ticket is joined.
-        SC_ASYNC_TRUST_RESULT(ticket->context->post(ticket->cleanup));
-        ticket->notify(ticket->operation);
+        context->outstanding.fetch_sub(1);
+        notify(operation);
     };
     context.outstanding.fetch_add(1);
     const Result queued = pool.queueTask(ticket->task);
@@ -176,6 +171,202 @@ Result detail::AsyncExecutionPoolTicket::submit(AsyncExecutionContext& context, 
 Result detail::AsyncExecutionTimer::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
 {
     return request.start(loop, duration);
+}
+
+Result detail::AsyncExecutionAccept::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    return request.start(loop, listener);
+}
+
+Result detail::AsyncExecutionAccept::advance(Request::Result& result)
+{
+    SC_TRY(result.moveTo(client));
+    return client.setBlocking(false);
+}
+
+detail::AsyncExecutionAccept::Value detail::AsyncExecutionAccept::value(Request::Result&)
+{
+    return Value(move(client));
+}
+
+Result detail::AsyncExecutionConnect::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    return request.start(loop, socket, address);
+}
+
+Result detail::AsyncExecutionSendBuffers::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    size_t first = 0;
+    while (first < data.sizeInElements() and data[first].empty())
+        ++first;
+    if (first == data.sizeInElements())
+        return Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
+    Span<Span<const char>> remaining;
+    SC_TRY(data.sliceStart(first, remaining));
+    return request.start(loop, socket, remaining);
+}
+
+void detail::AsyncExecutionSendAllBuffers::initialize()
+{
+    index = offset = transferred = 0;
+    initialization               = Result(true);
+    if (progress)
+        *progress = 0;
+    size_t total = 0;
+    for (const auto& part : data)
+    {
+        if (part.sizeInBytes() > size_t(-1) - total)
+        {
+            initialization = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
+            return;
+        }
+        total += part.sizeInBytes();
+    }
+    findNextBuffer();
+}
+
+void detail::AsyncExecutionSendAllBuffers::findNextBuffer()
+{
+    while (index < data.sizeInElements() and offset == data[index].sizeInBytes())
+    {
+        ++index;
+        offset = 0;
+    }
+}
+
+Result detail::AsyncExecutionSendAllBuffers::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    SC_TRY(initialization);
+    Span<const char> remaining;
+    SC_TRY(data[index].sliceStart(offset, remaining));
+    Span<const char> chunk;
+    SC_TRY(remaining.sliceStartLength(0, remaining.sizeInBytes() > 16384 ? 16384 : remaining.sizeInBytes(), chunk));
+    return request.start(loop, socket, chunk);
+}
+
+Result detail::AsyncExecutionSendAllBuffers::advance(Request::Result& result)
+{
+    return advanceBytes(result.completionData.numBytes);
+}
+
+Result detail::AsyncExecutionSendAllBuffers::advanceBytes(size_t count)
+{
+    if (index >= data.sizeInElements())
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    if (count == 0 or count > data[index].sizeInBytes() - offset)
+        return Result::Error(AsyncResultCategory, AsyncError::SocketSendIncomplete);
+    offset += count;
+    transferred += count; // initialize() verified the total size before any I/O.
+    if (progress)
+        *progress = transferred;
+    findNextBuffer();
+    return Result(true);
+}
+
+void detail::AsyncExecutionReceiveExact::initialize()
+{
+    received     = 0;
+    disconnected = false;
+    if (progress)
+        *progress = {};
+}
+
+Result detail::AsyncExecutionReceiveExact::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    Span<char> remaining;
+    SC_TRY(buffer.sliceStart(received, remaining));
+    return request.start(loop, socket, remaining);
+}
+
+Result detail::AsyncExecutionReceiveExact::advance(Request::Result& result)
+{
+    Span<char> chunk;
+    SC_TRY(result.get(chunk));
+    return advanceBytes(chunk.sizeInBytes(), result.isEnded());
+}
+
+Result detail::AsyncExecutionReceiveExact::advanceBytes(size_t count, bool ended)
+{
+    if (count > buffer.sizeInBytes() - received)
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    received += count;
+    disconnected = ended;
+    if (progress)
+        *progress = {{buffer.data(), received}, disconnected};
+    if (hasRemaining())
+    {
+        if (ended)
+            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::SocketReceiveIncomplete);
+        if (count == 0)
+            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::SocketReceiveNoProgress);
+    }
+    return Result(true);
+}
+
+void detail::AsyncExecutionReceiveLine::initialize()
+{
+    received     = 0;
+    disconnected = lineComplete = false;
+    if (progress)
+        *progress = {};
+}
+
+Result detail::AsyncExecutionReceiveLine::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&)
+{
+    if (buffer.empty())
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::EmptyReceiveBuffer);
+    return request.start(loop, socket, {&currentByte, 1});
+}
+
+Result detail::AsyncExecutionReceiveLine::advance(Request::Result& result)
+{
+    Span<char> chunk;
+    SC_TRY(result.get(chunk));
+    return advanceByte(chunk.sizeInBytes(), result.isEnded());
+}
+
+Result detail::AsyncExecutionReceiveLine::advanceByte(size_t count, bool ended)
+{
+    if (count > 1)
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    disconnected = ended;
+    if (ended)
+    {
+        updateProgress();
+        return Result(true);
+    }
+    if (count == 0)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::SocketReceiveNoProgress);
+    if (currentByte == '\n')
+        lineComplete = true;
+    else if (received == buffer.sizeInBytes())
+    {
+        updateProgress();
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ReceiveLineBufferExhausted);
+    }
+    else
+        buffer[received++] = currentByte;
+    updateProgress();
+    return Result(true);
+}
+
+detail::AsyncExecutionReceiveLine::Value detail::AsyncExecutionReceiveLine::currentValue()
+{
+    size_t count = received;
+    if (lineComplete and count > 0 and buffer[count - 1] == '\r')
+        --count;
+    return {{buffer.data(), count}, disconnected, lineComplete};
+}
+
+detail::AsyncExecutionReceiveLine::Value detail::AsyncExecutionReceiveLine::value(Request::Result&)
+{
+    return currentValue();
+}
+
+void detail::AsyncExecutionReceiveLine::updateProgress()
+{
+    if (progress)
+        *progress = currentValue();
 }
 
 Result detail::AsyncExecutionSend::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
@@ -284,10 +475,18 @@ Result detail::AsyncExecutionOwnedSend::submit(Request& request, AsyncEventLoop&
 
 Result detail::AsyncExecutionSendAll::advance(Request::Result& result)
 {
-    const size_t count = result.completionData.numBytes;
+    return advanceBytes(result.completionData.numBytes);
+}
+
+Result detail::AsyncExecutionSendAll::advanceBytes(size_t count)
+{
     if (count == 0 or count > remaining.sizeInBytes())
         return Result::Error(AsyncResultCategory, AsyncError::SocketSendIncomplete);
+    if (count > size_t(-1) - transferred)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
     transferred += count;
+    if (progress)
+        *progress = transferred;
     return Result(remaining.sliceStartLength(count, remaining.sizeInBytes() - count, remaining));
 }
 
@@ -303,6 +502,17 @@ detail::AsyncExecutionFileRead::Value detail::AsyncExecutionFileRead::value(Requ
     Span<char> data;
     (void)result.get(data);
     return {data, result.isEnded()};
+}
+
+AsyncExecutionConnection& AsyncExecutionConnection::operator=(AsyncExecutionConnection&& other) noexcept
+{
+    if (this != &other)
+    {
+        // Retire the previous descriptor with normal RAII close semantics; transfer into an empty destination.
+        SocketDescriptor previous(move(socket));
+        socket = move(other.socket);
+    }
+    return *this;
 }
 
 AsyncExecutionBuffer::AsyncExecutionBuffer(AsyncExecutionBuffer&& other) noexcept { *this = move(other); }
@@ -352,7 +562,7 @@ AsyncExecution::~AsyncExecution()
 {
     if (initialized)
     {
-        SC_ASYNC_ASSERT_RELEASE(not running);
+        SC_ASYNC_ASSERT_RELEASE(not context.running);
         SC_ASYNC_TRUST_RESULT(context.close());
         SC_ASYNC_TRUST_RESULT(loop.close());
         SC_ASYNC_TRUST_RESULT(pool.destroy());
@@ -382,7 +592,7 @@ Result AsyncExecution::create(size_t workers)
     return Result(true);
 }
 
-void AsyncExecution::RunState::finishOnLoop(Result result) noexcept
+void AsyncExecutionContext::RunState::finishOnLoop(Result result) noexcept
 {
     status    = result;
     completed = true;
@@ -390,7 +600,7 @@ void AsyncExecution::RunState::finishOnLoop(Result result) noexcept
         context.loop.interrupt();
 }
 
-void AsyncExecution::RunState::finish(Result result) noexcept
+void AsyncExecutionContext::RunState::finish(Result result) noexcept
 {
     if (Thread::CurrentThreadID() == context.ownerThread)
         finishOnLoop(result);
@@ -407,6 +617,47 @@ void AsyncExecution::RunState::finish(Result result) noexcept
     }
 }
 
+AsyncExecutionSender<detail::AsyncExecutionAccept> AsyncExecutionContext::accept(const SocketDescriptor& listener)
+{
+    return {*this, {listener, {}}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionConnect> AsyncExecutionContext::connect(const SocketDescriptor& socket,
+                                                                                   SocketIPAddress         address)
+{
+    return connect(socket, SocketAddress(address));
+}
+
+AsyncExecutionSender<detail::AsyncExecutionConnect> AsyncExecutionContext::connect(const SocketDescriptor& socket,
+                                                                                   SocketAddress           address)
+{
+    return {*this, {socket, address}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSendBuffers> AsyncExecutionContext::send(const SocketDescriptor& socket,
+                                                                                    Span<Span<const char>>  data)
+{
+    return {*this, {socket, data}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSendAllBuffers> AsyncExecutionContext::sendAll(
+    const SocketDescriptor& socket, Span<Span<const char>> data, size_t* progress)
+{
+    return {*this, {socket, data, progress}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionReceiveExact> AsyncExecutionContext::receiveExact(
+    const SocketDescriptor& socket, Span<char> buffer, AsyncExecutionReadResult* progress)
+{
+    return {*this, {socket, buffer, progress}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionReceiveLine> AsyncExecutionContext::receiveLine(
+    const SocketDescriptor& socket, Span<char> buffer, AsyncExecutionLineResult* progress)
+{
+    return {*this, {socket, buffer, progress}};
+}
+
 AsyncExecutionSender<detail::AsyncExecutionTimer> AsyncExecutionContext::sleep(TimeMs duration)
 {
     return AsyncExecutionSender<detail::AsyncExecutionTimer>{*this, {duration}};
@@ -419,9 +670,10 @@ AsyncExecutionSender<detail::AsyncExecutionSend> AsyncExecutionContext::send(con
 }
 
 AsyncExecutionSender<detail::AsyncExecutionSendAll> AsyncExecutionContext::sendAll(const SocketDescriptor& socket,
-                                                                                   Span<const char>        data)
+                                                                                   Span<const char>        data,
+                                                                                   size_t*                 progress)
 {
-    return AsyncExecutionSender<detail::AsyncExecutionSendAll>{*this, {socket, data}};
+    return AsyncExecutionSender<detail::AsyncExecutionSendAll>{*this, {socket, data, 0, progress}};
 }
 
 AsyncExecutionSender<detail::AsyncExecutionReceive> AsyncExecutionContext::receive(const SocketDescriptor& socket,
@@ -508,21 +760,23 @@ detail::AsyncExecutionTCPSender AsyncExecution::sendTCP(StringSpan host, uint16_
     return sendTCP(host, port, move(encoded.data), encoded.status);
 }
 
-Result AsyncExecution::beginRun()
+Result AsyncExecutionContext::beginRun()
 {
-    if (not initialized)
+    if (not accepting.load())
         return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
-    if (running)
+    if (Thread::CurrentThreadID() != ownerThread)
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    if (running or dispatching or delivering.load() != 0)
         return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::AlreadyRunning);
     running = true;
 
     return Result(true);
 }
 
-Result AsyncExecution::finishRun(RunState& state)
+Result AsyncExecutionContext::finishRun(RunState& state)
 {
     // SC sender completions occur on the owner thread. Synchronous external senders can finish in start().
-    if (not state.completed)
+    while (not state.completed)
     {
         state.driving = true;
         // A failed dispatcher cannot safely release arbitrary connected operation storage.

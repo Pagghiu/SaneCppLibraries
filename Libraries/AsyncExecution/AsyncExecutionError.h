@@ -11,6 +11,11 @@ enum class AsyncExecutionError : uint32_t
     AlreadyRunning,
     Stopped,
     FileTooLarge,
+    SocketReceiveIncomplete,
+    SocketReceiveNoProgress,
+    ReceiveLineBufferExhausted,
+    EmptyReceiveBuffer,
+    TransferSizeOverflow,
 };
 static constexpr ResultCategory AsyncExecutionResultCategory = ResultCategory(23);
 } // namespace SC

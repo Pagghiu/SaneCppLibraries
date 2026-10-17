@@ -141,7 +141,7 @@ Result runDemo(bool failFile, uint16_t port)
 
     const auto  ownerThread       = Thread::CurrentThreadID();
     Atomic<int> encodersOnWorkers = 0;
-    auto        encode            = [&](AsyncExecutionBuffer data) noexcept -> AsyncExecutionBufferResult
+    auto        encode = [&](AsyncExecutionBuffer data) noexcept -> AsyncExecutionValueResult<AsyncExecutionBuffer>
     {
         if (Thread::CurrentThreadID() != ownerThread)
             encodersOnWorkers.fetch_add(1);
@@ -149,11 +149,11 @@ Result runDemo(bool failFile, uint16_t port)
     };
 
     static_assert(std::is_nothrow_move_constructible_v<AsyncExecutionConnection>);
-    static_assert(std::is_nothrow_move_constructible_v<AsyncExecutionBufferResult>);
+    static_assert(std::is_nothrow_move_constructible_v<AsyncExecutionValueResult<AsyncExecutionBuffer>>);
     // Presentation snippet: each transfer is sequential; when_all runs the two transfers concurrently.
     auto sendEncoded = [&](StringSpan file, uint16_t destination)
     {
-        return app.readFile(file) | ex::continues_on(app.getPoolScheduler()) | ex::then(encode) |
+        return app.readFile(file) | ex::on(app.getPoolScheduler(), SC::tryThen(encode)) |
                ex::let_value([&, destination](auto& encoded) noexcept
                              { return app.sendTCP("127.0.0.1", destination, move(encoded)); });
     };

@@ -28,8 +28,8 @@ inline SC::Result base64EncodeInPlace(SC::AsyncExecutionBuffer& input)
     return Result(true);
 }
 
-// Value-returning form for then: checked data is consumed by the next I/O sender.
-inline SC::AsyncExecutionBufferResult base64Encode(SC::AsyncExecutionBuffer input) noexcept
+// Checked value for SC::tryThen: errors propagate before any downstream consumer runs.
+inline SC::AsyncExecutionValueResult<SC::AsyncExecutionBuffer> base64Encode(SC::AsyncExecutionBuffer input) noexcept
 {
     const SC::Result status = base64EncodeInPlace(input);
     return {status, SC::move(input)};

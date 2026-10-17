@@ -526,9 +526,13 @@ Result configureSCAwaitTest(const Parameters& parameters, Workspace& workspace)
     return Result(true);
 }
 
-Result configureSCAsyncExecutionTest(const Parameters& parameters, Workspace& workspace, bool demo = false)
+Result configureSCAsyncExecutionTest(const Parameters& parameters, Workspace& workspace, bool demo = false,
+                                     bool controlFlowDemo = false)
 {
-    Project project = {demo ? "SCAsyncExecutionDemo" : "SCAsyncExecutionTest"};
+    const StringView name    = controlFlowDemo ? StringView("SCAsyncControlFlowEcho")
+                               : demo          ? StringView("SCAsyncExecutionDemo")
+                                               : StringView("SCAsyncExecutionTest");
+    Project          project = {name};
     project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
@@ -552,7 +556,9 @@ Result configureSCAsyncExecutionTest(const Parameters& parameters, Workspace& wo
     project.addIncludePaths({"."});
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
     SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
-    if (demo)
+    if (controlFlowDemo)
+        project.addFiles("Examples/AsyncControlFlowEcho", "*.cpp");
+    else if (demo)
         project.addFiles("Examples/AsyncExecutionDemo", "*.cpp");
     else
     {
@@ -919,6 +925,7 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureSCAwaitTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace, true));
+    SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace, false, true));
     SC_TRY(configureStdCppHeaderNoLinkTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitCoroutineShimTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));

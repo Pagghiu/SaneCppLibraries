@@ -11,6 +11,7 @@
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Time/Time.h"
 
 namespace SC
 {
@@ -89,6 +90,24 @@ struct AsyncExecutionTest : TestCase
         static_assert(ex::operation_state<Operation>);
         static_assert(not std::is_move_constructible_v<Operation>);
 
+        if (test_section("borrowed TCP accept connect and scatter transfers"))
+            borrowedTCP();
+        if (test_section("TCP exact and line receive boundaries"))
+            tcpReceiveBoundaries();
+        if (test_section("TCP cancellation and terminal destruction"))
+            tcpCancellation();
+        if (test_section("TCP cursor short writes and progress errors"))
+            tcpCursors();
+        if (test_section("generic fallible transforms"))
+            fallibleTransforms();
+        if (test_section("standard composition and retained values"))
+            composition();
+        if (test_section("borrowed loop integration and external consumer"))
+            loopIntegration();
+        if (test_section("pool scheduler preserves loop progress"))
+            poolProgress();
+        if (test_section("pool scheduler stop races and terminal destruction"))
+            poolLifetime();
         if (test_section("owning facade files pool and repeated runs"))
             owningFacade();
         if (test_section("scheduler submission from another thread"))
@@ -109,6 +128,1039 @@ struct AsyncExecutionTest : TestCase
             files();
         if (test_section("destroy operation during completion"))
             completionLifetime();
+    }
+
+    template <typename Sender, typename... Outputs>
+    Result consumeBounded(AsyncExecutionContext& context, Sender&& sender, Outputs&... outputs)
+    {
+        ExecutionStopSource stop;
+        bool                expired = false;
+        AsyncLoopTimeout    watchdog;
+        watchdog.callback = [&](AsyncLoopTimeout::Result&)
+        {
+            expired = true;
+            stop.request_stop();
+        };
+        SC_TRY(watchdog.start(context.getEventLoop(), {2000}));
+        Result status{true};
+        if constexpr (sizeof...(Outputs) == 0)
+            status = context.run(forward<Sender>(sender), stop.get_token());
+        else
+            status = context.runIntoWithStop(forward<Sender>(sender), stop.get_token(), outputs...);
+        if (not watchdog.isFree())
+            SC_TRY(watchdog.unschedule(context.getEventLoop()));
+        return expired ? Result(false) : status;
+    }
+
+    Result tcpPair(AsyncExecutionContext& context, SocketDescriptor& listener, SocketDescriptor& client,
+                   AsyncExecutionConnection& accepted, uint16_t port, bool generalAddress = false)
+    {
+        SocketNetworking::initNetworking();
+        SocketIPAddress address;
+        SC_TRY(address.fromAddressPort("127.0.0.1", port));
+        SC_TRY(context.getEventLoop().createAsyncTCPSocket(address.getAddressFamily(), listener));
+        SC_TRY(context.getEventLoop().createAsyncTCPSocket(address.getAddressFamily(), client));
+        SC_TRY(SocketServer(listener).bind(address));
+        SC_TRY(SocketServer(listener).listen(2));
+        auto connect =
+            generalAddress ? context.connect(client, SocketAddress(address)) : context.connect(client, address);
+        return consumeBounded(context, ex::when_all(context.accept(listener), move(connect)), accepted);
+    }
+
+    void borrowedTCP()
+    {
+        static_assert(std::is_nothrow_move_assignable_v<AsyncExecutionConnection>);
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        SocketDescriptor         listener, client;
+        AsyncExecutionConnection accepted;
+        const uint16_t           port = report.mapPort(5100);
+        SC_TEST_EXPECT(tcpPair(context, listener, client, accepted, port, true));
+        SC_TEST_EXPECT(accepted.socket.isValid() and client.isValid());
+        Span<const char> parts[] = {{},
+                                    StringView("hel").toCharSpan(),
+                                    {},
+                                    StringView("lo\n").toCharSpan(),
+                                    StringView("next\r\n").toCharSpan(),
+                                    {}};
+
+        char   storage[16] = {};
+        size_t sent = 0, progress = 99;
+
+        AsyncExecutionLineResult line;
+        auto                     lazySend = context.sendAll(client, parts, &progress);
+        SC_TEST_EXPECT(progress == 99);
+        SC_TEST_EXPECT(consumeBounded(
+            context, ex::when_all(move(lazySend), context.receiveLine(accepted.socket, storage)), sent, line));
+        SC_TEST_EXPECT(sent == 12 and progress == 12);
+        SC_TEST_EXPECT(line.lineComplete and not line.disconnected and line.line.sizeInBytes() == 5);
+        SC_TEST_EXPECT(memcmp(line.line.data(), "hello", 5) == 0);
+        SC_TEST_EXPECT(parts[0].empty() and parts[1].sizeInBytes() == 3 and parts[3].sizeInBytes() == 3 and
+                       parts[4].sizeInBytes() == 6 and parts[5].empty());
+        SC_TEST_EXPECT(consumeBounded(context, context.receiveLine(accepted.socket, storage), line));
+        SC_TEST_EXPECT(line.lineComplete and line.line.sizeInBytes() == 4 and memcmp(line.line.data(), "next", 4) == 0);
+        Span<const char> oneShot[] = {{}, StringView("!").toCharSpan(), {}, StringView("?").toCharSpan(), {}};
+
+        char exactStorage[2];
+
+        AsyncExecutionReadResult exact;
+        SC_TEST_EXPECT(consumeBounded(
+            context, ex::when_all(context.send(client, oneShot), context.receiveExact(accepted.socket, exactStorage)),
+            sent, exact));
+        SC_TEST_EXPECT(sent == 2 and exact.data.sizeInBytes() == 2 and not exact.endOfFile);
+        SC_TEST_EXPECT(memcmp(exact.data.data(), "!?", 2) == 0 and oneShot[1].sizeInBytes() == 1 and
+                       oneShot[3].sizeInBytes() == 1);
+        size_t contiguousProgress = 99;
+        SC_TEST_EXPECT(
+            consumeBounded(context,
+                           ex::when_all(context.sendAll(client, StringView("ab").toCharSpan(), &contiguousProgress),
+                                        context.receiveExact(accepted.socket, exactStorage)),
+                           sent, exact));
+        SC_TEST_EXPECT(sent == 2 and contiguousProgress == 2 and memcmp(exactStorage, "ab", 2) == 0);
+        AsyncExecutionBuffer largeSource, largeReply;
+        SC_TEST_EXPECT(largeSource.resize(35000));
+        SC_TEST_EXPECT(largeReply.resize(35000));
+        for (size_t index = 0; index < largeSource.size(); ++index)
+            largeSource.bytes()[index] = static_cast<char>('a' + index % 23);
+        const auto       sourceBytes  = largeSource.bytes();
+        Span<const char> largeParts[] = {{sourceBytes.data(), 18000}, {}, {sourceBytes.data() + 18000, 17000}};
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.sendAll(client, largeParts, &progress),
+                                                   context.receiveExact(accepted.socket, largeReply.bytes())),
+                                      sent, exact));
+        SC_TEST_EXPECT(sent == 35000 and progress == 35000 and exact.data.sizeInBytes() == 35000);
+        SC_TEST_EXPECT(memcmp(largeSource.bytes().data(), largeReply.bytes().data(), 35000) == 0);
+        SC_TEST_EXPECT(largeParts[0].sizeInBytes() == 18000 and largeParts[2].sizeInBytes() == 17000);
+
+        SocketDescriptor       invalid;
+        Span<Span<const char>> emptyParts;
+        SC_TEST_EXPECT(consumeBounded(context, context.sendAll(invalid, emptyParts), sent));
+        SC_TEST_EXPECT(sent == 0);
+        SC_TEST_EXPECT(consumeBounded(context, context.send(client, emptyParts))
+                           .isError(AsyncResultCategory, AsyncError::EmptyBuffer));
+        SC_TEST_EXPECT(consumeBounded(context, context.receiveExact(invalid, Span<char>{}), exact));
+        SC_TEST_EXPECT(exact.data.empty() and not exact.endOfFile);
+        ExecutionStopSource prestopped;
+        prestopped.request_stop();
+        progress = 99;
+        SC_TEST_EXPECT(
+            context.run(context.sendAll(invalid, StringView("unused").toCharSpan(), &progress), prestopped.get_token())
+                .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(progress == 0);
+        AsyncExecutionReadResult stoppedProgress{storage, true};
+        SC_TEST_EXPECT(context.run(context.receiveExact(invalid, storage, &stoppedProgress), prestopped.get_token())
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(stoppedProgress.data.empty() and not stoppedProgress.endOfFile);
+
+        SC_TEST_EXPECT(consumeBounded(context, context.receiveLine(client, Span<char>{}))
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::EmptyReceiveBuffer));
+        SocketIPAddress address;
+        SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", port));
+        SC_TEST_EXPECT(consumeBounded(context, context.connect(invalid, address))
+                           .isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+        SC_TEST_EXPECT(consumeBounded(context, context.accept(invalid))
+                           .isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+        // Replacing an owned connection retires its previous descriptor before consumption returns.
+        SocketDescriptor second;
+        SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), second));
+        SC_TEST_EXPECT(consumeBounded(context, ex::when_all(context.accept(listener), context.connect(second, address)),
+                                      accepted));
+        SC_TEST_EXPECT(consumeBounded(context, context.receive(client, storage), exact));
+        SC_TEST_EXPECT(exact.endOfFile and exact.data.empty());
+        SC_TEST_EXPECT(second.close());
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(accepted.socket.close());
+        SC_TEST_EXPECT(listener.close());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void tcpReceiveBoundaries()
+    {
+        for (int test = 0; test < 4; ++test)
+        {
+            AsyncEventLoop loop;
+            SC_TEST_EXPECT(loop.create());
+            AsyncExecutionContext context{loop};
+            SC_TEST_EXPECT(context.create());
+            SocketDescriptor         listener, client;
+            AsyncExecutionConnection accepted;
+            SC_TEST_EXPECT(tcpPair(context, listener, client, accepted, report.mapPort(uint16_t(5101 + test))));
+            char                     storage[4] = {};
+            AsyncExecutionReadResult exact, exactProgress;
+            AsyncExecutionLineResult line, lineProgress;
+            if (test == 0)
+            {
+                auto send = context.sendAll(client, StringView("xy").toCharSpan()) |
+                            SC::tryThen([&](size_t) noexcept -> Result { return client.close(); });
+                const Result status = consumeBounded(
+                    context, ex::when_all(move(send), context.receiveExact(accepted.socket, storage, &exactProgress)),
+                    exact);
+                SC_TEST_EXPECT(
+                    status.isError(AsyncExecutionResultCategory, AsyncExecutionError::SocketReceiveIncomplete));
+                SC_TEST_EXPECT(exactProgress.data.sizeInBytes() == 2 and exactProgress.endOfFile);
+                SC_TEST_EXPECT(memcmp(storage, "xy", 2) == 0);
+                SC_TEST_EXPECT(consumeBounded(context, context.receive(accepted.socket, storage), exact));
+                SC_TEST_EXPECT(exact.endOfFile and exact.data.empty());
+            }
+            else if (test == 1)
+            {
+                SC_TEST_EXPECT(consumeBounded(
+                    context, ex::when_all(context.sendAll(client, StringView("abcd\n").toCharSpan()),
+                                          context.receiveLine(accepted.socket, storage, &lineProgress))));
+                SC_TEST_EXPECT(lineProgress.lineComplete and lineProgress.line.sizeInBytes() == 4);
+                SC_TEST_EXPECT(memcmp(storage, "abcd", 4) == 0);
+            }
+            else if (test == 2)
+            {
+                const Result status =
+                    consumeBounded(context, ex::when_all(context.sendAll(client, StringView("abcdX\n").toCharSpan()),
+                                                         context.receiveLine(accepted.socket, storage, &lineProgress)));
+                SC_TEST_EXPECT(
+                    status.isError(AsyncExecutionResultCategory, AsyncExecutionError::ReceiveLineBufferExhausted));
+                SC_TEST_EXPECT(not lineProgress.lineComplete and not lineProgress.disconnected and
+                               lineProgress.line.sizeInBytes() == 4);
+                SC_TEST_EXPECT(memcmp(storage, "abcd", 4) == 0);
+                SC_TEST_EXPECT(consumeBounded(context, context.receiveLine(accepted.socket, storage), line));
+                SC_TEST_EXPECT(line.lineComplete and line.line.empty()); // Only the overflowing byte was consumed.
+            }
+            else
+            {
+                auto send = context.sendAll(client, StringView("tail").toCharSpan()) |
+                            SC::tryThen([&](size_t) noexcept -> Result { return client.close(); });
+                SC_TEST_EXPECT(consumeBounded(
+                    context, ex::when_all(move(send), context.receiveLine(accepted.socket, storage, &lineProgress)),
+                    line));
+                SC_TEST_EXPECT(line.disconnected and not line.lineComplete and line.line.sizeInBytes() == 4);
+                SC_TEST_EXPECT(lineProgress.disconnected and memcmp(storage, "tail", 4) == 0);
+            }
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(accepted.socket.close());
+            SC_TEST_EXPECT(listener.close());
+            SC_TEST_EXPECT(context.close());
+            SC_TEST_EXPECT(loop.close());
+        }
+    }
+
+    void tcpCancellation()
+    {
+        // Pending accept: stop from another thread, then reuse the same listener for a connection.
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        SocketNetworking::initNetworking();
+        SocketIPAddress address;
+        SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5106)));
+        SocketDescriptor listener, client;
+        SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), listener));
+        SC_TEST_EXPECT(SocketServer(listener).bind(address));
+        SC_TEST_EXPECT(SocketServer(listener).listen(2));
+        ExecutionStopSource acceptStop;
+        ExecutionOutcome    acceptOutcome;
+        acceptOutcome.loop = &loop;
+        auto acceptSender  = context.accept(listener);
+        using AcceptOperation =
+            decltype(ex::connect(move(acceptSender), ExecutionReceiver{acceptOutcome, acceptStop.get_token()}));
+        alignas(AcceptOperation) char acceptStorage[sizeof(AcceptOperation)];
+        auto*                         accept = reinterpret_cast<AcceptOperation*>(acceptStorage);
+        placementNew(*accept, context, move(acceptSender.setup),
+                     ExecutionReceiver{acceptOutcome, acceptStop.get_token()});
+        bool acceptDestroyed    = false;
+        acceptOutcome.onStopped = [&]
+        {
+            const bool released = accept->request.isFree();
+            accept->~AcceptOperation();
+            acceptDestroyed = released;
+        };
+        ex::start(*accept);
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(accept->request.isActive());
+        Thread canceller;
+        SC_TEST_EXPECT(canceller.start([&](Thread&) { acceptStop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(acceptDestroyed and acceptOutcome.stopped == 1 and acceptOutcome.values == 0);
+        AsyncExecutionConnection accepted;
+        SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), client));
+        SC_TEST_EXPECT(consumeBounded(context, ex::when_all(context.accept(listener), context.connect(client, address)),
+                                      accepted));
+        SC_TEST_EXPECT(consumeBounded(context, context.sendAll(client, StringView("xy").toCharSpan())));
+        char                     buffer[4] = {};
+        AsyncExecutionReadResult progress;
+        ExecutionStopSource      readStop;
+        ExecutionOutcome         readOutcome;
+        readOutcome.loop = &loop;
+        auto read        = ex::connect(context.receiveExact(accepted.socket, buffer, &progress),
+                                       ExecutionReceiver{readOutcome, readStop.get_token()});
+        ex::start(read);
+        Result pumped{true};
+        for (int i = 0; i < 2000 and progress.data.sizeInBytes() < 2; ++i)
+        {
+            pumped = loop.runNoWait();
+            if (not pumped)
+                break;
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(pumped and progress.data.sizeInBytes() == 2 and not progress.endOfFile);
+        SC_TEST_EXPECT(canceller.start([&](Thread&) { readStop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(read.request.isFree() and readOutcome.stopped == 1 and readOutcome.values == 0);
+        SC_TEST_EXPECT(progress.data.sizeInBytes() == 2 and memcmp(buffer, "xy", 2) == 0);
+        char next[1];
+        SC_TEST_EXPECT(consumeBounded(context, ex::when_all(context.sendAll(client, StringView("z").toCharSpan()),
+                                                            context.receiveExact(accepted.socket, next))));
+        SC_TEST_EXPECT(next[0] == 'z');
+        SC_TEST_EXPECT(consumeBounded(context, context.sendAll(client, StringView("q").toCharSpan())));
+        ExecutionStopSource lineStop;
+        ExecutionOutcome    lineOutcome;
+        lineOutcome.loop = &loop;
+        AsyncExecutionLineResult lineProgress;
+        auto                     lineSender = context.receiveLine(accepted.socket, buffer, &lineProgress);
+        using LineOperation =
+            decltype(ex::connect(move(lineSender), ExecutionReceiver{lineOutcome, lineStop.get_token()}));
+        alignas(LineOperation) char lineStorage[sizeof(LineOperation)];
+        auto*                       lineOperation = reinterpret_cast<LineOperation*>(lineStorage);
+        placementNew(*lineOperation, context, move(lineSender.setup),
+                     ExecutionReceiver{lineOutcome, lineStop.get_token()});
+        bool lineDestroyed    = false;
+        lineOutcome.onStopped = [&]
+        {
+            const bool released = lineOperation->request.isFree();
+            lineOperation->~LineOperation();
+            lineDestroyed = released;
+        };
+        ex::start(*lineOperation);
+        for (int i = 0; i < 2000 and lineProgress.line.empty(); ++i)
+        {
+            pumped = loop.runNoWait();
+            if (not pumped)
+                break;
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(pumped and lineProgress.line.sizeInBytes() == 1 and buffer[0] == 'q');
+        SC_TEST_EXPECT(canceller.start([&](Thread&) { lineStop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(lineDestroyed and lineOutcome.stopped == 1 and not lineProgress.lineComplete);
+        AsyncExecutionLineResult nextLine;
+        size_t                   sentLineBytes = 0;
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.sendAll(client, StringView("\n").toCharSpan()),
+                                                   context.receiveLine(accepted.socket, buffer)),
+                                      sentLineBytes, nextLine));
+        SC_TEST_EXPECT(nextLine.lineComplete and nextLine.line.empty());
+        // Cancel between bounded send chunks; the progress count covers observed completions, not unreported OS bytes.
+        AsyncExecutionBuffer payload;
+        SC_TEST_EXPECT(payload.resize(65536));
+        memset(payload.bytes().data(), 'p', payload.size());
+        Span<const char>    parts[] = {payload.bytes(), {}};
+        size_t              sent    = 0;
+        ExecutionStopSource writeStop;
+        ExecutionOutcome    writeOutcome;
+        writeOutcome.loop = &loop;
+        auto write =
+            ex::connect(context.sendAll(client, parts, &sent), ExecutionReceiver{writeOutcome, writeStop.get_token()});
+        ex::start(write);
+        for (int i = 0; i < 2000 and sent == 0; ++i)
+        {
+            pumped = loop.runNoWait();
+            if (not pumped)
+                break;
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(pumped and sent > 0 and sent < payload.size());
+        SC_TEST_EXPECT(canceller.start([&](Thread&) { writeStop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(write.request.isFree() and writeOutcome.stopped == 1 and writeOutcome.values == 0);
+        SC_TEST_EXPECT(client.isValid() and accepted.socket.isValid() and sent < payload.size());
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(accepted.socket.close());
+        SC_TEST_EXPECT(listener.close());
+        // Race stop against an already-submitted connect without relying on an unreachable external host.
+        SocketDescriptor cancelListener, cancelClient;
+        SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5108)));
+        SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), cancelListener));
+        SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), cancelClient));
+        SC_TEST_EXPECT(SocketServer(cancelListener).bind(address));
+        SC_TEST_EXPECT(SocketServer(cancelListener).listen(1));
+        ExecutionStopSource connectStop;
+        ExecutionOutcome    connectOutcome;
+        connectOutcome.loop = &loop;
+        auto connecting     = ex::connect(context.connect(cancelClient, address),
+                                          ExecutionReceiver{connectOutcome, connectStop.get_token()});
+        ex::start(connecting);
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(not connecting.request.isFree());
+        SC_TEST_EXPECT(canceller.start([&](Thread&) { connectStop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(connecting.request.isFree() and connectOutcome.stopped == 1 and connectOutcome.values == 0);
+        SC_TEST_EXPECT(cancelClient.isValid()); // Cancellation does not close the borrowed descriptor.
+        SC_TEST_EXPECT(cancelClient.close());
+        SC_TEST_EXPECT(cancelListener.close());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+
+        // A full accept/connect graph may be destroyed by its terminal receiver, closing the dropped accepted value.
+        AsyncEventLoop lifetimeLoop;
+        SC_TEST_EXPECT(lifetimeLoop.create());
+        AsyncExecutionContext lifetime{lifetimeLoop};
+        SC_TEST_EXPECT(lifetime.create());
+        SocketDescriptor server, sender;
+        SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5107)));
+        SC_TEST_EXPECT(lifetimeLoop.createAsyncTCPSocket(address.getAddressFamily(), server));
+        SC_TEST_EXPECT(lifetimeLoop.createAsyncTCPSocket(address.getAddressFamily(), sender));
+        SC_TEST_EXPECT(SocketServer(server).bind(address));
+        SC_TEST_EXPECT(SocketServer(server).listen(1));
+        auto graph      = ex::when_all(lifetime.accept(server), lifetime.connect(sender, address));
+        using Graph     = decltype(graph);
+        using Operation = decltype(ex::connect(std::declval<Graph>(), std::declval<ExecutionReceiver>()));
+        struct Holder
+        {
+            Operation operation;
+            Holder(Graph inputGraph, ExecutionReceiver receiver)
+                : operation(ex::connect(move(inputGraph), move(receiver)))
+            {}
+        };
+        alignas(Holder) char holderStorage[sizeof(Holder)];
+        auto*                holder = reinterpret_cast<Holder*>(holderStorage);
+        ExecutionOutcome     outcome;
+        outcome.loop = &lifetimeLoop;
+        placementNew(*holder, move(graph), ExecutionReceiver{outcome, {}});
+        bool destroyed  = false;
+        outcome.onValue = [&]
+        {
+            holder->~Holder();
+            destroyed = true;
+        };
+        ex::start(holder->operation);
+        const Result driven = runBounded(lifetimeLoop);
+        SC_ASYNC_ASSERT_RELEASE(driven);
+        SC_TEST_EXPECT(driven and destroyed and outcome.values == 1 and outcome.errors == 0);
+        AsyncExecutionReadResult closed;
+        SC_TEST_EXPECT(consumeBounded(lifetime, lifetime.receive(sender, buffer), closed));
+        SC_TEST_EXPECT(closed.endOfFile and closed.data.empty());
+        SC_TEST_EXPECT(sender.close());
+        SC_TEST_EXPECT(server.close());
+        SC_TEST_EXPECT(lifetime.close());
+        SC_TEST_EXPECT(lifetimeLoop.close());
+    }
+
+    void tcpCursors()
+    {
+        SocketDescriptor unused;
+        Span<const char> parts[]  = {{}, StringView("abcd").toCharSpan(), {}, StringView("xy").toCharSpan(), {}};
+        size_t           progress = 99;
+        detail::AsyncExecutionSendAllBuffers cursor{unused, parts, &progress};
+        cursor.initialize();
+        SC_TEST_EXPECT(progress == 0 and cursor.index == 1 and cursor.offset == 0);
+        SC_TEST_EXPECT(cursor.advanceBytes(0).isError(AsyncResultCategory, AsyncError::SocketSendIncomplete));
+        SC_TEST_EXPECT(cursor.advanceBytes(5).isError(AsyncResultCategory, AsyncError::SocketSendIncomplete));
+        SC_TEST_EXPECT(cursor.advanceBytes(1));
+        SC_TEST_EXPECT(cursor.offset == 1 and progress == 1);
+        SC_TEST_EXPECT(cursor.advanceBytes(2));
+        SC_TEST_EXPECT(cursor.offset == 3 and progress == 3);
+        SC_TEST_EXPECT(cursor.advanceBytes(1));
+        SC_TEST_EXPECT(cursor.index == 3 and cursor.offset == 0 and progress == 4);
+        SC_TEST_EXPECT(cursor.advanceBytes(1));
+        SC_TEST_EXPECT(cursor.advanceBytes(1));
+        SC_TEST_EXPECT(not cursor.hasRemaining() and progress == 6 and parts[1].sizeInBytes() == 4 and
+                       parts[3].sizeInBytes() == 2);
+        char                                 byte       = 0;
+        Span<const char>                     enormous[] = {{&byte, size_t(-1)}, {&byte, 1}};
+        detail::AsyncExecutionSendAllBuffers overflow{unused, enormous};
+        overflow.initialize();
+        SC_TEST_EXPECT(
+            overflow.initialization.isError(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow));
+        SC_TEST_EXPECT(not overflow.completesImmediately());
+        char                               data[4] = {};
+        AsyncExecutionReadResult           exactProgress;
+        detail::AsyncExecutionReceiveExact exact{unused, data, &exactProgress};
+        exact.initialize();
+        SC_TEST_EXPECT(exact.advanceBytes(0, false).isError(AsyncExecutionResultCategory,
+                                                            AsyncExecutionError::SocketReceiveNoProgress));
+        SC_TEST_EXPECT(exact.advanceBytes(2, true).isError(AsyncExecutionResultCategory,
+                                                           AsyncExecutionError::SocketReceiveIncomplete));
+        SC_TEST_EXPECT(exactProgress.data.sizeInBytes() == 2 and exactProgress.endOfFile);
+        detail::AsyncExecutionReceiveLine line{unused, data};
+        line.initialize();
+        SC_TEST_EXPECT(line.advanceByte(0, false).isError(AsyncExecutionResultCategory,
+                                                          AsyncExecutionError::SocketReceiveNoProgress));
+    }
+
+    void fallibleTransforms()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create(2));
+        const auto  owner            = Thread::CurrentThreadID();
+        Atomic<int> encodersOnWorker = 0;
+        auto        encode           = [&](AsyncExecutionBuffer bytes) noexcept
+        {
+            if (Thread::CurrentThreadID() != owner)
+                encodersOnWorker.fetch_add(1);
+            return base64Encode(move(bytes));
+        };
+        auto source = [&]()
+        {
+            return app.onPool(
+                       []() noexcept
+                       {
+                           AsyncExecutionBuffer bytes;
+                           Result               status = bytes.resize(3);
+                           if (status)
+                               memcpy(bytes.bytes().data(), "foo", 3);
+                           return AsyncExecutionValueResult<AsyncExecutionBuffer>{status, move(bytes)};
+                       }) |
+                   SC::tryThen([](auto checked) noexcept { return checked; });
+        };
+        size_t count = 0;
+        // The same fallible CPU transform is independent of its downstream computation or I/O operation.
+        SC_TEST_EXPECT(app.runInto(source() | ex::continues_on(app.getPoolScheduler()) | SC::tryThen(encode) |
+                                       ex::then([](auto bytes) noexcept { return bytes.size(); }),
+                                   count));
+        SC_TEST_EXPECT(count == 4);
+        StringPath path;
+        SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionFallibleTest.txt"}));
+        SC_TEST_EXPECT(app.run(source() | ex::continues_on(app.getPoolScheduler()) | SC::tryThen(encode) |
+                               ex::let_value([&](auto& bytes) { return app.writeFile(path.view(), move(bytes)); })));
+        AsyncExecutionBuffer read;
+        SC_TEST_EXPECT(app.runInto(app.readFile(path.view()), read));
+        SC_TEST_EXPECT(read.size() == 4 and memcmp(read.bytes().data(), "Zm9v", 4) == 0);
+        SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
+        SC_TEST_EXPECT(encodersOnWorker.load() == 2);
+        const Result failure    = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
+        int          downstream = 0;
+        auto         fail       = []() noexcept
+        {
+            return AsyncExecutionValueResult<AsyncExecutionBuffer>{
+                Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory), {}};
+        };
+        // A checked allocation failure must never reach the dependent file sender or computation.
+        SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen(fail) |
+                               ex::let_value(
+                                   [&](auto& bytes)
+                                   {
+                                       ++downstream;
+                                       return app.writeFile(path.view(), move(bytes));
+                                   }))
+                           .isError(failure.category(), failure.errorValue()));
+        SC_TEST_EXPECT(downstream == 0);
+        SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen(fail) | ex::then([&](auto) noexcept { ++downstream; }))
+                           .isError(failure.category(), failure.errorValue()));
+        SC_TEST_EXPECT(downstream == 0);
+        SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen(fail) |
+                               ex::let_value(
+                                   [&](auto& bytes)
+                                   {
+                                       ++downstream;
+                                       return app.sendTCP("127.0.0.1", report.mapPort(19095), move(bytes));
+                                   }))
+                           .isError(failure.category(), failure.errorValue()));
+        SC_TEST_EXPECT(downstream == 0);
+        // Result-only transforms have a zero-value success signature and preserve Result identity on failure.
+        SC_TEST_EXPECT(app.run(SC::tryThen(ex::just(7), [](int value) noexcept { return Result(value == 7); }) |
+                               ex::then([&]() noexcept { ++downstream; })));
+        SC_TEST_EXPECT(downstream == 1);
+        SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen([&]() noexcept { return failure; }))
+                           .isError(failure.category(), failure.errorValue()));
+        int sum = 0;
+        SC_TEST_EXPECT(
+            app.runInto(ex::just(17, 25) | SC::tryThen([](int a, int b) noexcept
+                                                       { return AsyncExecutionValueResult<int>{Result(true), a + b}; }),
+                        sum));
+        SC_TEST_EXPECT(sum == 42);
+        struct MoveOnly
+        {
+            int value;
+            explicit MoveOnly(int value) noexcept : value(value) {}
+            MoveOnly(MoveOnly&&) noexcept            = default;
+            MoveOnly& operator=(MoveOnly&&) noexcept = default;
+            MoveOnly(const MoveOnly&)                = delete;
+        } retained{0};
+        SC_TEST_EXPECT(app.runInto(
+            ex::just() |
+                SC::tryThen([]() noexcept { return AsyncExecutionValueResult<MoveOnly>{Result(true), MoveOnly{42}}; }),
+            retained));
+        SC_TEST_EXPECT(retained.value == 42);
+        AsyncExecutionBuffer moved;
+        SC_TEST_EXPECT(app.runInto(
+            ex::just() |
+                SC::tryThen([owned = move(read)]() mutable noexcept
+                            { return AsyncExecutionValueResult<AsyncExecutionBuffer>{Result(true), move(owned)}; }),
+            moved));
+        SC_TEST_EXPECT(moved.size() == 4 and memcmp(moved.bytes().data(), "Zm9v", 4) == 0);
+        // Destroy the complete let_value parent from synchronous value/stopped notification.
+        auto selfDestroying = []()
+        {
+            return ex::just(7) |
+                   SC::tryThen([](int value) noexcept { return AsyncExecutionValueResult<int>{Result(true), value}; });
+        };
+        using Sender = decltype(selfDestroying());
+        using Op     = decltype(ex::connect(std::declval<Sender>(), std::declval<ExecutionReceiver>()));
+        struct Holder
+        {
+            Op operation;
+            Holder(Sender sender, ExecutionReceiver receiver) : operation(ex::connect(move(sender), move(receiver))) {}
+        };
+        for (int stop = 0; stop < 2; ++stop)
+        {
+            ExecutionStopSource terminalStop;
+            if (stop)
+                terminalStop.request_stop();
+            ExecutionOutcome     outcome;
+            alignas(Holder) char storage[sizeof(Holder)];
+            auto*                holder = reinterpret_cast<Holder*>(storage);
+            placementNew(*holder, selfDestroying(), ExecutionReceiver{outcome, terminalStop.get_token()});
+            bool destroyed  = false;
+            outcome.onValue = [&]
+            {
+                holder->~Holder();
+                destroyed = true;
+            };
+            outcome.onStopped = outcome.onValue;
+            ex::start(holder->operation);
+            SC_TEST_EXPECT(destroyed and outcome.values == 1 - stop and outcome.stopped == stop and
+                           outcome.errors == 0);
+        }
+        ExecutionStopSource stopped;
+        stopped.request_stop();
+        int calls = 0;
+        SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen(
+                                                [&]() noexcept
+                                                {
+                                                    ++calls;
+                                                    return Result(true);
+                                                }),
+                               stopped.get_token())
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(calls == 0);
+        ExecutionStopSource during;
+        SC_TEST_EXPECT(app.run(ex::just() | ex::continues_on(app.getPoolScheduler()) |
+                                   SC::tryThen(
+                                       [&]() noexcept
+                                       {
+                                           ++calls;
+                                           during.request_stop();
+                                           return Result(true);
+                                       }),
+                               during.get_token())
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(calls == 1);
+        ExecutionStopSource errorAndStop;
+        SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen(
+                                                [&]() noexcept
+                                                {
+                                                    errorAndStop.request_stop();
+                                                    return failure;
+                                                }),
+                               errorAndStop.get_token())
+                           .isError(failure.category(), failure.errorValue()));
+    }
+
+    void composition()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create(2));
+        const auto owner = Thread::CurrentThreadID();
+        auto       loop  = app.getScheduler();
+        auto       pool  = app.getPoolScheduler();
+        static_assert(ex::sender_in<decltype(ex::schedule(loop))>);
+        static_assert(ex::sender_in<decltype(ex::schedule(pool))>);
+        SC_TEST_EXPECT(ex::get_completion_scheduler<ex::set_value_t>(ex::get_env(ex::schedule(loop))) == loop);
+        SC_TEST_EXPECT(ex::get_completion_scheduler<ex::set_value_t>(ex::get_env(ex::schedule(pool))) == pool);
+        SC_TEST_EXPECT(ex::get_forward_progress_guarantee(loop) == ex::forward_progress_guarantee::weakly_parallel);
+        SC_TEST_EXPECT(ex::get_forward_progress_guarantee(pool) == ex::forward_progress_guarantee::weakly_parallel);
+
+        int          answer   = -1;
+        Atomic<bool> onWorker = false;
+        auto         compute  = [&]()
+        {
+            return ex::just(21) | ex::then(
+                                      [&](int value) noexcept
+                                      {
+                                          onWorker.store(Thread::CurrentThreadID() != owner);
+                                          return value * 2;
+                                      });
+        };
+        // on uses the root consumer's start scheduler to restore the owner thread.
+        bool restored = false;
+        SC_TEST_EXPECT(app.runInto(ex::on(pool, compute()) | ex::then(
+                                                                 [&](int value) noexcept
+                                                                 {
+                                                                     restored = Thread::CurrentThreadID() == owner;
+                                                                     return value;
+                                                                 }),
+                                   answer));
+        SC_TEST_EXPECT(onWorker.load() and restored and answer == 42);
+        onWorker.store(false);
+        SC_TEST_EXPECT(app.runInto(ex::starts_on(pool, compute()) | ex::continues_on(loop), answer));
+        SC_TEST_EXPECT(onWorker.load() and answer == 42);
+        onWorker.store(false);
+        SC_TEST_EXPECT(app.runInto(ex::schedule(loop) | ex::then([]() noexcept { return 21; }) |
+                                       ex::on(pool, ex::then(
+                                                        [&](int value) noexcept
+                                                        {
+                                                            onWorker.store(Thread::CurrentThreadID() != owner);
+                                                            return value * 2;
+                                                        })) |
+                                       ex::then(
+                                           [&](int value) noexcept
+                                           {
+                                               restored = Thread::CurrentThreadID() == owner;
+                                               return value;
+                                           }),
+                                   answer));
+        SC_TEST_EXPECT(onWorker.load() and restored and answer == 42);
+        // Retain multiple outputs, including a move-only value, from standard composition.
+        AsyncExecutionBuffer buffer;
+        SC_TEST_EXPECT(buffer.resize(3));
+        int                  first = 0, second = 0;
+        AsyncExecutionBuffer output;
+        SC_TEST_EXPECT(
+            app.runInto(ex::when_all(ex::just(17), ex::just(25), ex::just(move(buffer))), first, second, output));
+        SC_TEST_EXPECT(first == 17 and second == 25 and output.size() == 3);
+        SC_TEST_EXPECT(app.runInto(ex::just(99), first));
+        SC_TEST_EXPECT(first == 99);
+        const Result failure = Result::Error(AsyncResultCategory, AsyncError::InvalidAddress);
+        SC_TEST_EXPECT(app.runInto(ex::just_error(failure), first).isError(failure.category(), failure.errorValue()));
+        SC_TEST_EXPECT(first == 99);
+        SC_TEST_EXPECT(
+            app.runInto(ex::just_stopped(), first).isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(first == 99);
+        SC_TEST_EXPECT(app.runInto(ex::just_error(failure) | ex::upon_error([](Result) noexcept { return 7; }), first));
+        SC_TEST_EXPECT(first == 7);
+        SC_TEST_EXPECT(app.runInto(ex::just_stopped() | ex::upon_stopped([]() noexcept { return 8; }), first));
+        SC_TEST_EXPECT(first == 8);
+        ExecutionStopSource stop;
+        stop.request_stop();
+        SC_TEST_EXPECT(
+            app.runIntoWithStop(ex::schedule(pool) | ex::then([]() noexcept { return 1; }), stop.get_token(), first)
+                .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(first == 8);
+        // Worker completion publishes its output before notifying the owner loop.
+        SC_TEST_EXPECT(app.runInto(ex::starts_on(pool, ex::just(55)), first));
+        SC_TEST_EXPECT(first == 55);
+        Result nested{true};
+        SC_TEST_EXPECT(app.run(app.sleep({1}) | ex::then([&]() noexcept { nested = app.run(ex::just()); })));
+        SC_TEST_EXPECT(nested.isError(AsyncExecutionResultCategory, AsyncExecutionError::AlreadyRunning));
+    }
+
+    void loopIntegration()
+    {
+        auto graph = [](AsyncExecutionContext& context)
+        { return context.sleep({1}) | ex::then([]() noexcept { return 42; }); };
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create());
+        int output = 0;
+        SC_TEST_EXPECT(app.runInto(graph(app.getContext()), output));
+        SC_TEST_EXPECT(output == 42);
+
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.run(ex::just()).isError(AsyncResultCategory, AsyncError::NotInitialized));
+        SC_TEST_EXPECT(context.create());
+        SC_TEST_EXPECT(&context.getEventLoop() == &loop);
+        SC_TEST_EXPECT(context.runInto(graph(context), output));
+        SC_TEST_EXPECT(output == 42);
+        AsyncLoopTimeout interruptor;
+        interruptor.callback = [&](AsyncLoopTimeout::Result&) { loop.interrupt(); };
+        SC_TEST_EXPECT(interruptor.start(loop, {0}));
+        SC_TEST_EXPECT(context.runInto(graph(context), output));
+        SC_TEST_EXPECT(output == 42);
+        Result foreignRun{true};
+        Thread foreign;
+        SC_TEST_EXPECT(foreign.start([&](Thread&) { foreignRun = context.run(ex::just()); }));
+        SC_TEST_EXPECT(foreign.join());
+        SC_TEST_EXPECT(foreignRun.isError(AsyncResultCategory, AsyncError::InvalidState));
+        const auto owner = Thread::CurrentThreadID();
+        for (int mode = 0; mode < 4; ++mode)
+        {
+            ExecutionOutcome outcome;
+            bool             timedOut = false, correct = false;
+            AsyncLoopTimeout watchdog;
+            watchdog.callback = [&](AsyncLoopTimeout::Result&)
+            {
+                timedOut = true;
+                loop.interrupt();
+            };
+            SC_TEST_EXPECT(watchdog.start(loop, {2000}));
+            auto sender    = graph(context) | ex::then([&](int value) noexcept
+                                                    { correct = value == 42 and Thread::CurrentThreadID() == owner; });
+            auto operation = ex::connect(move(sender), ExecutionReceiver{outcome, {}});
+            if (mode == 0)
+                outcome.loop = &loop;
+            ex::start(operation);
+            if (mode == 0)
+                SC_TEST_EXPECT(loop.run());
+            else
+            {
+                const int64_t deadline = Time::Monotonic::now().getMonotonicMilliseconds() + 2500;
+                while (outcome.values == 0 and not timedOut)
+                {
+                    if (Time::Monotonic::now().getMonotonicMilliseconds() >= deadline)
+                    {
+                        timedOut = true;
+                        break;
+                    }
+                    if (mode == 1)
+                        SC_TEST_EXPECT(loop.runOnce());
+                    else if (mode == 2)
+                    {
+                        SC_TEST_EXPECT(loop.runNoWait());
+                        Thread::Sleep(1);
+                    }
+                    else
+                    {
+                        alignas(uint64_t) uint8_t eventStorage[8 * 1024];
+                        AsyncKernelEvents         events;
+                        events.eventsMemory = eventStorage;
+                        SC_TEST_EXPECT(loop.submitRequests(events));
+                        SC_TEST_EXPECT(loop.blockingPoll(events));
+                        SC_TEST_EXPECT(loop.dispatchCompletions(events));
+                    }
+                }
+            }
+            if (not watchdog.isFree())
+                SC_TEST_EXPECT(watchdog.unschedule(loop));
+            if (timedOut or not correct or outcome.values != 1 or outcome.errors != 0)
+            {
+                report.console.print("Integration mode {}, timeout={}\n", size_t(mode), size_t(timedOut));
+                report.console.print("correct={} values={}\n", size_t(correct), size_t(outcome.values));
+                report.console.print("errors={}\n", size_t(outcome.errors));
+            }
+            SC_ASYNC_ASSERT_RELEASE(not timedOut and outcome.values == 1);
+            SC_TEST_EXPECT(correct and outcome.errors == 0);
+        }
+        // sync_wait owns its own wait loop; this separate thread waits while the SC owner drives SC I/O.
+        AsyncLoopWakeUp finished;
+        finished.callback = [&](AsyncLoopWakeUp::Result&) { loop.interrupt(); };
+        SC_TEST_EXPECT(finished.start(loop));
+        struct WaitState
+        {
+            AsyncExecutionContext& context;
+            AsyncLoopWakeUp&       finished;
+            int                    value    = 0;
+            bool                   complete = false;
+        } wait{context, finished};
+        Thread consumer;
+        SC_TEST_EXPECT(consumer.start(
+            [&wait](Thread&)
+            {
+                auto result   = ex::sync_wait(wait.context.sleep({1}) | ex::then([]() noexcept { return 64; }));
+                wait.complete = result.has_value();
+                if (result)
+                    wait.value = std::get<0>(*result);
+                SC_ASYNC_TRUST_RESULT(wait.finished.wakeUp(wait.context.getEventLoop()));
+            }));
+        const Result driven = runBounded(loop);
+        SC_ASYNC_ASSERT_RELEASE(driven); // A failed driver cannot safely unwind a consumer still waiting for I/O.
+        SC_TEST_EXPECT(driven);
+        SC_TEST_EXPECT(consumer.join());
+        SC_TEST_EXPECT(wait.complete and wait.value == 64);
+        if (not finished.isFree())
+            SC_TEST_EXPECT(finished.stop(loop));
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void poolProgress()
+    {
+        AsyncEventLoop loop;
+        ThreadPool     pool;
+        SC_TEST_EXPECT(loop.create());
+        SC_TEST_EXPECT(pool.create(1));
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        SocketDescriptor listener, client, accepted;
+        SocketIPAddress  address;
+        const uint16_t   port = report.mapPort(5094);
+        SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", port));
+        SC_TEST_EXPECT(listener.create(address.getAddressFamily()));
+        SC_TEST_EXPECT(SocketServer(listener).bind(address));
+        SC_TEST_EXPECT(SocketServer(listener).listen(1));
+        SC_TEST_EXPECT(client.create(address.getAddressFamily()));
+        SC_TEST_EXPECT(SocketClient(client).connect("127.0.0.1", port));
+        SC_TEST_EXPECT(SocketServer(listener).accept(address.getAddressFamily(), accepted));
+        SC_TEST_EXPECT(client.setBlocking(false));
+        SC_TEST_EXPECT(accepted.setBlocking(false));
+        SC_TEST_EXPECT(loop.associateExternallyCreatedSocket(client));
+        SC_TEST_EXPECT(loop.associateExternallyCreatedSocket(accepted));
+
+        EventObject      releaseCPU;
+        Atomic<bool>     started = false, ioFinished = false, forcedRelease = false;
+        bool             timerProgress = false, socketProgress = false;
+        ExecutionOutcome cpuOutcome, ioOutcome;
+        ioOutcome.loop = &loop;
+        auto cpu       = ex::connect(ex::schedule(AsyncExecutionPoolScheduler{&context, &pool}) | ex::then(
+                                                                                                [&]() noexcept
+                                                                                                {
+                                                                                                    started.store(true);
+                                                                                                    releaseCPU.wait();
+                                                                                                }),
+                                     ExecutionReceiver{cpuOutcome, {}});
+        ex::start(cpu);
+        for (int i = 0; i < 1000 and not started.load(); ++i)
+            Thread::Sleep(1);
+
+        // This guard is independent of the owner loop. A stalled loop cannot run its own watchdog timer.
+        struct Guard
+        {
+            Atomic<bool>& done;
+            Atomic<bool>& forced;
+            EventObject&  release;
+        } guard{ioFinished, forcedRelease, releaseCPU};
+        Thread failsafe;
+        SC_TEST_EXPECT(failsafe.start(
+            [&guard](Thread&)
+            {
+                for (int i = 0; i < 1000 and not guard.done.load(); ++i)
+                    Thread::Sleep(1);
+                if (not guard.done.load())
+                {
+                    guard.forced.store(true);
+                    guard.release.signal();
+                }
+            }));
+        char buffer[16] = {};
+        auto io         = ex::when_all(
+                      context.sleep({10}) | ex::then([&]() noexcept { timerProgress = not forcedRelease.load(); }),
+                      context.sendAll(client, StringView("progress").toCharSpan()) | ex::then([](size_t) noexcept {}),
+                      context.receive(accepted, buffer) |
+                          ex::then(
+                              [&](AsyncExecutionReadResult data) noexcept
+                              {
+                                  socketProgress = not forcedRelease.load() and data.data.sizeInBytes() == 8 and
+                                                   memcmp(data.data.data(), "progress", 8) == 0;
+                              })) |
+                  ex::then(
+                      [&]() noexcept
+                      {
+                          ioFinished.store(true);
+                          releaseCPU.signal();
+                      });
+        auto operation = ex::connect(move(io), ExecutionReceiver{ioOutcome, {}});
+        ex::start(operation);
+        const Result ran = runBounded(loop);
+        SC_TEST_EXPECT(failsafe.join());
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+        SC_TEST_EXPECT(pool.destroy());
+        SC_TEST_EXPECT(ran and started.load() and ioOutcome.values == 1 and cpuOutcome.values == 1);
+        SC_TEST_EXPECT(not forcedRelease.load());
+        SC_TEST_EXPECT(timerProgress and socketProgress);
+    }
+
+    void poolLifetime()
+    {
+        AsyncEventLoop loop;
+        ThreadPool     pool;
+        SC_TEST_EXPECT(loop.create());
+        SC_TEST_EXPECT(pool.create(1));
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        const AsyncExecutionPoolScheduler scheduler{&context, &pool};
+        // Queue stop before the worker can dequeue the schedule request.
+        ThreadPoolTask blocker;
+        EventObject    entered, release;
+        struct Gate
+        {
+            EventObject& entered;
+            EventObject& release;
+        } gate{entered, release};
+        blocker.function = [&gate]()
+        {
+            gate.entered.signal();
+            gate.release.wait();
+        };
+        SC_TEST_EXPECT(pool.queueTask(blocker));
+        entered.wait();
+        ExecutionStopSource queuedStop;
+        ExecutionOutcome    queuedOutcome;
+        auto queued = ex::connect(ex::schedule(scheduler), ExecutionReceiver{queuedOutcome, queuedStop.get_token()});
+        ex::start(queued);
+        queuedStop.request_stop();
+        release.signal();
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(queuedOutcome.stopped == 1 and queuedOutcome.values == 0 and queuedOutcome.errors == 0);
+
+        for (int i = 0; i < 32; ++i)
+        {
+            ExecutionStopSource source;
+            ExecutionOutcome    outcome;
+            auto   operation = ex::connect(ex::schedule(scheduler), ExecutionReceiver{outcome, source.get_token()});
+            Thread canceller;
+            SC_TEST_EXPECT(canceller.start([&](Thread&) { source.request_stop(); }));
+            ex::start(operation);
+            SC_TEST_EXPECT(canceller.join());
+            SC_TEST_EXPECT(pool.waitForAllTasks());
+            SC_TEST_EXPECT(outcome.values + outcome.stopped == 1 and outcome.errors == 0);
+        }
+        for (bool stop : {false, true})
+        {
+            ExecutionStopSource source;
+            ExecutionOutcome    outcome;
+            using Operation =
+                decltype(ex::connect(ex::schedule(scheduler), ExecutionReceiver{outcome, source.get_token()}));
+            alignas(Operation) char storage[sizeof(Operation)];
+            auto*                   operation = reinterpret_cast<Operation*>(storage);
+            placementNew(*operation, context, pool, ExecutionReceiver{outcome, source.get_token()});
+            bool destroyed  = false;
+            outcome.onValue = [operation, &destroyed]()
+            {
+                operation->~Operation();
+                destroyed = true;
+            };
+            outcome.onStopped = outcome.onValue;
+            if (stop)
+                source.request_stop();
+            ex::start(*operation);
+            SC_TEST_EXPECT(pool.waitForAllTasks());
+            SC_TEST_EXPECT(destroyed and outcome.values + outcome.stopped == 1 and outcome.errors == 0);
+        }
+        struct RunningCPU
+        {
+            ExecutionStopSource source;
+            EventObject         entered, release;
+            Atomic<bool>        finished = false;
+        } running;
+        ExecutionOutcome runningOutcome;
+        runningOutcome.loop = &loop;
+        auto graph          = ex::schedule(scheduler) |
+                     ex::then(
+                         [&running]() noexcept
+                         {
+                             running.entered.signal();
+                             running.release.wait();
+                             running.finished.store(true);
+                         }) |
+                     ex::continues_on(context.getScheduler());
+        auto runningOperation = ex::connect(move(graph), ExecutionReceiver{runningOutcome, running.source.get_token()});
+        Thread canceller;
+        SC_TEST_EXPECT(canceller.start(
+            [&running](Thread&)
+            {
+                running.entered.wait();
+                running.source.request_stop();
+                running.release.signal();
+            }));
+        ex::start(runningOperation);
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(running.finished.load() and runningOutcome.stopped == 1 and runningOutcome.values == 0 and
+                       runningOutcome.errors == 0);
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+        SC_TEST_EXPECT(pool.destroy());
     }
 
     void owningFacade()
@@ -156,9 +1208,9 @@ struct AsyncExecutionTest : TestCase
                 memcpy(bytes.bytes().data(), vectors[i], bytes.size());
             auto encoded = base64Encode(move(bytes));
             SC_TEST_EXPECT(encoded.status);
-            SC_TEST_EXPECT(encoded.data.size() == strlen(expected[i]));
-            SC_TEST_EXPECT(encoded.data.size() == 0 or
-                           memcmp(encoded.data.bytes().data(), expected[i], encoded.data.size()) == 0);
+            SC_TEST_EXPECT(encoded.value.size() == strlen(expected[i]));
+            SC_TEST_EXPECT(encoded.value.size() == 0 or
+                           memcmp(encoded.value.bytes().data(), expected[i], encoded.value.size()) == 0);
         }
         // An external synchronous sender must not leave a stale loop interrupt behind.
         SC_TEST_EXPECT(app.run(ex::just()));

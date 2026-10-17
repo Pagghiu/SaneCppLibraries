@@ -1,6 +1,6 @@
 # ASYNCEXECUTION-0002 - Schedulers, Cancellation and Owning Facade
 
-Status: Accepted
+Status: Accepted; pool-ticket reclamation order superseded by ASYNCEXECUTION-0004
 Date: 2026-10-17
 
 ## Context

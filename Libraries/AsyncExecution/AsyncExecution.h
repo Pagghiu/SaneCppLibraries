@@ -14,12 +14,21 @@
 namespace SC
 {
 struct AsyncExecutionScheduler;
+struct AsyncExecutionConnection;
+struct AsyncExecutionReadResult;
+struct AsyncExecutionLineResult;
 template <typename Setup>
 struct AsyncExecutionSender;
 namespace detail
 {
 struct AsyncExecutionTimer;
+struct AsyncExecutionAccept;
+struct AsyncExecutionConnect;
 struct AsyncExecutionSend;
+struct AsyncExecutionSendBuffers;
+struct AsyncExecutionSendAllBuffers;
+struct AsyncExecutionReceiveExact;
+struct AsyncExecutionReceiveLine;
 struct AsyncExecutionSendAll;
 struct AsyncExecutionReceive;
 struct AsyncExecutionFileRead;
@@ -54,15 +63,57 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 
     AsyncExecutionScheduler getScheduler() noexcept;
 
-    AsyncExecutionSender<detail::AsyncExecutionTimer>    sleep(TimeMs duration);
-    AsyncExecutionSender<detail::AsyncExecutionSend>     send(const SocketDescriptor& socket, Span<const char> data);
-    AsyncExecutionSender<detail::AsyncExecutionReceive>  receive(const SocketDescriptor& socket, Span<char> buffer);
-    AsyncExecutionSender<detail::AsyncExecutionSendAll>  sendAll(const SocketDescriptor& socket, Span<const char> data);
-    AsyncExecutionSender<detail::AsyncExecutionFileRead> fileRead(const FileDescriptor& file, Span<char> buffer,
-                                                                  ThreadPool& pool, uint64_t offset = 0);
+    /// Drive this same loop directly for GUI/frame integration; operation storage must survive completion.
+    AsyncEventLoop& getEventLoop() noexcept { return loop; }
+
+    /// Consume one graph on the owner thread, driving the borrowed loop until terminal completion.
+    template <typename Sender>
+    Result run(Sender&& sender);
+
+    template <typename Sender, typename StopToken>
+    Result run(Sender&& sender, StopToken token);
+
+    /// Assign successful values to existing output objects, in completion argument order.
+    /// The consumer assigns only on success; assignments must be noexcept.
+    template <typename Sender, typename... Outputs>
+    Result runInto(Sender&& sender, Outputs&... outputs);
+
+    template <typename Sender, typename StopToken, typename... Outputs>
+    Result runIntoWithStop(Sender&& sender, StopToken token, Outputs&... outputs);
+
+    AsyncExecutionSender<detail::AsyncExecutionTimer> sleep(TimeMs duration);
+
+    /// Accept owns the returned connection; connect borrows an already-associated nonblocking socket.
+    AsyncExecutionSender<detail::AsyncExecutionAccept>  accept(const SocketDescriptor& listener);
+    AsyncExecutionSender<detail::AsyncExecutionConnect> connect(const SocketDescriptor& socket,
+                                                                SocketIPAddress         address);
+    AsyncExecutionSender<detail::AsyncExecutionConnect> connect(const SocketDescriptor& socket, SocketAddress address);
+
+    AsyncExecutionSender<detail::AsyncExecutionSend>        send(const SocketDescriptor& socket, Span<const char> data);
+    AsyncExecutionSender<detail::AsyncExecutionSendBuffers> send(const SocketDescriptor& socket,
+                                                                 Span<Span<const char>>  data);
+
+    /// Optional progress reports observed completed chunks, including before an error or stopped completion.
+    AsyncExecutionSender<detail::AsyncExecutionSendAll> sendAll(const SocketDescriptor& socket, Span<const char> data,
+                                                                size_t* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionSendAllBuffers> sendAll(const SocketDescriptor& socket,
+                                                                       Span<Span<const char>>  data,
+                                                                       size_t*                 progress = nullptr);
+
+    AsyncExecutionSender<detail::AsyncExecutionReceive>      receive(const SocketDescriptor& socket, Span<char> buffer);
+    AsyncExecutionSender<detail::AsyncExecutionReceiveExact> receiveExact(const SocketDescriptor&   socket,
+                                                                          Span<char>                buffer,
+                                                                          AsyncExecutionReadResult* progress = nullptr);
+    AsyncExecutionSender<detail::AsyncExecutionReceiveLine>  receiveLine(const SocketDescriptor&   socket,
+                                                                         Span<char>                buffer,
+                                                                         AsyncExecutionLineResult* progress = nullptr);
+
+    AsyncExecutionSender<detail::AsyncExecutionFileRead>  fileRead(const FileDescriptor& file, Span<char> buffer,
+                                                                   ThreadPool& pool, uint64_t offset = 0);
     AsyncExecutionSender<detail::AsyncExecutionFileWrite> fileWrite(const FileDescriptor& file, Span<const char> data,
                                                                     ThreadPool& pool, uint64_t offset = 0);
-    AsyncExecutionSender<detail::AsyncExecutionWork>      work(ThreadPool& pool, Function<Result()> procedure);
+
+    AsyncExecutionSender<detail::AsyncExecutionWork> work(ThreadPool& pool, Function<Result()> procedure);
 
     AsyncEventLoop& loop;
 
@@ -82,6 +133,25 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     Atomic<bool>                   accepting   = false;
     uint64_t                       ownerThread = 0;
     bool                           dispatching = false;
+
+    bool running = false;
+    struct RunState
+    {
+        AsyncExecutionContext&        context;
+        Result                        status{true};
+        bool                          completed = false;
+        bool                          driving   = false;
+        detail::AsyncExecutionCommand completion;
+        Result                        pending{true};
+
+        void finishOnLoop(Result result) noexcept;
+        void finish(Result result) noexcept;
+    };
+    template <typename Token, typename Output>
+    struct RunReceiver;
+
+    Result beginRun();
+    Result finishRun(RunState& state);
 
     Result post(detail::AsyncExecutionCommand& command) noexcept;
 
@@ -203,8 +273,118 @@ struct AsyncExecutionReadResult
     bool       endOfFile = false;
 };
 
+struct AsyncExecutionLineResult
+{
+    Span<char> line;
+    bool       disconnected = false;
+    bool       lineComplete = false;
+};
+
 namespace detail
 {
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionAccept
+{
+    using Request = AsyncSocketAccept;
+    using Value   = AsyncExecutionConnection;
+    const SocketDescriptor& listener;
+    SocketDescriptor        client;
+
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    Result advance(Request::Result& result);
+    bool   hasRemaining() const { return false; }
+    Value  value(Request::Result&);
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionConnect
+{
+    using Request = AsyncSocketConnect;
+    using Value   = AsyncCompletionData;
+    const SocketDescriptor& socket;
+    SocketAddress           address;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value value(Request::Result&) { return {}; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendBuffers
+{
+    using Request = AsyncSocketSend;
+    using Value   = size_t;
+    const SocketDescriptor& socket;
+    Span<Span<const char>>  data;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value value(Request::Result& result) { return result.completionData.numBytes; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendAllBuffers
+{
+    using Request = AsyncSocketSend;
+    using Value   = size_t;
+    const SocketDescriptor& socket;
+    Span<Span<const char>>  data;
+    size_t*                 progress = nullptr;
+
+    size_t index       = 0;
+    size_t offset      = 0;
+    size_t transferred = 0;
+    Result initialization{true};
+
+    void   initialize();
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    Result advance(Request::Result& result);
+    Result advanceBytes(size_t count);
+    void   findNextBuffer();
+    bool   hasRemaining() const { return index < data.sizeInElements(); }
+    bool   completesImmediately() const { return initialization and not hasRemaining(); }
+    Value  immediateValue() const { return transferred; }
+    Value  value(Request::Result&) const { return transferred; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionReceiveExact
+{
+    using Request = AsyncSocketReceive;
+    using Value   = AsyncExecutionReadResult;
+    const SocketDescriptor& socket;
+    Span<char>              buffer;
+    Value*                  progress = nullptr;
+
+    size_t received     = 0;
+    bool   disconnected = false;
+
+    void   initialize();
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    Result advance(Request::Result& result);
+    Result advanceBytes(size_t count, bool ended);
+    bool   hasRemaining() const { return received < buffer.sizeInBytes(); }
+    bool   completesImmediately() const { return buffer.empty(); }
+    Value  immediateValue() { return {{buffer.data(), 0}, false}; }
+    Value  value(Request::Result&) { return {{buffer.data(), received}, disconnected}; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionReceiveLine
+{
+    using Request = AsyncSocketReceive;
+    using Value   = AsyncExecutionLineResult;
+    const SocketDescriptor& socket;
+    Span<char>              buffer;
+    Value*                  progress = nullptr;
+
+    size_t received     = 0;
+    char   currentByte  = 0;
+    bool   disconnected = false;
+    bool   lineComplete = false;
+
+    void   initialize();
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&);
+    Result advance(Request::Result& result);
+    Result advanceByte(size_t count, bool ended);
+    bool   hasRemaining() const { return not disconnected and not lineComplete; }
+    Value  value(Request::Result&);
+    Value  currentValue();
+    void   updateProgress();
+};
+
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionTimer
 {
     using Request = AsyncLoopTimeout;
@@ -232,9 +412,16 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendAll
     const SocketDescriptor& socket;
     Span<const char>        remaining;
     size_t                  transferred = 0;
+    size_t*                 progress    = nullptr;
 
+    void initialize()
+    {
+        if (progress)
+            *progress = transferred;
+    }
     Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
     Result advance(Request::Result& result);
+    Result advanceBytes(size_t count);
     bool   hasRemaining() const { return not remaining.empty(); }
     bool   completesImmediately() const { return remaining.empty(); }
     Value  immediateValue() const { return transferred; }
@@ -398,6 +585,8 @@ struct AsyncExecutionOperation
         cancelCommand.operation = this;
         cancelCommand.execute   = [](AsyncExecutionCommand& command) noexcept
         { static_cast<AsyncExecutionOperation*>(command.operation)->cancelOnLoop(); };
+        if constexpr (requires { setup.initialize(); })
+            setup.initialize();
         // Register on the loop thread, after publication through the start command. An already-stopped token may
         // enqueue cancellation synchronously, but cannot dispatch it before this owner-thread call returns.
         auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
@@ -531,13 +720,131 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionBuffer
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionConnection
 {
     SocketDescriptor socket;
+    AsyncExecutionConnection() = default;
+    AsyncExecutionConnection& operator=(AsyncExecutionConnection&& other) noexcept;
     explicit AsyncExecutionConnection(SocketDescriptor socket) noexcept : socket(move(socket)) {}
     AsyncExecutionConnection(AsyncExecutionConnection&& other) noexcept : socket(move(other.socket)) {}
     AsyncExecutionConnection(const AsyncExecutionConnection&) = delete;
 };
 
-/// Checked output of a fallible synchronous buffer transform. then passes this as a value;
-/// the next owning I/O sender explicitly converts a failed status into set_error(Result).
+/// Checked output of an SC fallible transform. tryThen sends value only when status succeeds.
+template <typename Value>
+struct AsyncExecutionValueResult
+{
+    static_assert(std::is_object_v<Value>, "AsyncExecutionValueResult requires an owned object value");
+    Result status{true};
+    Value  value{};
+};
+
+namespace detail
+{
+template <typename Returned>
+struct AsyncExecutionTryTraits
+{
+    static_assert(std::is_same_v<Returned, Result>, "tryThen expects Result or AsyncExecutionValueResult<T>");
+    using Value          = void;
+    using ValueSignature = AsyncExecutionProtocol::set_value_t();
+    static Result status(Result result) noexcept { return result; }
+};
+
+template <typename Output>
+struct AsyncExecutionTryTraits<AsyncExecutionValueResult<Output>>
+{
+    static_assert(std::is_nothrow_move_constructible_v<Output>, "tryThen output must be nothrow move constructible");
+    using Value          = Output;
+    using ValueSignature = AsyncExecutionProtocol::set_value_t(Output);
+    static Result status(const AsyncExecutionValueResult<Output>& result) noexcept { return result.status; }
+};
+
+template <typename Compute>
+struct AsyncExecutionTrySender
+{
+    using sender_concept = AsyncExecutionProtocol::sender_tag;
+    using Returned       = std::remove_cvref_t<decltype(std::declval<Compute&>()())>;
+    using Traits         = AsyncExecutionTryTraits<Returned>;
+    using Value          = typename Traits::Value;
+    using ValueSignature = typename Traits::ValueSignature;
+    Compute compute;
+
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        return AsyncExecutionProtocol::completion_signatures<
+            ValueSignature, AsyncExecutionProtocol::set_error_t(Result), AsyncExecutionProtocol::set_stopped_t()>{};
+    }
+
+    template <typename Receiver>
+    struct Operation
+    {
+        using operation_state_concept = AsyncExecutionProtocol::operation_state_tag;
+        Compute  compute;
+        Receiver receiver;
+
+        void start() noexcept
+        {
+            auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
+            if (token.stop_requested())
+            {
+                AsyncExecutionProtocol::set_stopped(move(receiver));
+                return;
+            }
+            auto         result = compute();
+            const Result status = Traits::status(result);
+            // Preserve a completed transform's error; a successful CPU function observes stop after returning.
+            if (not status)
+                AsyncExecutionProtocol::set_error(move(receiver), status);
+            else if (token.stop_requested())
+                AsyncExecutionProtocol::set_stopped(move(receiver));
+            else if constexpr (std::is_void_v<Value>)
+                AsyncExecutionProtocol::set_value(move(receiver));
+            else
+                AsyncExecutionProtocol::set_value(move(receiver), move(result.value));
+            // Terminal delivery may destroy this operation; no member accesses follow it.
+        }
+    };
+
+    template <typename Receiver>
+    auto connect(Receiver receiver) && noexcept
+    {
+        return Operation<Receiver>{move(compute), move(receiver)};
+    }
+};
+
+template <typename Procedure>
+struct AsyncExecutionTryTransform
+{
+    Procedure procedure;
+
+    template <typename... Values>
+    auto operator()(Values&... values) noexcept
+    {
+        static_assert(std::is_nothrow_invocable_v<Procedure&, Values&&...>, "tryThen callable must be noexcept");
+        static_assert(not std::is_reference_v<decltype(procedure(move(values)...))>,
+                      "tryThen callable must return its checked result by value");
+        auto compute = [procedure = move(procedure), &values...]() mutable noexcept
+        { return procedure(move(values)...); };
+        return AsyncExecutionTrySender<decltype(compute)>{move(compute)};
+    }
+};
+} // namespace detail
+
+/// SC extension: unwrap Result or AsyncExecutionValueResult<T> into the execution completion channels.
+/// Inputs are consumed as rvalues; the callable must be noexcept. Standard let_value retains input lifetimes.
+template <typename Procedure>
+auto tryThen(Procedure procedure)
+{
+    return AsyncExecutionProtocol::let_value(detail::AsyncExecutionTryTransform<Procedure>{move(procedure)});
+}
+
+template <typename Sender, typename Procedure>
+auto tryThen(Sender&& sender, Procedure procedure)
+{
+    return AsyncExecutionProtocol::let_value(forward<Sender>(sender),
+                                             detail::AsyncExecutionTryTransform<Procedure>{move(procedure)});
+}
+
+/// Legacy checked-buffer carrier accepted by sendTCP for compatibility.
+/// Prefer AsyncExecutionValueResult<AsyncExecutionBuffer> with tryThen for transport-independent error handling.
 struct AsyncExecutionBufferResult
 {
     Result               status{true};
@@ -735,24 +1042,30 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
 
     detail::AsyncExecutionTCPSender sendTCP(StringSpan host, uint16_t port, AsyncExecutionBufferResult encoded);
 
+    AsyncExecutionContext& getContext() noexcept { return context; }
+
     template <typename Sender>
     Result run(Sender&& sender)
     {
-        struct EmptyReceiver
-        {
-        };
-        auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(EmptyReceiver{}));
-        return run(forward<Sender>(sender), token);
+        return context.run(forward<Sender>(sender));
     }
 
     template <typename Sender, typename StopToken>
     Result run(Sender&& sender, StopToken token)
     {
-        SC_TRY(beginRun());
-        RunState state{context};
-        auto operation = AsyncExecutionProtocol::connect(forward<Sender>(sender), RunReceiver<StopToken>{state, token});
-        AsyncExecutionProtocol::start(operation);
-        return finishRun(state);
+        return context.run(forward<Sender>(sender), token);
+    }
+
+    template <typename Sender, typename... Outputs>
+    Result runInto(Sender&& sender, Outputs&... outputs)
+    {
+        return context.runInto(forward<Sender>(sender), outputs...);
+    }
+
+    template <typename Sender, typename StopToken, typename... Outputs>
+    Result runIntoWithStop(Sender&& sender, StopToken token, Outputs&... outputs)
+    {
+        return context.runIntoWithStop(forward<Sender>(sender), token, outputs...);
     }
 
   private:
@@ -760,45 +1073,112 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
     ThreadPool            pool;
     AsyncExecutionContext context;
     bool                  initialized = false;
-    bool                  running     = false;
-    struct RunState
-    {
-        AsyncExecutionContext&        context;
-        Result                        status{true};
-        bool                          completed = false;
-        bool                          driving   = false;
-        detail::AsyncExecutionCommand completion;
-        Result                        pending{true};
-
-        void finishOnLoop(Result result) noexcept;
-        void finish(Result result) noexcept;
-    };
-    Result beginRun();
-    Result finishRun(RunState& state);
-    template <typename Token>
-    struct RunReceiver
-    {
-        using receiver_concept = AsyncExecutionProtocol::receiver_tag;
-        RunState& state;
-        Token     token;
-        struct Environment
-        {
-            Token token;
-            auto  query(AsyncExecutionProtocol::get_stop_token_t) const noexcept { return token; }
-        };
-        auto get_env() const noexcept { return Environment{token}; }
-        template <typename... Values>
-        void set_value(Values&&...) && noexcept
-        {
-            state.finish(Result(true));
-        }
-        void set_error(Result result) && noexcept { state.finish(result); }
-        void set_stopped() && noexcept
-        {
-            state.finish(Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
-        }
-    };
 };
+
+namespace detail
+{
+struct AsyncExecutionDiscard
+{
+    template <typename... Values>
+    void store(Values&&...) noexcept
+    {}
+};
+
+template <typename... Outputs>
+struct AsyncExecutionOutputs;
+
+template <>
+struct AsyncExecutionOutputs<>
+{
+    void store() noexcept {}
+};
+
+template <typename Head, typename... Tail>
+struct AsyncExecutionOutputs<Head, Tail...>
+{
+    Head&                          head;
+    AsyncExecutionOutputs<Tail...> tail;
+
+    AsyncExecutionOutputs(Head& head, Tail&... tail) noexcept : head(head), tail(tail...) {}
+
+    template <typename Value, typename... Values>
+    void store(Value&& value, Values&&... values) noexcept
+    {
+        static_assert(std::is_nothrow_assignable_v<Head&, Value>, "runInto output assignment must be noexcept");
+        head = forward<Value>(value);
+        tail.store(forward<Values>(values)...);
+    }
+};
+} // namespace detail
+
+template <typename Token, typename Output>
+struct AsyncExecutionContext::RunReceiver
+{
+    using receiver_concept = AsyncExecutionProtocol::receiver_tag;
+    RunState& state;
+    Token     token;
+    Output    output;
+    struct Environment
+    {
+        Token                   token;
+        AsyncExecutionScheduler scheduler;
+
+        auto query(AsyncExecutionProtocol::get_stop_token_t) const noexcept { return token; }
+        auto query(AsyncExecutionProtocol::get_scheduler_t) const noexcept { return scheduler; }
+        auto query(AsyncExecutionProtocol::get_start_scheduler_t) const noexcept { return scheduler; }
+    };
+    auto get_env() const noexcept { return Environment{token, state.context.getScheduler()}; }
+    template <typename... Values>
+    void set_value(Values&&... values) && noexcept
+    {
+        output.store(forward<Values>(values)...);
+        state.finish(Result(true));
+    }
+    void set_error(Result result) && noexcept { state.finish(result); }
+    void set_stopped() && noexcept
+    {
+        state.finish(Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+    }
+};
+
+template <typename Sender>
+Result AsyncExecutionContext::run(Sender&& sender)
+{
+    auto token =
+        AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(detail::AsyncExecutionDiscard{}));
+    return run(forward<Sender>(sender), token);
+}
+
+template <typename Sender, typename StopToken>
+Result AsyncExecutionContext::run(Sender&& sender, StopToken token)
+{
+    SC_TRY(beginRun());
+    RunState state{*this};
+    auto     operation = AsyncExecutionProtocol::connect(
+        forward<Sender>(sender), RunReceiver<StopToken, detail::AsyncExecutionDiscard>{state, token, {}});
+    AsyncExecutionProtocol::start(operation);
+    return finishRun(state);
+}
+
+template <typename Sender, typename... Outputs>
+Result AsyncExecutionContext::runInto(Sender&& sender, Outputs&... outputs)
+{
+    auto token =
+        AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(detail::AsyncExecutionDiscard{}));
+    return runIntoWithStop(forward<Sender>(sender), token, outputs...);
+}
+
+template <typename Sender, typename StopToken, typename... Outputs>
+Result AsyncExecutionContext::runIntoWithStop(Sender&& sender, StopToken token, Outputs&... outputs)
+{
+    SC_TRY(beginRun());
+    RunState state{*this};
+    using Output   = detail::AsyncExecutionOutputs<Outputs...>;
+    auto operation = AsyncExecutionProtocol::connect(forward<Sender>(sender),
+                                                     RunReceiver<StopToken, Output>{state, token, Output(outputs...)});
+    AsyncExecutionProtocol::start(operation);
+    return finishRun(state);
+}
 
 } // namespace SC
 #endif
