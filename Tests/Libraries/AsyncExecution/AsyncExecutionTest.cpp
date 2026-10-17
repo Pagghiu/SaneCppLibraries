@@ -12,10 +12,7 @@
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
-#ifdef SC_ASYNC_EXECUTION_TRACE_FILE_IO
-#include <stdio.h>
-#include <stdlib.h>
-#endif
+#include <stdlib.h> // _Exit (independent native-pipe deadline)
 
 namespace SC
 {
@@ -284,42 +281,17 @@ struct AsyncExecutionTest : TestCase
     {
         AsyncEventLoop loop;
         SC_TEST_EXPECT(loop.create());
-#ifdef SC_ASYNC_EXECUTION_TRACE_FILE_IO
-        Atomic<bool> traceFinished = false;
-        Thread       traceGuard;
-        SC_TEST_EXPECT(traceGuard.start(
-            [&traceFinished](Thread&)
+        Atomic<bool> finished = false;
+        Thread       deadline;
+        SC_TEST_EXPECT(deadline.start(
+            [&finished](Thread&)
             {
-                for (int i = 0; i < 800 and not traceFinished.load(); ++i)
+                for (int attempt = 0; attempt < 800 and not finished.load(); ++attempt)
                     Thread::Sleep(10);
-                if (not traceFinished.load())
-                {
-                    printf("independent native-pipe trace deadline reached\n");
-                    fflush(stdout);
+                // Independent of the event loop, which a backend regression could starve.
+                if (not finished.load())
                     ::_Exit(124);
-                }
             }));
-        AsyncEventLoopListeners traceListeners;
-        traceListeners.beforeBlockingPoll = [](AsyncEventLoop&)
-        {
-            static int count = 0;
-            if (count++ < 12)
-            {
-                printf("pipe trace: before poll\n");
-                fflush(stdout);
-            }
-        };
-        traceListeners.afterBlockingPoll = [](AsyncEventLoop&)
-        {
-            static int count = 0;
-            if (count++ < 12)
-            {
-                printf("pipe trace: after poll\n");
-                fflush(stdout);
-            }
-        };
-        loop.setListeners(&traceListeners);
-#endif
         AsyncExecutionContext context{loop};
         SC_TEST_EXPECT(context.create());
         PipeDescriptor pipe;
@@ -354,10 +326,8 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pipe.close());
         SC_TEST_EXPECT(context.close());
         SC_TEST_EXPECT(loop.close());
-#ifdef SC_ASYNC_EXECUTION_TRACE_FILE_IO
-        traceFinished.store(true);
-        SC_TEST_EXPECT(traceGuard.join());
-#endif
+        finished.store(true);
+        SC_TEST_EXPECT(deadline.join());
     }
 
     void borrowedTCP()
