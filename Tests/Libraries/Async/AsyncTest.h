@@ -100,6 +100,7 @@ struct SC::AsyncTest : public SC::TestCase
 
     // UDP Sockets
     void socketUDPSendReceive();
+    void socketUDPDatagramTruncation(bool queued);
     void socketUnixDatagramSendReceive();
 
     // File System Operations

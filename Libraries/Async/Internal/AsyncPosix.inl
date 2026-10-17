@@ -1018,13 +1018,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             AsyncSocketReceiveFrom& async = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
 
-            struct sockaddr* address    = &async.address.handle.reinterpret_as<struct sockaddr>();
-            socklen_t        addressLen = sizeof(async.address.handle);
-
-            res = ::recvfrom(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0, address, &addressLen);
+            struct iovec vector   = {};
+            vector.iov_base       = async.buffer.data();
+            vector.iov_len        = async.buffer.sizeInBytes();
+            struct msghdr message = {};
+            message.msg_name      = &async.address.handle.reinterpret_as<struct sockaddr>();
+            message.msg_namelen   = sizeof(async.address.handle);
+            message.msg_iov       = &vector;
+            message.msg_iovlen    = 1;
+            res                   = ::recvmsg(async.handle, &message, 0);
             if (res >= 0)
             {
-                async.address.nativeSize = addressLen;
+                async.address.nativeSize        = message.msg_namelen;
+                result.completionData.truncated = (message.msg_flags & MSG_TRUNC) != 0;
             }
         }
         else

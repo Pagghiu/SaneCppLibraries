@@ -503,9 +503,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         result.completionData.numBytes = static_cast<size_t>(completion.res);
         if (result.getAsync().getType() == AsyncRequest::Type::SocketReceiveFrom)
         {
-            AsyncSocketReceiveFrom& async = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
-            struct msghdr&          msg   = async.typeErasedMsgHdr.reinterpret_as<struct msghdr>();
-            async.address.nativeSize      = msg.msg_namelen;
+            AsyncSocketReceiveFrom& async   = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
+            struct msghdr&          msg     = async.typeErasedMsgHdr.reinterpret_as<struct msghdr>();
+            async.address.nativeSize        = msg.msg_namelen;
+            result.completionData.truncated = (msg.msg_flags & MSG_TRUNC) != 0;
         }
         if (completion.res == 0 and result.getAsync().getType() != AsyncRequest::Type::SocketReceiveFrom)
         {

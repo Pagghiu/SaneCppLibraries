@@ -158,6 +158,11 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketTCPSendReceiveError();
         }
+        if (test_section("UDP datagram truncation and boundaries"))
+        {
+            socketUDPDatagramTruncation(false);
+            socketUDPDatagramTruncation(true);
+        }
         if (test_section("socket UDP send/receive"))
         {
             socketUDPSendReceive();

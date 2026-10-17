@@ -699,18 +699,28 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         WSABUF      buffer;
-        buffer.buf = async.buffer.data();
-        buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
-        DWORD transferred;
+        buffer.buf          = async.buffer.data();
+        buffer.len          = static_cast<ULONG>(async.buffer.sizeInBytes());
+        async.truncatedSync = false;
 
         struct sockaddr* sockAddr = &async.address.handle.reinterpret_as<struct sockaddr>();
         async.addressSize         = sizeof(async.address.handle);
         async.receiveFlags        = 0;
         ::memset(sockAddr, 0, sizeof(async.address.handle));
-        const int res = ::WSARecvFrom(async.handle, &buffer, 1, &transferred, &async.receiveFlags, sockAddr,
+        const int res = ::WSARecvFrom(async.handle, &buffer, 1, nullptr, &async.receiveFlags, sockAddr,
                                       &async.addressSize, &overlapped, nullptr);
-        if (res == SOCKET_ERROR and WSAGetLastError() != WSA_IO_PENDING)
-            return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
+        if (res == SOCKET_ERROR)
+        {
+            const int error = ::WSAGetLastError();
+            if (error == WSAEMSGSIZE)
+            {
+                // Immediate failure has no IOCP packet; the datagram prefix and peer are available.
+                async.truncatedSync = true;
+                async.flags |= Internal::Flag_ManualCompletion;
+            }
+            else if (error != WSA_IO_PENDING)
+                return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
+        }
         return Result(true);
     }
 
@@ -782,22 +792,33 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     static Result completeAsync(AsyncSocketReceive::Result& result)
     {
+        if (result.getAsync().getType() == AsyncRequest::Type::SocketReceiveFrom)
+        {
+            auto& async       = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
+            DWORD transferred = 0;
+            DWORD flags       = 0;
+            bool  truncated   = async.truncatedSync;
+            if (not truncated)
+            {
+                if (::WSAGetOverlappedResult(async.handle, &async.overlapped.get().overlapped, &transferred, FALSE,
+                                             &flags) == FALSE)
+                {
+                    if (::WSAGetLastError() != WSAEMSGSIZE)
+                        return Result::Error(AsyncResultCategory, AsyncError::SocketReceiveFailed);
+                    truncated = true;
+                }
+            }
+            // UDP fills the supplied buffer before discarding the excess on WSAEMSGSIZE.
+            result.completionData.numBytes  = truncated ? async.buffer.sizeInBytes() : transferred;
+            result.completionData.truncated = truncated or (flags & MSG_PARTIAL) != 0;
+            async.address.nativeSize        = static_cast<uint32_t>(async.addressSize);
+            return Result(true);
+        }
         Result res =
             KernelQueue::checkWSAResult(result.getAsync().handle, result.getAsync().overlapped.get().overlapped,
                                         result.getAsync().type, &result.completionData.numBytes);
-        if (res)
-        {
-            if (result.getAsync().getType() == AsyncRequest::Type::SocketReceiveFrom)
-            {
-                AsyncSocketReceiveFrom& receiveFrom = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
-                receiveFrom.address.nativeSize      = static_cast<uint32_t>(receiveFrom.addressSize);
-            }
-            if (result.completionData.numBytes == 0 and
-                result.getAsync().getType() != AsyncRequest::Type::SocketReceiveFrom)
-            {
-                result.completionData.disconnected = true;
-            }
-        }
+        if (res and result.completionData.numBytes == 0)
+            result.completionData.disconnected = true;
         return res;
     }
 

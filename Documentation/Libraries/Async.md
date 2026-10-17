@@ -114,6 +114,13 @@ datagrams use send-to/receive-from requests that carry a family-neutral SC::Sock
 overloads remain available for IP callers. Unix pathname streams and datagrams work on macOS and Linux, with Linux
 abstract names supplied by Socket; Windows and Emscripten report Unix-domain creation as unsupported.
 
+`AsyncSocketReceiveFrom` consumes one datagram per completion. A zero-byte datagram succeeds and does not set
+`disconnected`. When the destination is too short, the result reports the copied prefix and `isTruncated()` is true;
+`completionData.truncated` carries the same information. UDP excess bytes are discarded, so the next receive starts at
+the next datagram. The original message length is not reported. A zero-capacity buffer can consume a nonempty datagram
+and return an empty truncated prefix. This contract applies to native readiness, io_uring and Windows overlapped UDP;
+other receive errors retain their normal Result identity. Check truncation before interpreting a complete-message format.
+
 A receive request owns no payload memory: the destination buffer in this compiled example remains in scope until the
 callback finishes. The callback may reactivate the request after consuming data to continue the receive loop.
 

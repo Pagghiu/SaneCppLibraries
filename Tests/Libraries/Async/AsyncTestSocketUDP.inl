@@ -4,6 +4,9 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/StringBuilder.h"
+#include "Libraries/Time/Time.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 void SC::AsyncTest::socketUDPSendReceive()
 {
@@ -147,4 +150,103 @@ void SC::AsyncTest::socketUnixDatagramSendReceive()
     SC_TEST_EXPECT(fileSystem.removeFile(senderPath.view()));
     SC_TEST_EXPECT(fileSystem.removeFile(receiverPath.view()));
 #endif
+}
+
+void SC::AsyncTest::socketUDPDatagramTruncation(bool queued)
+{
+    Atomic<bool> finished = false;
+    Atomic<int>  phase    = 0;
+    Thread       deadline;
+    SC_TEST_EXPECT(deadline.start(
+        [&finished, &phase](Thread&)
+        {
+            const auto started = Time::Monotonic::now();
+            while (not finished.load())
+            {
+                if (Time::Monotonic::now().getMonotonicMilliseconds() - started.getMonotonicMilliseconds() > 8000)
+                {
+                    fprintf(stderr, "UDP truncation deadline: case %d\n", phase.load());
+                    fflush(stderr);
+                    abort();
+                }
+                Thread::Sleep(10);
+            }
+        }));
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    SocketIPAddress serverAddress;
+    SocketIPAddress clientAddress;
+    SC_TEST_EXPECT(serverAddress.fromAddressPort("127.0.0.1", report.mapPort(5054)));
+    SC_TEST_EXPECT(clientAddress.fromAddressPort("127.0.0.1", report.mapPort(5055)));
+    SocketDescriptor server;
+    SocketDescriptor client;
+    SC_TEST_EXPECT(loop.createAsyncUDPSocket(serverAddress.getAddressFamily(), server));
+    SC_TEST_EXPECT(loop.createAsyncUDPSocket(clientAddress.getAddressFamily(), client));
+    SC_TEST_EXPECT(SocketServer(server).bind(serverAddress));
+    SC_TEST_EXPECT(SocketServer(client).bind(clientAddress));
+    struct State
+    {
+        size_t      expectedBytes = 0;
+        size_t      expectedSent  = 0;
+        bool        truncated     = false;
+        const char* prefix        = nullptr;
+        uint16_t    sourcePort    = 0;
+        int         receives      = 0;
+        int         sends         = 0;
+    } state;
+    state.sourcePort = clientAddress.getPort();
+    AsyncSocketSendTo send;
+    send.callback = [this, &state](AsyncSocketSendTo::Result& result)
+    {
+        SC_TEST_EXPECT(result.isValid());
+        SC_TEST_EXPECT(result.completionData.numBytes == state.expectedSent);
+        ++state.sends;
+    };
+    AsyncSocketReceiveFrom receive;
+    receive.callback = [this, &state](AsyncSocketReceiveFrom::Result& result)
+    {
+        Span<char> bytes;
+        SC_TEST_EXPECT(result.get(bytes));
+        SC_TEST_EXPECT(bytes.sizeInBytes() == state.expectedBytes);
+        SC_TEST_EXPECT(result.isTruncated() == state.truncated);
+        SC_TEST_EXPECT(not result.isEnded());
+        SC_TEST_EXPECT(result.getSourceAddress().getPort() == state.sourcePort);
+        if (not bytes.empty())
+            SC_TEST_EXPECT(memcmp(bytes.data(), state.prefix, state.expectedBytes) == 0);
+        ++state.receives;
+    };
+    char                   buffer[3]  = {};
+    const Span<const char> messages[] = {
+        StringView("abcdef").toCharSpan(), StringView("xy").toCharSpan(), {}, StringView("abcdef").toCharSpan()};
+    for (size_t index = 0; index < 4; ++index)
+    {
+        phase.store(static_cast<int>(index));
+        state.expectedSent    = messages[index].sizeInBytes();
+        state.expectedBytes   = index == 0 ? 3 : index == 1 ? 2 : 0;
+        state.truncated       = index == 0 or index == 3;
+        state.prefix          = messages[index].data();
+        const Span<char> loan = {buffer, index == 3 ? size_t(0) : sizeof(buffer)};
+        if (queued)
+        {
+            SC_TEST_EXPECT(send.start(loop, client, serverAddress, messages[index]));
+            SC_TEST_EXPECT(loop.run());
+            SC_TEST_EXPECT(receive.start(loop, server, loan));
+        }
+        else
+        {
+            SC_TEST_EXPECT(receive.start(loop, server, loan));
+            SC_TEST_EXPECT(loop.runNoWait());
+            SC_TEST_EXPECT(loop.runNoWait());
+            SC_TEST_EXPECT(send.start(loop, client, serverAddress, messages[index]));
+        }
+        SC_TEST_EXPECT(loop.run());
+        SC_TEST_EXPECT(state.receives == static_cast<int>(index + 1));
+        SC_TEST_EXPECT(state.sends == static_cast<int>(index + 1));
+        SC_TEST_EXPECT(receive.isFree() and send.isFree());
+    }
+    SC_TEST_EXPECT(server.close());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+    finished.store(true);
+    SC_TEST_EXPECT(deadline.join());
 }

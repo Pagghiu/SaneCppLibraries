@@ -747,6 +747,7 @@ struct SC_ASYNC_EXPORT AsyncSocketReceive : public AsyncRequest
     {
         size_t numBytes     = 0;
         bool   disconnected = false;
+        bool   truncated    = false; ///< Datagram prefix only; bytes beyond the supplied buffer were not returned.
     };
 
     struct Result : public AsyncResultOf<AsyncSocketReceive, CompletionData>
@@ -754,6 +755,8 @@ struct SC_ASYNC_EXPORT AsyncSocketReceive : public AsyncRequest
         using AsyncResultOf<AsyncSocketReceive, CompletionData>::AsyncResultOf;
 
         bool isEnded() const { return completionData.disconnected; }
+
+        bool isTruncated() const { return completionData.truncated; }
 
         /// @brief Get a Span of the actually read data
         /// @param outData The span of data actually read from socket
@@ -813,8 +816,9 @@ struct SC_ASYNC_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
 #if SC_PLATFORM_LINUX
     AlignedStorage<56> typeErasedMsgHdr;
 #elif SC_PLATFORM_WINDOWS
-    unsigned long receiveFlags = 0;
-    int           addressSize  = 0;
+    unsigned long receiveFlags  = 0;
+    int           addressSize   = 0;
+    bool          truncatedSync = false;
 #endif
 };
 
