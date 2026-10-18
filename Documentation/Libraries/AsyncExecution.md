@@ -58,6 +58,35 @@ A deadline requests cancellation; it cannot preempt running CPU work or bound cl
 
 Successful values are owned decayed snapshots, including zero/multiple and move-only values with nonthrowing storage construction. Reference outputs are copied into owned storage. The timeout operation retains its own inline value storage until destruction; it does not borrow the state of an already-completed child. Standard downstream `let_value` composition can retain received values through asynchronous continuations. Timeout introduces no allocation itself. Its connected state and borrowed context/resources must survive terminal completion. Completion runs on the thread delivering the final joined branch; use standard scheduler composition when affinity is required. A pool/context remains borrowed through a pool notification's return; a surrounding joined AsyncExecutionScope includes that tail before owning close.
 
+## Nonblocking graph lifetime and shutdown
+
+The runnable `Examples/AsyncExecutionDemo/Lifetime.cpp` example keeps one scope-owned `when_all` server/client graph alive while a frame loop pumps `runNoWait()`. The client encodes on the pool with standard `on` and `tryThen`, then uses native TCP I/O on the loop. The server receive has a joined deadline. The frame loop requests scope stop for application shutdown; the join receiver records completion without blocking the frame loop. Connection values live in provider `let_value` operations, and borrowed sockets/buffers outlive the scope join.
+
+The ownership shape is:
+
+```cpp
+SC::AsyncExecutionScope scope(context);
+SC_TRY(scope.spawn(ex::when_all(SC::move(server), SC::move(client))));
+auto join = ex::connect(scope.join(), FrameJoin{context, done, status});
+ex::start(join);
+while (not done)
+{
+    SC_ASYNC_TRUST_RESULT(loop.runNoWait());
+    // Application work continues here; on shutdown call scope.requestStop().
+}
+// All children and pool notifications are joined before buffer reuse and close.
+SC_TRY(app.close());
+SC_TRY(status);
+```
+
+`FrameJoin` is the example's concrete receiver; it retains the loop scheduler and stores status/done rather than driving or waiting on the loop. The full example checks scope summary/error policy, overwrites and verifies both buffers after joining, closes both borrowed socket descriptors, and checks observable runtime close. An independent watchdog terminates a stuck example; it is not the cancellation mechanism. The sample requires counting-scope support.
+
+After compiling `SCAsyncExecutionDemo`, run these modes through `./SC.sh build run SCAsyncExecutionDemo Debug --` (or Release), optionally adding `--port <port>`:
+
+- `--lifetime`: pool encoding and TCP fan-out complete normally.
+- `--lifetime --stall`: a peer stalls; the receive deadline cancels and joins both branches before reporting the expected timeout.
+- `--lifetime --cancel`: the application frame loop requests stop and joins cancellation before closing resources.
+
 ## Structured scopes
 
 Scopes are independently gated by `SC_ASYNC_EXECUTION_SCOPES_AVAILABLE`. Native support requires `__cpp_lib_counting_scope >= 202506L`, separately from `__cpp_lib_senders`; the explicitly selected, tested stdexec provider also enables scopes. Define `SC_ASYNC_EXECUTION_ENABLE_SCOPES=0` consistently in all translation units to disable this extension while retaining the basic adapter.

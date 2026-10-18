@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+SC::Result runAsyncExecutionLifetimeDemo(bool stall, bool cancel, uint16_t port);
+
 namespace
 {
 using namespace SC;
@@ -190,16 +192,23 @@ Result runDemo(bool failFile, uint16_t port)
 int main(int argc, const char* argv[])
 {
     SC::Globals::init(SC::Globals::Global);
-    bool     fail = false;
+    bool     fail     = false;
+    bool     lifetime = false, stall = false, cancel = false;
     uint16_t port = 19092;
     for (int i = 1; i < argc; ++i)
     {
-        if (strcmp(argv[i], "--fail") == 0)
+        if (strcmp(argv[i], "--lifetime") == 0)
+            lifetime = true;
+        else if (strcmp(argv[i], "--stall") == 0)
+            stall = true;
+        else if (strcmp(argv[i], "--cancel") == 0)
+            cancel = true;
+        else if (strcmp(argv[i], "--fail") == 0)
             fail = true;
         else if (strcmp(argv[i], "--port") == 0 and i + 1 < argc)
             port = static_cast<uint16_t>(atoi(argv[++i]));
     }
-    const SC::Result result = runDemo(fail, port);
+    const SC::Result result = lifetime ? runAsyncExecutionLifetimeDemo(stall, cancel, port) : runDemo(fail, port);
     if (not result)
         fprintf(stderr, "Demo failed: category %u, code %u\n", result.category().value, result.errorValue());
     return result ? 0 : 1;
