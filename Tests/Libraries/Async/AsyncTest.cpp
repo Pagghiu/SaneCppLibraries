@@ -158,10 +158,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketTCPConnectCancelWatcher();
         }
-#if SC_PLATFORM_LINUX
         if (test_section("socket TCP cancel pending completion"))
+        {
             socketTCPCancelPendingCompletion();
-#endif
+        }
         if (test_section("socket Unix connect accept"))
         {
             socketUnixConnectAccept();

@@ -508,11 +508,8 @@ void SC::AsyncTest::socketTCPConnectCancelCollectedError()
     SC_TEST_EXPECT(loop.close());
 }
 
-#if SC_PLATFORM_LINUX
 void SC::AsyncTest::socketTCPCancelPendingCompletion()
 {
-    if (options.apiType != AsyncEventLoop::Options::ApiType::ForceUseIoUring)
-        return;
     AsyncEventLoop loop;
     SC_TEST_EXPECT(loop.create(options));
     SocketDescriptor client, peer;
@@ -533,8 +530,9 @@ void SC::AsyncTest::socketTCPCancelPendingCompletion()
     SC_TEST_EXPECT(timer.start(loop, {2000}));
     Function<void(AsyncResult&)> afterStop = [&](AsyncResult&) { ++stopped; };
     SC_TEST_EXPECT(request.stop(loop, &afterStop));
-    // Collect one CQE at a time: cancellation acknowledgement must not release the operation's user_data early.
-    uint64_t          storage[3];
+    // Small batches exercise cancellation across separate polls. This fits one macOS/Windows event
+    // and retains the original one-CQE-per-batch io_uring coverage (CQE plus its pointer).
+    uint64_t          storage[4];
     AsyncKernelEvents events;
     events.eventsMemory = {reinterpret_cast<uint8_t*>(storage), sizeof(storage)};
     while (stopped == 0 and not expired)
@@ -545,7 +543,7 @@ void SC::AsyncTest::socketTCPCancelPendingCompletion()
     }
     SC_TEST_EXPECT(not expired and stopped == 1 and request.isFree() and callbacks == 0);
     SC_TEST_EXPECT(timer.unschedule(loop));
-    // afterStopped permits immediate storage reuse. An old CQE must never target this new free request.
+    // afterStopped permits immediate storage reuse. An old completion must never target this new free request.
     request.~AsyncSocketReceive();
     placementNew(request);
     request.callback = [&](AsyncSocketReceive::Result&) { ++callbacks; };
@@ -556,7 +554,6 @@ void SC::AsyncTest::socketTCPCancelPendingCompletion()
     SC_TEST_EXPECT(peer.close());
     SC_TEST_EXPECT(loop.close());
 }
-#endif
 
 void SC::AsyncTest::socketTCPConnectCancelWatcher()
 {
