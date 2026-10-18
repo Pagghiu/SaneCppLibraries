@@ -97,6 +97,7 @@ struct SC::AsyncTest : public SC::TestCase
     void socketTCPAccept();
     void socketTCPConnect();
     void socketTCPConnectCancelCollectedError();
+    void socketTCPConnectCancelWatcher();
     void socketTCPCancelPendingCompletion();
     void socketTCPSendReceive();
     void socketTCPSendMultiple();

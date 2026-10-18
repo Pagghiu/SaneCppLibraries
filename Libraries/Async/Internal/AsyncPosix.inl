@@ -606,6 +606,16 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return setEventWatcher(eventLoop, async, async.handle, OUTPUT_EVENTS_MASK);
     }
 
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketConnect& async)
+    {
+        if ((async.flags & Internal::Flag_WatcherSet) != 0)
+        {
+            SC_TRY(KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, async.handle, OUTPUT_EVENTS_MASK));
+            async.flags &= ~Internal::Flag_WatcherSet;
+        }
+        return Result(true);
+    }
+
     static Result completeAsync(AsyncSocketConnect::Result& result)
     {
         AsyncSocketConnect& async = result.getAsync();

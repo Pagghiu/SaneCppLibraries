@@ -154,6 +154,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketTCPConnectCancelCollectedError();
         }
+        if (test_section("socket TCP connect cancellation removes watcher"))
+        {
+            socketTCPConnectCancelWatcher();
+        }
 #if SC_PLATFORM_LINUX
         if (test_section("socket TCP cancel pending completion"))
             socketTCPCancelPendingCompletion();

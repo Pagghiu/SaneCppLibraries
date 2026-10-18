@@ -557,3 +557,45 @@ void SC::AsyncTest::socketTCPCancelPendingCompletion()
     SC_TEST_EXPECT(loop.close());
 }
 #endif
+
+void SC::AsyncTest::socketTCPConnectCancelWatcher()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    SocketIPAddress address;
+    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5093)));
+    SocketDescriptor listener, socket;
+    SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), listener));
+    SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), socket));
+    SC_TEST_EXPECT(SocketServer(listener).bind(address));
+    SC_TEST_EXPECT(SocketServer(listener).listen(1));
+
+    bool             expired = false;
+    AsyncLoopTimeout guard;
+    guard.callback = [&expired](AsyncLoopTimeout::Result&) { expired = true; };
+    SC_TEST_EXPECT(guard.start(loop, {2000}));
+    AsyncSocketConnect request;
+    int                values = 0, stopped = 0;
+    request.callback                          = [&values](AsyncSocketConnect::Result&) { ++values; };
+    Function<void(AsyncResult&)> afterStopped = [&stopped](AsyncResult&) { ++stopped; };
+    SC_TEST_EXPECT(request.start(loop, socket, address));
+    uint64_t          memory[1024];
+    AsyncKernelEvents events;
+    events.eventsMemory = {reinterpret_cast<uint8_t*>(memory), sizeof(memory)};
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    SC_TEST_EXPECT(loop.blockingPoll(events));
+    SC_TEST_EXPECT(request.stop(loop, &afterStopped));
+    SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    for (int pass = 0; pass < 8 and stopped == 0; ++pass)
+        SC_TEST_EXPECT(loop.runNoWait());
+    SC_TEST_EXPECT(stopped == 1 and values == 0 and request.isFree());
+    // Keep unrelated work active so the loop actually polls again after terminal cancellation.
+    // The connect socket remains writable: its old watcher must no longer reference the free request.
+    SC_TEST_EXPECT(loop.runNoWait());
+    SC_TEST_EXPECT(loop.runNoWait());
+    SC_TEST_EXPECT(not expired and values == 0 and stopped == 1);
+    SC_TEST_EXPECT(guard.unschedule(loop));
+    SC_TEST_EXPECT(socket.close());
+    SC_TEST_EXPECT(listener.close());
+    SC_TEST_EXPECT(loop.close());
+}
