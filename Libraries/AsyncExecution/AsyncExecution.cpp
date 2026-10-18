@@ -202,6 +202,13 @@ Result detail::AsyncExecutionTimer::submit(Request& request, AsyncEventLoop& loo
     return request.start(loop, duration);
 }
 
+Result detail::AsyncExecutionFilePoll::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TRY(file.get(handle, Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
+    return request.start(loop, handle);
+}
+
 Result detail::AsyncExecutionAccept::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
 {
     return request.start(loop, listener);
@@ -954,6 +961,11 @@ AsyncExecutionSender<detail::AsyncExecutionReceiveLine> AsyncExecutionContext::r
 AsyncExecutionSender<detail::AsyncExecutionTimer> AsyncExecutionContext::sleep(TimeMs duration)
 {
     return AsyncExecutionSender<detail::AsyncExecutionTimer>{*this, {duration}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFilePoll> AsyncExecutionContext::filePoll(const FileDescriptor& file)
+{
+    return {*this, {file}};
 }
 
 AsyncExecutionSender<detail::AsyncExecutionSend> AsyncExecutionContext::send(const SocketDescriptor& socket,

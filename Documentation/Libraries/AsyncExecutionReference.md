@@ -111,6 +111,18 @@ Early EOF before the requested file-send range completes reports `AsyncError::Fi
 prefix in optional progress. Native failures keep their identity. This corrects earlier POSIX zero-progress
 retrying and incomplete Windows worker success; it affects all Async adapters.
 
+# Readable readiness
+
+`filePoll(file)` borrows the descriptor and emits no success values. It observes one readable-ready indication
+without reading bytes or automatically rearming. Start another sender to observe readiness again. EOF can also
+make a descriptor readable; the subsequent read determines data/EOF. Readiness is a hint when other consumers
+can drain the descriptor before your read.
+
+The operation uses AsyncFileReadiness with the same owner-thread cancellation and terminal quiescence rules as
+other borrowed I/O. Valid Windows handles retain `AsyncError::OperationUnsupported`; no timer-polling emulation
+is supplied. Invalid descriptors report `AsyncError::InvalidFileHandle`; prestop avoids validation/submission.
+The descriptor must outlive terminal completion, even when a terminal receiver releases connected storage.
+
 # Datagrams, processes and signals
 
 | Factory | Successful value / contract |
@@ -219,7 +231,7 @@ channels. Similar operation names preserve resource semantics, not identical res
 | File read/write and explicit offsets | Yes | Yes | Yes |
 | Fill-to-EOF / exact file read | Exact | Fill-to-EOF | Both |
 | File send, UDP, process, one-shot signal | Yes | Yes | Yes |
-| File readiness | `filePoll` | `filePoll` | Missing |
+| File readiness | `filePoll` | `filePoll` | `filePoll`; POSIX, explicit Windows unsupported error |
 | Public wake-up | Internal only | `wakeUp` | Internal dispatcher only |
 | External-completion wrapper | Missing | Missing | Missing |
 | Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | Missing |

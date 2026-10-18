@@ -53,6 +53,7 @@ struct AsyncExecutionFileSendOptions
 namespace detail
 {
 struct AsyncExecutionTimer;
+struct AsyncExecutionFilePoll;
 struct AsyncExecutionAccept;
 struct AsyncExecutionConnect;
 struct AsyncExecutionSend;
@@ -122,6 +123,9 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     Result runIntoWithStop(Sender&& sender, StopToken token, Outputs&... outputs);
 
     AsyncExecutionSender<detail::AsyncExecutionTimer> sleep(TimeMs duration);
+
+    /// One readable-readiness observation. Borrows the descriptor, consumes no bytes and does not rearm.
+    AsyncExecutionSender<detail::AsyncExecutionFilePoll> filePoll(const FileDescriptor& file);
 
     /// Accept owns the returned connection; connect borrows an already-associated nonblocking socket.
     AsyncExecutionSender<detail::AsyncExecutionAccept>  accept(const SocketDescriptor& listener);
@@ -480,6 +484,16 @@ struct AsyncExecutionFileSendResult
 
 namespace detail
 {
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFilePoll
+{
+    using Request = AsyncFileReadiness;
+    using Value   = AsyncCompletionData;
+    const FileDescriptor& file;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value value(Request::Result&) { return {}; }
+};
+
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionAccept
 {
     using Request = AsyncSocketAccept;

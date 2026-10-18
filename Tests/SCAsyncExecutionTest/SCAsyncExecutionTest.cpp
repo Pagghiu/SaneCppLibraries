@@ -7,6 +7,7 @@ struct TestReport;
 void runAsyncExecutionTest(TestReport& report);
 void runAsyncExecutionTimeoutTest(TestReport& report);
 void runAsyncExecutionParityTest(TestReport& report);
+void runAsyncExecutionReadinessTest(TestReport& report);
 } // namespace SC
 
 #include "Libraries/Memory/Globals.h"
@@ -38,6 +39,7 @@ int main(int argc, const char* argv[])
     runAsyncExecutionTest(report);
     runAsyncExecutionTimeoutTest(report);
     runAsyncExecutionParityTest(report);
+    runAsyncExecutionReadinessTest(report);
 
     return report.getTestReturnCode();
 }
