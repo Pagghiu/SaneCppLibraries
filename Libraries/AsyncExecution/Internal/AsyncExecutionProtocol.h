@@ -35,6 +35,17 @@ namespace AsyncExecutionProtocol = std::execution;
 #if SC_ASYNC_EXECUTION_AVAILABLE
 #include <type_traits>
 #include <utility>
+#if !SC_ASYNC_EXECUTION_USE_STDEXEC
+#include <stop_token>
+#endif
+namespace SC::detail
+{
+#if SC_ASYNC_EXECUTION_USE_STDEXEC
+using AsyncExecutionStopSource = AsyncExecutionProtocol::inplace_stop_source;
+#else
+using AsyncExecutionStopSource = std::inplace_stop_source;
+#endif
+} // namespace SC::detail
 #endif
 
 // N5050 advertises counting scopes separately from the base sender/receiver framework.

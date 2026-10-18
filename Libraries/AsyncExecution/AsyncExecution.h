@@ -1786,5 +1786,338 @@ Result AsyncExecutionScope::spawn(Sender&& sender)
 
 #endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 
+namespace detail
+{
+struct AsyncExecutionTimeoutStopEnvironment
+{
+    decltype(std::declval<AsyncExecutionStopSource&>().get_token()) token;
+    auto query(AsyncExecutionProtocol::get_stop_token_t) const noexcept { return token; }
+};
+
+/// Arbitration is separate from provider-owned connected storage and value retention.
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionTimeoutState
+{
+    AsyncExecutionStopSource workStop;
+    AsyncExecutionStopSource timerStop;
+
+    void   workCompleted(Result status, bool stopped) noexcept;
+    void   timerCompleted(Result status, bool stopped) noexcept;
+    bool   beginCallerStop() noexcept;
+    bool   endCallerStop() noexcept;
+    bool   joined() noexcept;
+    Result outcome(bool& stopped) noexcept;
+
+  private:
+    Mutex mutex;
+    enum class Winner
+    {
+        Pending,
+        Work,
+        Timer
+    };
+    Winner winner = Winner::Pending;
+    Result workError{true};
+    Result timerError{true};
+    bool   workStopped    = false;
+    bool   callerStopped  = false;
+    bool   stoppingCaller = false;
+    bool   bothJoined     = false;
+    bool   delivering     = false;
+};
+
+template <typename Signature>
+struct AsyncExecutionTimeoutSignature;
+template <typename... Values>
+struct AsyncExecutionTimeoutSignature<AsyncExecutionProtocol::set_value_t(Values...)>
+{
+    static_assert((std::is_nothrow_constructible_v<std::decay_t<Values>, Values> and ...),
+                  "timeout values require nonthrowing owned storage construction");
+    using Type = AsyncExecutionProtocol::set_value_t(std::decay_t<Values>...);
+};
+template <typename Error>
+struct AsyncExecutionTimeoutSignature<AsyncExecutionProtocol::set_error_t(Error)>
+{
+    static_assert(std::is_same_v<std::decay_t<Error>, Result>, "timeout errors must carry SC::Result");
+    using Type = AsyncExecutionProtocol::set_error_t(Result);
+};
+template <>
+struct AsyncExecutionTimeoutSignature<AsyncExecutionProtocol::set_stopped_t()>
+{
+    using Type = AsyncExecutionProtocol::set_stopped_t();
+};
+template <typename Signatures>
+struct AsyncExecutionTimeoutSignatures
+{
+    // Preserve the provider's dependent/diagnostic result until a concrete environment is supplied.
+    using Type = Signatures;
+};
+template <typename... Signatures>
+struct AsyncExecutionTimeoutSignatures<AsyncExecutionProtocol::completion_signatures<Signatures...>>
+{
+    using Type =
+        AsyncExecutionProtocol::completion_signatures<typename AsyncExecutionTimeoutSignature<Signatures>::Type...,
+                                                      AsyncExecutionProtocol::set_error_t(Result),
+                                                      AsyncExecutionProtocol::set_stopped_t()>;
+};
+
+// Owned snapshots live in the outer operation, independently of completed child operation states.
+template <typename... Values>
+struct AsyncExecutionTimeoutValues;
+template <>
+struct AsyncExecutionTimeoutValues<>
+{
+    template <typename Receiver, typename... Outputs>
+    void emit(Receiver&& receiver, Outputs&&... outputs) noexcept
+    {
+        AsyncExecutionProtocol::set_value(forward<Receiver>(receiver), forward<Outputs>(outputs)...);
+    }
+};
+template <typename Head, typename... Tail>
+struct AsyncExecutionTimeoutValues<Head, Tail...>
+{
+    Head head;
+
+    AsyncExecutionTimeoutValues<Tail...> tail;
+    AsyncExecutionTimeoutValues(Head&& head, Tail&&... tail) noexcept : head(move(head)), tail(move(tail)...) {}
+    template <typename Receiver, typename... Outputs>
+    void emit(Receiver&& receiver, Outputs&&... outputs) noexcept
+    {
+        tail.emit(forward<Receiver>(receiver), forward<Outputs>(outputs)..., move(head));
+    }
+};
+
+template <typename Signature>
+struct AsyncExecutionTimeoutLayout
+{
+    static constexpr size_t Size      = 1;
+    static constexpr size_t Alignment = 1;
+};
+template <typename... Values>
+struct AsyncExecutionTimeoutLayout<AsyncExecutionProtocol::set_value_t(Values...)>
+{
+    using Pack = AsyncExecutionTimeoutValues<std::decay_t<Values>...>;
+
+    static constexpr size_t Size      = sizeof(Pack);
+    static constexpr size_t Alignment = alignof(Pack);
+};
+template <typename Signatures>
+struct AsyncExecutionTimeoutStorage;
+template <typename... Signatures>
+struct AsyncExecutionTimeoutStorage<AsyncExecutionProtocol::completion_signatures<Signatures...>>
+{
+    static constexpr size_t Size = []() consteval
+    {
+        size_t maximum = 1;
+        ((maximum = maximum < AsyncExecutionTimeoutLayout<Signatures>::Size
+                        ? AsyncExecutionTimeoutLayout<Signatures>::Size
+                        : maximum),
+         ...);
+        return maximum;
+    }();
+    static constexpr size_t Alignment = []() consteval
+    {
+        size_t maximum = 1;
+        ((maximum = maximum < AsyncExecutionTimeoutLayout<Signatures>::Alignment
+                        ? AsyncExecutionTimeoutLayout<Signatures>::Alignment
+                        : maximum),
+         ...);
+        return maximum;
+    }();
+};
+
+template <typename Sender, typename Timer, typename Receiver>
+struct AsyncExecutionTimeoutOperation
+{
+    using operation_state_concept = AsyncExecutionProtocol::operation_state_tag;
+
+    using Self = AsyncExecutionTimeoutOperation;
+    AsyncExecutionTimeoutState state;
+
+    Receiver receiver;
+
+    using Work =
+        decltype(AsyncExecutionProtocol::write_env(std::declval<Sender>(), AsyncExecutionTimeoutStopEnvironment{}));
+    using Environment = decltype(AsyncExecutionProtocol::get_env(std::declval<Receiver&>()));
+    using Layout =
+        AsyncExecutionTimeoutStorage<decltype(AsyncExecutionProtocol::get_completion_signatures<Work, Environment>())>;
+    AlignedStorage<Layout::Size, Layout::Alignment> output;
+
+    void (*emit)(void*, Receiver&) noexcept = nullptr;
+    void (*destroy)(void*) noexcept         = nullptr;
+
+    template <typename... Values>
+    void storeValues(Values&&... values) noexcept
+    {
+        using Pack = AsyncExecutionTimeoutValues<std::decay_t<Values>...>;
+        static_assert(sizeof(Pack) <= Layout::Size and alignof(Pack) <= Layout::Alignment);
+        auto* stored = reinterpret_cast<Pack*>(&output);
+        placementNew(*stored, forward<Values>(values)...);
+        emit    = [](void* storage, Receiver& target) noexcept { static_cast<Pack*>(storage)->emit(move(target)); };
+        destroy = [](void* storage) noexcept { static_cast<Pack*>(storage)->~Pack(); };
+    }
+    struct Capture
+    {
+        Self* owner;
+
+        AsyncExecutionTimeoutState* state;
+        template <typename... Values>
+        auto operator()(Values&... values) const noexcept -> decltype(AsyncExecutionProtocol::just())
+        {
+            owner->storeValues(move(values)...);
+            state->workCompleted(Result(true), false);
+            return AsyncExecutionProtocol::just();
+        }
+    };
+    struct Error
+    {
+        AsyncExecutionTimeoutState* state;
+
+        bool timer;
+        auto operator()(Result status) const noexcept
+        {
+            if (timer)
+                state->timerCompleted(status ? Result(false) : status, false);
+            else
+                state->workCompleted(status ? Result(false) : status, false);
+            return AsyncExecutionProtocol::just();
+        }
+    };
+    struct Stopped
+    {
+        AsyncExecutionTimeoutState* state;
+
+        bool timer;
+        auto operator()() const noexcept
+        {
+            if (timer)
+                state->timerCompleted(Result(true), true);
+            else
+                state->workCompleted(Result(true), true);
+            return AsyncExecutionProtocol::just();
+        }
+    };
+    struct TimerValue
+    {
+        AsyncExecutionTimeoutState* state;
+        void                        operator()() const noexcept { state->timerCompleted(Result(true), false); }
+    };
+    static auto children(Sender sender, Timer timer, Self* owner, AsyncExecutionTimeoutState& state)
+    {
+        namespace ex = AsyncExecutionProtocol;
+        auto work =
+            ex::let_stopped(ex::let_error(ex::let_value(move(sender), Capture{owner, &state}), Error{&state, false}),
+                            Stopped{&state, false});
+        auto deadline = ex::let_stopped(ex::let_error(ex::then(move(timer), TimerValue{&state}), Error{&state, true}),
+                                        Stopped{&state, true});
+        return ex::unstoppable(ex::when_all(
+            ex::write_env(move(work), AsyncExecutionTimeoutStopEnvironment{state.workStop.get_token()}),
+            ex::write_env(move(deadline), AsyncExecutionTimeoutStopEnvironment{state.timerStop.get_token()})));
+    }
+    struct Joined
+    {
+        using receiver_concept = AsyncExecutionProtocol::receiver_tag;
+        Self*     owner;
+        Receiver* target;
+        auto      get_env() const noexcept { return AsyncExecutionProtocol::get_env(*target); }
+        void      set_value() && noexcept
+        {
+            if (owner->state.joined())
+                owner->complete();
+        }
+    };
+    using Inner = decltype(AsyncExecutionProtocol::connect(children(std::declval<Sender>(), std::declval<Timer>(),
+                                                                    static_cast<Self*>(nullptr),
+                                                                    std::declval<AsyncExecutionTimeoutState&>()),
+                                                           Joined{}));
+    Inner inner;
+
+    struct Stop
+    {
+        Self* owner;
+        void  operator()() const noexcept
+        {
+            if (owner->state.beginCallerStop())
+            {
+                owner->state.workStop.request_stop();
+                owner->state.timerStop.request_stop();
+                if (owner->state.endCallerStop())
+                    owner->complete();
+            }
+        }
+    };
+    using Token    = decltype(AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)));
+    using Callback = typename Token::template callback_type<Stop>;
+    AlignedStorage<sizeof(Callback), alignof(Callback)> callbackStorage;
+
+    bool      registered = false;
+    Callback* callback() noexcept { return reinterpret_cast<Callback*>(&callbackStorage); }
+
+    AsyncExecutionTimeoutOperation(Sender sender, Timer timer, Receiver receiver)
+        : receiver(move(receiver)),
+          inner(AsyncExecutionProtocol::connect(children(move(sender), move(timer), this, state),
+                                                Joined{this, &this->receiver}))
+    {}
+    AsyncExecutionTimeoutOperation(const AsyncExecutionTimeoutOperation&) = delete;
+    ~AsyncExecutionTimeoutOperation()
+    {
+        SC_ASYNC_ASSERT_RELEASE(not registered);
+        if (destroy)
+            destroy(&output);
+    }
+    void start() noexcept
+    {
+        auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
+        placementNew(*callback(), token, Stop{this});
+        registered = true;
+        AsyncExecutionProtocol::start(inner);
+    }
+    void complete() noexcept
+    {
+        registered = false;
+        callback()->~Callback();
+        bool         stopped = false;
+        const Result status  = state.outcome(stopped);
+        if (stopped)
+            AsyncExecutionProtocol::set_stopped(move(receiver));
+        else if (not status)
+            AsyncExecutionProtocol::set_error(move(receiver), status);
+        else
+            emit(&output, receiver);
+        // Terminal delivery may destroy this operation and its owned value storage.
+    }
+};
+
+template <typename Sender, typename Timer>
+struct AsyncExecutionTimeoutSender
+{
+    using sender_concept = AsyncExecutionProtocol::sender_tag;
+    Sender sender;
+    Timer  timer;
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        using Work =
+            decltype(AsyncExecutionProtocol::write_env(std::declval<Sender>(), AsyncExecutionTimeoutStopEnvironment{}));
+        using Signatures = decltype(AsyncExecutionProtocol::get_completion_signatures<Work, Environment...>());
+        return typename AsyncExecutionTimeoutSignatures<Signatures>::Type{};
+    }
+    template <typename Receiver>
+    auto connect(Receiver receiver) && noexcept
+    {
+        return AsyncExecutionTimeoutOperation<Sender, Timer, Receiver>(move(sender), move(timer), move(receiver));
+    }
+};
+} // namespace detail
+
+/// SC extension: request stop at a relative deadline and join both branches before delivering work values/error/stop.
+/// Values use owned decayed storage. A reported work error takes precedence over deadline/caller cancellation.
+template <typename Sender>
+auto timeout(AsyncExecutionContext& context, Sender&& sender, TimeMs duration)
+{
+    auto timer = context.sleep(duration);
+    return detail::AsyncExecutionTimeoutSender<std::decay_t<Sender>, decltype(timer)>{forward<Sender>(sender),
+                                                                                      move(timer)};
+}
+
 } // namespace SC
 #endif

@@ -436,7 +436,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     project.addFiles("Tests/Libraries", "**.c*");
     project.addFiles("Tests/Libraries", "**.inl");
     project.removeFiles("Tests/Libraries/Await", "AwaitTest.cpp");
-    project.removeFiles("Tests/Libraries/AsyncExecution", "AsyncExecutionTest.cpp");
+    project.removeFiles("Tests/Libraries/AsyncExecution", "*.cpp");
     project.removeFiles("Tests/Libraries/Build", "BuildTest.cpp");
     project.addFiles("Tests/Support", "**.cpp");
     project.addFiles("Tests/Tools", "**.cpp");

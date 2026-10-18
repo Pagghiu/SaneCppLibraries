@@ -41,6 +41,23 @@ Factories include sleep, accept/connect, send/sendAll (contiguous or scatter/gat
 
 Cross-thread start posts to the owner dispatcher. Stop callbacks request owner-thread cancellation of pending native operations; terminal stopped notification waits for quiescence. Active worker functions cannot be preempted; cancellation waits for actual completion. Original operation errors retain their identity. A terminal notification may destroy operation storage. Context/runtime lifetime must extend past all producers and operation completions.
 
+## Joined timeout
+
+`timeout(context, sender, duration)` is an SC extension using the provider's standard `write_env`, `let_value`, `let_error`, `let_stopped`, `unstoppable` and `when_all` algorithms. It starts a relative timer alongside work, requests stop on the other branch when either finishes, and joins both before delivering work values, an error, or stopped. It requires base sender support and works with counting scopes disabled.
+
+```cpp
+auto receive = SC::timeout(context,
+                          context.receiveExact(connection.socket, buffer),
+                          SC::TimeMs{250});
+SC::AsyncExecutionReadResult read;
+SC_TRY(app.runInto(SC::move(receive), read));
+// The receive and timer have finished; buffer can be reused here.
+```
+
+A deadline requests cancellation; it cannot preempt running CPU work or bound cleanup latency. After both branches join, a failing work Result takes precedence, followed by a failing timer Result, caller stop, a winning deadline (`AsyncExecutionError::TimedOut`), work stopped, or work values. Work versus deadline success follows first observation, without a deterministic winner for concurrent ties. A timer cancelled by successful work does not report timeout. Errors retain their category and value, including a Result whose identity is Stopped; that is still an error channel completion. Caller cancellation is a stopped completion after cleanup.
+
+Successful values are owned decayed snapshots, including zero/multiple and move-only values with nonthrowing storage construction. Reference outputs are copied into owned storage. The timeout operation retains its own inline value storage until destruction; it does not borrow the state of an already-completed child. Standard downstream `let_value` composition can retain received values through asynchronous continuations. Timeout introduces no allocation itself. Its connected state and borrowed context/resources must survive terminal completion. Completion runs on the thread delivering the final joined branch; use standard scheduler composition when affinity is required. A pool/context remains borrowed through a pool notification's return; a surrounding joined AsyncExecutionScope includes that tail before owning close.
+
 ## Structured scopes
 
 Scopes are independently gated by `SC_ASYNC_EXECUTION_SCOPES_AVAILABLE`. Native support requires `__cpp_lib_counting_scope >= 202506L`, separately from `__cpp_lib_senders`; the explicitly selected, tested stdexec provider also enables scopes. Define `SC_ASYNC_EXECUTION_ENABLE_SCOPES=0` consistently in all translation units to disable this extension while retaining the basic adapter.
@@ -267,7 +284,7 @@ The following matrix describes implemented APIs and keeps remaining gaps explici
 | Wake-up / external completion | AsyncLoopWakeUp / AsyncExternalCompletion | Internal command wake-up; no operation API | wakeUp; no external-completion wrapper | Internal dispatcher; no operation API |
 | Filesystem operations | AsyncFileSystemOperation | Missing | fsOpen/Close/Read/Write/Copy/Rename/Remove | Missing |
 | CPU work | AsyncLoopWork + ThreadPool | No operation method | loopWork | work; owning onPool and pool scheduler |
-| Structured lifetime / timeout | Caller-owned requests and stop | FiberScheduler / counters / cancelAll | Task groups/registry, waitFor | AsyncExecutionScope spawn/requestStop/join plus manual connect/start or owning run; timeout pending |
+| Structured lifetime / timeout | Caller-owned requests and stop | FiberScheduler / counters / cancelAll | Task groups/registry, waitFor | AsyncExecutionScope spawn/requestStop/join; timeout stops and joins both branches; manual connect/start or owning run |
 
 Current output shapes: Await/Fibers populate send/write byte counts, received spans plus disconnect/EOF state, datagram source addresses, file-send byte counts/zero-copy/completeness, process exit status and signal number/delivery count. Await line reception additionally reports lineComplete. The borrowing sender baseline emits no value for timers/work, size_t for send/write, and AsyncExecutionReadResult (span plus endOfFile, also used for TCP disconnect) for receive/read. Missing sender operations have no published output contract yet; future value types must preserve the corresponding information.
 

@@ -1408,5 +1408,78 @@ void detail::AsyncExecutionScopeNode::complete(Result status, bool stopped) noex
 
 #endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 
+void detail::AsyncExecutionTimeoutState::workCompleted(Result status, bool stopped) noexcept
+{
+    mutex.lock();
+    workError   = status;
+    workStopped = stopped;
+    if (winner == Winner::Pending)
+        winner = Winner::Work;
+    mutex.unlock();
+    timerStop.request_stop();
+}
+
+void detail::AsyncExecutionTimeoutState::timerCompleted(Result status, bool stopped) noexcept
+{
+    mutex.lock();
+    timerError = status;
+    if (not stopped and winner == Winner::Pending)
+        winner = Winner::Timer;
+    mutex.unlock();
+    workStop.request_stop();
+}
+
+bool detail::AsyncExecutionTimeoutState::beginCallerStop() noexcept
+{
+    mutex.lock();
+    const bool accepted = not delivering;
+    if (accepted)
+    {
+        callerStopped  = true;
+        stoppingCaller = true;
+    }
+    mutex.unlock();
+    return accepted;
+}
+
+bool detail::AsyncExecutionTimeoutState::endCallerStop() noexcept
+{
+    mutex.lock();
+    stoppingCaller   = false;
+    const bool ready = bothJoined;
+    delivering       = ready;
+    mutex.unlock();
+    return ready;
+}
+
+bool detail::AsyncExecutionTimeoutState::joined() noexcept
+{
+    mutex.lock();
+    bothJoined       = true;
+    const bool ready = not stoppingCaller;
+    delivering       = ready;
+    mutex.unlock();
+    return ready;
+}
+
+Result detail::AsyncExecutionTimeoutState::outcome(bool& stopped) noexcept
+{
+    mutex.lock();
+    Result status = workError;
+    if (status)
+        status = timerError;
+    if (status)
+    {
+        if (callerStopped)
+            stopped = true;
+        else if (winner == Winner::Timer)
+            status = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TimedOut);
+        else
+            stopped = workStopped;
+    }
+    mutex.unlock();
+    return status;
+}
+
 } // namespace SC
 #endif

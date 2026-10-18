@@ -5,6 +5,7 @@ namespace SC
 {
 struct TestReport;
 void runAsyncExecutionTest(TestReport& report);
+void runAsyncExecutionTimeoutTest(TestReport& report);
 } // namespace SC
 
 #include "Libraries/Memory/Globals.h"
@@ -34,6 +35,7 @@ int main(int argc, const char* argv[])
     report.debugBreakOnFailedTest = true;
 
     runAsyncExecutionTest(report);
+    runAsyncExecutionTimeoutTest(report);
 
     return report.getTestReturnCode();
 }
