@@ -9,7 +9,7 @@ We need a small experiment establishing whether standard execution senders can w
 
 ## Decision
 
-Target WG21 N5046 (2026-05-12), the latest published C++26 working draft identified by its editor; N5054 starts C++29. Use its static `get_completion_signatures<Self, Env...>()`, member `connect`, `start`, and receiver completion protocols. This is draft interoperability, not published ISO conformance.
+Target WG21 N5050 (2026-06-01), identified by editor report N5051 as the final C++26 draft and basis of the DIS, replacing N5046. N5051 reports editorial changes with no intervening WG21 motions; this baseline correction does not itself establish a need to rewrite the execution protocol. Use its static `get_completion_signatures<Self, Env...>()`, member `connect`, `start`, and receiver completion protocols. This is draft interoperability, not published ISO conformance.
 
 AsyncExecution is an optional adapter library, analogous to Await: it explicitly depends on Async. Standard execution headers stay in an internal integration header and are enabled only with standard C++ headers available. No execution types are added to namespace std. The core Async library does not depend on AsyncExecution.
 
@@ -29,6 +29,7 @@ The dedicated SCAsyncExecutionTest target checks sender and operation-state conc
 
 ## Related
 
-- https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/n5046.pdf
+- https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/n5050.pdf
+- https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/n5051.html
 - https://www.iso.org/standard/83626.html
 - ../../Documentation/Libraries/AsyncExecution.md

@@ -1,6 +1,6 @@
 # AsyncExecution
 
-Experimental sender/receiver adapter over SC::Async. Requires C++20 language support and an execution implementation matching the relevant WG21 N5046 protocols. N5046 is a working draft, not a published ISO standard. It exposes event-loop and pool schedulers and uses the provider's standard sender algorithms. An owning facade intentionally permits allocations, as authorized for this experiment.
+Experimental sender/receiver adapter over SC::Async. Requires C++20 language support and an execution implementation matching the relevant WG21 N5050 protocols. N5050 is the final C++26 working draft, not a published ISO standard. It exposes event-loop and pool schedulers and uses the provider's standard sender algorithms. An owning facade intentionally permits allocations, as authorized for this experiment.
 
 Dependencies: Async, Strings and Threading. Standard execution integration is optional. With `SC_INCLUDE_STD_CPP=0`, or a standard library without `__cpp_lib_senders >= 202506L`, `SC_ASYNC_EXECUTION_AVAILABLE` is zero and no adapter API is exposed.
 
