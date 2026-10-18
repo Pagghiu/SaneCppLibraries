@@ -46,6 +46,7 @@ struct SC::AsyncTest : public SC::TestCase
     void loopFreeSubmittingOnClose();
     void loopFreeActiveOnClose();
     void loopInterrupt();
+    void loopInterruptCollectedCompletion();
 
     // Loop Work
     void loopWork();
@@ -93,6 +94,8 @@ struct SC::AsyncTest : public SC::TestCase
     // TCP Sockets
     void socketTCPAccept();
     void socketTCPConnect();
+    void socketTCPConnectCancelCollectedError();
+    void socketTCPCancelPendingCompletion();
     void socketTCPSendReceive();
     void socketTCPSendMultiple();
     void socketTCPSendReceiveError();

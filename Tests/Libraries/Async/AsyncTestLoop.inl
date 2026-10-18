@@ -3,6 +3,8 @@
 #include "AsyncTest.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Time/Time.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 void SC::AsyncTest::loopFreeSubmittingOnClose()
 {
@@ -123,4 +125,56 @@ void SC::AsyncTest::loopInterrupt()
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(numTimeouts == 2);
     SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() + eventLoop.getNumberOfSubmittedRequests() == 1);
+}
+
+void SC::AsyncTest::loopInterruptCollectedCompletion()
+{
+    Atomic<bool> finished = false;
+    Thread       guard;
+    SC_TEST_EXPECT(guard.start(
+        [&finished](Thread&)
+        {
+            const auto started = Time::Monotonic::now().getMonotonicMilliseconds();
+            while (not finished.load() and Time::Monotonic::now().getMonotonicMilliseconds() - started < 4000)
+                Thread::Sleep(1);
+            if (not finished.load())
+            {
+                fprintf(stderr, "Interrupted-loop completion/close exceeded its independent bound\n");
+                ::_Exit(124);
+            }
+        }));
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    SocketDescriptor client, peer;
+    createTCPSocketPair(loop, client, peer);
+    char               bytes[1] = {};
+    AsyncSocketReceive request;
+    int                callbacks = 0;
+    request.callback             = [&](AsyncSocketReceive::Result& result)
+    {
+        ++callbacks;
+        SC_TEST_EXPECT(result.isValid());
+    };
+    SC_TEST_EXPECT(SocketClient(peer).write({"X", 1}));
+    SC_TEST_EXPECT(request.start(loop, client, bytes));
+    uint64_t          storage[1024];
+    AsyncKernelEvents events;
+    events.eventsMemory = {reinterpret_cast<uint8_t*>(storage), sizeof(storage)};
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    SC_TEST_EXPECT(loop.blockingPoll(events));
+    SC_TEST_EXPECT(callbacks == 0);
+    loop.interrupt();
+    SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    SC_TEST_EXPECT(callbacks == 1 and request.isFree() and bytes[0] == 'X');
+    SC_TEST_EXPECT(loop.run()); // Consume the interruption even when only excluded internal work remains.
+    // Close must drain native cancellation even if an application interrupted before asking to close.
+    SC_TEST_EXPECT(request.start(loop, client, bytes));
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    loop.interrupt();
+    SC_TEST_EXPECT(loop.close());
+    SC_TEST_EXPECT(request.isFree() and callbacks == 1);
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(peer.close());
+    finished.store(true);
+    SC_TEST_EXPECT(guard.join());
 }

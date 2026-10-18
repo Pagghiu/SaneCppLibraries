@@ -84,7 +84,7 @@ run on the thread that dispatches them, not on an arbitrary kernel thread.
 
 `run()` normally returns after counted work drains, but `interrupt()` can make it return early and
 `excludeFromActiveCount()` can keep a long-lived request from holding it open. Neither facility releases an active
-request: it must still complete, be stopped, or be released when the loop closes.
+request: it must still complete, be stopped, or be released when the loop closes. Interruption does not discard a collected native completion batch: dispatch finishes that batch before run returns. A pending interruption returns from run before another poll and is consumed even when no counted work remains. Closing drains cancellation regardless of application interruption.
 
 # Timers And Cross-Thread Wake-Ups
 

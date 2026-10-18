@@ -63,6 +63,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopFreeActiveOnClose();
         }
+        if (test_section("loop interrupt collected completion"))
+            loopInterruptCollectedCompletion();
         if (test_section("loop interrupt"))
         {
             loopInterrupt();
@@ -142,6 +144,14 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketTCPConnect();
         }
+        if (test_section("socket TCP cancel collected error"))
+        {
+            socketTCPConnectCancelCollectedError();
+        }
+#if SC_PLATFORM_LINUX
+        if (test_section("socket TCP cancel pending completion"))
+            socketTCPCancelPendingCompletion();
+#endif
         if (test_section("socket Unix connect accept"))
         {
             socketUnixConnectAccept();

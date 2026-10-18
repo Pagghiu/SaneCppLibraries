@@ -1053,17 +1053,11 @@ SC::Result SC::AsyncEventLoop::runNoWait() { return internal.runStep(*this, Inte
 
 SC::Result SC::AsyncEventLoop::run()
 {
-    while (internal.getTotalNumberOfActiveHandle() != 0 or not internal.submissions.isEmpty() or
-           internal.numberOfManualCompletions != 0 or internal.hasPendingKernelCancellations or
-           not internal.cancellations.isEmpty())
+    while (internal.hasPendingWork() and not internal.interrupted)
     {
         SC_TRY(runOnce());
-        if (internal.interrupted)
-        {
-            internal.interrupted = false;
-            break;
-        }
     };
+    internal.interrupted = false;
     // We may still have pending cancellation callbacks
     internal.executeCancellationCallbacks(*this);
     return SC::Result(true);
@@ -1640,7 +1634,13 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
 
     stopRequests(eventLoop, manualCompletions);
 
-    SC_TRY(eventLoop.run());
+    // Closing owns cancellation cleanup. An application interruption cannot release native request storage early.
+    while (hasPendingWork())
+    {
+        interrupted = false;
+        SC_TRY(eventLoop.run());
+    }
+    interrupted = false;
     executeCancellationCallbacks(eventLoop);
     SC_TRY(eventLoop.internal.kernelQueue.get().close());
     if (numberOfExternals != 0 or numberOfActiveHandles != 0 or numberOfManualCompletions != 0)
@@ -1695,6 +1695,12 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(AsyncEventLoop& eventLo
 int SC::AsyncEventLoop::Internal::getTotalNumberOfActiveHandle() const
 {
     return numberOfActiveHandles + numberOfExternals;
+}
+
+bool SC::AsyncEventLoop::Internal::hasPendingWork() const
+{
+    return getTotalNumberOfActiveHandle() != 0 or not submissions.isEmpty() or numberOfManualCompletions != 0 or
+           hasPendingKernelCancellations or not cancellations.isEmpty();
 }
 
 SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEventLoop& eventLoop,
@@ -1829,11 +1835,6 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& eventLoop,
 SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& eventLoop, SyncMode syncMode,
                                                              AsyncKernelEvents& asyncKernelEvents)
 {
-    if (interrupted)
-    {
-        asyncKernelEvents.numberOfEvents = 0;
-        return SC::Result(true);
-    }
     KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
     switch (syncMode)
     {

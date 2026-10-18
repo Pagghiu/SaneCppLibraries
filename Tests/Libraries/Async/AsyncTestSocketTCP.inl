@@ -5,6 +5,7 @@
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/StringBuilder.h"
+#include <stdio.h>
 
 void SC::AsyncTest::createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client,
                                         SocketDescriptor& serverSideClient)
@@ -464,3 +465,95 @@ void SC::AsyncTest::socketTCPSendReceiveError()
     SC_TEST_EXPECT(numOnSend == 1);
     SC_TEST_EXPECT(numOnReceive == 1);
 }
+
+void SC::AsyncTest::socketTCPConnectCancelCollectedError()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    SocketIPAddress address;
+    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5120)));
+    SocketDescriptor reservation, client;
+    SC_TEST_EXPECT(reservation.create(address.getAddressFamily()));
+    SC_TEST_EXPECT(SocketServer(reservation).bind(address));
+    // A bound-but-not-listening port can drop SYNs; close the reservation to obtain connection refusal.
+    SC_TEST_EXPECT(reservation.close());
+    SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), client));
+
+    AsyncLoopTimeout watchdog;
+    bool             expired = false;
+    watchdog.callback        = [&](AsyncLoopTimeout::Result&) { expired = true; };
+    SC_TEST_EXPECT(watchdog.start(loop, {10000}));
+    AsyncSocketConnect request;
+    int                callbacks = 0, stopped = 0;
+    request.callback = [&](AsyncSocketConnect::Result&) { ++callbacks; };
+    SC_TEST_EXPECT(request.start(loop, client, address));
+    uint64_t          storage[1024];
+    AsyncKernelEvents events;
+    events.eventsMemory = {reinterpret_cast<uint8_t*>(storage), sizeof(storage)};
+    SC_TEST_EXPECT(loop.submitRequests(events));
+    SC_TEST_EXPECT(loop.blockingPoll(events));
+    SC_TEST_EXPECT(callbacks == 0 and not request.isFree());
+    Function<void(AsyncResult&)> afterStop = [&](AsyncResult&) { ++stopped; };
+    SC_TEST_EXPECT(request.stop(loop, &afterStop));
+    SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    while (stopped == 0 and not expired)
+        SC_TEST_EXPECT(loop.runNoWait());
+    if (expired or stopped != 1 or not request.isFree())
+        fprintf(stderr, "Collected-error cancellation: expired=%d stopped=%d free=%d callbacks=%d\n", int(expired),
+                stopped, int(request.isFree()), callbacks);
+    SC_TEST_EXPECT(not expired and stopped == 1 and request.isFree());
+    SC_TEST_EXPECT(callbacks == 0);
+    SC_TEST_EXPECT(watchdog.unschedule(loop));
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+#if SC_PLATFORM_LINUX
+void SC::AsyncTest::socketTCPCancelPendingCompletion()
+{
+    if (options.apiType != AsyncEventLoop::Options::ApiType::ForceUseIoUring)
+        return;
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    SocketDescriptor client, peer;
+    createTCPSocketPair(loop, client, peer);
+    AsyncSocketReceive request;
+    char               buffer[8] = {};
+    int                callbacks = 0, stopped = 0;
+    request.callback = [&](AsyncSocketReceive::Result&) { ++callbacks; };
+    SC_TEST_EXPECT(request.start(loop, client, buffer));
+    AsyncLoopTimeout timer;
+    bool             submitted = false, expired = false;
+    timer.callback = [&](AsyncLoopTimeout::Result&) { submitted = true; };
+    SC_TEST_EXPECT(timer.start(loop, {1}));
+    while (not submitted)
+        SC_TEST_EXPECT(loop.runOnce());
+    SC_TEST_EXPECT(request.isActive());
+    timer.callback = [&](AsyncLoopTimeout::Result&) { expired = true; };
+    SC_TEST_EXPECT(timer.start(loop, {2000}));
+    Function<void(AsyncResult&)> afterStop = [&](AsyncResult&) { ++stopped; };
+    SC_TEST_EXPECT(request.stop(loop, &afterStop));
+    // Collect one CQE at a time: cancellation acknowledgement must not release the operation's user_data early.
+    uint64_t          storage[3];
+    AsyncKernelEvents events;
+    events.eventsMemory = {reinterpret_cast<uint8_t*>(storage), sizeof(storage)};
+    while (stopped == 0 and not expired)
+    {
+        SC_TEST_EXPECT(loop.submitRequests(events));
+        SC_TEST_EXPECT(loop.blockingPoll(events));
+        SC_TEST_EXPECT(loop.dispatchCompletions(events));
+    }
+    SC_TEST_EXPECT(not expired and stopped == 1 and request.isFree() and callbacks == 0);
+    SC_TEST_EXPECT(timer.unschedule(loop));
+    // afterStopped permits immediate storage reuse. An old CQE must never target this new free request.
+    request.~AsyncSocketReceive();
+    placementNew(request);
+    request.callback = [&](AsyncSocketReceive::Result&) { ++callbacks; };
+    SC_TEST_EXPECT(timer.start(loop, {10}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(request.isFree() and callbacks == 0 and stopped == 1);
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(peer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+#endif

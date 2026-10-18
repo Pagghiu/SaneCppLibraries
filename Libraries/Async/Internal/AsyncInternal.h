@@ -133,10 +133,14 @@ struct SC::AsyncEventLoop::Internal
     static constexpr int16_t Flag_InternalWakeUpUserEvent = 1 << 8;  // kqueue wake-up watcher uses EVFILT_USER
     static constexpr int16_t Flag_ForceThreadPool         = 1 << 9;  // Use thread pool even if native async exists
     static constexpr int16_t Flag_KernelCompletionDrained = 1 << 10; // IOCP packet consumed after logical stop
+    static constexpr int16_t Flag_KernelOperationPending  = 1 << 11; // io_uring operation CQE still borrows request
+    static constexpr int16_t Flag_KernelCancelPending     = 1 << 12; // io_uring cancellation CQE still borrows request
 
     Result close(AsyncEventLoop& eventLoop);
 
     [[nodiscard]] int getTotalNumberOfActiveHandle() const;
+
+    [[nodiscard]] bool hasPendingWork() const;
 
     void removeActiveHandle(AsyncRequest& async);
     void addActiveHandle(AsyncRequest& async);

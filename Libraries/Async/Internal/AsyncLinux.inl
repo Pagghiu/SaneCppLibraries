@@ -144,7 +144,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx)
     {
         io_uring_cqe& completion = events[idx];
-        return reinterpret_cast<AsyncRequest*>(AsyncLinuxIOUring::getData(&completion));
+        return reinterpret_cast<AsyncRequest*>(reinterpret_cast<uintptr_t>(AsyncLinuxIOUring::getData(&completion)) &
+                                               ~uintptr_t(1));
     }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
@@ -341,43 +342,53 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
+    static void setRequestData(io_uring_sqe* submission, AsyncRequest& async)
+    {
+        async.flags |= Internal::Flag_KernelOperationPending;
+        AsyncLinuxIOUring::setData(submission, &async);
+    }
+
     Result validateEvent(uint32_t idx, bool& continueProcessing)
     {
         io_uring_cqe& completion = events[idx];
-        // Most cancellation completions have nullptr user_data
-        continueProcessing = completion.user_data != 0;
-        if (continueProcessing)
+        continueProcessing       = completion.user_data != 0;
+        if (not continueProcessing)
+            return Result(true);
+        AsyncRequest& async = *getAsyncRequest(idx);
+        if ((completion.user_data & 1) != 0)
         {
-            if (completion.res < 0)
+            // Even a failed cancellation acknowledgement must quiesce before user_data can be reused.
+            async.flags &= ~Internal::Flag_KernelCancelPending;
+            continueProcessing = false;
+        }
+        else
+        {
+            async.flags &= ~Internal::Flag_KernelOperationPending;
+            if (async.state == AsyncRequest::State::Cancelling)
             {
-                AsyncRequest* async = getAsyncRequest(idx);
-                if (completion.res == -EINTR and async != nullptr and
-                    (async->type == AsyncRequest::Type::FileRead or async->type == AsyncRequest::Type::FileWrite))
-                {
-                    // Character devices such as PTYs can transiently surface EINTR on io_uring file I/O.
-                    // Match the synchronous POSIX backends and let completeAsync re-submit transparently.
-                    continueProcessing = true;
-                }
-                else
-                {
-                    continueProcessing = false; // Don't process cancellations
-                    if (completion.res != -ECANCELED)
-                    {
-                        return async ? AsyncCompletionDetail::operationFailure(async->type)
-                                     : Result::Error(AsyncResultCategory, AsyncError::EventCompletionFailed);
-                    }
-                }
+                continueProcessing = false;
+                // A suppressed successful accept/open still created a descriptor owned by this completion.
+                if (completion.res >= 0 and (async.type == AsyncRequest::Type::SocketAccept or
+                                             (async.type == AsyncRequest::Type::FileSystemOperation and
+                                              static_cast<AsyncFileSystemOperation&>(async).operation ==
+                                                  AsyncFileSystemOperation::Operation::Open)))
+                    ::close(completion.res);
             }
-            else
-            {
-                // One exception to the above: AsyncFileReadiness is cancelled by matching its
-                // user_data that will generate a notification that must still be filtered.
-                AsyncRequest* async = getAsyncRequest(idx);
-                if (async->state == AsyncRequest::State::Cancelling)
-                {
-                    continueProcessing = false;
-                }
-            }
+        }
+        if (not continueProcessing)
+        {
+            if ((async.flags & (Internal::Flag_KernelOperationPending | Internal::Flag_KernelCancelPending)) == 0)
+                async.flags &= ~Internal::Flag_WaitingKernelCancel;
+            return Result(true);
+        }
+        if (completion.res < 0)
+        {
+            if (completion.res == -EINTR and
+                (async.type == AsyncRequest::Type::FileRead or async.type == AsyncRequest::Type::FileWrite))
+                return Result(true); // Preserve the existing transparent file-I/O retry.
+            continueProcessing = false;
+            if (completion.res != -ECANCELED)
+                return AsyncCompletionDetail::operationFailure(async.type);
         }
         return Result(true);
     }
@@ -411,7 +422,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         struct sockaddr* sockAddr     = &async.acceptData->sockAddrHandle.reinterpret_as<struct sockaddr>();
         async.acceptData->sockAddrLen = sizeof(struct sockaddr);
         AsyncLinuxIOUring::prepAccept(submission, async.handle, sockAddr, &async.acceptData->sockAddrLen, SOCK_CLOEXEC);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -431,7 +442,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         SC_TRY(getNewSubmission(eventLoop, submission));
         struct sockaddr* sockAddr = &async.address.handle.reinterpret_as<struct sockaddr>();
         AsyncLinuxIOUring::prepConnect(submission, async.handle, sockAddr, async.address.sizeOfHandle());
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -460,7 +471,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
             AsyncLinuxIOUring::prepWritev(submission, async.handle, vecs, nVecs, 0);
         }
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -493,7 +504,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         AsyncLinuxIOUring::prepRecv(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -533,7 +544,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             AsyncLinuxIOUring::prepReadv(submission, async.handle, vec, 1,
                                          getOffsetForReadWrite(async.handle, async.useOffset, async.offset));
         }
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -604,7 +615,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
             AsyncLinuxIOUring::prepWritev(submission, async.handle, vecs, nVecs, off);
         }
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -655,7 +666,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                                           static_cast<unsigned int>(async.spliceBytesPending), 0);
         }
         // Observe each stage: the file can supply fewer bytes than the requested range at EOF.
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -703,18 +714,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         AsyncLinuxIOUring::prepPollAdd(submission, async.handle, POLLIN);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
     Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFileReadiness& async)
     {
-        io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(eventLoop, submission));
-        AsyncLinuxIOUring::prepPollRemove(submission, reinterpret_cast<__u64>(&async));
-        eventLoop.internal.hasPendingKernelCancellations = true;
-        // Intentionally not setting user data here, as we don't care being notified about the removal
-        return Result(true);
+        return cancelSubmission(eventLoop, async, true);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -731,7 +737,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         AsyncLinuxIOUring::prepPollAdd(submission, pidFd, POLLIN);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -770,7 +776,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         AsyncLinuxIOUring::prepPollAdd(submission, sigFd, POLLIN);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -822,7 +828,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         }
 
         AsyncLinuxIOUring::prepSendMsg(submission, async.handle, &msg, 0);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -849,7 +855,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         msg.msg_iovlen = 1;
 
         AsyncLinuxIOUring::prepRecvMsg(submission, async.handle, &msg, 0);
-        AsyncLinuxIOUring::setData(submission, &async);
+        setRequestData(submission, async);
         return Result(true);
     }
 
@@ -867,14 +873,14 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             const int   mode  = async.openData.mode.toPosixAccess();
             const char* path  = async.openData.path.getNullTerminatedNative();
             AsyncLinuxIOUring::prepOpenAt(submission, AT_FDCWD, path, flags, mode);
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::Close: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
             AsyncLinuxIOUring::prepClose(submission, async.closeData.handle);
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::Read: {
@@ -882,7 +888,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             SC_TRY(getNewSubmission(eventLoop, submission));
             AsyncLinuxIOUring::prepRead(submission, async.readData.handle, async.readData.buffer.data(),
                                         async.readData.buffer.sizeInBytes(), async.readData.offset);
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::Write: {
@@ -890,7 +896,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             SC_TRY(getNewSubmission(eventLoop, submission));
             AsyncLinuxIOUring::prepWrite(submission, async.writeData.handle, async.writeData.buffer.data(),
                                          async.writeData.buffer.sizeInBytes(), async.writeData.offset);
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::CopyFile: {
@@ -907,21 +913,21 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             SC_TRY(getNewSubmission(eventLoop, submission));
             AsyncLinuxIOUring::prepRename(submission, async.renameData.path.getNullTerminatedNative(),
                                           async.renameData.newPath.getNullTerminatedNative());
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::RemoveDirectory: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
             AsyncLinuxIOUring::prepUnlink(submission, async.removeData.path.getNullTerminatedNative(), AT_REMOVEDIR);
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::RemoveFile: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
             AsyncLinuxIOUring::prepUnlink(submission, async.removeData.path.getNullTerminatedNative(), 0);
-            AsyncLinuxIOUring::setData(submission, &async);
+            setRequestData(submission, async);
         }
         break;
         case AsyncFileSystemOperation::Operation::None: break;
@@ -996,15 +1002,27 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Templates
     //-------------------------------------------------------------------------------------------------------
+    Result cancelSubmission(AsyncEventLoop& eventLoop, AsyncRequest& async, bool pollRemove = false)
+    {
+        if ((async.flags & Internal::Flag_KernelOperationPending) == 0)
+            return Result(true);
+        io_uring_sqe* submission;
+        SC_TRY(getNewSubmission(eventLoop, submission));
+        if (pollRemove)
+            AsyncLinuxIOUring::prepPollRemove(submission, reinterpret_cast<__u64>(&async));
+        else
+            AsyncLinuxIOUring::prepCancel(submission, &async, 0);
+        static_assert(alignof(AsyncRequest) >= 2, "Cancellation user_data requires one alignment bit");
+        AsyncLinuxIOUring::setData(submission, reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(&async) | 1));
+        async.flags |= Internal::Flag_KernelCancelPending | Internal::Flag_WaitingKernelCancel;
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        return Result(true);
+    }
+
     template <typename T>
     Result cancelAsync(AsyncEventLoop& eventLoop, T& async)
     {
-        io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(eventLoop, submission));
-        AsyncLinuxIOUring::prepCancel(submission, &async, 0);
-        eventLoop.internal.hasPendingKernelCancellations = true;
-        // Intentionally not setting user data here, as we don't care being notified about the removal
-        return Result(true);
+        return cancelSubmission(eventLoop, async);
     }
 
     // clang-format off
