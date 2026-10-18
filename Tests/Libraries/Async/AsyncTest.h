@@ -62,6 +62,7 @@ struct SC::AsyncTest : public SC::TestCase
     void loopDispatchCompletionsClearsEvents();
     void loopWakeUpCoalescing();
     void loopWakeUpEventObject();
+    void loopWakeUpCallbackLifetime();
 
     // Processes
     void processExit();

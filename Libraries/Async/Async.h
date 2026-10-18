@@ -382,7 +382,8 @@ struct AsyncLoopWakeUpOptions
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet1
 ///
 /// An EventObject can be wait-ed to synchronize further actions from the thread invoking the wake up request, ensuring
-/// that the callback has finished its execution.
+/// that the callback has finished its execution. The EventObject must survive the callback and the following signal.
+/// A callback that does not reactivate the request may destroy its request storage.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet2
 struct SC_ASYNC_EXPORT AsyncLoopWakeUp : public AsyncRequest

@@ -2499,11 +2499,15 @@ void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
             Result                  res(true);
             AsyncLoopWakeUp::Result result(eventLoop, *current, res, &hasBeenReactivated);
             result.completionData.deliveryCount = static_cast<uint32_t>(deliveryCount);
+            // A terminal callback can release the request, including its Function storage.
+            auto  callback    = current->callback;
+            auto* eventObject = current->eventObject;
             removeActiveHandle(*current);
-            current->callback(result);
-            if (current->eventObject)
+            if (callback.isValid())
+                callback(result);
+            if (eventObject)
             {
-                current->eventObject->signal();
+                eventObject->signal();
             }
             if (hasBeenReactivated and current->getPendingWakeUps() > 0)
             {

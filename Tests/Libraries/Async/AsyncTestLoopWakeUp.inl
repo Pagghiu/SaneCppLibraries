@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
 #include "Libraries/Time/Time.h"
+#include <stdlib.h>
 
 void SC::AsyncTest::loopWakeUpFromExternalThread()
 {
@@ -265,4 +266,33 @@ void SC::AsyncTest::loopWakeUpEventObject()
     SC_TEST_EXPECT(params.wakeUpRes);
     SC_TEST_EXPECT(params.observedNotifier1Called == 1);
     SC_TEST_EXPECT(params.callbackThreadID == Thread::CurrentThreadID());
+}
+
+void SC::AsyncTest::loopWakeUpCallbackLifetime()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    struct Context
+    {
+        AsyncLoopWakeUp* request        = nullptr;
+        uint32_t         deliveries     = 0;
+        uint64_t         callbackThread = 0;
+    } context;
+    context.request = static_cast<AsyncLoopWakeUp*>(::malloc(sizeof(AsyncLoopWakeUp)));
+    SC_TEST_EXPECT(context.request != nullptr);
+    placementNew(*context.request);
+    context.request->callback = [&context](AsyncLoopWakeUp::Result& result)
+    {
+        context.deliveries += result.completionData.deliveryCount;
+        context.callbackThread = Thread::CurrentThreadID();
+        context.request->~AsyncLoopWakeUp();
+        ::free(context.request);
+        context.request = nullptr;
+    };
+    SC_TEST_EXPECT(context.request->start(loop));
+    SC_TEST_EXPECT(context.request->wakeUp(loop));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(context.request == nullptr and context.deliveries == 1);
+    SC_TEST_EXPECT(context.callbackThread == Thread::CurrentThreadID());
+    SC_TEST_EXPECT(loop.close());
 }

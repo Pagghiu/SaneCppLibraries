@@ -99,6 +99,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopWakeUpCoalescing();
         }
+        if (test_section("loop wakeUp callback lifetime"))
+        {
+            loopWakeUpCallbackLifetime();
+        }
         if (test_section("loop wakeUp eventObject"))
         {
             loopWakeUpEventObject();

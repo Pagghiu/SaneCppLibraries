@@ -13,7 +13,7 @@ Async operations need per-request state while the operating system, event loop, 
 
 ## Consequences
 
-Async call sites must keep request objects, buffers, descriptors, and callbacks alive for the active lifetime. This makes lifetime visible and allows intrusive queues without allocation, but it puts more responsibility on callers and higher-level wrappers. Reusing a request from callbacks is allowed only after the request state permits it. Terminal callbacks may release the request storage: the event loop must complete request and sequence bookkeeping before delivering success, error or stopped callbacks, and must not access released storage afterwards. This includes deferred activation failures such as queueing work on an uncreated thread pool.
+Async call sites must keep request objects, buffers, descriptors, and callbacks alive for the active lifetime. This makes lifetime visible and allows intrusive queues without allocation, but it puts more responsibility on callers and higher-level wrappers. Reusing a request from callbacks is allowed only after the request state permits it. Terminal callbacks may release the request storage: the event loop must complete request and sequence bookkeeping before delivering success, error or stopped callbacks, and must not access released storage afterwards. This includes deferred activation failures such as queueing work on an uncreated thread pool. Wake-up dispatch copies its callback and optional completion EventObject before delivery; the EventObject remains borrowed through the subsequent signal, while a nonreactivated request may be released by the callback.
 
 ## Confirmation
 
