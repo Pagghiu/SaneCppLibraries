@@ -1,6 +1,6 @@
 # AsyncExecution
 
-Experimental sender/receiver adapter over SC::Async. Requires C++20 language support and an execution implementation matching the relevant WG21 N5050 protocols. N5050 is the final C++26 working draft, not a published ISO standard. It exposes event-loop and pool schedulers and uses the provider's standard sender algorithms. An owning facade intentionally permits allocations, as authorized for this experiment.
+Experimental sender/receiver adapter over SC::Async. Requires an execution implementation matching the relevant WG21 N5050 protocols. The reference-provider builds use C++20; native standard libraries may require C++26 language mode. N5050 is the final C++26 working draft, not a published ISO standard. It exposes event-loop and pool schedulers and uses the provider's standard sender algorithms. An owning facade intentionally permits allocations, as authorized for this experiment.
 
 Dependencies: Async, Strings and Threading. Standard execution integration is optional. With `SC_INCLUDE_STD_CPP=0`, or a standard library without `__cpp_lib_senders >= 202506L`, `SC_ASYNC_EXECUTION_AVAILABLE` is zero and no adapter API is exposed.
 
@@ -40,6 +40,32 @@ Create an AsyncExecutionContext with an existing loop, call context.create(), th
 Factories include sleep, accept/connect, send/sendAll (contiguous or scatter/gather), receive/receiveExact/receiveLine, borrowed file read/write helpers and work. The one-shot send/read/write operations may transfer partial data; complete-transfer helpers retry. Read results contain a span and an EOF flag. Borrowed file senders accept optional native-preferred or forced-pool options.
 
 Cross-thread start posts to the owner dispatcher. Stop callbacks request owner-thread cancellation of pending native operations; terminal stopped notification waits for quiescence. Active worker functions cannot be preempted; cancellation waits for actual completion. Original operation errors retain their identity. A terminal notification may destroy operation storage. Context/runtime lifetime must extend past all producers and operation completions.
+
+## Structured scopes
+
+Scopes are independently gated by `SC_ASYNC_EXECUTION_SCOPES_AVAILABLE`. Native support requires `__cpp_lib_counting_scope >= 202506L`, separately from `__cpp_lib_senders`; the explicitly selected, tested stdexec provider also enables scopes. Define `SC_ASYNC_EXECUTION_ENABLE_SCOPES=0` consistently in all translation units to disable this extension while retaining the basic adapter.
+
+`AsyncExecutionScope` owns connected child operation storage and borrows an existing context. Standard provider counting-scope associations, stop propagation and joining manage lifetime; the SC extension supplies recoverable allocation failures and Result aggregation.
+
+```cpp
+SC::AsyncExecutionScope scope(app.getContext());
+SC_TRY(scope.spawn(app.sleep({10}) | ex::then(onTick)));
+SC_TRY(scope.spawn(ex::schedule(app.getPoolScheduler()) | ex::then(encode)));
+// Keep driving app.getContext().getEventLoop() in the application's event loop.
+// Later, on shutdown:
+scope.requestStop();
+SC::AsyncExecutionScopeSummary summary;
+SC_TRY(app.runInto(scope.join(), summary));
+SC_TRY(app.close());
+```
+
+`spawn` reports acceptance, not the child's eventual result. Like standard start, it can execute synchronous senders inline; schedule CPU work explicitly to keep the owner responsive. Child values are discarded; consume them through ordinary composition inside the child. Error channels must carry a failing SC::Result. Summary counts accepted/succeeded/failed/stopped roots and retains the first observed error; completion order selects it. Child errors do not automatically cancel siblings.
+
+`requestStop` seals new roots and cooperatively stops children. Constructing `join()` is lazy; starting it seals roots and waits for every child and pool notification association. Caller stop requests child cancellation but never abandons cleanup. Join emits the summary, or the first child error after all children have joined. `getSummary()` remains available after error; root consumer outputs retain their ordinary success-only assignment contract. Concurrent join consumers are rejected with AlreadyRunning; that rejection does not establish quiescence. A provider join infrastructure error takes precedence over a recorded child error, which remains available in the summary. After join, new roots report ScopeClosed. Scopes cannot be reopened.
+
+A used scope keeps its context registered until join, so owning close is rejected even when its synchronous children have already finished. Destroy a used scope only after join and after joining producer threads. Active destruction fails explicitly; it does not block an owner loop required for progress. An empty never-used scope, including a failed first allocation, needs no join. Native submission/cancellation still occurs on the context owner, and CPU work cannot be preempted. Buffers/descriptors/execution resources remain borrowed through their terminal quiescence. A pool continuation retains an extra provider association through the context notification tail, allowing owning close immediately after a successful scope join.
+
+Default nodes allocate with correct operation alignment and return OutOfMemory without starting a child. Optional AsyncExecutionScopeAllocator callbacks receive size/alignment and matching deallocation; their user data stays alive through join. No provider or sender algorithm outside this boundary gains a general allocation-failure guarantee.
 
 ## Borrowed file operations
 
@@ -241,7 +267,7 @@ The following matrix describes implemented APIs and keeps remaining gaps explici
 | Wake-up / external completion | AsyncLoopWakeUp / AsyncExternalCompletion | Internal command wake-up; no operation API | wakeUp; no external-completion wrapper | Internal dispatcher; no operation API |
 | Filesystem operations | AsyncFileSystemOperation | Missing | fsOpen/Close/Read/Write/Copy/Rename/Remove | Missing |
 | CPU work | AsyncLoopWork + ThreadPool | No operation method | loopWork | work; owning onPool and pool scheduler |
-| Structured lifetime / timeout | Caller-owned requests and stop | FiberScheduler / counters / cancelAll | Task groups/registry, waitFor | Manual connect/start or owning run; no scope/timeout yet |
+| Structured lifetime / timeout | Caller-owned requests and stop | FiberScheduler / counters / cancelAll | Task groups/registry, waitFor | AsyncExecutionScope spawn/requestStop/join plus manual connect/start or owning run; timeout pending |
 
 Current output shapes: Await/Fibers populate send/write byte counts, received spans plus disconnect/EOF state, datagram source addresses, file-send byte counts/zero-copy/completeness, process exit status and signal number/delivery count. Await line reception additionally reports lineComplete. The borrowing sender baseline emits no value for timers/work, size_t for send/write, and AsyncExecutionReadResult (span plus endOfFile, also used for TCP disconnect) for receive/read. Missing sender operations have no published output contract yet; future value types must preserve the corresponding information.
 

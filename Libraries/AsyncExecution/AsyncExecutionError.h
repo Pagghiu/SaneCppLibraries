@@ -19,6 +19,8 @@ enum class AsyncExecutionError : uint32_t
     InvalidFileOffset,
     UnexpectedEndOfFile,
     FileReadNoProgress,
+    ScopeClosed,
+    InvalidAllocator,
 };
 static constexpr ResultCategory AsyncExecutionResultCategory = ResultCategory(23);
 } // namespace SC

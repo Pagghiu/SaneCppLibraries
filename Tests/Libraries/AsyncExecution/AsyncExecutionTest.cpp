@@ -94,6 +94,102 @@ struct ExecutionReceiver
     }
 };
 
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+#if SC_PLATFORM_WINDOWS
+static LONG WINAPI scopeAssertionExit(EXCEPTION_POINTERS* exception)
+{
+    if (exception->ExceptionRecord->ExceptionCode == EXCEPTION_BREAKPOINT)
+        ::_Exit(77);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+struct ScopeTestAllocator
+{
+    alignas(256) char bytes[32768];
+    Atomic<bool> busy        = false;
+    Atomic<int>  allocations = 0;
+    Atomic<int>  releases    = 0;
+    Atomic<bool> correct     = true;
+    size_t       size        = 0;
+    size_t       alignment   = 0;
+
+    AsyncExecutionScopeAllocator callbacks()
+    {
+        return {this,
+                [](void* user, size_t size, size_t alignment) noexcept -> void*
+                {
+                    auto& state = *static_cast<ScopeTestAllocator*>(user);
+                    state.allocations.fetch_add(1);
+                    if (size > sizeof(state.bytes) or alignment > alignof(ScopeTestAllocator) or
+                        state.busy.exchange(true))
+                        return nullptr;
+                    state.size      = size;
+                    state.alignment = alignment;
+                    return state.bytes;
+                },
+                [](void* user, void* memory, size_t size, size_t alignment) noexcept
+                {
+                    auto& state = *static_cast<ScopeTestAllocator*>(user);
+                    state.correct.store(state.correct.load() and memory == state.bytes and size == state.size and
+                                        alignment == state.alignment and state.busy.load());
+                    state.busy.store(false);
+                    state.releases.fetch_add(1);
+                }};
+    }
+};
+
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4324) // Intentional padding exercises over-aligned connected operation allocation.
+#endif
+struct ScopeProbeSender
+{
+    using sender_concept = ex::sender_tag;
+    bool* aligned;
+    bool* destroyed;
+    bool* scopeEnvironment;
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        return ex::completion_signatures<ex::set_value_t()>{};
+    }
+    template <typename Receiver>
+    struct alignas(256) Operation
+    {
+        using operation_state_concept = ex::operation_state_tag;
+        Receiver receiver;
+        bool*    aligned;
+        bool*    destroyed;
+        bool*    scopeEnvironment;
+        Operation(Receiver receiver, bool* aligned, bool* destroyed, bool* scopeEnvironment)
+            : receiver(move(receiver)), aligned(aligned), destroyed(destroyed), scopeEnvironment(scopeEnvironment)
+        {}
+        Operation(const Operation&) = delete;
+        ~Operation() { *destroyed = true; }
+        void start() noexcept
+        {
+            *aligned = reinterpret_cast<size_t>(this) % 256 == 0;
+            if constexpr (requires { detail::AsyncExecutionScopeQuery{}(ex::get_env(receiver)); })
+            {
+                auto association  = detail::AsyncExecutionScopeQuery{}(ex::get_env(receiver)).try_associate();
+                *scopeEnvironment = bool(association);
+            }
+            ex::set_value(move(receiver));
+        }
+    };
+    template <typename Receiver>
+    auto connect(Receiver receiver) const noexcept
+    {
+        return Operation<Receiver>(move(receiver), aligned, destroyed, scopeEnvironment);
+    }
+};
+
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+
+#endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+
 struct AsyncExecutionTest : TestCase
 {
     AsyncExecutionTest(TestReport& report) : TestCase(report, "AsyncExecutionTest")
@@ -150,6 +246,18 @@ struct AsyncExecutionTest : TestCase
             owningFacade();
         if (test_section("observable owning close and external driving"))
             owningClose();
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+        if (test_section("structured scope values errors and allocation"))
+            scopeBasics();
+        if (test_section("structured scope stop join and pool progress"))
+            scopeProgress();
+        if (test_section("structured scope concurrent join and terminal destruction"))
+            scopeJoinLifetime();
+        if (test_section("structured scope active destruction rejection"))
+            scopeDestruction();
+        if (test_section("scope active destruction child", TestCase::Execute::OnlyExplicit))
+            scopeDestructionChild();
+#endif
         if (test_section("scheduler submission from another thread"))
             scheduler();
         if (test_section("timer composition and thread pool"))
@@ -2045,6 +2153,368 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(context.close());
         SC_TEST_EXPECT(loop.close());
     }
+
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+    void scopeBasics()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create(2));
+        auto& context = app.getContext();
+        {
+            AsyncExecutionScope        empty(context);
+            AsyncExecutionScopeSummary summary;
+            SC_TEST_EXPECT(consumeBounded(context, empty.join(), summary));
+            SC_TEST_EXPECT(summary.accepted == 0 and summary.firstError);
+            SC_TEST_EXPECT(
+                empty.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed));
+        }
+        {
+            struct Allocation
+            {
+                int attempts = 0;
+                int freed    = 0;
+            } allocation;
+            AsyncExecutionScopeAllocator allocator;
+            allocator.userData = &allocation;
+            allocator.allocate = [](void* user, size_t, size_t) noexcept -> void*
+            {
+                ++static_cast<Allocation*>(user)->attempts;
+                return nullptr;
+            };
+            allocator.deallocate = [](void* user, void*, size_t, size_t) noexcept
+            { ++static_cast<Allocation*>(user)->freed; };
+            AsyncExecutionScope failed(context, allocator);
+            SC_TEST_EXPECT(
+                failed.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory));
+            SC_TEST_EXPECT(failed.getSummary().accepted == 0 and allocation.attempts == 1 and allocation.freed == 0);
+            // No provider association was acquired, so a failed first allocation does not require join.
+        }
+        {
+            AsyncExecutionScopeAllocator allocator;
+            allocator.allocate = [](void*, size_t, size_t) noexcept -> void* { return nullptr; };
+            AsyncExecutionScope invalid(context, allocator);
+            SC_TEST_EXPECT(
+                invalid.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::InvalidAllocator));
+        }
+        {
+            AsyncExecutionScope scope(context);
+            const Result        error = Result::Error(ResultCategory(99), 71);
+            SC_TEST_EXPECT(scope.spawn(ex::just(1)));
+            SC_TEST_EXPECT(scope.spawn(ex::just_error(error)));
+            SC_TEST_EXPECT(scope.spawn(ex::just_error(Result::Error(ResultCategory(99), 72))));
+            SC_TEST_EXPECT(scope.spawn(ex::just_stopped()));
+            // Even synchronous roots need an explicit join before the borrowing context can close.
+            SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()).isError(ResultCategory(99), 71));
+            const auto summary = scope.getSummary();
+            SC_TEST_EXPECT(summary.accepted == 4 and summary.succeeded == 1 and summary.failed == 2 and
+                           summary.stopped == 1);
+            SC_TEST_EXPECT(summary.firstError.isError(ResultCategory(99), 71));
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()).isError(ResultCategory(99), 71));
+        }
+        {
+            AsyncExecutionScope scope(context);
+            auto                lazy    = scope.join();
+            bool                aligned = false, destroyed = false, environment = false;
+            SC_TEST_EXPECT(
+                scope.spawn(ScopeProbeSender{&aligned, &destroyed, &environment} | ex::then([]() noexcept {})));
+            SC_TEST_EXPECT(consumeBounded(context, move(lazy)));
+            SC_TEST_EXPECT(aligned and destroyed and environment);
+        }
+        {
+            ScopeTestAllocator  allocation;
+            AsyncExecutionScope scope(context, allocation.callbacks());
+            SC_TEST_EXPECT(scope.spawn(context.sleep({5000})));
+            SC_TEST_EXPECT(
+                scope.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory));
+            SC_TEST_EXPECT(allocation.busy.load() and allocation.releases.load() == 0);
+            scope.requestStop();
+            AsyncExecutionScopeSummary summary;
+            SC_TEST_EXPECT(consumeBounded(context, scope.join(), summary));
+            SC_TEST_EXPECT(summary.accepted == 1 and summary.stopped == 1);
+            SC_TEST_EXPECT(allocation.allocations.load() == 2 and allocation.releases.load() == 1 and
+                           not allocation.busy.load() and allocation.correct.load());
+        }
+        {
+            ThreadPool          uncreated;
+            AsyncExecutionScope scope(context);
+            SC_TEST_EXPECT(scope.spawn(ex::schedule(AsyncExecutionPoolScheduler{&context, &uncreated})));
+            SC_TEST_EXPECT(consumeBounded(context, scope.join())
+                               .isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
+            SC_TEST_EXPECT(scope.getSummary().accepted == 1 and scope.getSummary().failed == 1);
+        }
+        {
+            AsyncExecutionScope grouped(context);
+            bool                branches[2] = {};
+            SC_TEST_EXPECT(grouped.spawn(ex::when_all(
+                context.sleep({1}) | ex::then([&branches]() noexcept { branches[0] = true; }),
+                ex::schedule(app.getPoolScheduler()) | ex::then([&branches]() noexcept { branches[1] = true; }))));
+            AsyncExecutionScopeSummary summary;
+            SC_TEST_EXPECT(consumeBounded(context, grouped.join(), summary));
+            SC_TEST_EXPECT(branches[0] and branches[1] and summary.accepted == 1 and summary.succeeded == 1);
+        }
+        SC_TEST_EXPECT(app.close());
+    }
+
+    void scopeProgress()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create(2));
+        auto&               context = app.getContext();
+        AsyncExecutionScope scope(context);
+        struct Gate
+        {
+            EventObject  entered, release;
+            Atomic<int>  cpu    = 0;
+            Atomic<bool> done   = false;
+            Atomic<bool> forced = false;
+            bool         timer  = false;
+        } gate;
+        Thread guard;
+        SC_TEST_EXPECT(guard.start(
+            [&gate](Thread&)
+            {
+                for (int attempt = 0; attempt < 2000 and not gate.done.load(); ++attempt)
+                    Thread::Sleep(1);
+                if (not gate.done.load())
+                {
+                    gate.forced.store(true);
+                    gate.entered.signal();
+                    gate.release.signal();
+                }
+                for (int attempt = 0; attempt < 2000 and not gate.done.load(); ++attempt)
+                    Thread::Sleep(1);
+                if (not gate.done.load())
+                    ::_Exit(124);
+            }));
+        SC_TEST_EXPECT(scope.spawn(ex::schedule(app.getPoolScheduler()) | ex::then(
+                                                                              [&gate]() noexcept
+                                                                              {
+                                                                                  gate.entered.signal();
+                                                                                  gate.release.wait();
+                                                                                  gate.cpu.fetch_add(1);
+                                                                              })));
+        gate.entered.wait();
+        SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+        SC_TEST_EXPECT(scope.spawn(context.sleep({10}) | ex::then(
+                                                             [&gate]() noexcept
+                                                             {
+                                                                 gate.timer = true;
+                                                                 gate.release.signal();
+                                                             })));
+        SC_TEST_EXPECT(scope.spawn(context.sleep({1}) | ex::continues_on(app.getPoolScheduler()) |
+                                   ex::then([&gate]() noexcept { gate.cpu.fetch_add(1); })));
+        AsyncExecutionScopeSummary summary;
+        SC_TEST_EXPECT(consumeBounded(context, scope.join(), summary));
+        gate.done.store(true);
+        SC_TEST_EXPECT(guard.join());
+        SC_TEST_EXPECT(not gate.forced.load());
+        SC_TEST_EXPECT(gate.timer and gate.cpu.load() == 2 and summary.accepted == 3 and summary.succeeded == 3);
+        SC_TEST_EXPECT(app.close());
+
+        SC_TEST_EXPECT(app.create(2));
+        {
+            AsyncExecutionScope cpuScope(context);
+            struct CPU
+            {
+                EventObject  entered, release;
+                Atomic<bool> done     = false;
+                Atomic<bool> finished = false;
+                Atomic<bool> forced   = false;
+            } cpu;
+            Thread cpuGuard;
+            SC_TEST_EXPECT(cpuGuard.start(
+                [&cpu](Thread&)
+                {
+                    for (int attempt = 0; attempt < 2000 and not cpu.done.load(); ++attempt)
+                        Thread::Sleep(1);
+                    if (not cpu.done.load())
+                    {
+                        cpu.forced.store(true);
+                        cpu.entered.signal();
+                        cpu.release.signal();
+                    }
+                    for (int attempt = 0; attempt < 2000 and not cpu.done.load(); ++attempt)
+                        Thread::Sleep(1);
+                    if (not cpu.done.load())
+                        ::_Exit(124);
+                }));
+            SC_TEST_EXPECT(cpuScope.spawn(ex::schedule(app.getPoolScheduler()) |
+                                          ex::then(
+                                              [&cpu]() noexcept
+                                              {
+                                                  cpu.entered.signal();
+                                                  cpu.release.wait();
+                                                  cpu.finished.store(true);
+                                              }) |
+                                          ex::continues_on(context.getScheduler())));
+            cpu.entered.wait();
+            cpuScope.requestStop();
+            SC_TEST_EXPECT(cpuScope.getSummary().accepted == 1 and cpuScope.getSummary().stopped == 0);
+            SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+            ExecutionOutcome outcome;
+            outcome.loop = &context.getEventLoop();
+            auto join    = ex::connect(cpuScope.join(), ExecutionReceiver{outcome, {}});
+            ex::start(join);
+            SC_TEST_EXPECT(outcome.values == 0 and outcome.errors == 0);
+            cpu.release.signal();
+            SC_TEST_EXPECT(runBounded(context.getEventLoop()));
+            cpu.done.store(true);
+            SC_TEST_EXPECT(cpuGuard.join());
+            SC_TEST_EXPECT(not cpu.forced.load() and cpu.finished.load());
+            SC_TEST_EXPECT(outcome.values == 1 and cpuScope.getSummary().stopped == 1);
+        }
+        {
+            AsyncExecutionScope stopped(context);
+            SC_TEST_EXPECT(stopped.spawn(context.sleep({5000})));
+            ExecutionStopSource stop;
+            stop.request_stop();
+            SC_TEST_EXPECT(context.runIntoWithStop(stopped.join(), stop.get_token(), summary));
+            SC_TEST_EXPECT(summary.stopped == 1 and summary.failed == 0);
+            SC_TEST_EXPECT(
+                stopped.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed));
+        }
+        {
+            AsyncExecutionScope parallel(context);
+            Atomic<int>         ran = 0;
+            Result              first{true}, second{true};
+            const auto          scheduler = app.getPoolScheduler();
+            struct Spawn
+            {
+                AsyncExecutionScope&        scope;
+                AsyncExecutionPoolScheduler scheduler;
+                Atomic<int>&                ran;
+                Result&                     status;
+            } one{parallel, scheduler, ran, first}, two{parallel, scheduler, ran, second};
+            auto work = [](Spawn& spawn)
+            {
+                for (int i = 0; i < 16 and spawn.status; ++i)
+                    spawn.status = spawn.scope.spawn(ex::schedule(spawn.scheduler) |
+                                                     ex::then([&ran = spawn.ran]() noexcept { ran.fetch_add(1); }));
+            };
+            Thread a, b;
+            SC_TEST_EXPECT(a.start([&one, &work](Thread&) { work(one); }));
+            SC_TEST_EXPECT(b.start([&two, &work](Thread&) { work(two); }));
+            SC_TEST_EXPECT(a.join());
+            SC_TEST_EXPECT(b.join());
+            SC_TEST_EXPECT(first and second);
+            SC_TEST_EXPECT(consumeBounded(context, parallel.join(), summary));
+            SC_TEST_EXPECT(ran.load() == 32 and summary.accepted == 32 and summary.succeeded == 32);
+        }
+        SC_TEST_EXPECT(app.close());
+    }
+
+    void scopeJoinLifetime()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create());
+        auto& context = app.getContext();
+        auto& loop    = context.getEventLoop();
+        {
+            AsyncExecutionScope scope(context);
+            SC_TEST_EXPECT(scope.spawn(context.sleep({5000})));
+            SC_TEST_EXPECT(loop.runNoWait());
+            ExecutionStopSource stop;
+            ExecutionOutcome    first, second;
+            first.loop = &loop;
+            auto left  = ex::connect(scope.join(), ExecutionReceiver{first, stop.get_token()});
+            auto right = ex::connect(scope.join(), ExecutionReceiver{second, {}});
+            ex::start(left);
+            ex::start(right);
+            SC_TEST_EXPECT(second.errors == 1 and
+                           second.error.isError(AsyncExecutionResultCategory, AsyncExecutionError::AlreadyRunning));
+            Thread canceller;
+            SC_TEST_EXPECT(canceller.start([&stop](Thread&) { stop.request_stop(); }));
+            SC_TEST_EXPECT(runBounded(loop));
+            SC_TEST_EXPECT(canceller.join());
+            SC_TEST_EXPECT(first.values == 1 and first.errors == 0 and first.stopped == 0);
+            SC_TEST_EXPECT(scope.getSummary().stopped == 1);
+        }
+        {
+            alignas(AsyncExecutionScope) char scopeStorage[sizeof(AsyncExecutionScope)];
+            auto*                             scope = reinterpret_cast<AsyncExecutionScope*>(scopeStorage);
+            placementNew(*scope, context);
+            SC_TEST_EXPECT(scope->spawn(context.sleep({1})));
+            ExecutionOutcome outcome;
+            outcome.loop = &loop;
+            using Join   = decltype(ex::connect(scope->join(), ExecutionReceiver{outcome, {}}));
+            alignas(Join) char joinStorage[sizeof(Join)];
+            auto*              join = reinterpret_cast<Join*>(joinStorage);
+            placementNew(*join, *scope, ExecutionReceiver{outcome, {}});
+            struct Destroy
+            {
+                AsyncExecutionScope* scope;
+                Join*                join;
+                bool                 done = false;
+            } destroy{scope, join};
+            outcome.onValue = [&destroy]()
+            {
+                destroy.join->~Join();
+                destroy.scope->~AsyncExecutionScope();
+                destroy.done = true;
+            };
+            ex::start(*join);
+            SC_TEST_EXPECT(runBounded(loop));
+            SC_TEST_EXPECT(destroy.done and outcome.values == 1 and outcome.errors == 0);
+        }
+        SC_TEST_EXPECT(app.close());
+    }
+
+    void scopeDestructionChild()
+    {
+#if SC_PLATFORM_WINDOWS
+        ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+        ::SetUnhandledExceptionFilter(scopeAssertionExit);
+#else
+        ::signal(SIGTRAP, [](int) { ::_Exit(77); });
+        ::signal(SIGILL, [](int) { ::_Exit(77); });
+#endif
+        AsyncExecution app;
+        if (not app.create())
+            ::_Exit(75);
+        {
+            AsyncExecutionScope scope(app.getContext());
+            if (not scope.spawn(app.sleep({5000})))
+                ::_Exit(76);
+        }
+        ::_Exit(78); // Reaching here would mean active destruction was silently accepted.
+    }
+
+    void scopeDestruction()
+    {
+        StringSpan arguments[] = {report.executableFile.view(), "--quiet",        "--test",
+                                  "AsyncExecutionTest",         "--test-section", "scope active destruction child"};
+        Process    child;
+        SC_TEST_EXPECT(child.launch(arguments, Process::StdOut::Ignore(), Process::StdIn(), Process::StdErr::Ignore()));
+        struct Wait
+        {
+            Process&     child;
+            Result       status{false};
+            Atomic<bool> done = false;
+        } wait{child};
+        Thread waiter;
+        SC_TEST_EXPECT(waiter.start(
+            [&wait](Thread&)
+            {
+                wait.status = wait.child.waitForExitSync();
+                wait.done.store(true);
+            }));
+        for (int attempt = 0; attempt < 5000 and not wait.done.load(); ++attempt)
+            Thread::Sleep(1);
+        const bool exited = wait.done.load();
+        if (not exited)
+        {
+#if SC_PLATFORM_WINDOWS
+            SC_TEST_EXPECT(::TerminateProcess(child.handle, 124) != FALSE);
+#else
+            SC_TEST_EXPECT(::kill(child.processID.pid, SIGKILL) == 0);
+#endif
+        }
+        SC_TEST_EXPECT(waiter.join());
+        SC_TEST_EXPECT(exited and wait.status and child.getExitStatus() == 77);
+    }
+
+#endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 
     void owningClose()
     {

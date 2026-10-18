@@ -36,3 +36,18 @@ namespace AsyncExecutionProtocol = std::execution;
 #include <type_traits>
 #include <utility>
 #endif
+
+// N5050 advertises counting scopes separately from the base sender/receiver framework.
+#ifndef SC_ASYNC_EXECUTION_ENABLE_SCOPES
+#define SC_ASYNC_EXECUTION_ENABLE_SCOPES 1
+#endif
+
+#if SC_ASYNC_EXECUTION_AVAILABLE && SC_ASYNC_EXECUTION_ENABLE_SCOPES
+#if SC_ASYNC_EXECUTION_USE_STDEXEC || (defined(__cpp_lib_counting_scope) && __cpp_lib_counting_scope >= 202506L)
+#define SC_ASYNC_EXECUTION_SCOPES_AVAILABLE 1
+#endif
+#endif
+
+#ifndef SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+#define SC_ASYNC_EXECUTION_SCOPES_AVAILABLE 0
+#endif

@@ -166,14 +166,17 @@ detail::AsyncExecutionCommand* AsyncExecutionContext::pop() noexcept
 Result detail::AsyncExecutionPoolTask::submit(AsyncExecutionContext& executionContext, ThreadPool& pool,
                                               void* executionOperation, Notify delivery) noexcept
 {
-    context           = &executionContext;
-    operation         = executionOperation;
-    notify            = delivery;
-    task.function     = []() {};
+    context       = &executionContext;
+    operation     = executionOperation;
+    notify        = delivery;
+    task.function = []() {};
+    // Only the pool's local callback copy remains in use. Receiver delivery may destroy the embedded task.
+    // The context/pool remain borrowed through notification return; never access operation after notify.
     task.afterRelease = [this]()
     {
-        // Only the pool's local callback copy remains in use. Receiver delivery may destroy the embedded task.
-        // The context/pool remain borrowed through notification return; never access operation after notify.
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+        auto scopeAssociation = move(association);
+#endif
         auto*      executionOperation = operation;
         const auto delivery           = notify;
         auto*      executionContext   = context;
@@ -185,7 +188,12 @@ Result detail::AsyncExecutionPoolTask::submit(AsyncExecutionContext& executionCo
     executionContext.outstanding.fetch_add(1);
     const Result queued = pool.queueTask(task);
     if (not queued)
+    {
         executionContext.outstanding.fetch_sub(1);
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+        association = {};
+#endif
+    }
     return queued;
 }
 
@@ -1220,6 +1228,185 @@ Result AsyncExecutionContext::finishRun(RunState& state)
     SC_ASYNC_ASSERT_RELEASE(state.completed);
     return state.status;
 }
+
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+namespace detail
+{
+static void* AsyncExecutionScopeAllocate(void*, size_t bytes, size_t alignment) noexcept
+{
+    if (alignment < alignof(void*))
+        alignment = alignof(void*);
+    const size_t overhead = sizeof(void*) + alignment - 1;
+    if (bytes > size_t(-1) - overhead)
+        return nullptr;
+    void* raw = AsyncExecutionReallocate(nullptr, bytes + overhead);
+    if (raw == nullptr)
+        return nullptr;
+    const size_t address                  = (reinterpret_cast<size_t>(raw) + overhead) & ~(alignment - 1);
+    auto*        aligned                  = reinterpret_cast<void*>(address);
+    reinterpret_cast<void**>(aligned)[-1] = raw;
+    return aligned;
+}
+static void AsyncExecutionScopeDeallocate(void*, void* memory, size_t, size_t) noexcept
+{
+    AsyncExecutionRelease(reinterpret_cast<void**>(memory)[-1]);
+}
+} // namespace detail
+
+AsyncExecutionScope::AsyncExecutionScope(AsyncExecutionContext& context, AsyncExecutionScopeAllocator allocator)
+    : context(context), allocator(allocator)
+{
+    if (not this->allocator.allocate and not this->allocator.deallocate)
+    {
+        this->allocator.allocate   = detail::AsyncExecutionScopeAllocate;
+        this->allocator.deallocate = detail::AsyncExecutionScopeDeallocate;
+    }
+}
+
+AsyncExecutionScope::~AsyncExecutionScope()
+{
+    SC_ASYNC_ASSERT_RELEASE(not joining and not contextBound and (not used or joined));
+}
+
+Result AsyncExecutionScope::checkSpawn()
+{
+    mutex.lock();
+    const bool closed = sealed;
+    mutex.unlock();
+    if (closed)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed);
+    if (not allocator.allocate or not allocator.deallocate)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::InvalidAllocator);
+    if (not context.accepting.load())
+        return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
+    return Result(true);
+}
+
+Result AsyncExecutionScope::beginChild(detail::AsyncExecutionScopeAssociation& association)
+{
+    mutex.lock();
+    if (sealed)
+    {
+        mutex.unlock();
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed);
+    }
+    if (not context.accepting.load())
+    {
+        mutex.unlock();
+        return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
+    }
+    association = provider.get_token().try_associate();
+    if (not association)
+    {
+        mutex.unlock();
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed);
+    }
+    if (not used)
+    {
+        contextBound = true;
+        context.outstanding.fetch_add(1); // Keep the used scope's context open until an explicit join.
+    }
+    used   = true;
+    joined = false;
+    context.outstanding.fetch_add(1);
+    mutex.unlock();
+    return Result(true);
+}
+
+void AsyncExecutionScope::acceptedChild()
+{
+    mutex.lock();
+    ++summary.accepted;
+    mutex.unlock();
+}
+
+void AsyncExecutionScope::abandonChild() { context.outstanding.fetch_sub(1); }
+
+void AsyncExecutionScope::completedChild(Result status, bool stopped)
+{
+    mutex.lock();
+    if (not status)
+    {
+        ++summary.failed;
+        if (summary.firstError)
+            summary.firstError = status;
+    }
+    else if (stopped)
+        ++summary.stopped;
+    else
+        ++summary.succeeded;
+    mutex.unlock();
+}
+
+void AsyncExecutionScope::requestStop() noexcept
+{
+    mutex.lock();
+    sealed = true;
+    mutex.unlock();
+    // Seal only the SC root interface. Provider associations remain open for already-accepted child graphs' tails.
+    provider.request_stop();
+}
+
+AsyncExecutionScopeJoinSender AsyncExecutionScope::join() noexcept { return {this}; }
+
+AsyncExecutionScopeSummary AsyncExecutionScope::getSummary()
+{
+    mutex.lock();
+    const auto result = summary;
+    mutex.unlock();
+    return result;
+}
+
+Result AsyncExecutionScope::beginJoin()
+{
+    mutex.lock();
+    if (joining)
+    {
+        mutex.unlock();
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::AlreadyRunning);
+    }
+    if (not context.accepting.load())
+    {
+        mutex.unlock();
+        return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
+    }
+    sealed  = true;
+    joining = true;
+    context.outstanding.fetch_add(1);
+    mutex.unlock();
+    return Result(true);
+}
+
+AsyncExecutionScopeSummary AsyncExecutionScope::finishJoin()
+{
+    mutex.lock();
+    joining                  = false;
+    joined                   = true;
+    const auto result        = summary;
+    const int  registrations = contextBound ? 2 : 1;
+    contextBound             = false;
+    mutex.unlock();
+    context.outstanding.fetch_sub(registrations);
+    return result;
+}
+
+detail::AsyncExecutionScopeEnvironment detail::AsyncExecutionScopeNode::getEnvironment() const noexcept
+{
+    return {scope.context.getScheduler(), scope.provider.get_token()};
+}
+
+void detail::AsyncExecutionScopeNode::complete(Result status, bool stopped) noexcept
+{
+    auto       lifetime = move(this->association);
+    auto*      owner    = &scope;
+    const auto release  = destroy;
+    owner->completedChild(status, stopped);
+    release(this);
+    owner->abandonChild();
+    // Releasing the association can synchronously finish join and destroy the scope. No owner/node access follows.
+}
+
+#endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 
 } // namespace SC
 #endif

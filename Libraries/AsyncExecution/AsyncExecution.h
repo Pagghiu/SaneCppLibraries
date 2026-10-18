@@ -14,6 +14,10 @@
 namespace SC
 {
 struct AsyncExecutionScheduler;
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+struct AsyncExecutionScope;
+struct AsyncExecutionScopeJoinSender;
+#endif
 struct AsyncExecutionConnection;
 struct AsyncExecutionReadResult;
 struct AsyncExecutionLineResult;
@@ -225,6 +229,9 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 
   private:
     friend struct AsyncExecution;
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+    friend struct AsyncExecutionScope;
+#endif
     friend struct detail::AsyncExecutionPoolTask;
     template <typename Setup, typename Receiver>
     friend struct detail::AsyncExecutionOperation;
@@ -303,10 +310,30 @@ struct AsyncExecutionEnvironment
 struct AsyncExecutionPoolScheduler;
 namespace detail
 {
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+using AsyncExecutionScopeToken       = decltype(std::declval<AsyncExecutionProtocol::counting_scope&>().get_token());
+using AsyncExecutionScopeAssociation = decltype(std::declval<AsyncExecutionScopeToken>().try_associate());
+
+struct AsyncExecutionScopeQuery
+{
+    static constexpr bool query(AsyncExecutionProtocol::forwarding_query_t) noexcept { return true; }
+    template <typename Environment>
+    auto operator()(const Environment& environment) const noexcept -> decltype(environment.query(*this))
+    {
+        return environment.query(*this);
+    }
+};
+
+#endif
+
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionPoolTask
 {
     using Notify = void (*)(void*) noexcept;
     ThreadPoolTask task;
+
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+    AsyncExecutionScopeAssociation association;
+#endif
 
     AsyncExecutionContext* context   = nullptr;
     void*                  operation = nullptr;
@@ -329,6 +356,18 @@ struct AsyncExecutionPoolOperation
     AsyncExecutionPoolOperation(const AsyncExecutionPoolOperation&) = delete;
     void start() noexcept
     {
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+        if constexpr (requires { AsyncExecutionScopeQuery{}(AsyncExecutionProtocol::get_env(receiver)); })
+        {
+            task.association = AsyncExecutionScopeQuery{}(AsyncExecutionProtocol::get_env(receiver)).try_associate();
+            if (not task.association)
+            {
+                AsyncExecutionProtocol::set_error(
+                    move(receiver), Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed));
+                return;
+            }
+        }
+#endif
         const Result queued =
             task.submit(context, pool, this,
                         [](void* operation) noexcept
@@ -1486,6 +1525,266 @@ Result AsyncExecutionContext::runIntoWithStop(Sender&& sender, StopToken token, 
     AsyncExecutionProtocol::start(operation);
     return finishRun(state);
 }
+
+#if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+/// Allocation callbacks must return correctly aligned storage or nullptr. Both null selects the default allocator.
+struct AsyncExecutionScopeAllocator
+{
+    void* userData = nullptr;
+
+    void* (*allocate)(void*, size_t, size_t) noexcept         = nullptr;
+    void (*deallocate)(void*, void*, size_t, size_t) noexcept = nullptr;
+};
+
+struct AsyncExecutionScopeSummary
+{
+    size_t accepted  = 0;
+    size_t succeeded = 0;
+    size_t failed    = 0;
+    size_t stopped   = 0;
+    Result firstError{true};
+};
+
+namespace detail
+{
+struct AsyncExecutionScopeNode;
+template <typename Sender>
+struct AsyncExecutionScopeChild;
+template <typename Receiver>
+struct AsyncExecutionScopeJoinOperation;
+} // namespace detail
+
+/// Own connected child storage while borrowing the context. A used scope must be joined before destruction.
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScope
+{
+    explicit AsyncExecutionScope(AsyncExecutionContext& context, AsyncExecutionScopeAllocator allocator = {});
+    ~AsyncExecutionScope();
+    AsyncExecutionScope(const AsyncExecutionScope&) = delete;
+    AsyncExecutionScope(AsyncExecutionScope&&)      = delete;
+
+    template <typename Sender>
+    Result spawn(Sender&& sender);
+
+    void requestStop() noexcept;
+
+    AsyncExecutionScopeJoinSender join() noexcept;
+    AsyncExecutionScopeSummary    getSummary();
+
+  private:
+    friend struct detail::AsyncExecutionScopeNode;
+    template <typename Sender>
+    friend struct detail::AsyncExecutionScopeChild;
+    template <typename Receiver>
+    friend struct detail::AsyncExecutionScopeJoinOperation;
+
+    AsyncExecutionContext&       context;
+    AsyncExecutionScopeAllocator allocator;
+
+    AsyncExecutionProtocol::counting_scope provider;
+
+    AsyncExecutionScopeSummary summary;
+
+    Mutex mutex;
+    bool  sealed       = false;
+    bool  joining      = false;
+    bool  used         = false;
+    bool  joined       = false;
+    bool  contextBound = false;
+
+    Result checkSpawn();
+    Result beginChild(detail::AsyncExecutionScopeAssociation& association);
+    Result beginJoin();
+
+    void acceptedChild();
+    void abandonChild();
+    void completedChild(Result status, bool stopped);
+
+    AsyncExecutionScopeSummary finishJoin();
+};
+
+namespace detail
+{
+struct AsyncExecutionScopeEnvironment
+{
+    AsyncExecutionScheduler  scheduler;
+    AsyncExecutionScopeToken token;
+
+    auto query(AsyncExecutionProtocol::get_scheduler_t) const noexcept { return scheduler; }
+    auto query(AsyncExecutionProtocol::get_start_scheduler_t) const noexcept { return scheduler; }
+    auto query(AsyncExecutionScopeQuery) const noexcept { return token; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScopeNode
+{
+    AsyncExecutionScope&           scope;
+    AsyncExecutionScopeAssociation association;
+    void (*destroy)(AsyncExecutionScopeNode*) noexcept;
+
+    AsyncExecutionScopeNode(AsyncExecutionScope& scope, AsyncExecutionScopeAssociation association,
+                            void (*destroy)(AsyncExecutionScopeNode*) noexcept)
+        : scope(scope), association(move(association)), destroy(destroy)
+    {}
+    AsyncExecutionScopeEnvironment getEnvironment() const noexcept;
+
+    void complete(Result status, bool stopped) noexcept;
+};
+
+struct AsyncExecutionScopeReceiver
+{
+    using receiver_concept = AsyncExecutionProtocol::receiver_tag;
+    AsyncExecutionScopeNode* node;
+    auto                     get_env() const noexcept { return node->getEnvironment(); }
+    template <typename... Values>
+    void set_value(Values&&...) && noexcept
+    {
+        node->complete(Result(true), false);
+    }
+    void set_error(Result result) && noexcept { node->complete(result ? Result(false) : result, false); }
+    void set_stopped() && noexcept { node->complete(Result(true), true); }
+};
+
+template <typename Sender>
+struct AsyncExecutionScopeChild : AsyncExecutionScopeNode
+{
+    using Wrapped   = decltype(std::declval<AsyncExecutionScopeToken>().wrap(std::declval<Sender>()));
+    using Operation = decltype(AsyncExecutionProtocol::connect(std::declval<Wrapped>(), AsyncExecutionScopeReceiver{}));
+    Operation operation;
+
+    AsyncExecutionScopeChild(AsyncExecutionScope& scope, AsyncExecutionScopeAssociation association, Sender&& sender)
+        : AsyncExecutionScopeNode(scope, move(association),
+                                  [](AsyncExecutionScopeNode* node) noexcept
+                                  {
+                                      auto*      self      = static_cast<AsyncExecutionScopeChild*>(node);
+                                      const auto allocator = self->scope.allocator;
+                                      self->~AsyncExecutionScopeChild();
+                                      allocator.deallocate(allocator.userData, self, sizeof(AsyncExecutionScopeChild),
+                                                           alignof(AsyncExecutionScopeChild));
+                                  }),
+          operation(AsyncExecutionProtocol::connect(scope.provider.get_token().wrap(forward<Sender>(sender)),
+                                                    AsyncExecutionScopeReceiver{this}))
+    {}
+};
+
+template <typename Receiver>
+struct AsyncExecutionScopeJoinOperation
+{
+    using operation_state_concept = AsyncExecutionProtocol::operation_state_tag;
+    AsyncExecutionScope& scope;
+    Receiver             receiver;
+    struct Environment
+    {
+        AsyncExecutionScheduler scheduler;
+        auto                    query(AsyncExecutionProtocol::get_scheduler_t) const noexcept { return scheduler; }
+        auto query(AsyncExecutionProtocol::get_start_scheduler_t) const noexcept { return scheduler; }
+        // Joining cannot be abandoned. Caller stop is handled by the outer operation instead.
+    };
+    struct Bridge
+    {
+        using receiver_concept = AsyncExecutionProtocol::receiver_tag;
+        AsyncExecutionScopeJoinOperation* operation;
+        AsyncExecutionScope*              owner;
+
+        Environment get_env() const noexcept { return {owner->context.getScheduler()}; }
+        void        set_value() && noexcept { operation->complete(Result(true)); }
+        void        set_error(Result result) && noexcept { operation->complete(result); }
+        void        set_stopped() && noexcept
+        {
+            operation->complete(Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        }
+    };
+    using Inner = decltype(AsyncExecutionProtocol::connect(
+        std::declval<AsyncExecutionProtocol::counting_scope&>().join(), Bridge{}));
+    Inner inner;
+    struct Stop
+    {
+        AsyncExecutionScope* scope;
+        void                 operator()() const noexcept { scope->requestStop(); }
+    };
+    using Token    = decltype(AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)));
+    using Callback = typename Token::template callback_type<Stop>;
+    AlignedStorage<sizeof(Callback), alignof(Callback)> storage;
+
+    bool registered = false;
+
+    Callback* callback() noexcept { return reinterpret_cast<Callback*>(&storage); }
+
+    AsyncExecutionScopeJoinOperation(AsyncExecutionScope& scope, Receiver receiver)
+        : scope(scope), receiver(move(receiver)),
+          inner(AsyncExecutionProtocol::connect(scope.provider.join(), Bridge{this, &scope}))
+    {}
+    AsyncExecutionScopeJoinOperation(const AsyncExecutionScopeJoinOperation&) = delete;
+    ~AsyncExecutionScopeJoinOperation() { SC_ASYNC_ASSERT_RELEASE(not registered); }
+
+    void start() noexcept
+    {
+        const Result status = scope.beginJoin();
+        if (not status)
+        {
+            AsyncExecutionProtocol::set_error(move(receiver), status);
+            return;
+        }
+        auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
+        placementNew(*callback(), token, Stop{&scope});
+        registered = true;
+        AsyncExecutionProtocol::start(inner);
+    }
+    void complete(Result status) noexcept
+    {
+        registered = false;
+        callback()->~Callback();
+        auto summary = scope.finishJoin();
+        auto target  = move(receiver);
+        if (not status)
+            AsyncExecutionProtocol::set_error(move(target), status);
+        else if (not summary.firstError)
+            AsyncExecutionProtocol::set_error(move(target), summary.firstError);
+        else
+            AsyncExecutionProtocol::set_value(move(target), summary);
+    }
+};
+} // namespace detail
+
+struct AsyncExecutionScopeJoinSender
+{
+    using sender_concept = AsyncExecutionProtocol::sender_tag;
+    AsyncExecutionScope* scope;
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        return AsyncExecutionProtocol::completion_signatures<AsyncExecutionProtocol::set_value_t(
+                                                                 AsyncExecutionScopeSummary),
+                                                             AsyncExecutionProtocol::set_error_t(Result)>{};
+    }
+    template <typename Receiver>
+    auto connect(Receiver receiver) const noexcept
+    {
+        return detail::AsyncExecutionScopeJoinOperation<Receiver>(*scope, move(receiver));
+    }
+};
+
+template <typename Sender>
+Result AsyncExecutionScope::spawn(Sender&& sender)
+{
+    SC_TRY(checkSpawn());
+    using Child  = detail::AsyncExecutionScopeChild<Sender>;
+    void* memory = allocator.allocate(allocator.userData, sizeof(Child), alignof(Child));
+    if (memory == nullptr)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
+    detail::AsyncExecutionScopeAssociation association;
+    const Result                           associated = beginChild(association);
+    if (not associated)
+    {
+        allocator.deallocate(allocator.userData, memory, sizeof(Child), alignof(Child));
+        return associated;
+    }
+    auto* child = static_cast<Child*>(memory);
+    placementNew(*child, *this, move(association), forward<Sender>(sender));
+    acceptedChild();
+    AsyncExecutionProtocol::start(child->operation);
+    return Result(true); // start may have synchronously destroyed the child and completed join.
+}
+
+#endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 
 } // namespace SC
 #endif
