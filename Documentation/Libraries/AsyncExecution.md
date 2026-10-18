@@ -71,6 +71,23 @@ Options mirror the explicit offset/length and pipe-size hint used by the other a
 
 Ranges must be nonnegative and fit signed 64-bit offsets. This single native transfer is bounded to 2,147,483,646 bytes, the portable TransmitFile limit; compose consecutive ranges for larger transfers. Length zero reports EmptyTransfer. A zero-byte completion before the full range produces FileSendIncomplete. Native API failures, including immediate EOF failures, retain their existing identity. usedZeroCopy reports the backend mechanism for an observed prefix, not a physical memory-copy guarantee. A successful value is complete; failure details belong to Result and optional progress.
 
+## Borrowed datagrams
+
+`sendTo(socket, address, data)` emits a byte count for one datagram. Scalar and vector payloads accept either SocketIPAddress or SocketAddress. The destination address is copied; the socket, payload and vector descriptors stay borrowed through terminal completion. Vector elements belong to the same datagram; an empty vector sends one empty datagram. These operations never chunk a payload or retry a partial result as a second message. Native protocol limits remain errors; counts exceeding the common uint32 buffer domain are rejected before narrowing.
+
+`receiveFrom(socket, buffer)` emits AsyncExecutionSocketReceiveFromResult: data, sourceAddress (IP compatibility), sourceSocketAddress (family-neutral), and truncated. The source values are copied; data still borrows the supplied buffer. Empty datagrams are successful messages. A short buffer returns its prefix with truncated=true; the original datagram length is not reported. UDP excess bytes are discarded, and the next receive consumes the next datagram. A zero-capacity buffer can therefore receive an empty truncated prefix from a nonempty message. Applications must check truncated before interpreting a packet that requires complete contents.
+
+```cpp
+size_t sent = 0;
+SC::AsyncExecutionSocketReceiveFromResult packet;
+SC_TRY(context.runInto(ex::when_all(
+    context.sendTo(client, serverAddress, message),
+    context.receiveFrom(server, buffer)), sent, packet));
+// packet.data borrows buffer; packet.sourceSocketAddress is a copied peer address.
+```
+
+Cancellation joins the native request before stopped delivery; buffers and operation storage may then be reused. Prestopped sends produce no datagram. Errors and stopped completion preserve root-consumer output objects. The UDP slice passed dedicated and default-suite Debug/Release validation on macOS, Linux and Windows; Linux callback regressions explicitly cover epoll and io_uring.
+
 ## Standard composition and returned values
 
 The SC blocking consumer supplies the loop scheduler through `get_scheduler` and `get_start_scheduler`, and forwards the supplied stop token. This supports both forms of standard `on`: temporary work on another scheduler and restoration to the calling loop. `starts_on` changes where a sender starts; `continues_on` changes where its completion continues. I/O senders still submit and complete on their context's loop, even when started on a worker.
@@ -194,7 +211,7 @@ The following matrix describes implemented APIs and keeps remaining gaps explici
 | Complete TCP send | Repeat AsyncSocketSend | sendAll | sendAll | sendAll, contiguous/scatter buffers, bounded chunks and optional progress |
 | Scatter/gather send | AsyncSocketSend buffer spans | Missing | send / sendAll overloads | send / sendAll overloads; metadata and payloads remain borrowed |
 | Exact / line receive | Repeat AsyncSocketReceive | Missing | receiveExact / receiveLine | receiveExact / receiveLine, optional progress on error/stopped |
-| UDP datagrams | AsyncSocketSendTo / ReceiveFrom | sendTo / receiveFrom, IP addresses | sendTo / receiveFrom, IP/general addresses | Missing |
+| UDP datagrams | AsyncSocketSendTo / ReceiveFrom | sendTo / receiveFrom, IP addresses | sendTo / receiveFrom, IP/general addresses | sendTo / receiveFrom, scalar/vector, copied peer and truncation |
 | One-shot file read | AsyncFileRead | fileRead / fileReadAt | fileRead with options | fileRead / fileReadAt; optional pool/offset options; legacy pool overload keeps absolute default 0 |
 | Fill read buffer | Repeat AsyncFileRead | fileReadExact / fileReadExactAt | fileReadUntilFullOrEOF | fileReadExact[At] / fileReadUntilFullOrEOF, distinct early-EOF contracts |
 | File write | AsyncFileWrite | fileWrite[At], fileWriteAll[At] | fileWrite, optional options/output and buffer spans | fileWrite[At] / fileWriteAll[At], scalar/vector, optional progress |
@@ -310,3 +327,7 @@ Optional file options, explicit ranges, exact/fill EOF behavior, complete vector
 ## Borrowed file-send step validation (2026-10-18)
 
 Dedicated Debug/Release suites passed on macOS (941/941 assertions), Linux (961/3540, including variable polling counts) and Windows (939/939). Coverage joins native/forced-pool sending with exact receiving, verifies nonzero ranges through 131075 bytes, preserves known early-EOF progress, checks invalid ranges/descriptors and pre-stop initialization, and closes borrowed resources after quiescence. The underlying Async correction also passed native/forced-worker EOF regressions and default Debug/Release suites on all three platforms; its Linux callback suite iterated epoll and io_uring. Amalgamation, all single-file Release builds, enabled-provider two-TU linking and enabled/disabled SC.cpp compilation passed. Explicit busy-pool/native-file and active-cancellation/reuse file-group checks remain a separate next gate; this does not complete the broader primitive/scope roadmap.
+
+### Borrowed datagram validation
+
+Scalar/vector datagrams, copied peer addresses, truncation and next-message boundaries, empty messages/vectors, zero-capacity receive, IPv4/IPv6, active/prestopped cancellation, terminal storage destruction, socket reuse, overflow and native errors passed Debug/Release on macOS, Linux and Windows. Bounded callback tests exercise both pending and already-queued messages, including explicit epoll/io_uring runs. Default suites and normal/failure or stalled demos passed on all three platforms. Regenerated single-file libraries, a separate consumer referencing the UDP factories, SC.cpp enabled/disabled and dependency/category checks passed. These default-suite claims exclude opt-in BuildTest; stdexec validation does not establish native standard-library conformance.

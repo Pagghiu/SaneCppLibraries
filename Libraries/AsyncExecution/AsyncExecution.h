@@ -17,6 +17,7 @@ struct AsyncExecutionScheduler;
 struct AsyncExecutionConnection;
 struct AsyncExecutionReadResult;
 struct AsyncExecutionLineResult;
+struct AsyncExecutionSocketReceiveFromResult;
 struct AsyncExecutionFileSendResult;
 template <typename Setup>
 struct AsyncExecutionSender;
@@ -49,6 +50,9 @@ struct AsyncExecutionTimer;
 struct AsyncExecutionAccept;
 struct AsyncExecutionConnect;
 struct AsyncExecutionSend;
+struct AsyncExecutionSendTo;
+struct AsyncExecutionSendToBuffers;
+struct AsyncExecutionReceiveFrom;
 struct AsyncExecutionSendBuffers;
 struct AsyncExecutionSendAllBuffers;
 struct AsyncExecutionReceiveExact;
@@ -135,6 +139,20 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     AsyncExecutionSender<detail::AsyncExecutionReceiveLine>  receiveLine(const SocketDescriptor&   socket,
                                                                          Span<char>                buffer,
                                                                          AsyncExecutionLineResult* progress = nullptr);
+
+    /// One datagram per operation. Addresses are copied; sockets, payloads and vector metadata are borrowed.
+    AsyncExecutionSender<detail::AsyncExecutionSendTo> sendTo(const SocketDescriptor& socket, SocketIPAddress address,
+                                                              Span<const char> data);
+    AsyncExecutionSender<detail::AsyncExecutionSendTo> sendTo(const SocketDescriptor& socket, SocketAddress address,
+                                                              Span<const char> data);
+    AsyncExecutionSender<detail::AsyncExecutionSendToBuffers> sendTo(const SocketDescriptor& socket,
+                                                                     SocketIPAddress         address,
+                                                                     Span<Span<const char>>  data);
+    AsyncExecutionSender<detail::AsyncExecutionSendToBuffers> sendTo(const SocketDescriptor& socket,
+                                                                     SocketAddress           address,
+                                                                     Span<Span<const char>>  data);
+    AsyncExecutionSender<detail::AsyncExecutionReceiveFrom>   receiveFrom(const SocketDescriptor& socket,
+                                                                          Span<char>              buffer);
 
     AsyncExecutionSender<detail::AsyncExecutionFileRead>     fileRead(const FileDescriptor& file, Span<char> buffer,
                                                                       AsyncExecutionFileReadOptions options = {});
@@ -358,6 +376,15 @@ struct AsyncExecutionLineResult
     bool       lineComplete = false;
 };
 
+/// One received datagram. data borrows the receive buffer; both source-address values are copied.
+struct AsyncExecutionSocketReceiveFromResult
+{
+    Span<char>      data;
+    SocketIPAddress sourceAddress;
+    SocketAddress   sourceSocketAddress;
+    bool            truncated = false;
+};
+
 struct AsyncExecutionFileSendResult
 {
     size_t bytesTransferred = 0;
@@ -517,6 +544,38 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionReceive
 {
     using Request = AsyncSocketReceive;
     using Value   = AsyncExecutionReadResult;
+    const SocketDescriptor& socket;
+    Span<char>              buffer;
+    Result                  submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value            value(Request::Result& result);
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendTo
+{
+    using Request = AsyncSocketSendTo;
+    using Value   = size_t;
+    const SocketDescriptor& socket;
+    SocketAddress           address;
+    Span<const char>        data;
+    Result                  submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value            value(Request::Result& result) { return result.completionData.numBytes; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendToBuffers
+{
+    using Request = AsyncSocketSendTo;
+    using Value   = size_t;
+    const SocketDescriptor& socket;
+    SocketAddress           address;
+    Span<Span<const char>>  data;
+    Result                  submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value            value(Request::Result& result) { return result.completionData.numBytes; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionReceiveFrom
+{
+    using Request = AsyncSocketReceiveFrom;
+    using Value   = AsyncExecutionSocketReceiveFromResult;
     const SocketDescriptor& socket;
     Span<char>              buffer;
     Result                  submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;

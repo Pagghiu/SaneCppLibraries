@@ -26,7 +26,7 @@ static Result AsyncExecutionValidateFileRange(const AsyncExecutionFileOptions& o
     return Result(true);
 }
 
-static Result AsyncExecutionValidateSingleFileTransfer(size_t bytes)
+static Result AsyncExecutionValidateSingleTransfer(size_t bytes)
 {
     if (uint64_t(bytes) > uint64_t(uint32_t(-1)))
         return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
@@ -419,9 +419,43 @@ Result detail::AsyncExecutionReceive::submit(Request& request, AsyncEventLoop& l
     return request.start(loop, socket, buffer);
 }
 
+Result detail::AsyncExecutionSendTo::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    SC_TRY(AsyncExecutionValidateSingleTransfer(data.sizeInBytes()));
+    return request.start(loop, socket, address, data);
+}
+
+Result detail::AsyncExecutionSendToBuffers::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    size_t total = 0;
+    for (const auto part : data)
+    {
+        SC_TRY(AsyncExecutionValidateSingleTransfer(part.sizeInBytes()));
+        if (part.sizeInBytes() > size_t(uint32_t(-1)) - total)
+            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow);
+        total += part.sizeInBytes();
+    }
+    if (data.empty())
+        return request.start(loop, socket, address, Span<const char>{});
+    return request.start(loop, socket, address, data);
+}
+
+Result detail::AsyncExecutionReceiveFrom::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    SC_TRY(AsyncExecutionValidateSingleTransfer(buffer.sizeInBytes()));
+    return request.start(loop, socket, buffer);
+}
+
+detail::AsyncExecutionReceiveFrom::Value detail::AsyncExecutionReceiveFrom::value(Request::Result& result)
+{
+    Span<char> data;
+    (void)result.get(data);
+    return {data, result.getSourceAddress(), result.getSourceSocketAddress(), result.isTruncated()};
+}
+
 Result detail::AsyncExecutionFileRead::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
 {
-    SC_TRY(AsyncExecutionValidateSingleFileTransfer(buffer.sizeInBytes()));
+    SC_TRY(AsyncExecutionValidateSingleTransfer(buffer.sizeInBytes()));
     SC_TRY(AsyncExecutionValidateFileRange(options, buffer.sizeInBytes()));
     SC_TRY(AsyncExecutionPrepareFile(request, task, options));
     return request.start(loop, file, buffer);
@@ -429,7 +463,7 @@ Result detail::AsyncExecutionFileRead::submit(Request& request, AsyncEventLoop& 
 
 Result detail::AsyncExecutionFileWrite::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task) const
 {
-    SC_TRY(AsyncExecutionValidateSingleFileTransfer(data.sizeInBytes()));
+    SC_TRY(AsyncExecutionValidateSingleTransfer(data.sizeInBytes()));
     SC_TRY(AsyncExecutionValidateFileRange(options, data.sizeInBytes()));
     SC_TRY(AsyncExecutionPrepareFile(request, task, options));
     return request.start(loop, file, data);
@@ -449,7 +483,7 @@ Result detail::AsyncExecutionFileWriteBuffers::submit(Request& request, AsyncEve
         ++first;
     if (first == data.sizeInElements())
         return Result::Error(AsyncResultCategory, AsyncError::EmptyBuffer);
-    SC_TRY(AsyncExecutionValidateSingleFileTransfer(total));
+    SC_TRY(AsyncExecutionValidateSingleTransfer(total));
     SC_TRY(AsyncExecutionValidateFileRange(options, total));
     SC_TRY(AsyncExecutionPrepareFile(request, task, options));
     Span<Span<const char>> remaining;
@@ -888,6 +922,40 @@ AsyncExecutionSender<detail::AsyncExecutionReceive> AsyncExecutionContext::recei
                                                                                    Span<char>              buffer)
 {
     return AsyncExecutionSender<detail::AsyncExecutionReceive>{*this, {socket, buffer}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSendTo> AsyncExecutionContext::sendTo(const SocketDescriptor& socket,
+                                                                                 SocketIPAddress         address,
+                                                                                 Span<const char>        data)
+{
+    return sendTo(socket, SocketAddress(address), data);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSendTo> AsyncExecutionContext::sendTo(const SocketDescriptor& socket,
+                                                                                 SocketAddress           address,
+                                                                                 Span<const char>        data)
+{
+    return {*this, {socket, address, data}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSendToBuffers> AsyncExecutionContext::sendTo(const SocketDescriptor& socket,
+                                                                                        SocketIPAddress         address,
+                                                                                        Span<Span<const char>>  data)
+{
+    return sendTo(socket, SocketAddress(address), data);
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSendToBuffers> AsyncExecutionContext::sendTo(const SocketDescriptor& socket,
+                                                                                        SocketAddress           address,
+                                                                                        Span<Span<const char>>  data)
+{
+    return {*this, {socket, address, data}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionReceiveFrom> AsyncExecutionContext::receiveFrom(
+    const SocketDescriptor& socket, Span<char> buffer)
+{
+    return {*this, {socket, buffer}};
 }
 
 AsyncExecutionSender<detail::AsyncExecutionFileSend> AsyncExecutionContext::fileSend(

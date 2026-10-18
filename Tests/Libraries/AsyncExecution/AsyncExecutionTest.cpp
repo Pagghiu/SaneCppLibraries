@@ -102,6 +102,11 @@ struct AsyncExecutionTest : TestCase
             fileNativeProgress();
         if (test_section("native pipe file transfers"))
             filePipes();
+        if (test_section("UDP datagrams and cancellation"))
+        {
+            datagrams(false);
+            datagrams(true);
+        }
         if (test_section("borrowed TCP accept connect and scatter transfers"))
             borrowedTCP();
         if (test_section("TCP exact and line receive boundaries"))
@@ -596,6 +601,143 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(loop.close());
         finished.store(true);
         SC_TEST_EXPECT(deadline.join());
+    }
+
+    void datagrams(bool ipv6)
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        SocketIPAddress target, source;
+        StringView      host = ipv6 ? StringView("::1") : StringView("127.0.0.1");
+        const uint16_t  port = report.mapPort(ipv6 ? 5152 : 5150);
+        SC_TEST_EXPECT(target.fromAddressPort(host, port));
+        SC_TEST_EXPECT(source.fromAddressPort(host, port + 1));
+        SocketDescriptor server, client;
+        SC_TEST_EXPECT(loop.createAsyncUDPSocket(target.getAddressFamily(), server));
+        SC_TEST_EXPECT(loop.createAsyncUDPSocket(source.getAddressFamily(), client));
+        SC_TEST_EXPECT(SocketServer(server).bind(target));
+        SC_TEST_EXPECT(SocketServer(client).bind(source));
+        char                                  storage[8] = {};
+        size_t                                sent       = 0;
+        AsyncExecutionSocketReceiveFromResult received;
+        SocketAddress                         copiedAddress(target);
+        auto lazy     = context.sendTo(client, copiedAddress, StringView("abc").toCharSpan());
+        copiedAddress = {};
+        static_assert(ex::sender<decltype(lazy)>);
+        SC_TEST_EXPECT(
+            consumeBounded(context, ex::when_all(move(lazy), context.receiveFrom(server, storage)), sent, received));
+        SC_TEST_EXPECT(sent == 3 and received.data.sizeInBytes() == 3 and not received.truncated);
+        SC_TEST_EXPECT(memcmp(received.data.data(), "abc", 3) == 0);
+        SC_TEST_EXPECT(received.sourceAddress.getPort() == source.getPort());
+        SocketIPAddress observedSource;
+        SC_TEST_EXPECT(received.sourceSocketAddress.getIPAddress(observedSource));
+        SC_TEST_EXPECT(observedSource.getPort() == source.getPort());
+        // Vector elements form one datagram. No sendAll-style retry can split it into messages.
+        Span<const char> parts[] = {StringView("de").toCharSpan(), {}, StringView("fg").toCharSpan()};
+        SC_TEST_EXPECT(consumeBounded(
+            context, ex::when_all(context.sendTo(client, target, parts), context.receiveFrom(server, {storage, 3})),
+            sent, received));
+        SC_TEST_EXPECT(sent == 4 and received.truncated and received.data.sizeInBytes() == 3);
+        SC_TEST_EXPECT(memcmp(storage, "def", 3) == 0);
+        SC_TEST_EXPECT(parts[0].sizeInBytes() == 2 and parts[1].empty() and parts[2].sizeInBytes() == 2);
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.sendTo(client, target, StringView("next").toCharSpan()),
+                                                   context.receiveFrom(server, storage)),
+                                      sent, received));
+        SC_TEST_EXPECT(sent == 4 and not received.truncated and received.data.sizeInBytes() == 4);
+        SC_TEST_EXPECT(memcmp(storage, "next", 4) == 0);
+        SC_TEST_EXPECT(consumeBounded(
+            context,
+            ex::when_all(context.sendTo(client, target, Span<const char>{}), context.receiveFrom(server, storage)),
+            sent, received));
+        SC_TEST_EXPECT(sent == 0 and received.data.empty() and not received.truncated);
+        SC_TEST_EXPECT(
+            consumeBounded(context,
+                           ex::when_all(context.sendTo(client, SocketAddress(target), StringView("x").toCharSpan()),
+                                        context.receiveFrom(server, {storage, 0})),
+                           sent, received));
+        SC_TEST_EXPECT(sent == 1 and received.data.empty() and received.truncated);
+
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.sendTo(client, target, Span<Span<const char>>{}),
+                                                   context.receiveFrom(server, storage)),
+                                      sent, received));
+        SC_TEST_EXPECT(sent == 0 and received.data.empty() and not received.truncated);
+
+        // An active receive joins cancellation before its receiver releases operation/buffer storage.
+        ExecutionStopSource stop;
+        ExecutionOutcome    outcome;
+        outcome.loop    = &loop;
+        auto sender     = context.receiveFrom(server, storage);
+        using Operation = decltype(ex::connect(move(sender), ExecutionReceiver{outcome, stop.get_token()}));
+        alignas(Operation) char operationStorage[sizeof(Operation)];
+        auto*                   operation = reinterpret_cast<Operation*>(operationStorage);
+        placementNew(*operation, context, move(sender.setup), ExecutionReceiver{outcome, stop.get_token()});
+        struct Terminal
+        {
+            Operation* operation;
+            char*      buffer;
+            bool       destroyed = false;
+        } terminal{operation, storage};
+        outcome.onStopped = [&terminal]
+        {
+            const bool free = terminal.operation->request.isFree();
+            terminal.operation->~Operation();
+            terminal.buffer[0] = 'z';
+            terminal.destroyed = free;
+        };
+        ex::start(*operation);
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(operation->request.isActive());
+        Thread canceller;
+        SC_TEST_EXPECT(canceller.start([&stop](Thread&) { stop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(terminal.destroyed and outcome.stopped == 1 and outcome.values == 0 and outcome.errors == 0);
+        SC_TEST_EXPECT(storage[0] == 'z');
+        // Reuse the same socket after cancellation; no stale completion may consume this datagram.
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.sendTo(client, target, StringView("reuse").toCharSpan()),
+                                                   context.receiveFrom(server, storage)),
+                                      sent, received));
+        SC_TEST_EXPECT(received.data.sizeInBytes() == 5 and not received.truncated);
+        SC_TEST_EXPECT(memcmp(storage, "reuse", 5) == 0);
+        const Result stopped =
+            context.run(context.sendTo(client, target, StringView("drop").toCharSpan()), stop.get_token());
+        SC_TEST_EXPECT(stopped.isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        const Result prestoppedRead =
+            context.runIntoWithStop(context.receiveFrom(server, storage), stop.get_token(), received);
+        SC_TEST_EXPECT(prestoppedRead.isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(received.data.sizeInBytes() == 5);
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.sendTo(client, target, StringView("after").toCharSpan()),
+                                                   context.receiveFrom(server, storage)),
+                                      sent, received));
+        SC_TEST_EXPECT(received.data.sizeInBytes() == 5 and memcmp(storage, "after", 5) == 0);
+        if constexpr (sizeof(size_t) > 4)
+        {
+            const size_t tooLarge  = size_t(uint64_t(1) << 32);
+            const Result oversized = context.run(context.sendTo(client, target, Span<const char>{storage, tooLarge}));
+            SC_TEST_EXPECT(oversized.isError(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow));
+            const Result largeRead = context.run(context.receiveFrom(server, {storage, tooLarge}));
+            SC_TEST_EXPECT(largeRead.isError(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow));
+            Span<const char> overflow[]  = {{storage, tooLarge - 1}, {storage, 1}};
+            const Result     largeVector = context.run(context.sendTo(client, target, overflow));
+            SC_TEST_EXPECT(
+                largeVector.isError(AsyncExecutionResultCategory, AsyncExecutionError::TransferSizeOverflow));
+        }
+        SocketDescriptor invalid;
+        const Result     invalidRead = context.run(context.receiveFrom(invalid, storage));
+        SC_TEST_EXPECT(invalidRead.isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+        const Result invalidSend = context.run(context.sendTo(invalid, target, StringView("x").toCharSpan()));
+        SC_TEST_EXPECT(invalidSend.isError(AsyncResultCategory, AsyncError::InvalidSocketHandle));
+        SC_TEST_EXPECT(server.close());
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
     }
 
     void borrowedTCP()
