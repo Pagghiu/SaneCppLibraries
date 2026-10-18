@@ -419,6 +419,38 @@ Result detail::AsyncExecutionReceive::submit(Request& request, AsyncEventLoop& l
     return request.start(loop, socket, buffer);
 }
 
+void detail::AsyncExecutionProcessExit::initialize()
+{
+    if (progress)
+        *progress = {};
+}
+
+void detail::AsyncExecutionProcessExit::observe(Request::Result& result)
+{
+    if (progress and result.isValid())
+        *progress = value(result);
+}
+
+Result detail::AsyncExecutionProcessExit::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    return request.start(loop, process);
+}
+
+detail::AsyncExecutionProcessExit::Value detail::AsyncExecutionProcessExit::value(Request::Result& result)
+{
+    return {result.completionData.exitStatus, true};
+}
+
+Result detail::AsyncExecutionSignal::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    return request.start(loop, signalNumber, options);
+}
+
+detail::AsyncExecutionSignal::Value detail::AsyncExecutionSignal::value(Request::Result& result)
+{
+    return {result.completionData.signalNumber, result.completionData.deliveryCount};
+}
+
 Result detail::AsyncExecutionSendTo::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
 {
     SC_TRY(AsyncExecutionValidateSingleTransfer(data.sizeInBytes()));
@@ -922,6 +954,18 @@ AsyncExecutionSender<detail::AsyncExecutionReceive> AsyncExecutionContext::recei
                                                                                    Span<char>              buffer)
 {
     return AsyncExecutionSender<detail::AsyncExecutionReceive>{*this, {socket, buffer}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionProcessExit> AsyncExecutionContext::processExit(
+    FileDescriptor::Handle process, AsyncExecutionProcessExitResult* progress)
+{
+    return {*this, {process, progress}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionSignal> AsyncExecutionContext::signal(int                signalNumber,
+                                                                                 AsyncSignalOptions options)
+{
+    return {*this, {signalNumber, options}};
 }
 
 AsyncExecutionSender<detail::AsyncExecutionSendTo> AsyncExecutionContext::sendTo(const SocketDescriptor& socket,

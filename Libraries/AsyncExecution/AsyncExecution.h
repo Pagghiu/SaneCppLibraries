@@ -18,6 +18,8 @@ struct AsyncExecutionConnection;
 struct AsyncExecutionReadResult;
 struct AsyncExecutionLineResult;
 struct AsyncExecutionSocketReceiveFromResult;
+struct AsyncExecutionProcessExitResult;
+struct AsyncExecutionSignalResult;
 struct AsyncExecutionFileSendResult;
 template <typename Setup>
 struct AsyncExecutionSender;
@@ -53,6 +55,8 @@ struct AsyncExecutionSend;
 struct AsyncExecutionSendTo;
 struct AsyncExecutionSendToBuffers;
 struct AsyncExecutionReceiveFrom;
+struct AsyncExecutionProcessExit;
+struct AsyncExecutionSignal;
 struct AsyncExecutionSendBuffers;
 struct AsyncExecutionSendAllBuffers;
 struct AsyncExecutionReceiveExact;
@@ -139,6 +143,12 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     AsyncExecutionSender<detail::AsyncExecutionReceiveLine>  receiveLine(const SocketDescriptor&   socket,
                                                                          Span<char>                buffer,
                                                                          AsyncExecutionLineResult* progress = nullptr);
+
+    /// Waits for a borrowed child handle. Stopping never terminates it; observed native completion may reap it.
+    AsyncExecutionSender<detail::AsyncExecutionProcessExit> processExit(
+        FileDescriptor::Handle process, AsyncExecutionProcessExitResult* progress = nullptr);
+    /// Completes on the next delivery; native signal support and coalescing limits apply.
+    AsyncExecutionSender<detail::AsyncExecutionSignal> signal(int signalNumber, AsyncSignalOptions options = {});
 
     /// One datagram per operation. Addresses are copied; sockets, payloads and vector metadata are borrowed.
     AsyncExecutionSender<detail::AsyncExecutionSendTo> sendTo(const SocketDescriptor& socket, SocketIPAddress address,
@@ -376,6 +386,18 @@ struct AsyncExecutionLineResult
     bool       lineComplete = false;
 };
 
+struct AsyncExecutionProcessExitResult
+{
+    int  exitStatus = -1;
+    bool complete   = false;
+};
+
+struct AsyncExecutionSignalResult
+{
+    int      signalNumber  = 0;
+    uint32_t deliveryCount = 0;
+};
+
 /// One received datagram. data borrows the receive buffer; both source-address values are copied.
 struct AsyncExecutionSocketReceiveFromResult
 {
@@ -548,6 +570,29 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionReceive
     Span<char>              buffer;
     Result                  submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
     static Value            value(Request::Result& result);
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionProcessExit
+{
+    using Request = AsyncProcessExit;
+    using Value   = AsyncExecutionProcessExitResult;
+    FileDescriptor::Handle           process;
+    AsyncExecutionProcessExitResult* progress = nullptr;
+
+    void         initialize();
+    void         observe(Request::Result& result);
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value value(Request::Result& result);
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSignal
+{
+    using Request = AsyncSignal;
+    using Value   = AsyncExecutionSignalResult;
+    int                signalNumber;
+    AsyncSignalOptions options;
+    Result             submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value       value(Request::Result& result);
 };
 
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendTo

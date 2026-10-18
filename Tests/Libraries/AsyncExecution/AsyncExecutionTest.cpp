@@ -6,13 +6,24 @@
     "Sender/receiver <execution> is unavailable. Set SC_ASYNC_EXECUTION_STDEXEC_INCLUDE to a stdexec include directory."
 #endif
 #include "Examples/AsyncExecutionDemo/Base64.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/Common/PlacementNew.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Process/Process.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
+#include <signal.h>
 #include <stdlib.h> // _Exit (independent native-pipe deadline)
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <stdio.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace SC
 {
@@ -91,6 +102,12 @@ struct AsyncExecutionTest : TestCase
         static_assert(ex::operation_state<Operation>);
         static_assert(not std::is_move_constructible_v<Operation>);
 
+        if (test_section("windows sender signal child", TestCase::Execute::OnlyExplicit))
+            windowsSignalChild();
+        if (test_section("borrowed process exits and cancellation"))
+            processWatches();
+        if (test_section("one delivery signals and cancellation"))
+            signalWatches();
         if (test_section("borrowed file ranges and complete transfers"))
             fileRanges();
         if (test_section("borrowed file send native and forced pool"))
@@ -601,6 +618,225 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(loop.close());
         finished.store(true);
         SC_TEST_EXPECT(deadline.join());
+    }
+
+    void processWatches()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        Process success, failure;
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(success.launch({"cmd", "/C", "exit", "/B", "0"}));
+        SC_TEST_EXPECT(failure.launch({"cmd", "/C", "exit", "/B", "7"}));
+#else
+        SC_TEST_EXPECT(success.launch({"sh", "-c", "sleep 0.2; exit 0"}));
+        SC_TEST_EXPECT(failure.launch({"sh", "-c", "sleep 0.1; exit 7"}));
+#endif
+        AsyncExecutionProcessExitResult successful, failed, observedSuccess, observedFailure;
+        SC_TEST_EXPECT(consumeBounded(context,
+                                      ex::when_all(context.processExit(success.handle, &observedSuccess),
+                                                   context.processExit(failure.handle, &observedFailure)),
+                                      successful, failed));
+        SC_TEST_EXPECT(successful.exitStatus == 0 and failed.exitStatus == 7 and successful.complete and
+                       failed.complete);
+        SC_TEST_EXPECT(observedSuccess.complete and observedSuccess.exitStatus == 0);
+        SC_TEST_EXPECT(observedFailure.complete and observedFailure.exitStatus == 7);
+        // Successful POSIX waits have reaped these children. Do not wait for them a second time.
+        AsyncExecutionProcessExitResult untouched{123};
+        const Result invalid = context.runInto(context.processExit(FileDescriptor::Invalid), untouched);
+        SC_TEST_EXPECT(invalid.isError(AsyncResultCategory, AsyncError::InvalidHandle));
+        SC_TEST_EXPECT(untouched.exitStatus == 123);
+        Process child;
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(child.launch({"cmd", "/C", "ping", "-n", "3", "127.0.0.1", ">NUL"}));
+#else
+        SC_TEST_EXPECT(child.launch({"sleep", "1"}));
+#endif
+        ExecutionStopSource prestop;
+        prestop.request_stop();
+        const Result stopped =
+            context.runIntoWithStop(context.processExit(child.handle), prestop.get_token(), untouched);
+        SC_TEST_EXPECT(stopped.isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(untouched.exitStatus == 123);
+        AsyncExecutionProcessExitResult cancelledProgress;
+        ExecutionStopSource             stop;
+        ExecutionOutcome                outcome;
+        outcome.loop   = &loop;
+        auto operation = ex::connect(context.processExit(child.handle, &cancelledProgress),
+                                     ExecutionReceiver{outcome, stop.get_token()});
+        ex::start(operation);
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(operation.request.isActive());
+        Thread canceller;
+        SC_TEST_EXPECT(canceller.start([&stop](Thread&) { stop.request_stop(); }));
+        SC_TEST_EXPECT(canceller.join());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(operation.request.isFree() and outcome.stopped == 1 and outcome.values == 0 and
+                       outcome.errors == 0);
+        SC_TEST_EXPECT(not cancelledProgress.complete);
+        // Stopping this pending wait did not reap the child: the caller can still wait normally.
+        SC_TEST_EXPECT(child.waitForExitSync());
+        SC_TEST_EXPECT(child.getExitStatus() == 0);
+        Process racing;
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(racing.launch({"cmd", "/C", "exit", "/B", "9"}));
+#else
+        SC_TEST_EXPECT(racing.launch({"sh", "-c", "sleep 0.1; exit 9"}));
+#endif
+        ExecutionStopSource             raceStop;
+        AsyncExecutionProcessExitResult raceProgress;
+        struct ObserveThenStop : detail::AsyncExecutionProcessExit
+        {
+            ExecutionStopSource& stop;
+            void                 observe(Request::Result& result)
+            {
+                detail::AsyncExecutionProcessExit::observe(result);
+                stop.request_stop();
+            }
+        };
+        // Force stop after native completion/reaping, before the generic sender selects its terminal channel.
+        auto raced = AsyncExecutionSender<ObserveThenStop>{context, {{racing.handle, &raceProgress}, raceStop}};
+        AsyncLoopTimeout raceDeadline;
+        raceDeadline.callback = [&raceStop](AsyncLoopTimeout::Result&) { raceStop.request_stop(); };
+        SC_TEST_EXPECT(raceDeadline.start(loop, {2000}));
+        const Result race = context.runIntoWithStop(move(raced), raceStop.get_token(), untouched);
+        if (not raceDeadline.isFree())
+            SC_TEST_EXPECT(raceDeadline.unschedule(loop));
+        SC_TEST_EXPECT(race.isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(raceProgress.complete and raceProgress.exitStatus == 9);
+        SC_TEST_EXPECT(untouched.exitStatus == 123);
+        // The native completion is known even though the graph stopped; do not wait for this child again.
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void signalWatches()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        AsyncExecutionSignalResult delivered{91, 17};
+        SC_TEST_EXPECT(
+            context.runInto(context.signal(0), delivered).isError(AsyncResultCategory, AsyncError::InvalidSignal));
+        SC_TEST_EXPECT(delivered.signalNumber == 91 and delivered.deliveryCount == 17);
+#if SC_PLATFORM_WINDOWS
+        constexpr int watchedSignal     = 21;
+        constexpr int unsupportedSignal = 999;
+#else
+        constexpr int watchedSignal     = SIGUSR1;
+        constexpr int unsupportedSignal = SIGKILL;
+        bool          raised            = false;
+        auto          trigger =
+            context.sleep({1}) | ex::then([&raised]() noexcept { raised = ::kill(::getpid(), SIGUSR1) == 0; });
+        SC_TEST_EXPECT(consumeBounded(context, ex::when_all(context.signal(watchedSignal), move(trigger)), delivered));
+        SC_TEST_EXPECT(raised and delivered.signalNumber == watchedSignal and delivered.deliveryCount >= 1);
+#endif
+        SC_TEST_EXPECT(
+            context.run(context.signal(unsupportedSignal)).isError(AsyncResultCategory, AsyncError::UnsupportedSignal));
+        ExecutionStopSource prestop;
+        prestop.request_stop();
+        delivered = {91, 17};
+        SC_TEST_EXPECT(context.runIntoWithStop(context.signal(watchedSignal), prestop.get_token(), delivered)
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(delivered.signalNumber == 91 and delivered.deliveryCount == 17);
+        ExecutionStopSource stop;
+        ExecutionOutcome    outcome;
+        outcome.loop = &loop;
+        AsyncSignalOptions options;
+        options.mode = AsyncSignalOptions::Mode::OneShot;
+        auto operation =
+            ex::connect(context.signal(watchedSignal, options), ExecutionReceiver{outcome, stop.get_token()});
+        ex::start(operation);
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(operation.request.isActive());
+        SC_TEST_EXPECT(stop.request_stop());
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(operation.request.isFree() and outcome.stopped == 1 and outcome.values == 0 and
+                       outcome.errors == 0);
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+#if SC_PLATFORM_WINDOWS
+        windowsSignalDelivery();
+#endif
+    }
+
+    void windowsSignalDelivery()
+    {
+#if SC_PLATFORM_WINDOWS
+        const bool allocatedConsole = ::GetConsoleCP() == 0 and ::AllocConsole() != FALSE;
+        auto       closeConsole     = MakeDeferred(
+            [allocatedConsole]
+            {
+                if (allocatedConsole)
+                    ::FreeConsole();
+            });
+        if (::GetConsoleCP() == 0)
+        {
+            report.console.printLine("AsyncExecutionTest - real console unavailable; signal delivery not tested");
+            return;
+        }
+        char eventName[96];
+        ::snprintf(eventName, sizeof(eventName), "Local\\SCAsyncExecutionSignalReady-%u", report.mapPort(5164));
+        HANDLE ready = ::CreateEventA(nullptr, TRUE, FALSE, eventName);
+        SC_TEST_EXPECT(ready != nullptr);
+        if (ready == nullptr)
+            return;
+        auto            closeReady = MakeDeferred([ready] { ::CloseHandle(ready); });
+        SmallString<32> offset;
+        SC_TEST_EXPECT(StringBuilder::format(offset, "{}", report.mapPort(0)));
+        StringSpan arguments[] = {
+            report.executableFile.view(),  "--quiet",       "--test",     "AsyncExecutionTest", "--test-section",
+            "windows sender signal child", "--port-offset", offset.view()};
+        Process child;
+        child.options.windowsHide                  = false;
+        child.options.windowsCreateNewProcessGroup = true;
+        const Result launched =
+            child.launch(arguments, Process::StdOut::Ignore(), Process::StdIn(), Process::StdErr::Ignore());
+        SC_TEST_EXPECT(launched);
+        if (not launched)
+            return;
+        const bool published = ::WaitForSingleObject(ready, 5000) == WAIT_OBJECT_0;
+        SC_TEST_EXPECT(published);
+        if (published)
+            SC_TEST_EXPECT(::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, static_cast<DWORD>(child.processID.pid)) !=
+                           FALSE);
+        const bool exited = ::WaitForSingleObject(child.handle, 5000) == WAIT_OBJECT_0;
+        if (not exited)
+            SC_TEST_EXPECT(::TerminateProcess(child.handle, 124) != FALSE);
+        SC_TEST_EXPECT(exited);
+        SC_TEST_EXPECT(child.waitForExitSync());
+        SC_TEST_EXPECT(child.getExitStatus() == 0);
+#endif
+    }
+
+    void windowsSignalChild()
+    {
+#if SC_PLATFORM_WINDOWS
+        char eventName[96];
+        ::snprintf(eventName, sizeof(eventName), "Local\\SCAsyncExecutionSignalReady-%u", report.mapPort(5164));
+        HANDLE ready = ::OpenEventA(EVENT_MODIFY_STATE, FALSE, eventName);
+        SC_TEST_EXPECT(ready != nullptr);
+        if (ready == nullptr)
+            return;
+        auto           closeReady = MakeDeferred([ready] { ::CloseHandle(ready); });
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        bool                       published = false;
+        AsyncExecutionSignalResult delivered;
+        auto                       announce =
+            context.sleep({10}) | ex::then([ready, &published]() noexcept { published = ::SetEvent(ready) != FALSE; });
+        SC_TEST_EXPECT(consumeBounded(context, ex::when_all(context.signal(21), move(announce)), delivered));
+        SC_TEST_EXPECT(published and delivered.signalNumber == 21 and delivered.deliveryCount >= 1);
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+#endif
     }
 
     void datagrams(bool ipv6)

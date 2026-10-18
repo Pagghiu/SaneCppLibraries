@@ -88,6 +88,22 @@ SC_TRY(context.runInto(ex::when_all(
 
 Cancellation joins the native request before stopped delivery; buffers and operation storage may then be reused. Prestopped sends produce no datagram. Errors and stopped completion preserve root-consumer output objects. The UDP slice passed dedicated and default-suite Debug/Release validation on macOS, Linux and Windows; Linux callback regressions explicitly cover epoll and io_uring.
 
+## Process exits and signals
+
+`processExit(handle[, progress])` borrows an already-launched child handle and emits AsyncExecutionProcessExitResult {exitStatus, complete}. Nonzero exit status is a value. Native watch/wait failures remain errors. Keep the handle owner alive through terminal completion and use only one wait per child.
+
+A successful POSIX native wait reaps its child. Stopping the sender never kills that child, but successful native completion may already have happened when stop or another branch's error discards the value. Supply optional progress when the surrounding graph can discard results: complete=true records that native completion was observed, even on a stopped/error graph. On POSIX, do not wait for that child again. After a stopped pending watch with complete=false, the caller remains responsible for waiting. The observer resets lazily at start and remains borrowed through terminal completion; keep it separate from root output objects whose preservation matters.
+
+```cpp
+SC::AsyncExecutionProcessExitResult status, observed;
+SC_TRY(context.runInto(context.processExit(process.handle, &observed), status));
+// status.exitStatus may be nonzero; the native wait itself succeeded.
+```
+
+`signal(number[, options])` emits AsyncExecutionSignalResult {signalNumber, deliveryCount} for one delivery. It never automatically rearms. Copied AsyncSignalOptions retain the underlying reserved mode/coalescing policy; deliveryCount need not equal the number of sends. For portable POSIX use, install one watcher for a process signal and fan out above it. Thread-directed signals are not a portable substitute for process-directed delivery. Windows retains the existing console-control mapping (2/21/15), console/process-group requirements and unsupported-signal errors; this API does not create a general Windows signal source or prevent native shutdown rules.
+
+The process/signal slice uses the existing owner-loop and cancellation machinery and adds no public Process dependency. It passed Debug/Release validation on macOS, Linux and Windows, including programmatic Windows console-control delivery.
+
 ## Standard composition and returned values
 
 The SC blocking consumer supplies the loop scheduler through `get_scheduler` and `get_start_scheduler`, and forwards the supplied stop token. This supports both forms of standard `on`: temporary work on another scheduler and restoration to the calling loop. `starts_on` changes where a sender starts; `continues_on` changes where its completion continues. I/O senders still submit and complete on their context's loop, even when started on a worker.
@@ -217,7 +233,7 @@ The following matrix describes implemented APIs and keeps remaining gaps explici
 | File write | AsyncFileWrite | fileWrite[At], fileWriteAll[At] | fileWrite, optional options/output and buffer spans | fileWrite[At] / fileWriteAll[At], scalar/vector, optional progress |
 | File-to-socket transfer | AsyncFileSend | fileSend | fileSend | fileSend; explicit range, native/forced pool, result and optional error progress |
 | File readiness | AsyncFileReadiness | filePoll | filePoll | Missing |
-| Process / signal | AsyncProcessExit / AsyncSignal | processExit / signal | processExit / signal | Missing |
+| Process / signal | AsyncProcessExit / AsyncSignal | processExit / signal | processExit / signal | processExit / signal, one terminal delivery |
 | Wake-up / external completion | AsyncLoopWakeUp / AsyncExternalCompletion | Internal command wake-up; no operation API | wakeUp; no external-completion wrapper | Internal dispatcher; no operation API |
 | Filesystem operations | AsyncFileSystemOperation | Missing | fsOpen/Close/Read/Write/Copy/Rename/Remove | Missing |
 | CPU work | AsyncLoopWork + ThreadPool | No operation method | loopWork | work; owning onPool and pool scheduler |
@@ -331,3 +347,7 @@ Dedicated Debug/Release suites passed on macOS (941/941 assertions), Linux (961/
 ### Borrowed datagram validation
 
 Scalar/vector datagrams, copied peer addresses, truncation and next-message boundaries, empty messages/vectors, zero-capacity receive, IPv4/IPv6, active/prestopped cancellation, terminal storage destruction, socket reuse, overflow and native errors passed Debug/Release on macOS, Linux and Windows. Bounded callback tests exercise both pending and already-queued messages, including explicit epoll/io_uring runs. Default suites and normal/failure or stalled demos passed on all three platforms. Regenerated single-file libraries, a separate consumer referencing the UDP factories, SC.cpp enabled/disabled and dependency/category checks passed. These default-suite claims exclude opt-in BuildTest; stdexec validation does not establish native standard-library conformance.
+
+### Process and signal validation
+
+Dedicated and default suites passed in Debug/Release on macOS, Linux and Windows. Coverage includes exit statuses 0/7, invalid handles, prestop/output preservation, active wait cancellation followed by caller-owned waiting, and deterministic stop after native completion with observed status 9 retained. Signal coverage includes native invalid/unsupported errors, process-directed POSIX delivery and cancellation, and Windows CTRL_BREAK delivery to a child that explicitly announces readiness. Normal/failure and stalled demos, regenerated single-file Release builds, process/signal separate-consumer linking, enabled/disabled SC.cpp and dependency/category checks passed. Default-suite coverage excludes opt-in BuildTest; execution-provider results remain stdexec validation rather than native standard-library conformance.
