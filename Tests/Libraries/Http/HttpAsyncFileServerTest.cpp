@@ -800,10 +800,19 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(context.httpServer.stop());
     };
 
-    // Safety timout against hangs
+    // Safety timeout against hangs. Preserve completed phases when a backend or a slow fixture exhausts the budget.
     AsyncLoopTimeout timeout;
-    timeout.callback = [this](AsyncLoopTimeout::Result&)
-    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    timeout.callback = [this, &context](AsyncLoopTimeout::Result&)
+    {
+        report.console.print("HTTP file timeout: get={}, put={}\n", size_t(context.getCount), size_t(context.putCount));
+        report.console.print("safety={}, mime={}\n", size_t(context.safetyCount), size_t(context.mimeCount));
+        report.console.print("missing={}, spa={}\n", size_t(context.missingCount), size_t(context.spaCount));
+        report.console.print("etag={}, range={}\n", size_t(context.etagCount), size_t(context.rangeCount));
+        report.console.print("head={}, options={}\n", size_t(context.headCount), size_t(context.optionsCount));
+        report.console.print("multipart={}, badMultipart={}\n", size_t(context.multipartCount),
+                             size_t(context.badMultipartCount));
+        SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false);
+    };
     SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{5000}));
     eventLoop.excludeFromActiveCount(timeout);
 
