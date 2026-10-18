@@ -98,6 +98,8 @@ struct AsyncExecutionTest : TestCase
             fileSenders(false);
             fileSenders(true);
         }
+        if (test_section("native borrowed files ignore unrelated busy pool"))
+            fileNativeProgress();
         if (test_section("native pipe file transfers"))
             filePipes();
         if (test_section("borrowed TCP accept connect and scatter transfers"))
@@ -403,6 +405,146 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pool.destroy());
     }
 
+    void fileNativeProgress()
+    {
+        AsyncEventLoop loop;
+        ThreadPool     pool;
+        SC_TEST_EXPECT(loop.create());
+        SC_TEST_EXPECT(pool.create(1));
+        AsyncExecutionContext context{loop};
+        SC_TEST_EXPECT(context.create());
+        SocketDescriptor         listener, client;
+        AsyncExecutionConnection accepted;
+        SC_TEST_EXPECT(tcpPair(context, listener, client, accepted, report.mapPort(5118)));
+        StringPath path;
+        SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionNative.txt"}));
+        FileDescriptor file;
+        FileOpen       openMode;
+        openMode.mode     = FileOpen::WriteRead;
+        openMode.blocking = false;
+        SC_TEST_EXPECT(file.open(path.view(), openMode));
+        SC_TEST_EXPECT(loop.associateExternallyCreatedFileDescriptor(file));
+        struct Gate
+        {
+            EventObject  release;
+            Atomic<bool> entered = false;
+            Atomic<bool> done    = false;
+            Atomic<bool> forced  = false;
+        } gate;
+        ThreadPoolTask blocker;
+        blocker.function = [&gate]()
+        {
+            gate.entered.store(true);
+            gate.release.wait();
+        };
+        SC_TEST_EXPECT(pool.queueTask(blocker));
+        Thread failsafe;
+        SC_TEST_EXPECT(failsafe.start(
+            [&gate](Thread&)
+            {
+                for (int attempt = 0; attempt < 3000 and not gate.done.load(); ++attempt)
+                    Thread::Sleep(1);
+                if (not gate.done.load())
+                {
+                    gate.forced.store(true);
+                    gate.release.signal();
+                }
+            }));
+        for (int attempt = 0; attempt < 1000 and not gate.entered.load(); ++attempt)
+            Thread::Sleep(1);
+        size_t       written = 0;
+        const Result wrote =
+            consumeBounded(context, context.fileWriteAllAt(file, 0, StringView("native").toCharSpan()), written);
+        char                          local[6] = {}, remote[6] = {};
+        AsyncExecutionReadResult      read, received;
+        AsyncExecutionFileSendResult  sent;
+        AsyncExecutionFileSendOptions sendOptions;
+        sendOptions.length     = 6;
+        sendOptions.threadPool = &pool; // A native-capable file send must not join the unrelated worker.
+        bool   timer           = false;
+        Result ran{false};
+        if (wrote)
+            ran = consumeBounded(context,
+                                 ex::when_all(context.fileReadExactAt(file, 0, local),
+                                              context.fileSend(file, client, sendOptions),
+                                              context.receiveExact(accepted.socket, remote),
+                                              context.sleep({1}) | ex::then([&timer]() noexcept { timer = true; })),
+                                 read, sent, received);
+        gate.done.store(true);
+        gate.release.signal();
+        SC_TEST_EXPECT(failsafe.join());
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(gate.entered.load() and not gate.forced.load());
+        SC_TEST_EXPECT(wrote and ran and written == 6 and timer and sent.complete and sent.bytesTransferred == 6);
+        SC_TEST_EXPECT(read.data.sizeInBytes() == 6 and received.data.sizeInBytes() == 6);
+        SC_TEST_EXPECT(memcmp(local, "native", 6) == 0 and memcmp(remote, "native", 6) == 0);
+
+        // A blocking, unassociated descriptor separately exercises explicit worker routing.
+        SC_TEST_EXPECT(file.close());
+        openMode.mode     = FileOpen::ReadWrite;
+        openMode.blocking = true;
+        SC_TEST_EXPECT(file.open(path.view(), openMode));
+        AsyncExecutionFileReadOptions forced{&pool};
+        forced.threadPoolMode = AsyncThreadPoolMode::ForceThreadPool;
+        SC_TEST_EXPECT(consumeBounded(
+            context, context.fileWriteAllAt(file, 0, StringView("worker").toCharSpan(), forced), written));
+        SC_TEST_EXPECT(consumeBounded(context, context.fileReadExactAt(file, 0, local, forced), read));
+        SC_TEST_EXPECT(written == 6 and read.data.sizeInBytes() == 6 and memcmp(local, "worker", 6) == 0);
+
+        // Stop pending worker I/O, reuse its buffer at terminal notification, then release the syscall.
+        PipeDescriptor pipe;
+        SC_TEST_EXPECT(pipe.createPipe());
+        char                loan[1] = {};
+        ExecutionStopSource stop;
+        ExecutionOutcome    outcome;
+        outcome.loop      = &loop;
+        outcome.onStopped = [&loan]() { loan[0] = 'z'; };
+        auto operation    = ex::connect(context.fileReadExact(pipe.readPipe, loan, forced),
+                                        ExecutionReceiver{outcome, stop.get_token()});
+        struct Release
+        {
+            ExecutionStopSource& stop;
+            FileDescriptor&      writer;
+            Atomic<bool>         armed   = false;
+            Atomic<bool>         expired = false;
+            Result               wrote{false};
+        } release{stop, pipe.writePipe};
+        Thread writer;
+        SC_TEST_EXPECT(writer.start(
+            [&release](Thread&)
+            {
+                for (int attempt = 0; attempt < 1000 and not release.armed.load(); ++attempt)
+                    Thread::Sleep(1);
+                release.expired.store(not release.armed.load());
+                release.stop.request_stop();
+                Thread::Sleep(20);
+                release.wrote = release.writer.write(StringView("x").toCharSpan());
+                if (not release.wrote)
+                    ::_Exit(124);
+            }));
+        ex::start(operation);
+        const Result first  = loop.runNoWait();
+        const Result second = loop.runNoWait();
+        const bool   worker = operation.request.usesThreadPool() and not operation.request.isFree();
+        release.armed.store(true);
+        const Result cancelled = runBounded(loop);
+        SC_TEST_EXPECT(writer.join());
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(first and second and cancelled and worker and not release.expired.load() and release.wrote);
+        SC_TEST_EXPECT(outcome.stopped == 1 and outcome.values == 0 and outcome.errors == 0 and
+                       operation.request.isFree());
+        SC_TEST_EXPECT(loan[0] == 'z'); // No worker may overwrite storage after set_stopped.
+        SC_TEST_EXPECT(pipe.close());
+        SC_TEST_EXPECT(file.close());
+        SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
+        SC_TEST_EXPECT(accepted.socket.close());
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(listener.close());
+        SC_TEST_EXPECT(context.close());
+        SC_TEST_EXPECT(loop.close());
+        SC_TEST_EXPECT(pool.destroy());
+    }
+
     void filePipes()
     {
         AsyncEventLoop loop;
@@ -671,7 +813,8 @@ struct AsyncExecutionTest : TestCase
         Thread canceller;
         SC_TEST_EXPECT(canceller.start([&](Thread&) { acceptStop.request_stop(); }));
         SC_TEST_EXPECT(canceller.join());
-        SC_TEST_EXPECT(runBounded(loop));
+        const Result acceptCancelled = runBounded(loop);
+        SC_TEST_EXPECT(acceptCancelled);
         SC_TEST_EXPECT(acceptDestroyed and acceptOutcome.stopped == 1 and acceptOutcome.values == 0);
         AsyncExecutionConnection accepted;
         SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), client));
@@ -697,7 +840,8 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pumped and progress.data.sizeInBytes() == 2 and not progress.endOfFile);
         SC_TEST_EXPECT(canceller.start([&](Thread&) { readStop.request_stop(); }));
         SC_TEST_EXPECT(canceller.join());
-        SC_TEST_EXPECT(runBounded(loop));
+        const Result readCancelled = runBounded(loop);
+        SC_TEST_EXPECT(readCancelled);
         SC_TEST_EXPECT(read.request.isFree() and readOutcome.stopped == 1 and readOutcome.values == 0);
         SC_TEST_EXPECT(progress.data.sizeInBytes() == 2 and memcmp(buffer, "xy", 2) == 0);
         char next[1];
@@ -734,7 +878,8 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pumped and lineProgress.line.sizeInBytes() == 1 and buffer[0] == 'q');
         SC_TEST_EXPECT(canceller.start([&](Thread&) { lineStop.request_stop(); }));
         SC_TEST_EXPECT(canceller.join());
-        SC_TEST_EXPECT(runBounded(loop));
+        const Result lineCancelled = runBounded(loop);
+        SC_TEST_EXPECT(lineCancelled);
         SC_TEST_EXPECT(lineDestroyed and lineOutcome.stopped == 1 and not lineProgress.lineComplete);
         AsyncExecutionLineResult nextLine;
         size_t                   sentLineBytes = 0;
@@ -765,7 +910,8 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pumped and sent > 0 and sent < payload.size());
         SC_TEST_EXPECT(canceller.start([&](Thread&) { writeStop.request_stop(); }));
         SC_TEST_EXPECT(canceller.join());
-        SC_TEST_EXPECT(runBounded(loop));
+        const Result writeCancelled = runBounded(loop);
+        SC_TEST_EXPECT(writeCancelled);
         SC_TEST_EXPECT(write.request.isFree() and writeOutcome.stopped == 1 and writeOutcome.values == 0);
         SC_TEST_EXPECT(client.isValid() and accepted.socket.isValid() and sent < payload.size());
         SC_TEST_EXPECT(client.close());
@@ -788,7 +934,8 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(not connecting.request.isFree());
         SC_TEST_EXPECT(canceller.start([&](Thread&) { connectStop.request_stop(); }));
         SC_TEST_EXPECT(canceller.join());
-        SC_TEST_EXPECT(runBounded(loop));
+        const Result connectCancelled = runBounded(loop);
+        SC_TEST_EXPECT(connectCancelled);
         SC_TEST_EXPECT(connecting.request.isFree() and connectOutcome.stopped == 1 and connectOutcome.values == 0);
         SC_TEST_EXPECT(cancelClient.isValid()); // Cancellation does not close the borrowed descriptor.
         SC_TEST_EXPECT(cancelClient.close());
