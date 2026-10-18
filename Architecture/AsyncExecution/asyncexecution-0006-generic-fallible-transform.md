@@ -13,7 +13,7 @@ Add SC::tryThen as an SC extension, with pipe-closure and direct sender/callable
 
 Compose provider let_value with a small synchronous checked sender. let_value retains incoming values through the nested operation; the checked sender owns the callable and borrows those stable inputs. It checks stop before invoking CPU work, then emits the original Result on failure, stopped after successful work if requested, or the moved output value. A running callable cannot be preempted. No storage access follows terminal delivery; move-only callables and outputs are supported. This introduces no adapter-specific allocation or exception path.
 
-CPU placement remains standard on/continues_on composition. The demo uses on(pool, tryThen(codec)) so work returns to the loop before dependent I/O. Keep AsyncExecutionBufferResult and sendTCP compatibility overloads temporarily, while removing their use from the main example path. The generic result carrier works for TCP, file writing and further computation. Include required standard traits/utility headers explicitly inside the internal protocol boundary.
+CPU placement remains standard on/continues_on composition. The demo uses on(pool, tryThen(codec)) so work returns to the loop before dependent I/O. The initial temporary AsyncExecutionBufferResult/sendTCP compatibility path is removed by ASYNCEXECUTION-0016. The generic result carrier works for TCP, file writing and further computation. Include required standard traits/utility headers explicitly inside the internal protocol boundary.
 
 ## Consequences
 

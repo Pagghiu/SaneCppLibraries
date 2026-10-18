@@ -2513,15 +2513,41 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         };
         SC_TEST_EXPECT(app.run(ex::when_all(cpu(), cpu())));
         SC_TEST_EXPECT(poolContinuations.load() == 2);
+        Atomic<bool> boundBodyOnWorker     = false;
+        bool         boundDeliveredOnOwner = false;
+        auto         ownerBound =
+            app.onPool(
+                [&]() noexcept
+                {
+                    boundBodyOnWorker.store(Thread::CurrentThreadID() != ownerThread);
+                    return 9;
+                }) |
+            ex::then([&](int value) noexcept
+                     { boundDeliveredOnOwner = value == 9 and Thread::CurrentThreadID() == ownerThread; });
+        // Even a caller whose environment/starting agent is a pool worker receives onPool's result on the owner.
+        SC_TEST_EXPECT(app.run(ex::on(app.getPoolScheduler(), move(ownerBound))));
+        SC_TEST_EXPECT(boundBodyOnWorker.load() and boundDeliveredOnOwner);
+
         ExecutionStopSource poolStop;
         poolStop.request_stop();
         SC_TEST_EXPECT(app.run(ex::schedule(app.getPoolScheduler()), poolStop.get_token())
                            .isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
-        // then keeps a fallible transform's checked result as a value. TCP must translate failure before connecting.
+        // A codec selects its own error channel before a dependent transport is even constructed.
         const Result encodingFailure = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::FileTooLarge);
-        SC_TEST_EXPECT(
-            app.run(app.sendTCP("127.0.0.1", report.mapPort(19092), AsyncExecutionBufferResult{encodingFailure, {}}))
-                .isError(encodingFailure.category(), encodingFailure.errorValue()));
+        bool         attemptedTCP    = false;
+        auto         failedCodec =
+            ex::just() |
+            ex::on(app.getPoolScheduler(),
+                   tryThen([encodingFailure]() noexcept -> AsyncExecutionValueResult<AsyncExecutionBuffer>
+                           { return {encodingFailure, {}}; })) |
+            ex::let_value(
+                [&](auto& bytes) noexcept
+                {
+                    attemptedTCP = true;
+                    return app.sendTCP("invalid-IP", report.mapPort(19092), move(bytes));
+                });
+        SC_TEST_EXPECT(app.run(move(failedCodec)).isError(encodingFailure.category(), encodingFailure.errorValue()));
+        SC_TEST_EXPECT(not attemptedTCP);
         const char* vectors[]  = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
         const char* expected[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"};
         for (size_t i = 0; i < 7; ++i)

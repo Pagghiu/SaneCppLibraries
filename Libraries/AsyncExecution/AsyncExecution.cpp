@@ -1183,22 +1183,13 @@ AsyncExecutionSender<detail::AsyncExecutionOwnedSend> detail::AsyncExecutionSend
     return {*context, {connection.socket, move(data)}};
 }
 
-detail::AsyncExecutionTCPSender AsyncExecution::sendTCP(StringSpan host, uint16_t port, AsyncExecutionBuffer data,
-                                                        Result status)
+detail::AsyncExecutionTCPSender AsyncExecution::sendTCP(StringSpan host, uint16_t port, AsyncExecutionBuffer data)
 {
     detail::AsyncExecutionOwnedConnect setup;
-    setup.initialization = status;
-    if (status)
-        setup.initialization = setup.address.fromAddressPort(host, port);
+    setup.initialization = setup.address.fromAddressPort(host, port);
     return AsyncExecutionProtocol::let_value(
         AsyncExecutionSender<detail::AsyncExecutionOwnedConnect>{context, move(setup)},
         detail::AsyncExecutionSendConnected{&context, move(data)});
-}
-
-detail::AsyncExecutionTCPSender AsyncExecution::sendTCP(StringSpan host, uint16_t port,
-                                                        AsyncExecutionBufferResult encoded)
-{
-    return sendTCP(host, port, move(encoded.data), encoded.status);
 }
 
 Result AsyncExecutionContext::beginRun()

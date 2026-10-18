@@ -104,8 +104,16 @@ struct AsyncExecutionTimeoutTest : AsyncExecutionTestCase
                         });
         ExecutionStopSource stop;
         ExecutionOutcome    outcome;
-        auto                operation = ex::connect(timeout(context, move(work), {callerStop ? 5000 : 1}),
-                                                    ExecutionReceiver{outcome, stop.get_token()});
+        // Either branch can be last. A worker terminal notification must wake the owner before interrupting its loop.
+        AsyncLoopWakeUp terminal;
+        terminal.callback = [&loop](AsyncLoopWakeUp::Result&) { loop.interrupt(); };
+        SC_TEST_EXPECT(terminal.start(loop));
+        auto notify       = [&]() { SC_ASYNC_TRUST_RESULT(terminal.wakeUp(loop)); };
+        outcome.onValue   = notify;
+        outcome.onError   = notify;
+        outcome.onStopped = notify;
+        auto operation    = ex::connect(timeout(context, move(work), {callerStop ? 5000 : 1}),
+                                        ExecutionReceiver{outcome, stop.get_token()});
         ex::start(operation);
         gate.entered.wait();
         if (callerStop)
@@ -120,7 +128,6 @@ struct AsyncExecutionTimeoutTest : AsyncExecutionTestCase
         SC_TEST_EXPECT(not gate.finished.load() and outcome.values == 0 and outcome.errors == 0 and
                        outcome.stopped == 0);
         SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
-        outcome.loop = &loop;
         gate.release.signal();
         SC_TEST_EXPECT(runBounded(loop));
         gate.done.store(true);

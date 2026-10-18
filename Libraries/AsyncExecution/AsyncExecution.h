@@ -1180,14 +1180,6 @@ auto tryThen(Sender&& sender, Procedure procedure)
                                              detail::AsyncExecutionTryTransform<Procedure>{move(procedure)});
 }
 
-/// Legacy checked-buffer carrier accepted by sendTCP for compatibility.
-/// Prefer AsyncExecutionValueResult<AsyncExecutionBuffer> with tryThen for transport-independent error handling.
-struct AsyncExecutionBufferResult
-{
-    Result               status{true};
-    AsyncExecutionBuffer data;
-};
-
 namespace detail
 {
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionOwnedRead
@@ -1362,6 +1354,8 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
 
     AsyncExecutionSender<detail::AsyncExecutionOwnedWrite> writeFile(StringSpan path, AsyncExecutionBuffer data);
 
+    /// SC extension: run the body on the owned pool and complete on this runtime's owner loop.
+    /// Standard on restores the caller's scheduler; schedule(pool) continues on a worker.
     template <typename Procedure>
     auto onPool(AsyncExecutionBuffer data, Procedure procedure)
     {
@@ -1378,10 +1372,7 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
 
     AsyncExecutionSender<detail::AsyncExecutionOwnedConnect> connectTCP(StringSpan host, uint16_t port);
 
-    detail::AsyncExecutionTCPSender sendTCP(StringSpan host, uint16_t port, AsyncExecutionBuffer data,
-                                            Result status = Result(true));
-
-    detail::AsyncExecutionTCPSender sendTCP(StringSpan host, uint16_t port, AsyncExecutionBufferResult encoded);
+    detail::AsyncExecutionTCPSender sendTCP(StringSpan host, uint16_t port, AsyncExecutionBuffer data);
 
     AsyncExecutionContext& getContext() noexcept { return context; }
 
