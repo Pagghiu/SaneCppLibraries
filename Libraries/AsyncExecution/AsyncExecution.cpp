@@ -158,45 +158,26 @@ detail::AsyncExecutionCommand* AsyncExecutionContext::pop() noexcept
     return command;
 }
 
-Result detail::AsyncExecutionPoolTicket::submit(AsyncExecutionContext& context, ThreadPool& pool, void* operation,
-                                                Notify notify) noexcept
+Result detail::AsyncExecutionPoolTask::submit(AsyncExecutionContext& executionContext, ThreadPool& pool,
+                                              void* executionOperation, Notify delivery) noexcept
 {
-    struct Ticket
+    context           = &executionContext;
+    operation         = executionOperation;
+    notify            = delivery;
+    task.function     = []() {};
+    task.afterRelease = [this]()
     {
-        ThreadPoolTask         task;
-        AsyncExecutionContext* context;
-        void*                  operation;
-        Notify                 notify;
-    };
-
-    auto* ticket = static_cast<Ticket*>(AsyncExecutionReallocate(nullptr, sizeof(Ticket)));
-    if (not ticket)
-        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
-    placementNew(*ticket);
-    ticket->operation         = operation;
-    ticket->notify            = notify;
-    ticket->context           = &context;
-    ticket->task.function     = []() {};
-    ticket->task.afterRelease = [ticket]()
-    {
-        // The pool no longer accesses the task node. Reclaim before receiver delivery, which may destroy its
-        // operation or close the context. The pool itself remains alive through this notification's return.
-        auto*      context   = ticket->context;
-        auto*      operation = ticket->operation;
-        const auto notify    = ticket->notify;
-        ticket->~Ticket();
-        AsyncExecutionRelease(ticket);
+        // Only the pool's local callback copy remains in use. Receiver delivery may destroy the embedded task.
+        // The context/pool remain borrowed through notification return; never access operation after notify.
+        auto*      executionOperation = operation;
+        const auto delivery           = notify;
         context->outstanding.fetch_sub(1);
-        notify(operation);
+        delivery(executionOperation);
     };
-    context.outstanding.fetch_add(1);
-    const Result queued = pool.queueTask(ticket->task);
+    executionContext.outstanding.fetch_add(1);
+    const Result queued = pool.queueTask(task);
     if (not queued)
-    {
-        context.outstanding.fetch_sub(1);
-        ticket->~Ticket();
-        AsyncExecutionRelease(ticket);
-    }
+        executionContext.outstanding.fetch_sub(1);
     return queued;
 }
 

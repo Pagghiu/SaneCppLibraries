@@ -1,6 +1,6 @@
 # ASYNCEXECUTION-0004 - Preserve Loop Progress During Pool Continuations
 
-Status: Accepted
+Status: Accepted; ticket allocation superseded by ASYNCEXECUTION-0012
 Date: 2026-10-17
 
 ## Context

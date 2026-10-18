@@ -81,7 +81,7 @@ template <typename Setup, typename Receiver>
 struct AsyncExecutionOperation;
 template <typename Receiver>
 struct AsyncExecutionPoolOperation;
-struct AsyncExecutionPoolTicket;
+struct AsyncExecutionPoolTask;
 } // namespace detail
 
 /// Owns an intrusive command dispatcher; borrows its event loop. Create and close on the loop thread.
@@ -225,7 +225,7 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 
   private:
     friend struct AsyncExecution;
-    friend struct detail::AsyncExecutionPoolTicket;
+    friend struct detail::AsyncExecutionPoolTask;
     template <typename Setup, typename Receiver>
     friend struct detail::AsyncExecutionOperation;
     template <typename Receiver>
@@ -273,6 +273,11 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScheduler
 
     AsyncExecutionSender<detail::AsyncExecutionTimer> schedule() const noexcept;
     bool operator==(const AsyncExecutionScheduler& other) const noexcept { return context == other.context; }
+    AsyncExecutionScheduler query(
+        AsyncExecutionProtocol::get_completion_scheduler_t<AsyncExecutionProtocol::set_value_t>) const noexcept
+    {
+        return *this;
+    }
     auto query(AsyncExecutionProtocol::get_forward_progress_guarantee_t) const noexcept
     {
         return AsyncExecutionProtocol::forward_progress_guarantee::weakly_parallel;
@@ -288,14 +293,20 @@ struct AsyncExecutionEnvironment
     }
 };
 
-/// Successful scheduling completes on a worker. A separate ticket survives receiver-driven operation destruction.
+/// Successful scheduling completes on a worker, after the pool releases the embedded task node.
 struct AsyncExecutionPoolScheduler;
 namespace detail
 {
-struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionPoolTicket
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionPoolTask
 {
     using Notify = void (*)(void*) noexcept;
-    static Result submit(AsyncExecutionContext& context, ThreadPool& pool, void* operation, Notify notify) noexcept;
+    ThreadPoolTask task;
+
+    AsyncExecutionContext* context   = nullptr;
+    void*                  operation = nullptr;
+    Notify                 notify    = nullptr;
+
+    Result submit(AsyncExecutionContext& context, ThreadPool& pool, void* operation, Notify notify) noexcept;
 };
 template <typename Receiver>
 struct AsyncExecutionPoolOperation
@@ -304,23 +315,26 @@ struct AsyncExecutionPoolOperation
     AsyncExecutionContext& context;
     ThreadPool&            pool;
     Receiver               receiver;
+    AsyncExecutionPoolTask task;
+
     AsyncExecutionPoolOperation(AsyncExecutionContext& context, ThreadPool& pool, Receiver receiver)
         : context(context), pool(pool), receiver(move(receiver))
     {}
     AsyncExecutionPoolOperation(const AsyncExecutionPoolOperation&) = delete;
     void start() noexcept
     {
-        const Result queued = AsyncExecutionPoolTicket::submit(
-            context, pool, this,
-            [](void* operation) noexcept
-            {
-                auto receiver = move(static_cast<AsyncExecutionPoolOperation*>(operation)->receiver);
-                auto token    = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
-                if (token.stop_requested())
-                    AsyncExecutionProtocol::set_stopped(move(receiver));
-                else
-                    AsyncExecutionProtocol::set_value(move(receiver));
-            });
+        const Result queued =
+            task.submit(context, pool, this,
+                        [](void* operation) noexcept
+                        {
+                            auto receiver = move(static_cast<AsyncExecutionPoolOperation*>(operation)->receiver);
+                            auto token =
+                                AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
+                            if (token.stop_requested())
+                                AsyncExecutionProtocol::set_stopped(move(receiver));
+                            else
+                                AsyncExecutionProtocol::set_value(move(receiver));
+                        });
         if (not queued)
             AsyncExecutionProtocol::set_error(move(receiver), queued);
     }
@@ -361,6 +375,11 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionPoolScheduler
     bool                   operator==(const AsyncExecutionPoolScheduler& other) const noexcept
     {
         return context == other.context and pool == other.pool;
+    }
+    AsyncExecutionPoolScheduler query(
+        AsyncExecutionProtocol::get_completion_scheduler_t<AsyncExecutionProtocol::set_value_t>) const noexcept
+    {
+        return *this;
     }
     auto query(AsyncExecutionProtocol::get_forward_progress_guarantee_t) const noexcept
     {

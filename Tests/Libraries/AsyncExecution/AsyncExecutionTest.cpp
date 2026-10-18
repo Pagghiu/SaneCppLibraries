@@ -46,6 +46,7 @@ struct ExecutionOutcome
 
     Function<void()> onValue;
     Function<void()> onStopped;
+    Function<void()> onError;
     AsyncEventLoop*  loop = nullptr;
 };
 struct ExecutionEnvironment
@@ -74,10 +75,13 @@ struct ExecutionReceiver
     }
     void set_error(Result error) && noexcept
     {
+        auto* loop = outcome.loop;
         ++outcome.errors;
         outcome.error = error;
-        if (outcome.loop)
-            outcome.loop->interrupt();
+        if (outcome.onError.isValid())
+            outcome.onError();
+        if (loop)
+            loop->interrupt();
     }
     void set_stopped() && noexcept
     {
@@ -1882,6 +1886,11 @@ struct AsyncExecutionTest : TestCase
         AsyncExecutionContext context{loop};
         SC_TEST_EXPECT(context.create());
         const AsyncExecutionPoolScheduler scheduler{&context, &pool};
+        const auto                        loopScheduler = context.getScheduler();
+        SC_TEST_EXPECT(ex::get_completion_scheduler<ex::set_value_t>(loopScheduler) ==
+                       ex::get_completion_scheduler<ex::set_value_t>(ex::get_env(ex::schedule(loopScheduler))));
+        SC_TEST_EXPECT(ex::get_completion_scheduler<ex::set_value_t>(scheduler) ==
+                       ex::get_completion_scheduler<ex::set_value_t>(ex::get_env(ex::schedule(scheduler))));
         // Queue stop before the worker can dequeue the schedule request.
         ThreadPoolTask blocker;
         EventObject    entered, release;
@@ -1972,9 +1981,67 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(pool.waitForAllTasks());
         SC_TEST_EXPECT(running.finished.load() and runningOutcome.stopped == 1 and runningOutcome.values == 0 and
                        runningOutcome.errors == 0);
+        // Task release precedes receiver return. Whole-pool joins must include that notification tail.
+        ExecutionOutcome tailOutcome;
+        struct TailState
+        {
+            EventObject  entered, release;
+            Atomic<bool> finished = false;
+        } tailState;
+        tailOutcome.onValue = [&tailState]()
+        {
+            tailState.entered.signal();
+            tailState.release.wait();
+            tailState.finished.store(true);
+        };
+        auto tail = ex::connect(ex::schedule(scheduler), ExecutionReceiver{tailOutcome, {}});
+        ex::start(tail);
+        tailState.entered.wait();
+        SC_TEST_EXPECT(pool.waitForTask(tail.task.task));
+        SC_TEST_EXPECT(not tailState.finished.load());
+        Thread releaseTail;
+        SC_TEST_EXPECT(releaseTail.start(
+            [&](Thread&)
+            {
+                Thread::Sleep(10);
+                tailState.release.signal();
+            }));
+        SC_TEST_EXPECT(pool.waitForAllTasks());
+        SC_TEST_EXPECT(tailState.finished.load());
+        SC_TEST_EXPECT(releaseTail.join());
+
+        tailState.finished.store(false);
+        auto destroyTail = ex::connect(ex::schedule(scheduler), ExecutionReceiver{tailOutcome, {}});
+        ex::start(destroyTail);
+        tailState.entered.wait();
+        SC_TEST_EXPECT(releaseTail.start(
+            [&](Thread&)
+            {
+                Thread::Sleep(10);
+                tailState.release.signal();
+            }));
+        SC_TEST_EXPECT(pool.destroy());
+        SC_TEST_EXPECT(tailState.finished.load());
+        SC_TEST_EXPECT(releaseTail.join());
+
+        // Submission failure must release context accounting and permit terminal self-destruction too.
+        ExecutionOutcome failedOutcome;
+        using FailedOperation = decltype(ex::connect(ex::schedule(scheduler), ExecutionReceiver{failedOutcome, {}}));
+        alignas(FailedOperation) char failedStorage[sizeof(FailedOperation)];
+        auto*                         failed = reinterpret_cast<FailedOperation*>(failedStorage);
+        placementNew(*failed, context, pool, ExecutionReceiver{failedOutcome, {}});
+        bool failedDestroyed  = false;
+        failedOutcome.onError = [failed, &failedDestroyed]()
+        {
+            failed->~FailedOperation();
+            failedDestroyed = true;
+        };
+        ex::start(*failed);
+        SC_TEST_EXPECT(failedDestroyed and failedOutcome.errors == 1 and failedOutcome.values == 0 and
+                       failedOutcome.stopped == 0);
+        SC_TEST_EXPECT(failedOutcome.error.isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
         SC_TEST_EXPECT(context.close());
         SC_TEST_EXPECT(loop.close());
-        SC_TEST_EXPECT(pool.destroy());
     }
 
     void owningFacade()

@@ -33,3 +33,21 @@ The dedicated SCAsyncExecutionTest target checks sender and operation-state conc
 - https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/n5051.html
 - https://www.iso.org/standard/83626.html
 - ../../Documentation/Libraries/AsyncExecution.md
+
+## N5050 protocol audit (2026-10-18)
+
+Compared the official draft repository tags `n5046` and `n5050`, file `source/exec.tex`: byte-identical, SHA-256 `4a60ba52a15d14987b722be3d3b867e87046cb5167956e85d13ba7462294e978`. N5051 reports no intervening WG21 motions. No execution-clause migration is needed solely because of this baseline update.
+
+The implementation audit covered:
+
+| Pinned clauses | Adapter mapping and finding |
+| --- | --- |
+| exec.async.ops, exec.opstate, exec.opstate.start | Lazy connection, immovable operation storage, noexcept start, exactly one value/error/stopped notification; no operation access after terminal delivery. Native cancellation joins request storage before notification. |
+| exec.snd.concepts, exec.getcomplsigs, exec.connect | sender_tag, static consteval get_completion_signatures<Self, Env...>, member connect, Result errors and operation-specific success values. |
+| exec.sched, exec.schedule | Copyable borrowing handles, resource-identity equality, worker/owner-loop value affinity. Audit found missing scheduler-side value completion-scheduler queries; both schedulers now return themselves, matching schedule sender attributes. |
+| exec.get.env, exec.get.stop.token | Read-only attributes/receiver environments, receiver token callbacks; native submission/cancellation marshalled to owner loop. |
+| exec.get.compl.sched, exec.get.fwd.progress | Value-only completion affinity queries and conservative weakly_parallel progress. No promised error/stopped completion affinity. |
+
+These are source-level mappings and provider test targets, not proof of native standard-library conformance or an exhaustive formal audit. Pinned source: https://github.com/cplusplus/draft/blob/n5050/source/exec.tex (comparison: n5046 at the same path).
+
+Native provider availability checked on the available host/VM toolchains: Apple clang 17/libc++ 200100, Homebrew clang 23.1.2/libc++ 230102, Ubuntu GCC 13.3 and clang 18.1.3/libstdc++ 20240904 do not define __cpp_lib_senders after including execution. The newest installed MSVC 14.44.35207 execution/yvals_core headers have neither that macro nor sender/scheduler tags. Native sender tests are unavailable on these installations; retain the default-provider feature gate and test with the explicitly selected external provider. Recheck availability when toolchains change.
