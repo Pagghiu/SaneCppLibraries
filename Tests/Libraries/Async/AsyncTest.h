@@ -50,6 +50,7 @@ struct SC::AsyncTest : public SC::TestCase
 
     // Loop Work
     void loopWork();
+    void loopWorkErrorCallbackLifetime();
 
     // Timeouts
     void loopTimeout();

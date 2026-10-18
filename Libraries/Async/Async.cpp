@@ -2319,7 +2319,6 @@ void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, Kernel
     {
         clearSequence(*async.sequence);
     }
-    (void)completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode);
     if (not async.isCancelling())
     {
         if (async.sequence and async.sequence->runningRequest == &async)
@@ -2330,6 +2329,8 @@ void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, Kernel
         }
         async.markAsFree();
     }
+    // Terminal callbacks may destroy or restart the request. Finish all bookkeeping before delivery.
+    (void)completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode);
 }
 
 SC::Result SC::AsyncEventLoop::Internal::completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,

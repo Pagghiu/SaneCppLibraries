@@ -73,6 +73,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopWork();
         }
+        if (test_section("loop work error callback lifetime"))
+            loopWorkErrorCallbackLifetime();
         if (test_section("loop timeout"))
         {
             loopTimeout();

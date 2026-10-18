@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include <stdlib.h>
 
 void SC::AsyncTest::loopWork()
 {
@@ -51,4 +52,36 @@ void SC::AsyncTest::loopWork()
     SC_TEST_EXPECT(numWorkCallbackCalls.load() == NUM_WORKS);
     SC_TEST_EXPECT(numAfterWorkCallbackCalls == NUM_WORKS);
     //! [AsyncLoopWorkSnippet]
+}
+
+void SC::AsyncTest::loopWorkErrorCallbackLifetime()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create(options));
+    ThreadPool uncreatedPool;
+    struct Context
+    {
+        AsyncLoopWork* request   = nullptr;
+        int            callbacks = 0;
+        Result         status{true};
+    } context;
+    context.request = static_cast<AsyncLoopWork*>(::malloc(sizeof(AsyncLoopWork)));
+    SC_TEST_EXPECT(context.request != nullptr);
+    placementNew(*context.request);
+    context.request->work     = [] { return Result(true); };
+    context.request->callback = [&context](AsyncLoopWork::Result& result)
+    {
+        context.status = result.isValid();
+        ++context.callbacks;
+        context.request->~AsyncLoopWork();
+        ::free(context.request);
+        context.request = nullptr;
+    };
+    // Queueing fails during deferred activation, after start has successfully published the request.
+    SC_TEST_EXPECT(context.request->setThreadPool(uncreatedPool));
+    SC_TEST_EXPECT(context.request->start(loop));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(context.request == nullptr and context.callbacks == 1);
+    SC_TEST_EXPECT(context.status.isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
+    SC_TEST_EXPECT(loop.close());
 }
