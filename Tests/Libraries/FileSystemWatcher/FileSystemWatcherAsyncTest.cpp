@@ -111,6 +111,10 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 uint64_t callbackThreadID       = 0;
                 uint64_t addRemoveRenameChanges = 0;
                 uint64_t modifiedChanges        = 0;
+                uint64_t observedChanges        = 0;
+                uint64_t matchingChanges        = 0;
+
+                StringPath lastRelativePath;
 
                 StringView appDirectory;
 
@@ -127,11 +131,14 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
+                ++params.observedChanges;
+                SC_TEST_EXPECT(params.lastRelativePath.assign(notification.relativePath));
                 if (notification.relativePath != params.expectedRelativePath.view())
                 {
                     return;
                 }
 
+                ++params.matchingChanges;
                 params.callbackThreadID = Thread::CurrentThreadID();
                 if (notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
                 {
@@ -167,7 +174,16 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
             submitQueuedWatcher(eventLoop);
             SC_TEST_EXPECT(fs.write("dir/subdir2/test.txt", "content"));
-            SC_TEST_EXPECT(runUntil(eventLoop, [&] { return params.addRemoveRenameChanges > 0; }));
+            const bool notified = runUntil(eventLoop, [&] { return params.addRemoveRenameChanges > 0; });
+            if (not notified)
+            {
+                report.console.print("Watcher timeout: observed={}, matching={}\n", size_t(params.observedChanges),
+                                     size_t(params.matchingChanges));
+                report.console.print("modified={}\n", size_t(params.modifiedChanges));
+                report.console.print("expected={}, last={}\n", params.expectedRelativePath.view(),
+                                     params.lastRelativePath.view());
+            }
+            SC_TEST_EXPECT(notified);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID == Thread::CurrentThreadID());
             SC_TEST_EXPECT(fs.removeFile({"dir/subdir2/test.txt"_a8}));
