@@ -116,7 +116,8 @@ struct SC::AsyncFibersTest : public SC::TestCase
         }
         if (not useRuntimeStacks and test_section("owner loop while worker runs"))
         {
-            ownerLoopWhileWorkerRuns();
+            ownerLoopWhileWorkerRuns(TimeMs{0});
+            ownerLoopWhileWorkerRuns(TimeMs{1});
         }
         if (not useRuntimeStacks and test_section("worker pool sleep"))
         {
@@ -928,19 +929,15 @@ struct SC::AsyncFibersTest : public SC::TestCase
         SC_TEST_EXPECT(eventLoop.close());
     }
 
-    void ownerLoopWhileWorkerRuns()
+    void ownerLoopWhileWorkerRuns(TimeMs timeout)
     {
         struct State
         {
-            FiberScheduler* scheduler = nullptr;
-            AsyncFiberIO*   io        = nullptr;
+            AsyncFiberIO* io = nullptr;
+            TimeMs        timeout;
 
-            EventObject operationStarted;
-            EventObject resumeWorker;
             EventObject fiberResumed;
             EventObject finishFiber;
-
-            Result workerResult = Result(true);
         };
 
         AsyncEventLoop eventLoop;
@@ -955,45 +952,41 @@ struct SC::AsyncFibersTest : public SC::TestCase
         FiberStack        stack                  = stackForTest({stackMemory, sizeof(stackMemory)});
 
         State state;
-        state.scheduler = &scheduler;
-        state.io        = &io;
+        state.io      = &io;
+        state.timeout = timeout;
 
         SC_TEST_EXPECT(scheduler.spawn(task, stack,
                                        FiberTask::Procedure(
                                            [&state](FiberScheduler&)
                                            {
-                                               state.operationStarted.signal();
-                                               SC_TRY(state.io->sleep(TimeMs{1}));
+                                               SC_TRY(state.io->sleep(state.timeout));
                                                state.fiberResumed.signal();
                                                state.finishFiber.wait();
                                                return Result(true);
                                            })));
 
-        Thread workerThread;
-        auto   worker = [&state](Thread&)
-        {
-            state.workerResult = state.scheduler->runNoWait();
-            state.resumeWorker.wait();
-            if (state.workerResult)
-            {
-                state.workerResult = state.scheduler->runNoWait();
-            }
-        };
-        SC_TEST_EXPECT(workerThread.start(worker));
+        TwoPhaseWorker worker(scheduler, 1);
+        SC_TEST_EXPECT(worker.start());
 
-        state.operationStarted.wait();
+        // Finish publishing the suspension before the owner can complete the timer.
+        // Otherwise sleep can return inline, blocking the fiber before it ever becomes ready.
+        worker.initialRunsFinished.wait();
+        SC_TEST_EXPECT(worker.workerResult);
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Waiting);
         while (not scheduler.hasReadyFibers())
         {
             SC_TEST_EXPECT(io.runOwnerOnce());
         }
-        state.resumeWorker.signal();
+        worker.resumeWorker.signal();
         state.fiberResumed.wait();
 
         Result ownerResult = io.runOwnerOnce();
 
         state.finishFiber.signal();
-        SC_TEST_EXPECT(workerThread.join());
-        SC_TEST_EXPECT(state.workerResult);
+        worker.workerFinished.wait();
+        SC_TEST_EXPECT(worker.thread.join());
+        SC_TEST_EXPECT(worker.workerResult);
+        SC_TEST_EXPECT(worker.workerRuns.load() == 2);
         SC_TEST_EXPECT(task.isCompleted());
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(ownerResult);
