@@ -148,6 +148,8 @@ struct AsyncExecutionTest : TestCase
             poolLifetime();
         if (test_section("owning facade files pool and repeated runs"))
             owningFacade();
+        if (test_section("observable owning close and external driving"))
+            owningClose();
         if (test_section("scheduler submission from another thread"))
             scheduler();
         if (test_section("timer composition and thread pool"))
@@ -2042,6 +2044,77 @@ struct AsyncExecutionTest : TestCase
         SC_TEST_EXPECT(failedOutcome.error.isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
         SC_TEST_EXPECT(context.close());
         SC_TEST_EXPECT(loop.close());
+    }
+
+    void owningClose()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.close());
+        SC_TEST_EXPECT(app.run(app.sleep({0})).isError(AsyncResultCategory, AsyncError::NotInitialized));
+        SC_TEST_EXPECT(app.create(0).isError(ThreadingResultCategory, ThreadingError::InvalidWorkerThreadCount));
+        SC_TEST_EXPECT(app.close());
+        SC_TEST_EXPECT(app.create());
+        SC_TEST_EXPECT(app.create().isError(AsyncResultCategory, AsyncError::AlreadyInitialized));
+
+        Result foreignClose{true};
+        Thread foreign;
+        SC_TEST_EXPECT(foreign.start([&](Thread&) { foreignClose = app.close(); }));
+        SC_TEST_EXPECT(foreign.join());
+        SC_TEST_EXPECT(foreignClose.isError(AsyncResultCategory, AsyncError::InvalidState));
+
+        auto&               context = app.getContext();
+        auto&               loop    = context.getEventLoop();
+        ExecutionStopSource stop;
+        ExecutionOutcome    outcome;
+        outcome.loop   = &loop;
+        auto operation = ex::connect(context.sleep({5000}), ExecutionReceiver{outcome, stop.get_token()});
+        ex::start(operation);
+        SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+        stop.request_stop();
+        SC_TEST_EXPECT(runBounded(loop));
+        SC_TEST_EXPECT(outcome.stopped == 1 and outcome.values == 0 and outcome.errors == 0);
+
+        Result reentrantClose{true};
+        SC_TEST_EXPECT(app.run(app.sleep({1}) | ex::then([&]() noexcept { reentrantClose = app.close(); })));
+        SC_TEST_EXPECT(reentrantClose.isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+
+        // A worker notification is active after its embedded task was released. Rejection must not stop the loop.
+        struct PoolGate
+        {
+            EventObject entered, release, finished;
+        } gate;
+        ExecutionOutcome poolOutcome;
+        poolOutcome.onValue = [&gate]() { gate.finished.signal(); };
+        auto graph          = ex::schedule(app.getPoolScheduler()) | ex::then(
+                                                                [&gate]() noexcept
+                                                                {
+                                                                    gate.entered.signal();
+                                                                    gate.release.wait();
+                                                                });
+        auto pooled = ex::connect(move(graph), ExecutionReceiver{poolOutcome, {}});
+        ex::start(pooled);
+        gate.entered.wait();
+        SC_TEST_EXPECT(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain));
+        SC_TEST_EXPECT(app.run(app.sleep({1})));
+        gate.release.signal();
+        gate.finished.wait();
+        Result closed{false};
+        for (int attempt = 0; attempt < 2000; ++attempt)
+        {
+            closed = app.close();
+            if (closed or not closed.isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain))
+                break;
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(closed);
+        SC_TEST_EXPECT(poolOutcome.values == 1 and poolOutcome.errors == 0 and poolOutcome.stopped == 0);
+        SC_TEST_EXPECT(app.close());
+        SC_TEST_EXPECT(app.run(app.sleep({0})).isError(AsyncResultCategory, AsyncError::NotInitialized));
+        SC_TEST_EXPECT(app.create());
+        SC_TEST_EXPECT(app.run(app.sleep({1})));
+        SC_TEST_EXPECT(app.close());
     }
 
     void owningFacade()

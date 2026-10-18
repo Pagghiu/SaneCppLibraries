@@ -230,17 +230,23 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     friend struct detail::AsyncExecutionOperation;
     template <typename Receiver>
     friend struct detail::AsyncExecutionPoolOperation;
-    Mutex                          mutex;
-    AsyncLoopWakeUp                wakeUp;
-    detail::AsyncExecutionCommand* head        = nullptr;
-    detail::AsyncExecutionCommand* tail        = nullptr;
-    Atomic<int32_t>                outstanding = 0;
-    Atomic<int32_t>                delivering  = 0;
-    Atomic<bool>                   accepting   = false;
-    uint64_t                       ownerThread = 0;
-    bool                           dispatching = false;
+    Mutex           mutex;
+    AsyncLoopWakeUp wakeUp;
 
-    bool running = false;
+    detail::AsyncExecutionCommand* head = nullptr;
+    detail::AsyncExecutionCommand* tail = nullptr;
+
+    Atomic<int32_t> outstanding       = 0;
+    Atomic<int32_t> delivering        = 0;
+    Atomic<int32_t> poolNotifications = 0;
+
+    Atomic<bool> accepting   = false;
+    uint64_t     ownerThread = 0;
+
+    bool dispatching = false;
+    bool running     = false;
+    bool closing     = false;
+
     struct RunState
     {
         AsyncExecutionContext&        context;
@@ -1303,6 +1309,10 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
 
     Result create(size_t workers = 1);
 
+    /// Owner-thread shutdown. Rejects active adapter work; joins no running graph.
+    /// Idempotent after successful close; a failed cleanup can be retried after resolving its cause.
+    Result close();
+
     AsyncExecutionScheduler     getScheduler() noexcept { return context.getScheduler(); }
     AsyncExecutionPoolScheduler getPoolScheduler() noexcept { return {&context, &pool}; }
 
@@ -1364,7 +1374,12 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
     AsyncEventLoop        loop;
     ThreadPool            pool;
     AsyncExecutionContext context;
-    bool                  initialized = false;
+
+    uint64_t ownerThread = 0;
+
+    bool loopCreated    = false;
+    bool poolCreated    = false;
+    bool contextCreated = false;
 };
 
 namespace detail

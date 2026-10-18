@@ -48,11 +48,11 @@ static Result AsyncExecutionPrepareFile(Request& request, AsyncTaskSequence& tas
 
 AsyncExecutionContext::AsyncExecutionContext(AsyncEventLoop& loop) : loop(loop) {}
 
-AsyncExecutionContext::~AsyncExecutionContext() { SC_ASYNC_ASSERT_DEBUG(not accepting.load()); }
+AsyncExecutionContext::~AsyncExecutionContext() { SC_ASYNC_ASSERT_DEBUG(not accepting.load() and not closing); }
 
 Result AsyncExecutionContext::create()
 {
-    if (accepting.load())
+    if (accepting.load() or closing)
         return Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized);
     ownerThread     = Thread::CurrentThreadID();
     wakeUp.callback = [this](AsyncLoopWakeUp::Result& result)
@@ -70,16 +70,21 @@ Result AsyncExecutionContext::create()
 
 Result AsyncExecutionContext::close()
 {
-    if (not accepting.load())
+    if (not accepting.load() and not closing)
         return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
-    if (Thread::CurrentThreadID() != ownerThread or running or dispatching or delivering.load() != 0 or
-        outstanding.load() != 0)
+    // Read outstanding before notification counts: workers publish their notification before dropping outstanding.
+    if (Thread::CurrentThreadID() != ownerThread or running or dispatching or outstanding.load() != 0 or
+        poolNotifications.load() != 0 or delivering.load() != 0)
         return Result::Error(AsyncResultCategory, AsyncError::ActiveRequestsRemain);
     // Callers must stop submitting and join producer threads before closing the context.
     accepting.store(false);
-    SC_TRY(wakeUp.stop(loop));
+    closing = true;
+    if (not wakeUp.isFree() and not wakeUp.isCancelling())
+        SC_TRY(wakeUp.stop(loop));
     SC_TRY(loop.runNoWait());
-    SC_ASYNC_ASSERT_DEBUG(wakeUp.isFree());
+    if (not wakeUp.isFree())
+        return Result::Error(AsyncResultCategory, AsyncError::ActiveRequestsRemain);
+    closing = false;
     return Result(true);
 }
 
@@ -171,8 +176,11 @@ Result detail::AsyncExecutionPoolTask::submit(AsyncExecutionContext& executionCo
         // The context/pool remain borrowed through notification return; never access operation after notify.
         auto*      executionOperation = operation;
         const auto delivery           = notify;
-        context->outstanding.fetch_sub(1);
+        auto*      executionContext   = context;
+        executionContext->poolNotifications.fetch_add(1);
+        executionContext->outstanding.fetch_sub(1);
         delivery(executionOperation);
+        executionContext->poolNotifications.fetch_sub(1);
     };
     executionContext.outstanding.fetch_add(1);
     const Result queued = pool.queueTask(task);
@@ -815,35 +823,57 @@ AsyncExecution::AsyncExecution() : context(loop) {}
 
 AsyncExecution::~AsyncExecution()
 {
-    if (initialized)
-    {
-        SC_ASYNC_ASSERT_RELEASE(not context.running);
-        SC_ASYNC_TRUST_RESULT(context.close());
-        SC_ASYNC_TRUST_RESULT(loop.close());
-        SC_ASYNC_TRUST_RESULT(pool.destroy());
-    }
+    // All graphs/producers must already be quiescent. A completed graph can still have a copied pool notification
+    // returning to ThreadPool; join that tail before destroying the borrowed context and pool.
+    if (poolCreated)
+        SC_ASYNC_TRUST_RESULT(pool.waitForAllTasks());
+    SC_ASYNC_TRUST_RESULT(close());
 }
 
 Result AsyncExecution::create(size_t workers)
 {
-    if (initialized)
+    if (loopCreated or poolCreated or contextCreated)
         return Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized);
+    ownerThread = Thread::CurrentThreadID();
     SocketNetworking::initNetworking();
     SC_TRY(loop.create());
-    const Result createdPool = pool.create(workers);
-    if (not createdPool)
+    loopCreated   = true;
+    Result status = pool.create(workers);
+    if (status)
     {
-        (void)loop.close();
-        return createdPool;
+        poolCreated = true;
+        status      = context.create();
+        if (status)
+        {
+            contextCreated = true;
+            return Result(true);
+        }
     }
-    const Result createdContext = context.create();
-    if (not createdContext)
+    const Result cleanup = close();
+    return cleanup ? status : cleanup;
+}
+
+Result AsyncExecution::close()
+{
+    if (not loopCreated and not poolCreated and not contextCreated)
+        return Result(true);
+    if (Thread::CurrentThreadID() != ownerThread)
+        return Result::Error(AsyncResultCategory, AsyncError::InvalidState);
+    if (contextCreated)
     {
-        (void)pool.destroy();
-        (void)loop.close();
-        return createdContext;
+        SC_TRY(context.close());
+        contextCreated = false;
     }
-    initialized = true;
+    if (loopCreated)
+    {
+        SC_TRY(loop.close());
+        loopCreated = false;
+    }
+    if (poolCreated)
+    {
+        SC_TRY(pool.destroy());
+        poolCreated = false;
+    }
     return Result(true);
 }
 
