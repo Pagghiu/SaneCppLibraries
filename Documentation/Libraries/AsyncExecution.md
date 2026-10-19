@@ -195,10 +195,11 @@ this integration; its frame-pacing experiment is still under investigation. See 
 | Files | `readFile`, `writeFile` | `fileRead[At]`, `fileReadExact[At]`, `fileReadUntilFullOrEOF`, `fileWrite[All][At]`, `fileSend` |
 | Readiness and wake-up | Through `getContext()` | One-shot `filePoll` (POSIX), `wakeUp(notification)` |
 | Datagrams | Through `getContext()` | `sendTo`, `receiveFrom` |
+| External producer | Through `getContext()` | One-shot `externalCompletion(record)` |
 | Processes and signals | Through `getContext()` | `processExit`, one-shot `signal` |
 | Joined lifetime | `run`, `runInto`, explicit `close` | `run`, `runInto`; `AsyncExecutionScope`, `timeout` |
 
-Public external-completion senders and filesystem metadata operations are not implemented yet.
+Filesystem metadata operations are not implemented yet.
 `filePoll` observes readability without consuming bytes; generic Windows handle readiness reports `OperationUnsupported`. The [reference](@ref library_async_execution_reference) covers partial transfers, EOF, datagram truncation and cancellation.
 
 Borrowed buffers, descriptors, pools and contexts must survive terminal completion. CPU cancellation waits for

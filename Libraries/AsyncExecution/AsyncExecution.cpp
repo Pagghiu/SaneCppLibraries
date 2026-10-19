@@ -163,6 +163,13 @@ detail::AsyncExecutionCommand* AsyncExecutionContext::pop() noexcept
     return command;
 }
 
+detail::AsyncExecutionDelivery::AsyncExecutionDelivery(AsyncExecutionContext& context) noexcept : context(context)
+{
+    context.delivering.fetch_add(1);
+}
+
+detail::AsyncExecutionDelivery::~AsyncExecutionDelivery() { context.delivering.fetch_sub(1); }
+
 AsyncExecutionNotification::AsyncExecutionNotification(AsyncExecutionContext& context) noexcept : context(context)
 {
     command.operation = this;
@@ -227,6 +234,88 @@ void AsyncExecutionNotification::dispatch() noexcept
 AsyncExecutionNotificationSender AsyncExecutionContext::wakeUp(AsyncExecutionNotification& notification)
 {
     return {*this, notification};
+}
+
+AsyncExecutionExternalCompletion::AsyncExecutionExternalCompletion(AsyncExecutionContext& context) noexcept
+    : context(context)
+{
+    command.operation = this;
+    command.execute   = [](detail::AsyncExecutionCommand& command) noexcept
+    { static_cast<AsyncExecutionExternalCompletion*>(command.operation)->dispatch(); };
+}
+
+AsyncExecutionExternalCompletion::~AsyncExecutionExternalCompletion()
+{
+    SC_ASYNC_ASSERT_DEBUG(waiter == nullptr and not command.queued);
+}
+
+Result AsyncExecutionExternalCompletion::complete(Result producerStatus, size_t transferred) noexcept
+{
+    mutex.lock();
+    if (completed)
+    {
+        mutex.unlock();
+        return Result::Error(AsyncResultCategory, AsyncError::CompletionAlreadyPosted);
+    }
+    status                   = producerStatus;
+    bytes                    = transferred;
+    const Result publication = waiter ? context.post(command) : Result(true);
+    if (publication)
+        completed = true;
+    mutex.unlock();
+    return publication;
+}
+
+Result AsyncExecutionExternalCompletion::attach(AsyncExecutionContext&                          incomingContext,
+                                                detail::AsyncExecutionExternalCompletionWaiter& incoming) noexcept
+{
+    if (&context != &incomingContext)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ExternalCompletionContextMismatch);
+    mutex.lock();
+    if (waiter or consumed)
+    {
+        const auto error = consumed ? AsyncExecutionError::ExternalCompletionConsumed
+                                    : AsyncExecutionError::ExternalCompletionAlreadyWaiting;
+        mutex.unlock();
+        return Result::Error(AsyncExecutionResultCategory, error);
+    }
+    waiter                   = &incoming;
+    const Result publication = completed ? context.post(command) : Result(true);
+    if (not publication)
+        waiter = nullptr;
+    mutex.unlock();
+    return publication;
+}
+
+void AsyncExecutionExternalCompletion::detach(detail::AsyncExecutionExternalCompletionWaiter& outgoing) noexcept
+{
+    mutex.lock();
+    if (waiter == &outgoing)
+    {
+        waiter = nullptr;
+        context.remove(command);
+    }
+    mutex.unlock();
+}
+
+void AsyncExecutionExternalCompletion::dispatch() noexcept
+{
+    mutex.lock();
+    auto*        selected       = waiter;
+    const Result producerStatus = status;
+    const size_t transferred    = bytes;
+    SC_ASYNC_ASSERT_DEBUG(completed and selected != nullptr);
+    context.remove(command);
+    waiter   = nullptr;
+    consumed = true;
+    mutex.unlock();
+    selected->deliver(selected->operation, producerStatus, transferred);
+}
+
+AsyncExecutionExternalCompletionSender AsyncExecutionContext::externalCompletion(
+    AsyncExecutionExternalCompletion& completion)
+{
+    return {*this, completion};
 }
 
 Result detail::AsyncExecutionPoolTask::submit(AsyncExecutionContext& executionContext, ThreadPool& pool,

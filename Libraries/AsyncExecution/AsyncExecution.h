@@ -16,6 +16,8 @@ namespace SC
 struct AsyncExecutionScheduler;
 struct AsyncExecutionNotification;
 struct AsyncExecutionNotificationSender;
+struct AsyncExecutionExternalCompletion;
+struct AsyncExecutionExternalCompletionSender;
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 struct AsyncExecutionScope;
 struct AsyncExecutionScopeJoinSender;
@@ -56,6 +58,14 @@ namespace detail
 {
 template <typename Receiver>
 struct AsyncExecutionNotificationOperation;
+template <typename Receiver>
+struct AsyncExecutionExternalCompletionOperation;
+struct AsyncExecutionDelivery;
+struct AsyncExecutionExternalCompletionWaiter
+{
+    void* operation                                 = nullptr;
+    void (*deliver)(void*, Result, size_t) noexcept = nullptr;
+};
 struct AsyncExecutionNotificationWaiter
 {
     void* operation                 = nullptr;
@@ -135,6 +145,9 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 
     /// Wait once for a coalescing, possibly cross-thread notification.
     AsyncExecutionNotificationSender wakeUp(AsyncExecutionNotification& notification);
+
+    /// Join a single external producer acknowledgement, including when stop was already requested.
+    AsyncExecutionExternalCompletionSender externalCompletion(AsyncExecutionExternalCompletion& completion);
 
     /// One readable-readiness observation. Borrows the descriptor, consumes no bytes and does not rearm.
     AsyncExecutionSender<detail::AsyncExecutionFilePoll> filePoll(const FileDescriptor& file);
@@ -249,6 +262,10 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     friend struct AsyncExecutionScope;
 #endif
     friend struct AsyncExecutionNotification;
+    friend struct AsyncExecutionExternalCompletion;
+    friend struct detail::AsyncExecutionDelivery;
+    template <typename Receiver>
+    friend struct detail::AsyncExecutionExternalCompletionOperation;
     template <typename Receiver>
     friend struct detail::AsyncExecutionNotificationOperation;
     friend struct detail::AsyncExecutionPoolTask;
@@ -836,6 +853,16 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionWork
     static Value       value(Request::Result&) { return {}; }
 };
 
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionDelivery
+{
+    explicit AsyncExecutionDelivery(AsyncExecutionContext& context) noexcept;
+    ~AsyncExecutionDelivery();
+    AsyncExecutionDelivery(const AsyncExecutionDelivery&) = delete;
+
+  private:
+    AsyncExecutionContext& context;
+};
+
 template <typename Setup, typename Receiver>
 struct AsyncExecutionOperation
 {
@@ -885,12 +912,7 @@ struct AsyncExecutionOperation
         context.outstanding.fetch_sub(1);
     }
 
-    struct Delivery
-    {
-        AsyncExecutionContext& context;
-        explicit Delivery(AsyncExecutionContext& context) : context(context) { context.delivering.fetch_add(1); }
-        ~Delivery() { context.delivering.fetch_sub(1); }
-    };
+    using Delivery = AsyncExecutionDelivery;
 
     void finishStopped() noexcept
     {
@@ -1138,7 +1160,7 @@ struct AsyncExecutionNotificationOperation
         notification.detach(waiter);
         context.remove(cancelCommand);
         context.outstanding.fetch_sub(1);
-        typename AsyncExecutionOperation<AsyncExecutionTimer, Receiver>::Delivery delivery(context);
+        AsyncExecutionDelivery delivery(context);
         if (not status)
             AsyncExecutionProtocol::set_error(move(receiver), status);
         else if (stopped)
@@ -1205,6 +1227,144 @@ struct AsyncExecutionNotificationSender
     auto connect(Receiver receiver) const noexcept
     {
         return detail::AsyncExecutionNotificationOperation<Receiver>{context, notification, move(receiver)};
+    }
+};
+
+/// Single-use acknowledgement from an external producer. Stop waits for complete(), including prestop.
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionExternalCompletion
+{
+    explicit AsyncExecutionExternalCompletion(AsyncExecutionContext& context) noexcept;
+    ~AsyncExecutionExternalCompletion();
+    AsyncExecutionExternalCompletion(const AsyncExecutionExternalCompletion&) = delete;
+    AsyncExecutionExternalCompletion(AsyncExecutionExternalCompletion&&)      = delete;
+
+    /// Call after the producer's last access to borrowed data. Retry a failed publication, never a successful one.
+    Result complete(Result status = Result(true), size_t bytes = 0) noexcept;
+    bool   isStopRequested() const noexcept { return stopRequested.load(); }
+
+  private:
+    template <typename Receiver>
+    friend struct detail::AsyncExecutionExternalCompletionOperation;
+    Result attach(AsyncExecutionContext& context, detail::AsyncExecutionExternalCompletionWaiter& waiter) noexcept;
+    void   detach(detail::AsyncExecutionExternalCompletionWaiter& waiter) noexcept;
+    void   dispatch() noexcept;
+
+    AsyncExecutionContext& context;
+    Mutex                  mutex;
+
+    detail::AsyncExecutionCommand command;
+
+    detail::AsyncExecutionExternalCompletionWaiter* waiter = nullptr;
+
+    Atomic<bool> stopRequested = false;
+
+    Result status{true};
+    size_t bytes = 0;
+
+    bool completed = false;
+    bool consumed  = false;
+};
+
+namespace detail
+{
+template <typename Receiver>
+struct AsyncExecutionExternalCompletionOperation
+{
+    using operation_state_concept = AsyncExecutionProtocol::operation_state_tag;
+    AsyncExecutionContext&            context;
+    AsyncExecutionExternalCompletion& completion;
+
+    Receiver receiver;
+
+    AsyncExecutionExternalCompletionWaiter waiter;
+
+    AsyncExecutionCommand command;
+
+    struct StopRequest
+    {
+        AsyncExecutionExternalCompletion* completion;
+
+        void operator()() const noexcept { completion->stopRequested.store(true); }
+    };
+    using StopToken    = decltype(AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)));
+    using StopCallback = typename StopToken::template callback_type<StopRequest>;
+    AlignedStorage<sizeof(StopCallback), alignof(StopCallback)> stopStorage;
+
+    bool stopRegistered = false;
+
+    AsyncExecutionExternalCompletionOperation(AsyncExecutionContext&            context,
+                                              AsyncExecutionExternalCompletion& completion, Receiver receiver)
+        : context(context), completion(completion), receiver(move(receiver))
+    {}
+    AsyncExecutionExternalCompletionOperation(const AsyncExecutionExternalCompletionOperation&) = delete;
+    AsyncExecutionExternalCompletionOperation(AsyncExecutionExternalCompletionOperation&&)      = delete;
+
+    void finish(Result status, size_t bytes) noexcept
+    {
+        const bool stopped =
+            AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)).stop_requested();
+        if (stopRegistered)
+        {
+            stopRegistered = false;
+            reinterpret_cast<StopCallback*>(&stopStorage)->~StopCallback();
+        }
+        completion.detach(waiter);
+        context.outstanding.fetch_sub(1);
+        AsyncExecutionDelivery delivery(context);
+        if (not status)
+            AsyncExecutionProtocol::set_error(move(receiver), status);
+        else if (stopped)
+            AsyncExecutionProtocol::set_stopped(move(receiver));
+        else
+            AsyncExecutionProtocol::set_value(move(receiver), bytes);
+    }
+    void startOnLoop() noexcept
+    {
+        waiter.operation = this;
+        waiter.deliver   = [](void* pointer, Result status, size_t bytes) noexcept
+        { static_cast<AsyncExecutionExternalCompletionOperation*>(pointer)->finish(status, bytes); };
+        const Result status = completion.attach(context, waiter);
+        if (not status)
+        {
+            finish(status, 0);
+            return;
+        }
+        // The owner cannot dispatch acknowledgement until this start command returns. Register only after
+        // accepting the wait, so rejected overlap cannot request stop on another consumer's producer.
+        auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
+        placementNew(*reinterpret_cast<StopCallback*>(&stopStorage), token, StopRequest{&completion});
+        stopRegistered = true;
+    }
+    void start() noexcept
+    {
+        command.operation = this;
+        command.execute   = [](AsyncExecutionCommand& command) noexcept
+        { static_cast<AsyncExecutionExternalCompletionOperation*>(command.operation)->startOnLoop(); };
+        context.outstanding.fetch_add(1);
+        const Result status = context.post(command);
+        if (not status)
+            finish(status, 0);
+    }
+};
+} // namespace detail
+
+struct AsyncExecutionExternalCompletionSender
+{
+    using sender_concept = AsyncExecutionProtocol::sender_tag;
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        return AsyncExecutionProtocol::completion_signatures<AsyncExecutionProtocol::set_value_t(size_t),
+                                                             AsyncExecutionProtocol::set_error_t(Result),
+                                                             AsyncExecutionProtocol::set_stopped_t()>{};
+    }
+    AsyncExecutionContext&            context;
+    AsyncExecutionExternalCompletion& completion;
+    auto get_env() const noexcept { return AsyncExecutionEnvironment{context.getScheduler()}; }
+    template <typename Receiver>
+    auto connect(Receiver receiver) const noexcept
+    {
+        return detail::AsyncExecutionExternalCompletionOperation<Receiver>{context, completion, move(receiver)};
     }
 };
 

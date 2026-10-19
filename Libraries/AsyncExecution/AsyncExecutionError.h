@@ -24,6 +24,9 @@ enum class AsyncExecutionError : uint32_t
     TimedOut,
     NotificationAlreadyWaiting,
     NotificationContextMismatch,
+    ExternalCompletionAlreadyWaiting,
+    ExternalCompletionContextMismatch,
+    ExternalCompletionConsumed,
 };
 static constexpr ResultCategory AsyncExecutionResultCategory = ResultCategory(23);
 } // namespace SC

@@ -138,6 +138,24 @@ terminal delivery. A failed `notify()` retains the bit but requires the caller t
 Success means published, not delivered. Terminal delivery happens on the owner thread and may release connected
 storage. Complete the wait and join producers before destroying the notification or closing its context.
 
+# External producer completion
+
+Create `AsyncExecutionExternalCompletion completion{context}` as a stable, single-use record for an external
+job. The producer calls `completion.complete(result, bytes)` after its last access to graph-borrowed data.
+`context.externalCompletion(completion)` waits for that acknowledgement, emitting the byte count on success
+or the unchanged producer `Result` on failure. Publication before the wait is retained. Duplicate publication
+reports `AsyncError::CompletionAlreadyPosted`; overlapping waits, wrong context and repeated consumption
+report distinct AsyncExecution errors. A failed publication may be retried; a successful one must not be.
+
+Stop sets `completion.isStopRequested()` for a cooperative producer, but waits for acknowledgement even with
+an already-stopped token. An external job may already be running when the sender starts. After acknowledgement,
+producer error wins over stop; otherwise the sender emits stopped or the byte count. A composed `timeout` also
+joins acknowledgement before returning. Producers that never acknowledge cannot be forcibly joined.
+
+This portable callback bridge uses the native wake-up dispatcher; it does not submit Windows OVERLAPPED
+operations or provide cancellation for arbitrary third-party APIs. Delivery occurs on the owner thread and
+may free connected storage. Join producer threads before destroying the record or closing its context.
+
 # Datagrams, processes and signals
 
 | Factory | Successful value / contract |
@@ -248,7 +266,7 @@ channels. Similar operation names preserve resource semantics, not identical res
 | File send, UDP, process, one-shot signal | Yes | Yes | Yes |
 | File readiness | `filePoll` | `filePoll` | `filePoll`; POSIX, explicit Windows unsupported error |
 | Public wake-up | Internal only | `wakeUp` | One-shot `wakeUp(notification)`; coalescing |
-| External-completion wrapper | Missing | Missing | Missing |
+| External-completion wrapper | Missing | Missing | Single-use `externalCompletion`; joins producer acknowledgement |
 | Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | Missing |
 | Lifetime helpers | Scheduler/counters/cancelAll | Task groups/registry/waitFor | Scope spawn/stop/join and joined timeout |
 
