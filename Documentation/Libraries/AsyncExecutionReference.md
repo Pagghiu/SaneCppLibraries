@@ -132,8 +132,26 @@ the supplied pool. `ForceThreadPool` explicitly selects the fallback. After subm
 completion instead of abandoning an internal worker or cancelling away an opened-handle result. A stopped
 open closes its unused handle before terminal delivery; a cleanup failure becomes an error. Earlier native
 errors retain precedence. Close/write side effects can occur despite stopped delivery; cancellation is not
-rollback. Prestop prevents submission and preserves resources. Metadata copy/rename/remove factories remain
-unfinished.
+rollback. Prestop prevents submission and preserves resources.
+
+`fsCopyFile` and `fsCopyDirectory` take `(pool, path, destination[, flags, poolMode])` and emit no values.
+They retain FileSystemCopyFlags, including overwrite (off by default) and native-clone preference.
+`fsRename(pool, path, destination[, poolMode])`, `fsRemoveFile(pool, path[, poolMode])` and
+`fsRemoveEmptyDirectory(pool, path[, poolMode])` also emit no values. The latter requires an empty directory.
+Both paths and copy flags are captured at construction. Copy operations use the native pool fallback on all
+backends; rename/remove can use io_uring natively. They share the same joined-stop policy and preserve native
+errors; cancellation does not undo a completed copy, rename or removal.
+
+For independent copies, use ordinary provider composition (with an initialized context and pool):
+
+```cpp
+SC_TRY(context.run(ex::when_all(
+    context.fsCopyFile(pool, "message.txt", "copy-a.txt"),
+    context.fsCopyFile(pool, "message.txt", "copy-b.txt"))));
+```
+
+With default copy flags, both destinations must be absent. The joined graph keeps its copied paths alive
+through completion; callers only retain the context and pool.
 
 # Readable readiness
 
@@ -291,12 +309,21 @@ channels. Similar operation names preserve resource semantics, not identical res
 | File readiness | `filePoll` | `filePoll` | `filePoll`; POSIX, explicit Windows unsupported error |
 | Public wake-up | Internal only | `wakeUp` | One-shot `wakeUp(notification)`; coalescing |
 | External-completion wrapper | Missing | Missing | Single-use `externalCompletion`; joins producer acknowledgement |
-| Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | `fsOpen/Close/Read/Write`; copy/rename/remove pending |
+| Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | `fsOpen/Close/Read/Write/CopyFile/CopyDirectory/Rename/RemoveFile/RemoveEmptyDirectory` |
 | Lifetime helpers | Scheduler/counters/cancelAll | Task groups/registry/waitFor | Scope spawn/stop/join and joined timeout |
 
 Do not infer complete-transfer behavior from names across adapters: current Fibers `fileWriteAll` delegates
 to its write implementation; stronger parity needs separate validation. Process reaping and optional progress
 remain native observations even when a composed root discards success values.
+
+# Await interoperability
+
+Await and AsyncExecution can be configured with the same native loop. The owner must drive Await deferred-frame
+cleanup, join both adapters and account for the execution dispatcher keeping native work alive.
+Direct sender-to-AwaitTask and reverse conversion are deferred:
+it needs explicit allocator/frame ownership, owner-thread resumption and joined stop/completion hooks.
+There is no implicit `co_await` conversion or provider dependency in Await. The operation parity table above
+compares independent adapters; it does not imply that their task types can be interchanged.
 
 # Build settings
 

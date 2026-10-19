@@ -466,6 +466,72 @@ AsyncExecutionSender<detail::AsyncExecutionFSWrite> AsyncExecutionContext::fsWri
     return {*this, {{pool, poolMode}, file, data, offset}};
 }
 
+detail::AsyncExecutionFSPath::AsyncExecutionFSPath(ThreadPool& pool, Operation operation, StringSpan inputPath,
+                                                   StringSpan inputDestination, FileSystemCopyFlags flags,
+                                                   AsyncThreadPoolMode poolMode)
+    : AsyncExecutionFileSystemBase{pool, poolMode}, operation(operation), flags(flags)
+{
+    const bool copying = operation == Operation::CopyFile or operation == Operation::CopyDirectory;
+    if (inputPath.isEmpty())
+        initialization =
+            Result::Error(AsyncResultCategory, copying ? AsyncError::InvalidSourcePath : AsyncError::InvalidPath);
+    else
+        initialization = AsyncExecutionResolvePath(inputPath, path);
+    if (initialization and (copying or operation == Operation::Rename))
+        initialization = inputDestination.isEmpty()
+                             ? Result::Error(AsyncResultCategory, AsyncError::InvalidDestinationPath)
+                             : AsyncExecutionResolvePath(inputDestination, destination);
+}
+
+Result detail::AsyncExecutionFSPath::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    SC_TRY(initialization);
+    SC_TRY(prepare(request));
+    switch (operation)
+    {
+    case Operation::CopyFile: return request.copyFile(loop, path.view(), destination.view(), flags);
+    case Operation::CopyDirectory: return request.copyDirectory(loop, path.view(), destination.view(), flags);
+    case Operation::Rename: return request.rename(loop, path.view(), destination.view());
+    case Operation::RemoveFile: return request.removeFile(loop, path.view());
+    case Operation::RemoveDirectory: return request.removeEmptyDirectory(loop, path.view());
+    default: return Result::Error(AsyncResultCategory, AsyncError::OperationNotSet);
+    }
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSPath> AsyncExecutionContext::fsCopyFile(ThreadPool& pool, StringSpan path,
+                                                                                     StringSpan          destination,
+                                                                                     FileSystemCopyFlags flags,
+                                                                                     AsyncThreadPoolMode poolMode)
+{
+    return {*this, {pool, AsyncFileSystemOperation::Operation::CopyFile, path, destination, flags, poolMode}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSPath> AsyncExecutionContext::fsCopyDirectory(
+    ThreadPool& pool, StringSpan path, StringSpan destination, FileSystemCopyFlags flags, AsyncThreadPoolMode poolMode)
+{
+    return {*this, {pool, AsyncFileSystemOperation::Operation::CopyDirectory, path, destination, flags, poolMode}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSPath> AsyncExecutionContext::fsRename(ThreadPool& pool, StringSpan path,
+                                                                                   StringSpan          destination,
+                                                                                   AsyncThreadPoolMode poolMode)
+{
+    return {*this, {pool, AsyncFileSystemOperation::Operation::Rename, path, destination, {}, poolMode}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSPath> AsyncExecutionContext::fsRemoveFile(ThreadPool&         pool,
+                                                                                       StringSpan          path,
+                                                                                       AsyncThreadPoolMode poolMode)
+{
+    return {*this, {pool, AsyncFileSystemOperation::Operation::RemoveFile, path, {}, {}, poolMode}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSPath> AsyncExecutionContext::fsRemoveEmptyDirectory(
+    ThreadPool& pool, StringSpan path, AsyncThreadPoolMode poolMode)
+{
+    return {*this, {pool, AsyncFileSystemOperation::Operation::RemoveDirectory, path, {}, {}, poolMode}};
+}
+
 Result detail::AsyncExecutionFilePoll::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
 {
     FileDescriptor::Handle handle = FileDescriptor::Invalid;

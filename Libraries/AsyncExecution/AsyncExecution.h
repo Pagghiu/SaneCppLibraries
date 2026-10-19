@@ -64,12 +64,14 @@ struct AsyncExecutionExternalCompletionOperation;
 struct AsyncExecutionDelivery;
 struct AsyncExecutionExternalCompletionWaiter
 {
-    void* operation                                 = nullptr;
+    void* operation = nullptr;
+
     void (*deliver)(void*, Result, size_t) noexcept = nullptr;
 };
 struct AsyncExecutionNotificationWaiter
 {
-    void* operation                 = nullptr;
+    void* operation = nullptr;
+
     void (*deliver)(void*) noexcept = nullptr;
 };
 struct AsyncExecutionTimer;
@@ -78,6 +80,7 @@ struct AsyncExecutionFSOpen;
 struct AsyncExecutionFSClose;
 struct AsyncExecutionFSRead;
 struct AsyncExecutionFSWrite;
+struct AsyncExecutionFSPath;
 struct AsyncExecutionAccept;
 struct AsyncExecutionConnect;
 struct AsyncExecutionSend;
@@ -101,10 +104,12 @@ struct AsyncExecutionFileSend;
 struct AsyncExecutionWork;
 struct AsyncExecutionCommand
 {
-    AsyncExecutionCommand* next                      = nullptr;
+    AsyncExecutionCommand* next = nullptr;
+
     void (*execute)(AsyncExecutionCommand&) noexcept = nullptr;
-    void* operation                                  = nullptr;
-    bool  queued                                     = false;
+
+    void* operation = nullptr;
+    bool  queued    = false;
 };
 template <typename Setup, typename Receiver>
 struct AsyncExecutionOperation;
@@ -169,6 +174,20 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     AsyncExecutionSender<detail::AsyncExecutionFSWrite> fsWrite(
         ThreadPool& pool, const FileDescriptor& file, Span<const char> data, uint64_t offset = 0,
         AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+
+    AsyncExecutionSender<detail::AsyncExecutionFSPath> fsCopyFile(
+        ThreadPool& pool, StringSpan path, StringSpan destination, FileSystemCopyFlags flags = {},
+        AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSPath> fsCopyDirectory(
+        ThreadPool& pool, StringSpan path, StringSpan destination, FileSystemCopyFlags flags = {},
+        AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSPath> fsRename(
+        ThreadPool& pool, StringSpan path, StringSpan destination,
+        AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSPath> fsRemoveFile(
+        ThreadPool& pool, StringSpan path, AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSPath> fsRemoveEmptyDirectory(
+        ThreadPool& pool, StringSpan path, AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
 
     /// Accept owns the returned connection; connect borrows an already-associated nonblocking socket.
     AsyncExecutionSender<detail::AsyncExecutionAccept>  accept(const SocketDescriptor& listener);
@@ -310,12 +329,16 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 
     struct RunState
     {
-        AsyncExecutionContext&        context;
-        Result                        status{true};
-        bool                          completed = false;
-        bool                          driving   = false;
+        AsyncExecutionContext& context;
+
+        Result status{true};
+
+        bool completed = false;
+        bool driving   = false;
+
         detail::AsyncExecutionCommand completion;
-        Result                        pending{true};
+
+        Result pending{true};
 
         void finishOnLoop(Result result) noexcept;
         void finish(Result result) noexcept;
@@ -596,6 +619,26 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFSWrite : AsyncExecutionFileSyste
     static Value value(Request::Result& result) { return result.completionData.numBytes; }
 };
 
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFSPath : AsyncExecutionFileSystemBase
+{
+    using Value     = AsyncCompletionData;
+    using Operation = AsyncFileSystemOperation::Operation;
+
+    Operation operation;
+
+    StringPath path;
+    StringPath destination;
+
+    FileSystemCopyFlags flags;
+
+    Result initialization{true};
+
+    AsyncExecutionFSPath(ThreadPool& pool, Operation operation, StringSpan path, StringSpan destination,
+                         FileSystemCopyFlags flags, AsyncThreadPoolMode poolMode);
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value value(Request::Result&) { return {}; }
+};
+
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFilePoll
 {
     using Request = AsyncFileReadiness;
@@ -857,11 +900,13 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileReadMany
 {
     using Request = AsyncFileRead;
     using Value   = AsyncExecutionReadResult;
-    const FileDescriptor&         file;
-    Span<char>                    buffer;
+    const FileDescriptor& file;
+    Span<char>            buffer;
+
     AsyncExecutionFileReadOptions options;
-    Value*                        progress    = nullptr;
-    bool                          requireFull = false;
+
+    Value* progress    = nullptr;
+    bool   requireFull = false;
 
     size_t received  = 0;
     bool   endOfFile = false;
@@ -881,12 +926,14 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileWriteAll
 {
     using Request = AsyncFileWrite;
     using Value   = size_t;
-    const FileDescriptor&          file;
-    Span<const char>               data;
-    Span<Span<const char>>         buffers;
+    const FileDescriptor&  file;
+    Span<const char>       data;
+    Span<Span<const char>> buffers;
+
     AsyncExecutionFileWriteOptions options;
-    size_t*                        progress     = nullptr;
-    bool                           singleBuffer = true;
+
+    size_t* progress     = nullptr;
+    bool    singleBuffer = true;
 
     size_t index       = 0;
     size_t offset      = 0;
@@ -976,7 +1023,8 @@ struct AsyncExecutionOperation
     using StopToken    = decltype(AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)));
     using StopCallback = typename StopToken::template callback_type<StopRequest>;
     AlignedStorage<sizeof(StopCallback), alignof(StopCallback)> stopStorage;
-    bool                                                        stopRegistered = false;
+
+    bool stopRegistered = false;
 
     StopCallback* stopCallback() noexcept { return reinterpret_cast<StopCallback*>(&stopStorage); }
 
@@ -1473,9 +1521,11 @@ struct AsyncExecutionExternalCompletionSender
 /// Move-only owned bytes. Allocation failures are Result errors; no C++ exceptions are used.
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionBuffer
 {
-    AsyncExecutionBuffer()                                       = default;
+    AsyncExecutionBuffer() = default;
+
     AsyncExecutionBuffer(const AsyncExecutionBuffer&)            = delete;
     AsyncExecutionBuffer& operator=(const AsyncExecutionBuffer&) = delete;
+
     AsyncExecutionBuffer(AsyncExecutionBuffer&& other) noexcept;
     AsyncExecutionBuffer& operator=(AsyncExecutionBuffer&& other) noexcept;
     ~AsyncExecutionBuffer();
@@ -1677,10 +1727,12 @@ struct AsyncExecutionOwnedCompute
     using Returned = decltype(std::declval<Procedure&>()());
     using Value = std::conditional_t<std::is_void_v<Returned> or std::is_same_v<Returned, Result>, AsyncCompletionData,
                                      std::remove_cvref_t<Returned>>;
-    ThreadPool&                                   pool;
-    Procedure                                     procedure;
+    ThreadPool& pool;
+    Procedure   procedure;
+
     AlignedStorage<sizeof(Value), alignof(Value)> output;
-    bool                                          produced = false;
+
+    bool produced = false;
 
     AsyncExecutionOwnedCompute(ThreadPool& pool, Procedure procedure) : pool(pool), procedure(move(procedure)) {}
     AsyncExecutionOwnedCompute(AsyncExecutionOwnedCompute&& other) noexcept
@@ -1881,7 +1933,8 @@ struct AsyncExecutionOutputs<>
 template <typename Head, typename... Tail>
 struct AsyncExecutionOutputs<Head, Tail...>
 {
-    Head&                          head;
+    Head& head;
+
     AsyncExecutionOutputs<Tail...> tail;
 
     AsyncExecutionOutputs(Head& head, Tail&... tail) noexcept : head(head), tail(tail...) {}
@@ -2210,7 +2263,8 @@ Result AsyncExecutionScope::spawn(Sender&& sender)
     if (memory == nullptr)
         return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
     detail::AsyncExecutionScopeAssociation association;
-    const Result                           associated = beginChild(association);
+
+    const Result associated = beginChild(association);
     if (not associated)
     {
         allocator.deallocate(allocator.userData, memory, sizeof(Child), alignof(Child));

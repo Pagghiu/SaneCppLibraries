@@ -23,7 +23,7 @@ Metadata/path operations emit no success values. Use native copy flags, backend 
 
 ## Staging
 
-The first implementation supplies open, close, read and write. Copy, rename and remove follow as the next filesystem group under the same path, pool and stop policy.
+Handle and metadata factories are implemented in separate increments under the same path, pool and joined-stop policy.
 
 ## Confirmation
 

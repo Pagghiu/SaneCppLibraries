@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Time/Time.h"
 #include "Tests/Libraries/AsyncExecution/AsyncExecutionTestSupport.h"
@@ -62,9 +63,15 @@ struct AsyncExecutionFileSystemTest : AsyncExecutionTestCase
                     errors(mode);
                 if (test_section("filesystem submitted open stops after cleanup"))
                     submittedOpen(mode);
+                if (test_section("filesystem metadata composition and flags"))
+                    metadata(mode);
+                if (test_section("filesystem metadata errors and prestop"))
+                    metadataErrors(mode);
             }
             if (test_section("filesystem stopped worker joins and terminal storage"))
                 stoppedWorkers();
+            if (test_section("filesystem metadata stopped workers and terminal storage"))
+                stoppedMetadata();
         }
         done.store(true);
         SC_TEST_EXPECT(guard.join());
@@ -182,6 +189,95 @@ struct AsyncExecutionFileSystemTest : AsyncExecutionTestCase
         SC_TEST_EXPECT(f.fs.removeFile("AE-FS-submitted-open.bin"));
         SC_TEST_EXPECT(f.close());
     }
+    void metadata(AsyncThreadPoolMode mode)
+    {
+        Fixture f;
+        SC_TEST_EXPECT(f.create(options, report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-source.txt", "payload"));
+        auto       source = path("AE-FS-meta-source.txt");
+        auto       first  = path("AE-FS-meta-first.txt");
+        const auto second = path("AE-FS-meta-second.txt");
+        auto       copy   = f.io.fsCopyFile(f.pool, source.view(), first.view(), {}, mode);
+        SC_TEST_EXPECT(source.assign("discarded-source-snapshot"));
+        SC_TEST_EXPECT(first.assign("discarded-destination-snapshot"));
+        SC_TEST_EXPECT(
+            consumeBounded(f.io, ex::when_all(move(copy), f.io.fsCopyFile(f.pool, path("AE-FS-meta-source.txt").view(),
+                                                                          second.view(), {}, mode))));
+        String text = StringEncoding::Utf8;
+        SC_TEST_EXPECT(f.fs.read("AE-FS-meta-first.txt", text));
+        SC_TEST_EXPECT(text.view() == "payload");
+        SC_TEST_EXPECT(f.fs.read("AE-FS-meta-second.txt", text));
+        SC_TEST_EXPECT(text.view() == "payload");
+        const auto   original    = path("AE-FS-meta-source.txt");
+        const auto   destination = path("AE-FS-meta-first.txt");
+        const Result native      = FileSystem::Operations::copyFile(original.view(), destination.view(), {});
+        SC_TEST_EXPECT(not native);
+        const Result duplicate =
+            consumeBounded(f.io, f.io.fsCopyFile(f.pool, original.view(), destination.view(), {}, mode));
+        SC_TEST_EXPECT(duplicate.isError(native.category(), native.errorValue()));
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-source.txt", "replacement"));
+        FileSystemCopyFlags flags;
+        flags.setOverwrite(true).setUseCloneIfSupported(false);
+        auto overwrite = f.io.fsCopyFile(f.pool, original.view(), destination.view(), flags, mode);
+        flags.setOverwrite(false);
+        SC_TEST_EXPECT(consumeBounded(f.io, move(overwrite)));
+        SC_TEST_EXPECT(f.fs.read("AE-FS-meta-first.txt", text));
+        SC_TEST_EXPECT(text.view() == "replacement");
+        const auto renamed = path("AE-FS-meta-renamed.txt");
+        SC_TEST_EXPECT(consumeBounded(f.io, f.io.fsRename(f.pool, destination.view(), renamed.view(), mode)));
+        SC_TEST_EXPECT(not f.fs.exists("AE-FS-meta-first.txt") and f.fs.exists("AE-FS-meta-renamed.txt"));
+        SC_TEST_EXPECT(consumeBounded(f.io, ex::when_all(f.io.fsRemoveFile(f.pool, original.view(), mode),
+                                                         f.io.fsRemoveFile(f.pool, second.view(), mode),
+                                                         f.io.fsRemoveFile(f.pool, renamed.view(), mode))));
+        SC_TEST_EXPECT(f.fs.makeDirectoryRecursive("AE-FS-meta-tree/sub"));
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-tree/sub/data.txt", "tree"));
+        const auto tree   = path("AE-FS-meta-tree");
+        const auto target = path("AE-FS-meta-tree-copy");
+        SC_TEST_EXPECT(consumeBounded(f.io, f.io.fsCopyDirectory(f.pool, tree.view(), target.view(), {}, mode)));
+        SC_TEST_EXPECT(f.fs.read("AE-FS-meta-tree-copy/sub/data.txt", text));
+        SC_TEST_EXPECT(text.view() == "tree");
+        SC_TEST_EXPECT(consumeBounded(
+            f.io, ex::when_all(f.io.fsRemoveFile(f.pool, path("AE-FS-meta-tree/sub/data.txt").view(), mode),
+                               f.io.fsRemoveFile(f.pool, path("AE-FS-meta-tree-copy/sub/data.txt").view(), mode))));
+        SC_TEST_EXPECT(consumeBounded(
+            f.io, ex::when_all(f.io.fsRemoveEmptyDirectory(f.pool, path("AE-FS-meta-tree/sub").view(), mode),
+                               f.io.fsRemoveEmptyDirectory(f.pool, path("AE-FS-meta-tree-copy/sub").view(), mode))));
+        SC_TEST_EXPECT(consumeBounded(f.io, ex::when_all(f.io.fsRemoveEmptyDirectory(f.pool, tree.view(), mode),
+                                                         f.io.fsRemoveEmptyDirectory(f.pool, target.view(), mode))));
+        SC_TEST_EXPECT(not f.fs.exists("AE-FS-meta-tree") and not f.fs.exists("AE-FS-meta-tree-copy"));
+        SC_TEST_EXPECT(f.close());
+    }
+    void metadataErrors(AsyncThreadPoolMode mode)
+    {
+        Fixture f;
+        SC_TEST_EXPECT(f.create(options, report.applicationRootDirectory.view()));
+        const auto   valid  = path("AE-FS-meta-errors.txt");
+        const Result source = consumeBounded(f.io, f.io.fsCopyFile(f.pool, {}, valid.view(), {}, mode));
+        SC_TEST_EXPECT(source.isError(AsyncResultCategory, AsyncError::InvalidSourcePath));
+        const Result destination = consumeBounded(f.io, f.io.fsCopyDirectory(f.pool, valid.view(), {}, {}, mode));
+        SC_TEST_EXPECT(destination.isError(AsyncResultCategory, AsyncError::InvalidDestinationPath));
+        const Result rename = consumeBounded(f.io, f.io.fsRename(f.pool, valid.view(), {}, mode));
+        SC_TEST_EXPECT(rename.isError(AsyncResultCategory, AsyncError::InvalidDestinationPath));
+        const Result remove = consumeBounded(f.io, f.io.fsRemoveFile(f.pool, {}, mode));
+        SC_TEST_EXPECT(remove.isError(AsyncResultCategory, AsyncError::InvalidPath));
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-errors.txt", "unchanged"));
+        ExecutionStopSource stop;
+        stop.request_stop();
+        const Result prestop = f.io.run(f.io.fsRemoveFile(f.pool, valid.view(), mode), stop.get_token());
+        SC_TEST_EXPECT(prestop.isError(AsyncExecutionResultCategory, AsyncExecutionError::Stopped));
+        SC_TEST_EXPECT(f.fs.exists("AE-FS-meta-errors.txt"));
+        SC_TEST_EXPECT(f.fs.makeDirectory("AE-FS-meta-nonempty"));
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-nonempty/data.txt", "content"));
+        const Result notEmpty =
+            consumeBounded(f.io, f.io.fsRemoveEmptyDirectory(f.pool, path("AE-FS-meta-nonempty").view(), mode));
+        SC_TEST_EXPECT(not notEmpty and f.fs.exists("AE-FS-meta-nonempty/data.txt"));
+        SC_TEST_EXPECT(f.fs.removeDirectoryRecursive("AE-FS-meta-nonempty"));
+        SC_TEST_EXPECT(f.fs.removeFile("AE-FS-meta-errors.txt"));
+        const auto missing = path("AE-FS-meta-missing.txt");
+        SC_TEST_EXPECT(not f.fs.exists("AE-FS-meta-missing.txt"));
+        destroyOnCompletion(f, f.io.fsRemoveFile(f.pool, missing.view(), mode), false, true);
+        SC_TEST_EXPECT(f.close());
+    }
     template <typename Sender>
     void destroyOnCompletion(Fixture& f, Sender sender, bool stopped, bool shouldFail)
     {
@@ -249,6 +345,39 @@ struct AsyncExecutionFileSystemTest : AsyncExecutionTestCase
         SC_TEST_EXPECT(outcome.errors == (shouldFail ? 1 : 0));
         SC_TEST_EXPECT(outcome.stopped == (stopped and not shouldFail ? 1 : 0));
         SC_TEST_EXPECT(f.loop.runNoWait());
+    }
+    void stoppedMetadata()
+    {
+        Fixture f;
+        SC_TEST_EXPECT(f.create(options, report.applicationRootDirectory.view()));
+        constexpr auto forced  = AsyncThreadPoolMode::ForceThreadPool;
+        const auto     source  = path("AE-FS-meta-stopped-source.txt");
+        const auto     copy    = path("AE-FS-meta-stopped-copy.txt");
+        const auto     renamed = path("AE-FS-meta-stopped-renamed.txt");
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-stopped-source.txt", "payload"));
+        destroyOnCompletion(f, f.io.fsCopyFile(f.pool, source.view(), copy.view(), {}, forced), true, false);
+        SC_TEST_EXPECT(f.fs.exists("AE-FS-meta-stopped-copy.txt"));
+        destroyOnCompletion(f, f.io.fsRename(f.pool, copy.view(), renamed.view(), forced), true, false);
+        SC_TEST_EXPECT(not f.fs.exists("AE-FS-meta-stopped-copy.txt") and
+                       f.fs.exists("AE-FS-meta-stopped-renamed.txt"));
+        destroyOnCompletion(f, f.io.fsRemoveFile(f.pool, renamed.view(), forced), true, false);
+        SC_TEST_EXPECT(not f.fs.exists("AE-FS-meta-stopped-renamed.txt"));
+        SC_TEST_EXPECT(f.fs.makeDirectory("AE-FS-meta-stopped-tree"));
+        SC_TEST_EXPECT(f.fs.writeString("AE-FS-meta-stopped-tree/data.txt", "tree"));
+        const auto tree   = path("AE-FS-meta-stopped-tree");
+        const auto target = path("AE-FS-meta-stopped-tree-copy");
+        destroyOnCompletion(f, f.io.fsCopyDirectory(f.pool, tree.view(), target.view(), {}, forced), true, false);
+        SC_TEST_EXPECT(f.fs.exists("AE-FS-meta-stopped-tree-copy/data.txt"));
+        SC_TEST_EXPECT(f.fs.removeFile("AE-FS-meta-stopped-tree-copy/data.txt"));
+        destroyOnCompletion(f, f.io.fsRemoveEmptyDirectory(f.pool, target.view(), forced), true, false);
+        SC_TEST_EXPECT(not f.fs.exists("AE-FS-meta-stopped-tree-copy"));
+        SC_TEST_EXPECT(f.fs.removeDirectoryRecursive("AE-FS-meta-stopped-tree"));
+        destroyOnCompletion(f, f.io.fsCopyFile(f.pool, source.view(), copy.view(), {}, forced), false, false);
+        destroyOnCompletion(f, f.io.fsCopyFile(f.pool, source.view(), copy.view(), {}, forced), false, true);
+        destroyOnCompletion(f, f.io.fsCopyFile(f.pool, source.view(), copy.view(), {}, forced), true, true);
+        SC_TEST_EXPECT(f.fs.removeFile("AE-FS-meta-stopped-source.txt"));
+        SC_TEST_EXPECT(f.fs.removeFile("AE-FS-meta-stopped-copy.txt"));
+        SC_TEST_EXPECT(f.close());
     }
     void stoppedWorkers()
     {
