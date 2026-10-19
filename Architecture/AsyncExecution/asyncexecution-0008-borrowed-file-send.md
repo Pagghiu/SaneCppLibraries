@@ -1,4 +1,4 @@
-# ASYNCEXECUTION-0009 - Borrowed File Send
+# ASYNCEXECUTION-0008 - Borrowed File Send
 
 Status: Accepted
 Date: 2026-10-18
@@ -23,7 +23,7 @@ Sender code can join file sending with peer receiving using when_all. Borrowed o
 
 ## Confirmation
 
-Check native and forced-pool transfers, nonzero offsets, data across splice/chunk boundaries, known progress on early EOF, invalid ranges/descriptors, missing forced pools, pre-stopped initialization and terminal cleanup. Validate native progress independently of an available but busy pool before closing the file-group milestone.
+Check native and forced-pool transfers, nonzero offsets, data across splice/chunk boundaries, known progress on early EOF, invalid ranges/descriptors, missing forced pools, pre-stopped initialization and terminal cleanup. Validate native progress independently of an available but busy pool before releasing borrowed resources.
 
 ## Related
 

@@ -1,11 +1,11 @@
-# ASYNCEXECUTION-0005 - Consume Values and Preserve Loop Integration
+# ASYNCEXECUTION-0004 - Consume Values and Preserve Loop Integration
 
 Status: Accepted
 Date: 2026-10-17
 
 ## Context
 
-The owning runtime's initial run consumer discarded values and only exposed a stop token. Standard on needs a start scheduler to restore the original execution resource. Applications also need the same graphs to run against an externally driven AsyncEventLoop, comparable to Await and AsyncFibers, without adopting another poller or exception policy.
+Value-oriented consumers need caller-owned outputs, and standard on needs a start scheduler to restore the execution resource. Applications also need the same graphs to run against an externally driven AsyncEventLoop, comparable to Await and AsyncFibers, without adopting another poller or exception policy.
 
 ## Decision
 
@@ -23,4 +23,4 @@ Callers retain values without an allocated tuple, at the cost of providing compa
 
 ## Confirmation
 
-Check standard schedule/starts_on/continues_on/both on forms, thread affinity, SC error identity, stopped recovery, retained scalar/multiple/move-only values and stop-token consumption. Exercise one graph with the owning runtime, borrowed blocking consumer, direct loop modes and phased polling. Verify external sync_wait on a separate thread while the SC owner drives its loop. Use bounded watchdogs for externally driven tests. Run the milestone validation gates before marking M2 complete.
+Check standard schedule/starts_on/continues_on/both on forms, thread affinity, SC error identity, stopped recovery, retained scalar/multiple/move-only values and stop-token consumption. Exercise one graph with the owning runtime, borrowed blocking consumer, direct loop modes and phased polling. Verify external sync_wait on a separate thread while the SC owner drives its loop. Use bounded watchdogs for externally driven tests. Verify required platform, provider and build-boundary checks.

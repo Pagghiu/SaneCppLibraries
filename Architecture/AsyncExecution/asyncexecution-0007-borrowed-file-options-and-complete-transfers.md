@@ -1,11 +1,11 @@
-# ASYNCEXECUTION-0008 - Borrowed File Options and Complete Transfers
+# ASYNCEXECUTION-0007 - Borrowed File Options and Complete Transfers
 
 Status: Accepted
 Date: 2026-10-17
 
 ## Context
 
-The prototype file factories require a pool and always select an absolute offset. Await exposes optional pool/offset options, while Fibers has At-style explicit offsets and an exact-read error contract. Await's fill-read instead succeeds at partial EOF. Native Windows requests also have their own cursor/append handling; exposing new options must not imply a portable shared descriptor cursor that the underlying adapters do not currently provide.
+File factories need explicit pool, offset and exact-versus-fill semantics. Await exposes optional pool/offset options, while Fibers has At-style explicit offsets and an exact-read error contract. Await's fill-read instead succeeds at partial EOF. Native Windows requests also have their own cursor/append handling; exposing new options must not imply a portable shared descriptor cursor that the underlying adapters do not currently provide.
 
 ## Decision
 
@@ -23,4 +23,4 @@ The new surface matches existing control-flow adapters where contracts agree, wh
 
 ## Confirmation
 
-Check explicit scalar/vector offsets, complete writes across chunk/vector boundaries, exact/fill EOF distinctions, zero progress, empty transfers, lazy/prestopped progress initialization, numeric bounds, forced/native-preferred pools and cancellation quiescence. Verify native pipe I/O independently of owning readFile/writeFile. Inspect Windows vector/cursor behavior rather than assuming POSIX behavior. Complete the file-group validation before advancing to UDP.
+Check explicit scalar/vector offsets, complete writes across chunk/vector boundaries, exact/fill EOF distinctions, zero progress, empty transfers, lazy/prestopped progress initialization, numeric bounds, forced/native-preferred pools and cancellation quiescence. Verify native pipe I/O independently of owning readFile/writeFile. Inspect Windows vector/cursor behavior rather than assuming POSIX behavior. Verify platform and build-boundary checks.

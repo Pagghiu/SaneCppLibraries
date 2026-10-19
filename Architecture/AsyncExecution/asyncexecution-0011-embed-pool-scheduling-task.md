@@ -1,11 +1,11 @@
-# ASYNCEXECUTION-0012 - Embed Pool Scheduling Task
+# ASYNCEXECUTION-0011 - Embed Pool Scheduling Task
 
 Status: Accepted
 Date: 2026-10-18
 
 ## Context
 
-ASYNCEXECUTION-0004 restored owner-loop progress using ThreadPool afterRelease, but retained a heap ticket that is no longer necessary. The pool operation is immovable, and ThreadPool copies the callback before releasing its node.
+The pool operation is immovable, and ThreadPool afterRelease copies the notification before releasing its node. Scheduling can therefore retain operation-local task storage while permitting receiver-driven destruction.
 
 ## Decision
 
@@ -13,7 +13,7 @@ Embed ThreadPoolTask in the connected pool operation. Its body is empty; its aft
 
 The pool and context remain borrowed through callback return. waitForTask joins node release only. waitForAllTasks and destroy join active notifications; destroy discards queued tasks without notification and is not cancellation for live sender graphs. Join graph work and producer threads before destroying borrowed execution resources. Running CPU continuations remain cooperative.
 
-This supersedes the allocation/reclamation portion of ASYNCEXECUTION-0004, preserving its completion affinity and progress contract. It requires no Threading changes and does not change the allocation policy for owning conveniences.
+Pool scheduling uses no separate heap ticket. Preserve owner-loop progress and affinity from ASYNCEXECUTION-0002; owning conveniences retain their explicit allocation policy.
 
 ## Confirmation
 

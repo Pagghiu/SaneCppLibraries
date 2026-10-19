@@ -1,11 +1,11 @@
-# ASYNCEXECUTION-0006 - Generic Fallible Transform
+# ASYNCEXECUTION-0005 - Generic Fallible Transform
 
 Status: Accepted
 Date: 2026-10-17
 
 ## Context
 
-The initial Base64 example returned a checked buffer through standard then, and sendTCP alone unwrapped its Result. That couples a CPU transform's failure handling to its eventual transport and makes file/computation consumers handle the same result differently. Standard then must retain ordinary value-transformation semantics.
+Coupling a CPU transform's failure handling to its eventual transport makes file/computation consumers interpret the same result differently. Standard then must retain ordinary value-transformation semantics.
 
 ## Decision
 
@@ -13,7 +13,7 @@ Add SC::tryThen as an SC extension, with pipe-closure and direct sender/callable
 
 Compose provider let_value with a small synchronous checked sender. let_value retains incoming values through the nested operation; the checked sender owns the callable and borrows those stable inputs. It checks stop before invoking CPU work, then emits the original Result on failure, stopped after successful work if requested, or the moved output value. A running callable cannot be preempted. No storage access follows terminal delivery; move-only callables and outputs are supported. This introduces no adapter-specific allocation or exception path.
 
-CPU placement remains standard on/continues_on composition. The demo uses on(pool, tryThen(codec)) so work returns to the loop before dependent I/O. The initial temporary AsyncExecutionBufferResult/sendTCP compatibility path is removed by ASYNCEXECUTION-0016. The generic result carrier works for TCP, file writing and further computation. Include required standard traits/utility headers explicitly inside the internal protocol boundary.
+Use then for synchronous value transformation, let_value for dependent senders, when_all for fan-out/joining and standard on/continues_on for placement. The examples use on(pool, tryThen(codec)) with an owner scheduler environment before dependent I/O. AsyncExecutionBufferResult and transport status-injection overloads are removed: computation selects its error channel before TCP is constructed. This experimental API break has no compatibility shim. The generic result carrier works for TCP, file writing and further computation. Include required standard traits/utility headers explicitly inside the internal protocol boundary.
 
 ## Consequences
 
