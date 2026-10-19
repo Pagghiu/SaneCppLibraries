@@ -83,6 +83,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopTimeoutCallbackLifetime();
         }
+        if (test_section("loop interrupt before blocking poll"))
+            loopInterruptBeforeBlockingPoll();
         if (test_section("loop wakeUpFromExternalThread"))
         {
             loopWakeUpFromExternalThread();

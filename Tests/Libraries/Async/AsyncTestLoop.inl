@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Threading/ThreadPool.h"
 #include "Libraries/Time/Time.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -177,4 +178,58 @@ void SC::AsyncTest::loopInterruptCollectedCompletion()
     SC_TEST_EXPECT(peer.close());
     finished.store(true);
     SC_TEST_EXPECT(guard.join());
+}
+
+void SC::AsyncTest::loopInterruptBeforeBlockingPoll()
+{
+    for (int mode = 0; mode < 2; ++mode)
+    {
+        const bool     fromListener = mode != 0;
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create(options));
+        struct State
+        {
+            AsyncEventLoop& loop;
+            Result          error{true};
+            bool            callback = false;
+            bool            expired  = false;
+        } state{loop};
+        AsyncLoopTimeout sentinel;
+        sentinel.callback = [&state](AsyncLoopTimeout::Result&) { state.expired = true; };
+        SC_TEST_EXPECT(sentinel.start(loop, {1000}));
+        AsyncEventLoopListeners listeners;
+        ThreadPool              missingPool;
+        AsyncLoopWork           work;
+        if (fromListener)
+        {
+            listeners.beforeBlockingPoll = [&state](AsyncEventLoop&)
+            {
+                state.callback = true;
+                state.loop.interrupt();
+            };
+            loop.setListeners(&listeners);
+        }
+        else
+        {
+            work.work     = []() { return Result(true); };
+            work.callback = [&state](AsyncLoopWork::Result& result)
+            {
+                state.error    = result.isValid();
+                state.callback = true;
+                state.loop.interrupt();
+            };
+            SC_TEST_EXPECT(work.setThreadPool(missingPool, AsyncThreadPoolMode::ForceThreadPool));
+            SC_TEST_EXPECT(work.start(loop));
+        }
+        SC_TEST_EXPECT(loop.run());
+        SC_TEST_EXPECT(state.callback);
+        // The callback runs before kernel polling. Interrupt must return without waiting for unrelated timers.
+        SC_TEST_EXPECT(not state.expired);
+        if (not fromListener)
+            SC_TEST_EXPECT(state.error.isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
+        loop.setListeners(nullptr);
+        if (not sentinel.isFree())
+            SC_TEST_EXPECT(sentinel.unschedule(loop));
+        SC_TEST_EXPECT(loop.close());
+    }
 }
