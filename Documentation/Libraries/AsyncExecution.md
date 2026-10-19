@@ -204,8 +204,25 @@ errors. Scopes need provider counting-scope support in addition to base senders.
 
 For a GUI/server that already drives the loop, connect/start `scope.join()` with your receiver and keep
 pumping `runNoWait()` while doing application work. `Examples/AsyncExecutionDemo/Lifetime.cpp` illustrates
-this integration; its frame-pacing experiment is still under investigation. See the
+this integration. It prepares Base64 data on the pool while connecting, then uses `when_all` for the TCP
+exchange. Its 200 ms receive deadline starts after preparation, so CPU queueing does not consume the I/O
+budget. A frame processes at most four nonblocking loop cycles; the application must keep pumping until
+scope join completes, including after timeout or shutdown. See the
 [driving reference](@ref asyncexecution-driving) for receiver and storage lifetimes.
+
+With the execution provider configured, build and run the example:
+
+```sh
+./SC.sh build configure SCAsyncExecutionDemo
+./SC.sh build compile SCAsyncExecutionDemo Debug
+./SC.sh build run SCAsyncExecutionDemo Debug -- --lifetime
+./SC.sh build run SCAsyncExecutionDemo Debug -- --lifetime --stall
+./SC.sh build run SCAsyncExecutionDemo Debug -- --lifetime --cancel
+```
+
+`--stall` withholds client bytes to exercise timeout and joined cancellation. `--cancel` requests scope
+stop once the receive starts. Add `--frame-ms 40` to simulate a slower application frame cadence;
+this is a responsiveness example, not a scheduling-latency guarantee.
 
 # Choose the operation you need
 
