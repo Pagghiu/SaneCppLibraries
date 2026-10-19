@@ -10,6 +10,7 @@ void runAsyncExecutionParityTest(TestReport& report);
 void runAsyncExecutionReadinessTest(TestReport& report);
 void runAsyncExecutionNotificationTest(TestReport& report);
 void runAsyncExecutionExternalCompletionTest(TestReport& report);
+void runAsyncExecutionFileSystemTest(TestReport& report);
 } // namespace SC
 
 #include "Libraries/Memory/Globals.h"
@@ -44,6 +45,7 @@ int main(int argc, const char* argv[])
     runAsyncExecutionReadinessTest(report);
     runAsyncExecutionNotificationTest(report);
     runAsyncExecutionExternalCompletionTest(report);
+    runAsyncExecutionFileSystemTest(report);
 
     return report.getTestReturnCode();
 }

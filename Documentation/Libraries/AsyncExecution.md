@@ -147,6 +147,27 @@ SC_TRY(context.run(SC::move(echo)));
 reports incomplete input; `sendAll` handles partial writes. The lower-level `receive` and `send` perform one
 transfer and can return a shorter prefix.
 
+# Open a file inside a graph
+
+Filesystem senders can own an opened file for the lifetime of a dependent operation:
+
+```cpp
+SC::ThreadPool pool;
+SC_TRY(pool.create(1));
+char buffer[64] = {};
+auto readPrefix = context.fsOpen(pool, "message.txt")
+    | ex::let_value([&](auto& opened) noexcept {
+          return context.fsRead(pool, opened.file, buffer);
+      });
+SC::AsyncExecutionReadResult prefix;
+SC_TRY(context.runInto(SC::move(readPrefix), prefix));
+SC_TRY(pool.destroy());
+```
+
+The graph owns and closes the file; `prefix.data` aliases your buffer. This reads one prefix, rather than the
+whole file. Use `fsClose` inside the graph when close errors need observation. The pool supplies the fallback
+on backends without native filesystem operations.
+
 # Add a deadline
 
 Given a connected socket `peer` and a borrowed buffer, wrap the receive with the SC `timeout` extension:
@@ -193,6 +214,7 @@ this integration; its frame-pacing experiment is still under investigation. See 
 | Timers and workers | `sleep`, pool scheduler, `onPool` | `sleep`, loop scheduler, `work` |
 | TCP | `connectTCP`, `sendTCP` | `accept`, `connect`, `send`, `sendAll`, `receive`, `receiveExact`, `receiveLine` |
 | Files | `readFile`, `writeFile` | `fileRead[At]`, `fileReadExact[At]`, `fileReadUntilFullOrEOF`, `fileWrite[All][At]`, `fileSend` |
+| Filesystem handles | Through `getContext()` | Owned `fsOpen`, borrowed `fsClose/Read/Write` |
 | Readiness and wake-up | Through `getContext()` | One-shot `filePoll` (POSIX), `wakeUp(notification)` |
 | Datagrams | Through `getContext()` | `sendTo`, `receiveFrom` |
 | External producer | Through `getContext()` | One-shot `externalCompletion(record)` |

@@ -23,6 +23,7 @@ struct AsyncExecutionScope;
 struct AsyncExecutionScopeJoinSender;
 #endif
 struct AsyncExecutionConnection;
+struct AsyncExecutionFile;
 struct AsyncExecutionReadResult;
 struct AsyncExecutionLineResult;
 struct AsyncExecutionSocketReceiveFromResult;
@@ -73,6 +74,10 @@ struct AsyncExecutionNotificationWaiter
 };
 struct AsyncExecutionTimer;
 struct AsyncExecutionFilePoll;
+struct AsyncExecutionFSOpen;
+struct AsyncExecutionFSClose;
+struct AsyncExecutionFSRead;
+struct AsyncExecutionFSWrite;
 struct AsyncExecutionAccept;
 struct AsyncExecutionConnect;
 struct AsyncExecutionSend;
@@ -151,6 +156,19 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 
     /// One readable-readiness observation. Borrows the descriptor, consumes no bytes and does not rearm.
     AsyncExecutionSender<detail::AsyncExecutionFilePoll> filePoll(const FileDescriptor& file);
+
+    /// Filesystem paths are copied at construction; pools, descriptors and buffers are borrowed through completion.
+    AsyncExecutionSender<detail::AsyncExecutionFSOpen> fsOpen(
+        ThreadPool& pool, StringSpan path, FileOpen mode = {},
+        AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSClose> fsClose(
+        ThreadPool& pool, FileDescriptor& file, AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSRead> fsRead(
+        ThreadPool& pool, const FileDescriptor& file, Span<char> buffer, uint64_t offset = 0,
+        AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    AsyncExecutionSender<detail::AsyncExecutionFSWrite> fsWrite(
+        ThreadPool& pool, const FileDescriptor& file, Span<const char> data, uint64_t offset = 0,
+        AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
 
     /// Accept owns the returned connection; connect borrows an already-associated nonblocking socket.
     AsyncExecutionSender<detail::AsyncExecutionAccept>  accept(const SocketDescriptor& listener);
@@ -516,6 +534,68 @@ struct AsyncExecutionFileSendResult
 
 namespace detail
 {
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFileSystemBase
+{
+    using Request = AsyncFileSystemOperation;
+
+    static constexpr bool waitsForCompletion = true;
+
+    ThreadPool&         pool;
+    AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred;
+
+    Result prepare(Request& request) const;
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFSOpen : AsyncExecutionFileSystemBase
+{
+    using Value = AsyncExecutionFile;
+
+    StringPath path;
+    FileOpen   mode;
+
+    Result initialization{true};
+
+    FileDescriptor opened;
+
+    AsyncExecutionFSOpen(ThreadPool& pool, StringSpan path, FileOpen mode, AsyncThreadPoolMode poolMode);
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    void   observe(Request::Result& result);
+    Result discard();
+    Value  value(Request::Result&);
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFSClose : AsyncExecutionFileSystemBase
+{
+    using Value = AsyncCompletionData;
+    FileDescriptor& file;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    void         observe(Request::Result& result);
+    static Value value(Request::Result&) { return {}; }
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFSRead : AsyncExecutionFileSystemBase
+{
+    using Value = AsyncExecutionReadResult;
+    const FileDescriptor& file;
+    Span<char>            buffer;
+    uint64_t              offset = 0;
+
+    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    Value  value(Request::Result& result);
+};
+
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFSWrite : AsyncExecutionFileSystemBase
+{
+    using Value = size_t;
+    const FileDescriptor& file;
+    Span<const char>      data;
+    uint64_t              offset = 0;
+
+    Result       submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const;
+    static Value value(Request::Result& result) { return result.completionData.numBytes; }
+};
+
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFilePoll
 {
     using Request = AsyncFileReadiness;
@@ -923,6 +1003,19 @@ struct AsyncExecutionOperation
 
     void cancelOnLoop() noexcept
     {
+        if constexpr (requires { Setup::waitsForCompletion; })
+        {
+            // Filesystem requests can own an internal worker while the outer request is Free.
+            // Their normal callback acknowledges irreversible effects and newly opened handles.
+            if constexpr (not Setup::waitsForCompletion)
+                cancelNativeOnLoop();
+        }
+        else
+            cancelNativeOnLoop();
+    }
+
+    void cancelNativeOnLoop() noexcept
+    {
         if (request.isFree())
         {
             finishStopped();
@@ -1022,6 +1115,15 @@ struct AsyncExecutionOperation
                     if (status)
                         return;
                 }
+            }
+        }
+        if constexpr (requires { setup.discard(); })
+        {
+            if (not status or stopped)
+            {
+                const Result cleanup = setup.discard();
+                if (status)
+                    status = cleanup;
             }
         }
         prepareCompletion();
@@ -1397,6 +1499,17 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionConnection
     explicit AsyncExecutionConnection(SocketDescriptor socket) noexcept : socket(move(socket)) {}
     AsyncExecutionConnection(AsyncExecutionConnection&& other) noexcept : socket(move(other.socket)) {}
     AsyncExecutionConnection(const AsyncExecutionConnection&) = delete;
+};
+
+/// Move-only file value for sender composition. Use fsClose to observe close errors explicitly.
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionFile
+{
+    FileDescriptor file;
+    AsyncExecutionFile() = default;
+    explicit AsyncExecutionFile(FileDescriptor file) noexcept : file(move(file)) {}
+    AsyncExecutionFile(AsyncExecutionFile&& other) noexcept : file(move(other.file)) {}
+    AsyncExecutionFile(const AsyncExecutionFile&) = delete;
+    AsyncExecutionFile& operator=(AsyncExecutionFile&& other) noexcept;
 };
 
 /// Checked output of an SC fallible transform. tryThen sends value only when status succeeds.

@@ -357,6 +357,115 @@ Result detail::AsyncExecutionTimer::submit(Request& request, AsyncEventLoop& loo
     return request.start(loop, duration);
 }
 
+Result detail::AsyncExecutionFileSystemBase::prepare(Request& request) const
+{
+    return request.setThreadPool(pool, poolMode);
+}
+
+detail::AsyncExecutionFSOpen::AsyncExecutionFSOpen(ThreadPool& pool, StringSpan inputPath, FileOpen mode,
+                                                   AsyncThreadPoolMode poolMode)
+    : AsyncExecutionFileSystemBase{pool, poolMode}, mode(mode)
+{
+    initialization = inputPath.isEmpty() ? Result::Error(AsyncResultCategory, AsyncError::InvalidPath)
+                                         : AsyncExecutionResolvePath(inputPath, path);
+}
+
+Result detail::AsyncExecutionFSOpen::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    SC_TRY(initialization);
+    SC_TRY(prepare(request));
+    return request.open(loop, path.view(), mode);
+}
+
+void detail::AsyncExecutionFSOpen::observe(Request::Result& result)
+{
+    if (result.isValid())
+        SC_ASYNC_TRUST_RESULT(opened.assign(result.completionData.handle));
+}
+
+Result detail::AsyncExecutionFSOpen::discard() { return Result::Explicit(opened.close()); }
+
+AsyncExecutionFile detail::AsyncExecutionFSOpen::value(Request::Result&) { return AsyncExecutionFile{move(opened)}; }
+
+Result detail::AsyncExecutionFSClose::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TRY(file.get(handle, Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
+    SC_TRY(prepare(request));
+    return request.close(loop, handle);
+}
+
+void detail::AsyncExecutionFSClose::observe(Request::Result& result)
+{
+    const Result status = result.isValid();
+    // These are completion-stage failures: pool FileDescriptor::close or an io_uring close CQE.
+    // Validation/submission/queue errors retain the caller's descriptor. Never retry an attempted native close.
+    if (status or status.isError(FileResultCategory, FileError::CloseFailed) or
+        status.isError(AsyncResultCategory, AsyncError::EventCompletionFailed))
+        file.detach();
+}
+
+Result detail::AsyncExecutionFSRead::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    const AsyncExecutionFileOptions options{nullptr, offset, true};
+    SC_TRY(AsyncExecutionValidateFileRange(options, buffer.sizeInBytes()));
+    SC_TRY(AsyncExecutionValidateSingleTransfer(buffer.sizeInBytes()));
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TRY(file.get(handle, Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
+    SC_TRY(prepare(request));
+    return request.read(loop, handle, buffer, offset);
+}
+
+AsyncExecutionReadResult detail::AsyncExecutionFSRead::value(Request::Result& result)
+{
+    return {{buffer.data(), result.completionData.numBytes}, result.completionData.numBytes == 0};
+}
+
+Result detail::AsyncExecutionFSWrite::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
+{
+    const AsyncExecutionFileOptions options{nullptr, offset, true};
+    SC_TRY(AsyncExecutionValidateFileRange(options, data.sizeInBytes()));
+    SC_TRY(AsyncExecutionValidateSingleTransfer(data.sizeInBytes()));
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TRY(file.get(handle, Result::Error(AsyncResultCategory, AsyncError::InvalidFileHandle)));
+    SC_TRY(prepare(request));
+    return request.write(loop, handle, data, offset);
+}
+
+AsyncExecutionFile& AsyncExecutionFile::operator=(AsyncExecutionFile&& other) noexcept
+{
+    file = move(other.file);
+    return *this;
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSOpen> AsyncExecutionContext::fsOpen(ThreadPool& pool, StringSpan path,
+                                                                                 FileOpen            mode,
+                                                                                 AsyncThreadPoolMode poolMode)
+{
+    return {*this, {pool, path, mode, poolMode}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSClose> AsyncExecutionContext::fsClose(ThreadPool&         pool,
+                                                                                   FileDescriptor&     file,
+                                                                                   AsyncThreadPoolMode poolMode)
+{
+    return {*this, {{pool, poolMode}, file}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSRead> AsyncExecutionContext::fsRead(ThreadPool&           pool,
+                                                                                 const FileDescriptor& file,
+                                                                                 Span<char> buffer, uint64_t offset,
+                                                                                 AsyncThreadPoolMode poolMode)
+{
+    return {*this, {{pool, poolMode}, file, buffer, offset}};
+}
+
+AsyncExecutionSender<detail::AsyncExecutionFSWrite> AsyncExecutionContext::fsWrite(
+    ThreadPool& pool, const FileDescriptor& file, Span<const char> data, uint64_t offset, AsyncThreadPoolMode poolMode)
+{
+    return {*this, {{pool, poolMode}, file, data, offset}};
+}
+
 Result detail::AsyncExecutionFilePoll::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&) const
 {
     FileDescriptor::Handle handle = FileDescriptor::Invalid;

@@ -111,6 +111,30 @@ Early EOF before the requested file-send range completes reports `AsyncError::Fi
 prefix in optional progress. Native failures keep their identity. This corrects earlier POSIX zero-progress
 retrying and incomplete Windows worker success; it affects all Async adapters.
 
+# Filesystem handles
+
+`fsOpen(pool, path, mode[, poolMode])` copies/resolves the path at sender construction and emits an owning
+`AsyncExecutionFile` with a `file` descriptor. Use standard `let_value` to keep it alive through child work,
+or `runInto` to transfer ownership to an existing object. Native path storage has StringPath's capacity;
+conversion/capacity failures are initialization errors. `fsClose(pool, file[, poolMode])` emits no values and
+invalidates the descriptor after a completed close attempt, including a native close failure. Validation and
+pool submission failures preserve ownership. Explicit close reports errors; ordinary descriptor RAII remains
+available when close errors do not need observation.
+
+`fsRead(pool, file, buffer[, offset, poolMode])` emits the read span and EOF flag;
+`fsWrite(pool, file, data[, offset, poolMode])` emits bytes written. Both represent one native operation,
+retain native EmptyBuffer/partial-transfer behavior and use an explicit offset (default zero). Buffers,
+descriptors and the required pool remain borrowed through completion. Single-transfer/offset bounds match
+other file senders.
+
+These factories use AsyncFileSystemOperation: Linux io_uring can perform them natively; other backends use
+the supplied pool. `ForceThreadPool` explicitly selects the fallback. After submission, stop joins normal
+completion instead of abandoning an internal worker or cancelling away an opened-handle result. A stopped
+open closes its unused handle before terminal delivery; a cleanup failure becomes an error. Earlier native
+errors retain precedence. Close/write side effects can occur despite stopped delivery; cancellation is not
+rollback. Prestop prevents submission and preserves resources. Metadata copy/rename/remove factories remain
+unfinished.
+
 # Readable readiness
 
 `filePoll(file)` borrows the descriptor and emits no success values. It observes one readable-ready indication
@@ -267,7 +291,7 @@ channels. Similar operation names preserve resource semantics, not identical res
 | File readiness | `filePoll` | `filePoll` | `filePoll`; POSIX, explicit Windows unsupported error |
 | Public wake-up | Internal only | `wakeUp` | One-shot `wakeUp(notification)`; coalescing |
 | External-completion wrapper | Missing | Missing | Single-use `externalCompletion`; joins producer acknowledgement |
-| Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | Missing |
+| Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | `fsOpen/Close/Read/Write`; copy/rename/remove pending |
 | Lifetime helpers | Scheduler/counters/cancelAll | Task groups/registry/waitFor | Scope spawn/stop/join and joined timeout |
 
 Do not infer complete-transfer behavior from names across adapters: current Fibers `fileWriteAll` delegates

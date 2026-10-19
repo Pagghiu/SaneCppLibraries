@@ -1,6 +1,6 @@
 # ASYNCEXECUTION-0020 - Filesystem Sender Ownership
 
-Status: Proposed
+Status: Accepted
 Date: 2026-10-19
 
 ## Context
@@ -20,6 +20,10 @@ fsRead emits AsyncExecutionReadResult and fsWrite emits a byte count for one nat
 After native submission, filesystem stop is cooperative: retain the normal callback until the operation/worker completes, then observe the token. A queued or running filesystem operation can have irreversible effects; cancellation is not rollback. Do not synchronously join a worker from the owner dispatcher, cancel away the only open-handle result, or deliver stopped because the outer request is Free. Prestop prevents submission and leaves descriptors/filesystem unchanged. The generic operation needs an explicit join-on-stop policy for these setups, plus a discard-value cleanup hook for open.
 
 Metadata/path operations emit no success values. Use native copy flags, backend fallback and existing Result identity. No new scheduler, inter-adapter dependency or core allocation policy is introduced. Factories, validation, path copying and native setup belong in AsyncExecution.cpp.
+
+## Staging
+
+The first implementation supplies open, close, read and write. Copy, rename and remove follow as the next filesystem group under the same path, pool and stop policy.
 
 ## Confirmation
 
