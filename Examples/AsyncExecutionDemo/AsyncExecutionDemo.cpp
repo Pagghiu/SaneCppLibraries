@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+SC::Result runAsyncExecutionScopeFailureDemo();
+
 SC::Result runAsyncExecutionLifetimeDemo(bool stall, bool cancel, uint16_t port, unsigned frameMilliseconds);
 
 namespace
@@ -192,13 +194,16 @@ Result runDemo(bool failFile, uint16_t port)
 int main(int argc, const char* argv[])
 {
     SC::Globals::init(SC::Globals::Global);
-    bool     fail     = false;
+    bool     fail         = false;
+    bool     scopeFailure = false;
     bool     lifetime = false, stall = false, cancel = false;
     uint16_t port              = 19092;
     unsigned frameMilliseconds = 1;
     for (int i = 1; i < argc; ++i)
     {
-        if (strcmp(argv[i], "--lifetime") == 0)
+        if (strcmp(argv[i], "--scope-failure") == 0)
+            scopeFailure = true;
+        else if (strcmp(argv[i], "--lifetime") == 0)
             lifetime = true;
         else if (strcmp(argv[i], "--stall") == 0)
             stall = true;
@@ -216,8 +221,9 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[i], "--port") == 0 and i + 1 < argc)
             port = static_cast<uint16_t>(atoi(argv[++i]));
     }
-    const SC::Result result =
-        lifetime ? runAsyncExecutionLifetimeDemo(stall, cancel, port, frameMilliseconds) : runDemo(fail, port);
+    const SC::Result result = scopeFailure ? runAsyncExecutionScopeFailureDemo()
+                              : lifetime   ? runAsyncExecutionLifetimeDemo(stall, cancel, port, frameMilliseconds)
+                                           : runDemo(fail, port);
     if (not result)
         fprintf(stderr, "Demo failed: category %u, code %u\n", result.category().value, result.errorValue());
     return result ? 0 : 1;

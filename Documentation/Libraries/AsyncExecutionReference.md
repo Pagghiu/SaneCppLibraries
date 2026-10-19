@@ -125,7 +125,12 @@ available when close errors do not need observation.
 `fsWrite(pool, file, data[, offset, poolMode])` emits bytes written. Both represent one native operation,
 retain native EmptyBuffer/partial-transfer behavior and use an explicit offset (default zero). Buffers,
 descriptors and the required pool remain borrowed through completion. Single-transfer/offset bounds match
-other file senders.
+other file senders. These are seekable filesystem transfers, not the nonblocking-pipe path. Use handles
+compatible with the selected backend; filesystem worker fallback uses synchronous FileDescriptor I/O.
+In particular, Windows fallback seeks the shared descriptor before reading/writing: serialize those operations
+or use independently opened descriptors, and do not assume an unchanged cursor or atomic seek-plus-transfer.
+Handles from `fsOpen` are the natural fit. Prefer `fileReadAt`/`fileWriteAt` and their complete-transfer helpers
+for ordinary borrowed regular-file ranges; those use the AsyncFileRead/Write request family and its file options.
 
 These factories use AsyncFileSystemOperation: Linux io_uring can perform them natively; other backends use
 the supplied pool. `ForceThreadPool` explicitly selects the fallback. After submission, stop joins normal
@@ -253,12 +258,24 @@ associations. Default nodes allocate with proper alignment and report `OutOfMemo
 Optional `AsyncExecutionScopeAllocator` callbacks receive size/alignment and matching deallocation; allocator
 user data survives join. This is no general allocation guarantee for arbitrary provider algorithms.
 
+For related concurrent branches, `when_all(a, b)` requests sibling cancellation after failure and joins both.
+Separate `scope.spawn(a)` / `scope.spawn(b)` roots instead share lifetime ownership with independent failure
+policies: a child error alone does not request sibling stop.
+
 `spawn` reports acceptance and may execute synchronous senders inline. Schedule CPU work explicitly.
 Child values are discarded; consume them within each graph. Child errors must be failing Results and do not
 automatically stop siblings. Summary counts accepted/succeeded/failed/stopped roots and retains first observed
 error. Starting `join()` seals roots; caller stop requests cancellation but still joins every child and pool
 notification. Join returns the summary or the first child error. A provider join error takes precedence;
 `getSummary()` retains child observations even when join reports error.
+
+Do not propagate a later spawn rejection with `SC_TRY` while earlier accepted work remains unjoined. Keep the
+submission Result, request stop, then join before releasing a used local scope or its borrowed storage. Keep
+submission and join Results separately observable: the tutorial/example choose the submission error first,
+otherwise the join error. This is an application policy, not scope error aggregation. A rejected submission is
+not an accepted/failed child in the summary. Owner-thread consumers must be called outside callbacks and
+without an overlapping consumer; external-loop applications retain persistent shutdown state and pump to
+join completion. A synchronous scope-exit guard cannot safely provide arbitrary asynchronous joining.
 
 `requestStop()` seals roots and cooperatively stops children. Concurrent join consumers report `AlreadyRunning`;
 that failure does not establish quiescence. After join, new roots report `ScopeClosed`; scopes cannot reopen.

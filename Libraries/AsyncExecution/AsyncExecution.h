@@ -168,9 +168,12 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
         AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
     AsyncExecutionSender<detail::AsyncExecutionFSClose> fsClose(
         ThreadPool& pool, FileDescriptor& file, AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    /// One seekable-file transfer via AsyncFileSystemOperation. Offset defaults to zero, never a shared cursor.
+    /// The required pool supplies filesystem fallback; prefer fileReadAt for ordinary borrowed range I/O.
     AsyncExecutionSender<detail::AsyncExecutionFSRead> fsRead(
         ThreadPool& pool, const FileDescriptor& file, Span<char> buffer, uint64_t offset = 0,
         AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
+    /// One filesystem-family write at an explicit offset (default zero); may be short. Pool remains borrowed.
     AsyncExecutionSender<detail::AsyncExecutionFSWrite> fsWrite(
         ThreadPool& pool, const FileDescriptor& file, Span<const char> data, uint64_t offset = 0,
         AsyncThreadPoolMode poolMode = AsyncThreadPoolMode::NativePreferred);
@@ -234,8 +237,11 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     AsyncExecutionSender<detail::AsyncExecutionReceiveFrom>   receiveFrom(const SocketDescriptor& socket,
                                                                           Span<char>              buffer);
 
-    AsyncExecutionSender<detail::AsyncExecutionFileRead>     fileRead(const FileDescriptor& file, Span<char> buffer,
-                                                                      AsyncExecutionFileReadOptions options = {});
+    /// One AsyncFileRead transfer into caller storage. Default options delegate native addressing to Async.
+    /// Supply a fallback pool for regular files; pipes use appropriate nonblocking/associated handles without offsets.
+    AsyncExecutionSender<detail::AsyncExecutionFileRead> fileRead(const FileDescriptor& file, Span<char> buffer,
+                                                                  AsyncExecutionFileReadOptions options = {});
+    /// Recommended borrowed regular-file read: explicit offset, independent of a portable shared cursor contract.
     AsyncExecutionSender<detail::AsyncExecutionFileRead>     fileReadAt(const FileDescriptor& file, uint64_t offset,
                                                                         Span<char>                    buffer,
                                                                         AsyncExecutionFileReadOptions options = {});
@@ -249,6 +255,7 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
         const FileDescriptor& file, Span<char> buffer, AsyncExecutionFileReadOptions options = {},
         AsyncExecutionReadResult* progress = nullptr);
 
+    /// One borrowed write with delegated addressing by default; fileWriteAt explicitly selects the byte offset.
     AsyncExecutionSender<detail::AsyncExecutionFileWrite> fileWrite(const FileDescriptor& file, Span<const char> data,
                                                                     AsyncExecutionFileWriteOptions options = {});
     AsyncExecutionSender<detail::AsyncExecutionFileWriteBuffers> fileWrite(const FileDescriptor&          file,
@@ -488,6 +495,7 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionPoolSender
         return detail::AsyncExecutionPoolOperation<Receiver>(*context, *pool, move(receiver));
     }
 };
+/// Borrow both resources: AsyncExecutionPoolScheduler{&context, &pool}; success continuations run on a worker.
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionPoolScheduler
 {
     using scheduler_concept        = AsyncExecutionProtocol::scheduler_tag;
@@ -2047,6 +2055,8 @@ struct AsyncExecutionScopeJoinOperation;
 } // namespace detail
 
 /// Own connected child storage while borrowing the context. A used scope must be joined before destruction.
+/// Separate roots do not stop siblings on error; compose related branches with when_all for that policy.
+/// After a later spawn rejection, retain the submission error, requestStop and join accepted roots before returning.
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScope
 {
     explicit AsyncExecutionScope(AsyncExecutionContext& context, AsyncExecutionScopeAllocator allocator = {});
@@ -2054,6 +2064,7 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScope
     AsyncExecutionScope(const AsyncExecutionScope&) = delete;
     AsyncExecutionScope(AsyncExecutionScope&&)      = delete;
 
+    /// Reports acceptance, not child completion. Avoid SC_TRY early returns after an earlier accepted root.
     template <typename Sender>
     Result spawn(Sender&& sender);
 
