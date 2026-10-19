@@ -325,6 +325,22 @@ it needs explicit allocator/frame ownership, owner-thread resumption and joined 
 There is no implicit `co_await` conversion or provider dependency in Await. The operation parity table above
 compares independent adapters; it does not imply that their task types can be interchanged.
 
+# Limits and follow-ups
+
+- Native C++26 provider validation requires an installed implementation exposing the sender and, for scopes,
+  counting-scope feature macros. External stdexec test results establish interoperability with that provider.
+- Direct Await task conversion is deferred. A future optional bridge needs explicit frame allocation, task
+  ownership, owner-loop resumption and cancellation acknowledgement before either adapter can release storage.
+- Windows file readiness retains Async's unsupported result. Direct Windows OVERLAPPED submission also remains
+  outside the portable external-producer bridge; adding either requires a native lifetime/cancellation contract.
+- Cancellation cannot preempt a running CPU procedure or undo filesystem side effects. External producers must
+  acknowledge completion. A timeout joins its losing branch and can therefore complete after its deadline.
+- The parity table describes the current independent adapters. Stronger Fibers complete-write semantics and
+  shared-loop Await/Execution task composition need their own implementation and validation.
+
+These are bounded follow-ups to the experimental adapter. APIs expose the available native semantics;
+applications retain the resource and producer lifetimes described above.
+
 # Build settings
 
 Compile `AsyncExecution.cpp` alongside your other sources. Templates/layouts stay in the header; non-template

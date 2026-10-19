@@ -13,7 +13,7 @@ The context stops accepting starts when actual shutdown begins. A failed dispatc
 
 Worker notifications publish a separate count before dropping outstanding task accounting. Close reads outstanding before notification counts, avoiding a false idle gap. Receiver delivery may destroy its operation; the copied callback saves its context pointer and never accesses the operation afterward. This count does not prohibit an owner-thread consumer from driving unrelated work while a worker continuation runs.
 
-All graphs and producer threads must be quiescent before runtime destruction, on the owner thread. The destructor joins completed graphs' pool notification tails and invokes the same checked cleanup. It cannot safely stop/join arbitrary active graphs without a structured lifetime owner. Borrowed contexts/pools survive notification return. Native requests submitted directly to getEventLoop remain the caller's responsibility; close is not a general graph registry. Scopes will supply graph-level ownership.
+All graphs and producer threads must be quiescent before runtime destruction, on the owner thread. The destructor joins completed graphs' pool notification tails and invokes the same checked cleanup. It cannot safely stop/join arbitrary active graphs without a structured lifetime owner. Borrowed contexts/pools survive notification return. Native requests submitted directly to getEventLoop remain the caller's responsibility; close is not a general graph registry. AsyncExecutionScope supplies graph-level ownership and joined cancellation.
 
 ## Confirmation
 
