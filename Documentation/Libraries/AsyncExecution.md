@@ -193,12 +193,12 @@ this integration; its frame-pacing experiment is still under investigation. See 
 | Timers and workers | `sleep`, pool scheduler, `onPool` | `sleep`, loop scheduler, `work` |
 | TCP | `connectTCP`, `sendTCP` | `accept`, `connect`, `send`, `sendAll`, `receive`, `receiveExact`, `receiveLine` |
 | Files | `readFile`, `writeFile` | `fileRead[At]`, `fileReadExact[At]`, `fileReadUntilFullOrEOF`, `fileWrite[All][At]`, `fileSend` |
-| Readable readiness | Through `getContext()` | One-shot `filePoll` (POSIX) |
+| Readiness and wake-up | Through `getContext()` | One-shot `filePoll` (POSIX), `wakeUp(notification)` |
 | Datagrams | Through `getContext()` | `sendTo`, `receiveFrom` |
 | Processes and signals | Through `getContext()` | `processExit`, one-shot `signal` |
 | Joined lifetime | `run`, `runInto`, explicit `close` | `run`, `runInto`; `AsyncExecutionScope`, `timeout` |
 
-Public wake-up/external-completion senders and filesystem metadata operations are not implemented yet.
+Public external-completion senders and filesystem metadata operations are not implemented yet.
 `filePoll` observes readability without consuming bytes; generic Windows handle readiness reports `OperationUnsupported`. The [reference](@ref library_async_execution_reference) covers partial transfers, EOF, datagram truncation and cancellation.
 
 Borrowed buffers, descriptors, pools and contexts must survive terminal completion. CPU cancellation waits for

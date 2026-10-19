@@ -14,6 +14,8 @@
 namespace SC
 {
 struct AsyncExecutionScheduler;
+struct AsyncExecutionNotification;
+struct AsyncExecutionNotificationSender;
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 struct AsyncExecutionScope;
 struct AsyncExecutionScopeJoinSender;
@@ -52,6 +54,13 @@ struct AsyncExecutionFileSendOptions
 
 namespace detail
 {
+template <typename Receiver>
+struct AsyncExecutionNotificationOperation;
+struct AsyncExecutionNotificationWaiter
+{
+    void* operation                 = nullptr;
+    void (*deliver)(void*) noexcept = nullptr;
+};
 struct AsyncExecutionTimer;
 struct AsyncExecutionFilePoll;
 struct AsyncExecutionAccept;
@@ -123,6 +132,9 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
     Result runIntoWithStop(Sender&& sender, StopToken token, Outputs&... outputs);
 
     AsyncExecutionSender<detail::AsyncExecutionTimer> sleep(TimeMs duration);
+
+    /// Wait once for a coalescing, possibly cross-thread notification.
+    AsyncExecutionNotificationSender wakeUp(AsyncExecutionNotification& notification);
 
     /// One readable-readiness observation. Borrows the descriptor, consumes no bytes and does not rearm.
     AsyncExecutionSender<detail::AsyncExecutionFilePoll> filePoll(const FileDescriptor& file);
@@ -236,13 +248,16 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionContext
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
     friend struct AsyncExecutionScope;
 #endif
+    friend struct AsyncExecutionNotification;
+    template <typename Receiver>
+    friend struct detail::AsyncExecutionNotificationOperation;
     friend struct detail::AsyncExecutionPoolTask;
     template <typename Setup, typename Receiver>
     friend struct detail::AsyncExecutionOperation;
     template <typename Receiver>
     friend struct detail::AsyncExecutionPoolOperation;
     Mutex           mutex;
-    AsyncLoopWakeUp wakeUp;
+    AsyncLoopWakeUp dispatcherWakeUp;
 
     detail::AsyncExecutionCommand* head = nullptr;
     detail::AsyncExecutionCommand* tail = nullptr;
@@ -1044,6 +1059,152 @@ struct AsyncExecutionSender
         requires(std::is_copy_constructible_v<Setup>)
     {
         return detail::AsyncExecutionOperation<Setup, Receiver>(context, setup, move(receiver));
+    }
+};
+
+/// A stable producer-facing notification. Join producers and complete its wait before destruction.
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionNotification
+{
+    explicit AsyncExecutionNotification(AsyncExecutionContext& context) noexcept;
+    ~AsyncExecutionNotification();
+    AsyncExecutionNotification(const AsyncExecutionNotification&) = delete;
+    AsyncExecutionNotification(AsyncExecutionNotification&&)      = delete;
+
+    /// Coalesces notifications, including before a wait. Success means published, not delivered.
+    Result notify() noexcept;
+
+  private:
+    template <typename Receiver>
+    friend struct detail::AsyncExecutionNotificationOperation;
+    Result attach(detail::AsyncExecutionNotificationWaiter& waiter) noexcept;
+    void   detach(detail::AsyncExecutionNotificationWaiter& waiter) noexcept;
+    void   dispatch() noexcept;
+
+    AsyncExecutionContext& context;
+    Mutex                  mutex;
+
+    detail::AsyncExecutionCommand command;
+
+    detail::AsyncExecutionNotificationWaiter* waiter = nullptr;
+
+    bool pending = false;
+};
+
+namespace detail
+{
+template <typename Receiver>
+struct AsyncExecutionNotificationOperation
+{
+    using operation_state_concept = AsyncExecutionProtocol::operation_state_tag;
+    AsyncExecutionContext&      context;
+    AsyncExecutionNotification& notification;
+
+    Receiver receiver;
+
+    AsyncExecutionNotificationWaiter waiter;
+
+    AsyncExecutionCommand command;
+    AsyncExecutionCommand cancelCommand;
+
+    struct StopRequest
+    {
+        AsyncExecutionNotificationOperation* operation;
+        void operator()() const noexcept { SC_ASYNC_TRUST_RESULT(operation->context.post(operation->cancelCommand)); }
+    };
+    using StopToken    = decltype(AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)));
+    using StopCallback = typename StopToken::template callback_type<StopRequest>;
+    AlignedStorage<sizeof(StopCallback), alignof(StopCallback)> stopStorage;
+
+    bool stopRegistered = false;
+
+    AsyncExecutionNotificationOperation(AsyncExecutionContext& context, AsyncExecutionNotification& notification,
+                                        Receiver receiver)
+        : context(context), notification(notification), receiver(move(receiver))
+    {}
+    AsyncExecutionNotificationOperation(const AsyncExecutionNotificationOperation&) = delete;
+    AsyncExecutionNotificationOperation(AsyncExecutionNotificationOperation&&)      = delete;
+
+    bool stopRequested() const noexcept
+    {
+        return AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver)).stop_requested();
+    }
+    void finish(Result status, bool stopped) noexcept
+    {
+        if (stopRegistered)
+        {
+            stopRegistered = false;
+            reinterpret_cast<StopCallback*>(&stopStorage)->~StopCallback();
+        }
+        notification.detach(waiter);
+        context.remove(cancelCommand);
+        context.outstanding.fetch_sub(1);
+        typename AsyncExecutionOperation<AsyncExecutionTimer, Receiver>::Delivery delivery(context);
+        if (not status)
+            AsyncExecutionProtocol::set_error(move(receiver), status);
+        else if (stopped)
+            AsyncExecutionProtocol::set_stopped(move(receiver));
+        else
+            AsyncExecutionProtocol::set_value(move(receiver));
+    }
+    void startOnLoop() noexcept
+    {
+        cancelCommand.operation = this;
+        cancelCommand.execute   = [](AsyncExecutionCommand& command) noexcept
+        { static_cast<AsyncExecutionNotificationOperation*>(command.operation)->finish(Result(true), true); };
+        auto token = AsyncExecutionProtocol::get_stop_token(AsyncExecutionProtocol::get_env(receiver));
+        placementNew(*reinterpret_cast<StopCallback*>(&stopStorage), token, StopRequest{this});
+        stopRegistered = true;
+        if (stopRequested())
+        {
+            finish(Result(true), true);
+            return;
+        }
+        if (&context != &notification.context)
+        {
+            finish(Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::NotificationContextMismatch),
+                   false);
+            return;
+        }
+        waiter.operation = this;
+        waiter.deliver   = [](void* pointer) noexcept
+        {
+            auto* operation = static_cast<AsyncExecutionNotificationOperation*>(pointer);
+            operation->finish(Result(true), operation->stopRequested());
+        };
+        const Result status = notification.attach(waiter);
+        if (not status)
+            finish(status, false);
+    }
+    void start() noexcept
+    {
+        command.operation = this;
+        command.execute   = [](AsyncExecutionCommand& command) noexcept
+        { static_cast<AsyncExecutionNotificationOperation*>(command.operation)->startOnLoop(); };
+        context.outstanding.fetch_add(1);
+        const Result status = context.post(command);
+        if (not status)
+            finish(status, false);
+    }
+};
+} // namespace detail
+
+struct AsyncExecutionNotificationSender
+{
+    using sender_concept = AsyncExecutionProtocol::sender_tag;
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        return AsyncExecutionProtocol::completion_signatures<AsyncExecutionProtocol::set_value_t(),
+                                                             AsyncExecutionProtocol::set_error_t(Result),
+                                                             AsyncExecutionProtocol::set_stopped_t()>{};
+    }
+    AsyncExecutionContext&      context;
+    AsyncExecutionNotification& notification;
+    auto                        get_env() const noexcept { return AsyncExecutionEnvironment{context.getScheduler()}; }
+    template <typename Receiver>
+    auto connect(Receiver receiver) const noexcept
+    {
+        return detail::AsyncExecutionNotificationOperation<Receiver>{context, notification, move(receiver)};
     }
 };
 

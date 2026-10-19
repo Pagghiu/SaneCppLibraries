@@ -54,8 +54,8 @@ Result AsyncExecutionContext::create()
 {
     if (accepting.load() or closing)
         return Result::Error(AsyncResultCategory, AsyncError::AlreadyInitialized);
-    ownerThread     = Thread::CurrentThreadID();
-    wakeUp.callback = [this](AsyncLoopWakeUp::Result& result)
+    ownerThread               = Thread::CurrentThreadID();
+    dispatcherWakeUp.callback = [this](AsyncLoopWakeUp::Result& result)
     {
         result.reactivateRequest(true);
         dispatching = true;
@@ -63,7 +63,7 @@ Result AsyncExecutionContext::create()
             command->execute(*command); // Commands may destroy themselves. Do not access them afterward.
         dispatching = false;
     };
-    SC_TRY(wakeUp.start(loop));
+    SC_TRY(dispatcherWakeUp.start(loop));
     accepting.store(true);
     return Result(true);
 }
@@ -79,10 +79,10 @@ Result AsyncExecutionContext::close()
     // Callers must stop submitting and join producer threads before closing the context.
     accepting.store(false);
     closing = true;
-    if (not wakeUp.isFree() and not wakeUp.isCancelling())
-        SC_TRY(wakeUp.stop(loop));
+    if (not dispatcherWakeUp.isFree() and not dispatcherWakeUp.isCancelling())
+        SC_TRY(dispatcherWakeUp.stop(loop));
     SC_TRY(loop.runNoWait());
-    if (not wakeUp.isFree())
+    if (not dispatcherWakeUp.isFree())
         return Result::Error(AsyncResultCategory, AsyncError::ActiveRequestsRemain);
     closing = false;
     return Result(true);
@@ -109,7 +109,7 @@ Result AsyncExecutionContext::post(detail::AsyncExecutionCommand& command) noexc
     else
         head = &command;
     tail                = &command;
-    const Result status = wakeUp.wakeUp(loop);
+    const Result status = dispatcherWakeUp.wakeUp(loop);
     if (not status)
     {
         if (previous)
@@ -161,6 +161,72 @@ detail::AsyncExecutionCommand* AsyncExecutionContext::pop() noexcept
     }
     mutex.unlock();
     return command;
+}
+
+AsyncExecutionNotification::AsyncExecutionNotification(AsyncExecutionContext& context) noexcept : context(context)
+{
+    command.operation = this;
+    command.execute   = [](detail::AsyncExecutionCommand& command) noexcept
+    { static_cast<AsyncExecutionNotification*>(command.operation)->dispatch(); };
+}
+
+AsyncExecutionNotification::~AsyncExecutionNotification()
+{
+    SC_ASYNC_ASSERT_DEBUG(waiter == nullptr and not command.queued);
+}
+
+Result AsyncExecutionNotification::notify() noexcept
+{
+    mutex.lock();
+    pending             = true;
+    const Result status = waiter ? context.post(command) : Result(true);
+    mutex.unlock();
+    return status;
+}
+
+Result AsyncExecutionNotification::attach(detail::AsyncExecutionNotificationWaiter& incoming) noexcept
+{
+    mutex.lock();
+    if (waiter)
+    {
+        mutex.unlock();
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::NotificationAlreadyWaiting);
+    }
+    waiter              = &incoming;
+    const Result status = pending ? context.post(command) : Result(true);
+    if (not status)
+        waiter = nullptr;
+    mutex.unlock();
+    return status;
+}
+
+void AsyncExecutionNotification::detach(detail::AsyncExecutionNotificationWaiter& outgoing) noexcept
+{
+    mutex.lock();
+    if (waiter == &outgoing)
+    {
+        waiter = nullptr;
+        context.remove(command);
+    }
+    mutex.unlock();
+}
+
+void AsyncExecutionNotification::dispatch() noexcept
+{
+    mutex.lock();
+    auto* selected = waiter;
+    // A producer may have requeued this command after pop() and before this lock.
+    context.remove(command);
+    waiter  = nullptr;
+    pending = false;
+    mutex.unlock();
+    if (selected)
+        selected->deliver(selected->operation); // Delivery may destroy the notification and connected storage.
+}
+
+AsyncExecutionNotificationSender AsyncExecutionContext::wakeUp(AsyncExecutionNotification& notification)
+{
+    return {*this, notification};
 }
 
 Result detail::AsyncExecutionPoolTask::submit(AsyncExecutionContext& executionContext, ThreadPool& pool,

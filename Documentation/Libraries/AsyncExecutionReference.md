@@ -123,6 +123,21 @@ other borrowed I/O. Valid Windows handles retain `AsyncError::OperationUnsupport
 is supplied. Invalid descriptors report `AsyncError::InvalidFileHandle`; prestop avoids validation/submission.
 The descriptor must outlive terminal completion, even when a terminal receiver releases connected storage.
 
+# Cross-thread notifications
+
+`AsyncExecutionNotification notification{context}` supplies a stable address for producers.
+`context.wakeUp(notification)` is a lazy one-shot sender with no success values. From any thread,
+`notification.notify()` publishes a coalescing notification and returns `Result`. Repeated publications merge
+into one pending bit, including before the wait starts. This is an SC extension using the context's native
+AsyncLoopWakeUp dispatcher. It does not allocate another request or block a worker.
+
+Only one active waiter is allowed (`NotificationAlreadyWaiting`); a notification belongs to its construction
+context (`NotificationContextMismatch`). Prestop does not consume a pending bit. Cancellation before dispatch
+leaves the bit for the next wait; if dispatch already selected it, the bit is consumed even when stop wins
+terminal delivery. A failed `notify()` retains the bit but requires the caller to handle/retry publication.
+Success means published, not delivered. Terminal delivery happens on the owner thread and may release connected
+storage. Complete the wait and join producers before destroying the notification or closing its context.
+
 # Datagrams, processes and signals
 
 | Factory | Successful value / contract |
@@ -232,7 +247,7 @@ channels. Similar operation names preserve resource semantics, not identical res
 | Fill-to-EOF / exact file read | Exact | Fill-to-EOF | Both |
 | File send, UDP, process, one-shot signal | Yes | Yes | Yes |
 | File readiness | `filePoll` | `filePoll` | `filePoll`; POSIX, explicit Windows unsupported error |
-| Public wake-up | Internal only | `wakeUp` | Internal dispatcher only |
+| Public wake-up | Internal only | `wakeUp` | One-shot `wakeUp(notification)`; coalescing |
 | External-completion wrapper | Missing | Missing | Missing |
 | Filesystem operations | Missing | `fsOpen/Close/Read/Write/Copy/Rename/Remove` | Missing |
 | Lifetime helpers | Scheduler/counters/cancelAll | Task groups/registry/waitFor | Scope spawn/stop/join and joined timeout |

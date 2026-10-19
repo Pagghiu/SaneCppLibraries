@@ -8,6 +8,7 @@ void runAsyncExecutionTest(TestReport& report);
 void runAsyncExecutionTimeoutTest(TestReport& report);
 void runAsyncExecutionParityTest(TestReport& report);
 void runAsyncExecutionReadinessTest(TestReport& report);
+void runAsyncExecutionNotificationTest(TestReport& report);
 } // namespace SC
 
 #include "Libraries/Memory/Globals.h"
@@ -40,6 +41,7 @@ int main(int argc, const char* argv[])
     runAsyncExecutionTimeoutTest(report);
     runAsyncExecutionParityTest(report);
     runAsyncExecutionReadinessTest(report);
+    runAsyncExecutionNotificationTest(report);
 
     return report.getTestReturnCode();
 }
