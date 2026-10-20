@@ -27,6 +27,8 @@ enum class AsyncExecutionError : uint32_t
     ExternalCompletionAlreadyWaiting,
     ExternalCompletionContextMismatch,
     ExternalCompletionConsumed,
+    ScopeStorageInUse,
+    ScopeCapacityExhausted,
 };
 static constexpr ResultCategory AsyncExecutionResultCategory = ResultCategory(23);
 } // namespace SC

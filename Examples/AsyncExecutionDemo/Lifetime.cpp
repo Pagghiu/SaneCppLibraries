@@ -70,8 +70,6 @@ SC::Result runAsyncExecutionLifetimeDemo(bool stall, bool cancel, uint16_t port,
 
     const auto owner = Thread::CurrentThreadID();
 
-    AsyncExecutionScope scope(context);
-
     char encodedStorage[8];
     auto codec = [&]() noexcept
     {
@@ -108,7 +106,9 @@ SC::Result runAsyncExecutionLifetimeDemo(bool stall, bool cancel, uint16_t port,
             });
 
     // A single scope owns preparation and transfer. Joined completion releases all borrowed resources.
-    SC_TRY(scope.spawn(move(exchange)));
+    AsyncExecutionScopeSlot<decltype(exchange)> slot;
+    AsyncExecutionScope                         scope(context);
+    SC_TRY(scope.spawn(slot, move(exchange)));
     SC_TRY(requireLifetime(app.close().isError(AsyncResultCategory, AsyncError::ActiveRequestsRemain),
                            LifetimeError::ActiveCloseAccepted));
     bool   done = false;

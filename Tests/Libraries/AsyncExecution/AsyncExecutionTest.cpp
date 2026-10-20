@@ -125,6 +125,45 @@ struct ScopeProbeSender
 #pragma warning(pop)
 #endif
 
+struct ScopeHeldState
+{
+    Function<void()> complete;
+    Atomic<int>      destroyed = 0;
+};
+struct ScopeHeldSender
+{
+    using sender_concept = ex::sender_tag;
+    ScopeHeldState& state;
+    int&            moves;
+    ScopeHeldSender(ScopeHeldState& state, int& moves) : state(state), moves(moves) {}
+    ScopeHeldSender(ScopeHeldSender&& other) noexcept : state(other.state), moves(other.moves) { ++moves; }
+    ScopeHeldSender(const ScopeHeldSender&) = delete;
+    template <typename Self, typename... Environment>
+    static consteval auto get_completion_signatures()
+    {
+        return ex::completion_signatures<ex::set_value_t()>{};
+    }
+    template <typename Receiver>
+    struct Operation
+    {
+        using operation_state_concept = ex::operation_state_tag;
+        ScopeHeldState& state;
+        Receiver        receiver;
+        Operation(ScopeHeldState& state, Receiver receiver) : state(state), receiver(move(receiver)) {}
+        Operation(const Operation&) = delete;
+        ~Operation() { state.destroyed.fetch_add(1); }
+        void start() noexcept
+        {
+            state.complete = [self = this]() noexcept { ex::set_value(move(self->receiver)); };
+        }
+    };
+    template <typename Receiver>
+    auto connect(Receiver receiver) && noexcept
+    {
+        return Operation<Receiver>(state, move(receiver));
+    }
+};
+
 #endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
 
 struct AsyncExecutionTest : AsyncExecutionTestCase
@@ -184,6 +223,8 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         if (test_section("observable owning close and external driving"))
             owningClose();
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+        if (test_section("typed scope storage capacity reuse and lifetime"))
+            scopeTypedStorage();
         if (test_section("structured scope values errors and allocation"))
             scopeBasics();
         if (test_section("structured scope stop join and pool progress"))
@@ -2032,13 +2073,195 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
     }
 
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
+    void scopeTypedStorage()
+    {
+        AsyncExecution app;
+        SC_TEST_EXPECT(app.create(2));
+        auto& context = app.getContext();
+        {
+            AsyncExecutionScope unconfigured(context);
+            ScopeHeldState      state;
+            int                 moves = 0;
+            ScopeHeldSender     sender{state, moves};
+            SC_TEST_EXPECT(unconfigured.spawn(move(sender))
+                               .isError(AsyncExecutionResultCategory, AsyncExecutionError::InvalidAllocator));
+            SC_TEST_EXPECT(moves == 0 and not state.complete.isValid());
+        }
+        {
+            AsyncExecutionScopePool<ScopeHeldSender> pool;
+            AsyncExecutionScope                      scope(context);
+            ScopeHeldState                           state;
+            int                                      moves = 0;
+            ScopeHeldSender                          sender{state, moves};
+            SC_TEST_EXPECT(scope.spawn(pool, move(sender)).isError(AsyncResultCategory, AsyncError::NotInitialized));
+            SC_TEST_EXPECT(pool.create({}));
+            SC_TEST_EXPECT(scope.spawn(pool, move(sender))
+                               .isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeCapacityExhausted));
+            SC_TEST_EXPECT(moves == 0 and scope.getSummary().accepted == 0);
+            SC_TEST_EXPECT(pool.close());
+        }
+        {
+            AsyncExecutionScopeSlot<ScopeHeldSender> slots[1];
+            AsyncExecutionScopePool<ScopeHeldSender> pool, other;
+            SC_TEST_EXPECT(pool.create(slots));
+            SC_TEST_EXPECT(pool.capacity() == 1 and pool.availableCount() == 1 and pool.activeCount() == 0);
+            SC_TEST_EXPECT(
+                other.create(slots).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse));
+            SC_TEST_EXPECT(other.capacity() == 0);
+            // Even an explicit heap policy must never spill a typed overload into allocation.
+            ScopeTestAllocator  allocator;
+            AsyncExecutionScope scope(context, allocator.callbacks());
+            ScopeHeldState      first, rejected, second;
+            int                 firstMoves = 0, rejectedMoves = 0, secondMoves = 0;
+            ScopeHeldSender     a{first, firstMoves}, b{rejected, rejectedMoves};
+            SC_TEST_EXPECT(scope.spawn(slots[0], move(b))
+                               .isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse));
+            SC_TEST_EXPECT(rejectedMoves == 0);
+            SC_TEST_EXPECT(scope.spawn(pool, move(a)));
+            SC_TEST_EXPECT(firstMoves > 0 and pool.activeCount() == 1 and pool.availableCount() == 0);
+            SC_TEST_EXPECT(
+                pool.create(slots).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse));
+            SC_TEST_EXPECT(scope.spawn(pool, move(b))
+                               .isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeCapacityExhausted));
+            SC_TEST_EXPECT(rejectedMoves == 0 and not rejected.complete.isValid());
+            SC_TEST_EXPECT(pool.close().isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse));
+            first.complete();
+            SC_TEST_EXPECT(first.destroyed.load() == 1 and pool.availableCount() == 1);
+            SC_TEST_EXPECT(scope.spawn(pool, ScopeHeldSender{second, secondMoves}));
+            Thread completion;
+            SC_TEST_EXPECT(completion.start([&second](Thread&) { second.complete(); }));
+            SC_TEST_EXPECT(completion.join());
+            SC_TEST_EXPECT(second.destroyed.load() == 1 and pool.activeCount() == 0);
+            scope.requestStop();
+            SC_TEST_EXPECT(
+                scope.spawn(pool, move(b)).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed));
+            SC_TEST_EXPECT(rejectedMoves == 0 and pool.availableCount() == 1);
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()));
+            SC_TEST_EXPECT(scope.getSummary().accepted == 2 and allocator.allocations.load() == 0);
+            SC_TEST_EXPECT(pool.close());
+            // Unbound storage can now serve a different scope directly.
+            AsyncExecutionScope direct(context);
+            SC_TEST_EXPECT(direct.spawn(slots[0], move(b)));
+            int anotherMoves = 0;
+            SC_TEST_EXPECT(direct.spawn(slots[0], ScopeHeldSender{first, anotherMoves})
+                               .isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse));
+            SC_TEST_EXPECT(anotherMoves == 0);
+            SC_TEST_EXPECT(
+                other.create(slots).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse));
+            rejected.complete();
+            SC_TEST_EXPECT(consumeBounded(context, direct.join()));
+        }
+        {
+            bool                                      aligned = false, destroyed = false, environment = false;
+            AsyncExecutionScopeSlot<ScopeProbeSender> slot;
+            static_assert(alignof(decltype(slot)) >= 256);
+            AsyncExecutionScope scope(context);
+            SC_TEST_EXPECT(scope.spawn(slot, ScopeProbeSender{&aligned, &destroyed, &environment}));
+            SC_TEST_EXPECT(aligned and destroyed and environment);
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()));
+        }
+        {
+            // Synchronous reclamation supports concurrent producers without an allocator or an owner-loop hop.
+            using Sender = decltype(ex::just(1));
+            AsyncExecutionScopeSlot<Sender> slots[2];
+            AsyncExecutionScopePool<Sender> pool;
+            SC_TEST_EXPECT(pool.create(slots));
+            AsyncExecutionScope scope(context);
+            Result              one{true}, two{true};
+            auto                submit = [&](Result& result)
+            {
+                for (int i = 0; i < 128 and result; ++i)
+                    result = scope.spawn(pool, ex::just(1));
+            };
+            Thread a, b;
+            SC_TEST_EXPECT(a.start([&](Thread&) { submit(one); }));
+            SC_TEST_EXPECT(b.start([&](Thread&) { submit(two); }));
+            SC_TEST_EXPECT(a.join());
+            SC_TEST_EXPECT(b.join());
+            SC_TEST_EXPECT(one and two);
+            SC_TEST_EXPECT(pool.availableCount() == 2);
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()));
+            SC_TEST_EXPECT(scope.getSummary().succeeded == 256);
+            SC_TEST_EXPECT(pool.close());
+        }
+        {
+            // Reentrant acceptance of a different graph type within one scope, with caller-owned storage.
+            AsyncExecutionScope                           scope(context);
+            AsyncExecutionScopeSlot<decltype(ex::just())> inner;
+            Result                                        nested{false};
+            auto sender = ex::just() | ex::then([&]() noexcept { nested = scope.spawn(inner, ex::just()); });
+            AsyncExecutionScopeSlot<decltype(sender)> outer;
+            SC_TEST_EXPECT(scope.spawn(outer, move(sender)));
+            SC_TEST_EXPECT(nested);
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()));
+            SC_TEST_EXPECT(scope.getSummary().succeeded == 2);
+        }
+        {
+            // Scope join also covers worker notification tails after the typed operation slot is reclaimed.
+            Atomic<int> ran      = 0;
+            auto        makeWork = [&]()
+            { return ex::schedule(app.getPoolScheduler()) | ex::then([&]() noexcept { ran.fetch_add(1); }); };
+            using Sender = decltype(makeWork());
+            AsyncExecutionScopeSlot<Sender> slots[2];
+            AsyncExecutionScopePool<Sender> pool;
+            SC_TEST_EXPECT(pool.create(slots));
+            AsyncExecutionScope scope(context);
+            SC_TEST_EXPECT(scope.spawn(pool, makeWork()));
+            const Result second = scope.spawn(pool, makeWork());
+            if (not second)
+                scope.requestStop();
+            SC_TEST_EXPECT(consumeBounded(context, scope.join()));
+            SC_TEST_EXPECT(second and ran.load() == 2 and pool.activeCount() == 0);
+            SC_TEST_EXPECT(pool.close());
+        }
+        {
+            // Join's terminal receiver can destroy pool, slots, scope and its own operation immediately.
+            using Sender = decltype(context.sleep({1}));
+            struct Owner
+            {
+                AsyncExecutionScopeSlot<Sender> slots[1];
+                AsyncExecutionScopePool<Sender> pool;
+                AsyncExecutionScope             scope;
+                explicit Owner(AsyncExecutionContext& context) : scope(context) {}
+            };
+            AlignedStorage<sizeof(Owner), alignof(Owner)> storage;
+            auto*                                         owner = reinterpret_cast<Owner*>(&storage);
+            placementNew(*owner, context);
+            SC_TEST_EXPECT(owner->pool.create(owner->slots));
+            SC_TEST_EXPECT(owner->scope.spawn(owner->pool, context.sleep({1})));
+            ExecutionOutcome outcome;
+            outcome.loop = &context.getEventLoop();
+            using Join   = decltype(ex::connect(owner->scope.join(), ExecutionReceiver{outcome, {}}));
+            AlignedStorage<sizeof(Join), alignof(Join)> joinStorage;
+            auto*                                       join = reinterpret_cast<Join*>(&joinStorage);
+            placementNew(*join, owner->scope, ExecutionReceiver{outcome, {}});
+            struct Destroy
+            {
+                Owner* owner;
+                Join*  join;
+                bool   done = false;
+            } destroy{owner, join};
+            outcome.onValue = [this, &destroy]()
+            {
+                SC_TEST_EXPECT(destroy.owner->pool.availableCount() == 1);
+                destroy.join->~Join();
+                destroy.owner->~Owner();
+                destroy.done = true;
+            };
+            ex::start(*join);
+            SC_TEST_EXPECT(runBounded(context.getEventLoop()));
+            SC_TEST_EXPECT(destroy.done and outcome.values == 1);
+        }
+        SC_TEST_EXPECT(app.close());
+    }
+
     void scopeBasics()
     {
         AsyncExecution app;
         SC_TEST_EXPECT(app.create(2));
         auto& context = app.getContext();
         {
-            AsyncExecutionScope        empty(context);
+            AsyncExecutionScope        empty(context, AsyncExecutionScopeAllocator::heap());
             AsyncExecutionScopeSummary summary;
             SC_TEST_EXPECT(consumeBounded(context, empty.join(), summary));
             SC_TEST_EXPECT(summary.accepted == 0 and summary.firstError);
@@ -2074,7 +2297,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                 invalid.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::InvalidAllocator));
         }
         {
-            AsyncExecutionScope scope(context);
+            AsyncExecutionScope scope(context, AsyncExecutionScopeAllocator::heap());
             const Result        error = Result::Error(ResultCategory(99), 71);
             SC_TEST_EXPECT(scope.spawn(ex::just(1)));
             SC_TEST_EXPECT(scope.spawn(ex::just_error(error)));
@@ -2090,7 +2313,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
             SC_TEST_EXPECT(consumeBounded(context, scope.join()).isError(ResultCategory(99), 71));
         }
         {
-            AsyncExecutionScope scope(context);
+            AsyncExecutionScope scope(context, AsyncExecutionScopeAllocator::heap());
             auto                lazy    = scope.join();
             bool                aligned = false, destroyed = false, environment = false;
             SC_TEST_EXPECT(
@@ -2114,14 +2337,14 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         }
         {
             ThreadPool          uncreated;
-            AsyncExecutionScope scope(context);
+            AsyncExecutionScope scope(context, AsyncExecutionScopeAllocator::heap());
             SC_TEST_EXPECT(scope.spawn(ex::schedule(AsyncExecutionPoolScheduler{&context, &uncreated})));
             SC_TEST_EXPECT(consumeBounded(context, scope.join())
                                .isError(ThreadingResultCategory, ThreadingError::ThreadPoolNotCreated));
             SC_TEST_EXPECT(scope.getSummary().accepted == 1 and scope.getSummary().failed == 1);
         }
         {
-            AsyncExecutionScope grouped(context);
+            AsyncExecutionScope grouped(context, AsyncExecutionScopeAllocator::heap());
             bool                branches[2] = {};
             SC_TEST_EXPECT(grouped.spawn(ex::when_all(
                 context.sleep({1}) | ex::then([&branches]() noexcept { branches[0] = true; }),
@@ -2138,7 +2361,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         AsyncExecution app;
         SC_TEST_EXPECT(app.create(2));
         auto&               context = app.getContext();
-        AsyncExecutionScope scope(context);
+        AsyncExecutionScope scope(context, AsyncExecutionScopeAllocator::heap());
         struct Gate
         {
             EventObject  entered, release;
@@ -2191,7 +2414,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
 
         SC_TEST_EXPECT(app.create(2));
         {
-            AsyncExecutionScope cpuScope(context);
+            AsyncExecutionScope cpuScope(context, AsyncExecutionScopeAllocator::heap());
             struct CPU
             {
                 EventObject  entered, release;
@@ -2242,7 +2465,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
             SC_TEST_EXPECT(outcome.values == 1 and cpuScope.getSummary().stopped == 1);
         }
         {
-            AsyncExecutionScope stopped(context);
+            AsyncExecutionScope stopped(context, AsyncExecutionScopeAllocator::heap());
             SC_TEST_EXPECT(stopped.spawn(context.sleep({5000})));
             ExecutionStopSource stop;
             stop.request_stop();
@@ -2252,7 +2475,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                 stopped.spawn(ex::just()).isError(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed));
         }
         {
-            AsyncExecutionScope parallel(context);
+            AsyncExecutionScope parallel(context, AsyncExecutionScopeAllocator::heap());
             Atomic<int>         ran = 0;
             Result              first{true}, second{true};
             const auto          scheduler = app.getPoolScheduler();
@@ -2288,7 +2511,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         auto& context = app.getContext();
         auto& loop    = context.getEventLoop();
         {
-            AsyncExecutionScope scope(context);
+            AsyncExecutionScope scope(context, AsyncExecutionScopeAllocator::heap());
             SC_TEST_EXPECT(scope.spawn(context.sleep({5000})));
             SC_TEST_EXPECT(loop.runNoWait());
             ExecutionStopSource stop;
@@ -2310,7 +2533,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         {
             alignas(AsyncExecutionScope) char scopeStorage[sizeof(AsyncExecutionScope)];
             auto*                             scope = reinterpret_cast<AsyncExecutionScope*>(scopeStorage);
-            placementNew(*scope, context);
+            placementNew(*scope, context, AsyncExecutionScopeAllocator::heap());
             SC_TEST_EXPECT(scope->spawn(context.sleep({1})));
             ExecutionOutcome outcome;
             outcome.loop = &loop;
@@ -2350,7 +2573,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         if (not app.create())
             ::_Exit(75);
         {
-            AsyncExecutionScope scope(app.getContext());
+            AsyncExecutionScope scope(app.getContext(), AsyncExecutionScopeAllocator::heap());
             if (not scope.spawn(app.sleep({5000})))
                 ::_Exit(76);
         }

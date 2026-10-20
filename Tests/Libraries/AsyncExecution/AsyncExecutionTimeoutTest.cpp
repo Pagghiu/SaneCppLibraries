@@ -194,7 +194,7 @@ struct AsyncExecutionTimeoutTest : AsyncExecutionTestCase
         }
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
         {
-            AsyncExecutionScope scope(context);
+            AsyncExecutionScope scope(context, AsyncExecutionScopeAllocator::heap());
             SC_TEST_EXPECT(scope.spawn(timeout(context, ex::schedule(app.getPoolScheduler()), {5000})));
             SC_TEST_EXPECT(consumeBounded(context, scope.join()));
             SC_TEST_EXPECT(scope.getSummary().succeeded == 1);

@@ -1563,15 +1563,143 @@ static void AsyncExecutionScopeDeallocate(void*, void* memory, size_t, size_t) n
 }
 } // namespace detail
 
-AsyncExecutionScope::AsyncExecutionScope(AsyncExecutionContext& context, AsyncExecutionScopeAllocator allocator)
-    : context(context), allocator(allocator)
+AsyncExecutionScopeAllocator AsyncExecutionScopeAllocator::heap() noexcept
 {
-    if (not this->allocator.allocate and not this->allocator.deallocate)
+    return {nullptr, detail::AsyncExecutionScopeAllocate, detail::AsyncExecutionScopeDeallocate};
+}
+
+detail::AsyncExecutionScopeSlotState::~AsyncExecutionScopeSlotState()
+{
+    SC_ASYNC_ASSERT_RELEASE(not busy and pool == nullptr);
+}
+Result detail::AsyncExecutionScopeSlotState::reserve()
+{
+    mutex.lock();
+    const bool unavailable = pool != nullptr or busy;
+    if (not unavailable)
+        busy = true;
+    mutex.unlock();
+    return unavailable ? Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse)
+                       : Result(true);
+}
+void detail::AsyncExecutionScopeSlotState::release() noexcept
+{
+    if (pool)
+        pool->release(*this);
+    else
     {
-        this->allocator.allocate   = detail::AsyncExecutionScopeAllocate;
-        this->allocator.deallocate = detail::AsyncExecutionScopeDeallocate;
+        mutex.lock();
+        SC_ASYNC_ASSERT_RELEASE(busy);
+        busy = false;
+        mutex.unlock(); // No slot access after publishing reuse.
     }
 }
+
+detail::AsyncExecutionScopePoolState::~AsyncExecutionScopePoolState() { SC_ASYNC_TRUST_RESULT(close()); }
+Result detail::AsyncExecutionScopePoolState::create()
+{
+    mutex.lock();
+    const bool alreadyOpen = open;
+    if (not alreadyOpen)
+        open = true;
+    mutex.unlock();
+    return alreadyOpen ? Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse)
+                       : Result(true);
+}
+Result detail::AsyncExecutionScopePoolState::bind(AsyncExecutionScopeSlotState& slot)
+{
+    mutex.lock();
+    slot.mutex.lock();
+    const bool unavailable = slot.pool != nullptr or slot.busy;
+    if (not unavailable)
+    {
+        slot.pool      = this;
+        slot.nextBound = bound;
+        slot.nextFree  = free;
+        bound = free = &slot;
+        ++count;
+    }
+    slot.mutex.unlock();
+    mutex.unlock();
+    return unavailable ? Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse)
+                       : Result(true);
+}
+Result detail::AsyncExecutionScopePoolState::close()
+{
+    mutex.lock();
+    if (active != 0)
+    {
+        mutex.unlock();
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeStorageInUse);
+    }
+    while (bound)
+    {
+        auto* slot = bound;
+        slot->mutex.lock();
+        bound          = slot->nextBound;
+        slot->pool     = nullptr;
+        slot->nextFree = slot->nextBound = nullptr;
+        slot->mutex.unlock();
+    }
+    free  = nullptr;
+    count = 0;
+    open  = false;
+    mutex.unlock();
+    return Result(true);
+}
+Result detail::AsyncExecutionScopePoolState::reserve(AsyncExecutionScopeSlotState*& slot)
+{
+    mutex.lock();
+    Result status(true);
+    if (not open)
+        status = Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
+    else if (free == nullptr)
+        status = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeCapacityExhausted);
+    else
+    {
+        slot       = free;
+        free       = slot->nextFree;
+        slot->busy = true;
+        ++active;
+    }
+    mutex.unlock();
+    return status;
+}
+void detail::AsyncExecutionScopePoolState::release(AsyncExecutionScopeSlotState& slot) noexcept
+{
+    mutex.lock();
+    SC_ASYNC_ASSERT_RELEASE(slot.busy and slot.pool == this and active > 0);
+    slot.busy     = false;
+    slot.nextFree = free;
+    free          = &slot;
+    --active;
+    mutex.unlock(); // No pool/slot access after publishing reuse; association release follows in the caller.
+}
+size_t detail::AsyncExecutionScopePoolState::capacity()
+{
+    mutex.lock();
+    const size_t result = count;
+    mutex.unlock();
+    return result;
+}
+size_t detail::AsyncExecutionScopePoolState::activeCount()
+{
+    mutex.lock();
+    const size_t result = active;
+    mutex.unlock();
+    return result;
+}
+size_t detail::AsyncExecutionScopePoolState::availableCount()
+{
+    mutex.lock();
+    const size_t result = count - active;
+    mutex.unlock();
+    return result;
+}
+
+AsyncExecutionScope::AsyncExecutionScope(AsyncExecutionContext& context, AsyncExecutionScopeAllocator allocator)
+    : context(context), allocator(allocator)
+{}
 
 AsyncExecutionScope::~AsyncExecutionScope()
 {
@@ -1585,8 +1713,6 @@ Result AsyncExecutionScope::checkSpawn()
     mutex.unlock();
     if (closed)
         return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::ScopeClosed);
-    if (not allocator.allocate or not allocator.deallocate)
-        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::InvalidAllocator);
     if (not context.accepting.load())
         return Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
     return Result(true);

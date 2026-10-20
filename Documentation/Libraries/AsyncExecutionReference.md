@@ -45,11 +45,12 @@ affinity is not promised; submission failure may be delivered on the submitting 
 
 Use ordinary `then` for synchronous values and `let_value` for dependent senders. `SC::tryThen` is the fallible
 synchronous bridge: a callable returning `Result` produces no success values; a callable returning
-`AsyncExecutionValueResult<T>` produces one owned T. Callables must be `noexcept`, and T must support nonthrowing
+`AsyncExecutionValueResult<T>` produces one T by value (a span still borrows its pointee). Callables must be `noexcept`, and T must support nonthrowing
 move construction. Reference payloads are rejected. The bridge does not schedule work itself.
 
 `tryThen` checks stop before invoking work. A running procedure cannot be preempted; failure wins over a
-concurrent stop, and successful work observes stop after returning. The earlier experimental
+concurrent stop, and successful work observes stop after returning.
+
 Payloads are caller-owned spans; AsyncExecutionBuffer and buffer-specific onPool are removed.
 `app.readFile(path, destination)` reads through observed EOF or fails with FileTooLarge; exact capacity uses
 one extra byte of internal scratch to probe EOF. Empty capacity only accepts empty files. Positive short reads
@@ -261,9 +262,35 @@ delivered. These delivery windows are deliberately not claimed to have identical
 # Structured scopes and shutdown
 
 `AsyncExecutionScope` borrows a context and owns connected child storage using provider counting-scope
-associations. Default nodes allocate with proper alignment and report `OutOfMemory` without starting a child.
-Optional `AsyncExecutionScopeAllocator` callbacks receive size/alignment and matching deallocation; allocator
-user data survives join. This is no general allocation guarantee for arbitrary provider algorithms.
+associations. Default scopes configure no allocation. `spawn(sender)` requires an explicit callback pair;
+`AsyncExecutionScopeAllocator::heap()` is named heap opt-in for execution nodes. Missing/partial callbacks
+report `InvalidAllocator` before consuming a sender; allocation failure reports `OutOfMemory`.
+
+`AsyncExecutionScopeSlot<Sender>` contains correctly aligned storage for the complete scope-wrapped connected
+graph of the exact decayed sender type. `spawn(slot, sender)` requires an idle, unbound slot. A
+`AsyncExecutionScopePool<Sender>` borrows a homogeneous slot span via `create`, with `capacity`, `activeCount`,
+`availableCount` and `close`. Busy/pool-bound slots and active close/rebind report `ScopeStorageInUse`;
+exhaustion reports `ScopeCapacityExhausted`. An uncreated pool reports Async NotInitialized. Typed submissions
+never use an allocator fallback, and all rejection paths preserve the submitted sender. Zero-capacity pools
+are valid but always exhausted. Named factories stabilize types; separate lambda expressions can require
+separate pools. Multiple graph types may feed one scope through separate slots/pools.
+
+Reservation, release and counter queries are synchronized. Coordinate producers around create/close and
+finish them before destruction. Partial binding failure rolls back newly bound slots. Close unbinds idle slots;
+an idle pool destructor also unbinds them. Destroy an unbound slot only when idle. Child destruction precedes
+slot reuse, context accounting and provider-association release; no storage access follows the release that
+can finish join. Pool locks are never held across terminal delivery. Connected operation addresses remain
+stable, including synchronous/self-destroying completions. Sizes include provider wrappers and alignment,
+change with graph/provider types and are visible with sizeof; there is no arbitrary byte arena or stable ABI size.
+
+Slots/pools own no payloads. let_value retains span objects, not pointees. Lazy/external driving requires stable
+application-owned payloads and operation storage through joined completion. Stop/timeout is not permission
+for reuse; failed/stopped reads may already have modified bytes. Do not resize/move active container storage.
+Concurrent writable ranges must be disjoint; shared immutable bytes require no concurrent writers. Graph
+dependencies order CPU writes before dependent I/O, but do not protect unrelated accesses.
+Reusing an operation slot does not establish an independent payload's admission policy. Local run/runInto
+and raw connect/start already support caller-owned connected storage. This is no blanket allocation guarantee
+for arbitrary provider algorithms or OS resources.
 
 For related concurrent branches, `when_all(a, b)` requests sibling cancellation after failure and joins both.
 Separate `scope.spawn(a)` / `scope.spawn(b)` roots instead share lifetime ownership with independent failure

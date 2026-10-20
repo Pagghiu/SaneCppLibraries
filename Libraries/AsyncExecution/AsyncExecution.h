@@ -1957,14 +1957,20 @@ Result AsyncExecutionContext::runIntoWithStop(Sender&& sender, StopToken token, 
 }
 
 #if SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
-/// Allocation callbacks must return correctly aligned storage or nullptr. Both null selects the default allocator.
-struct AsyncExecutionScopeAllocator
+/// Explicit execution-node allocation policy. Null callbacks do not select heap allocation.
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScopeAllocator
 {
-    void* userData = nullptr;
+    static AsyncExecutionScopeAllocator heap() noexcept;
+    void*                               userData = nullptr;
 
     void* (*allocate)(void*, size_t, size_t) noexcept         = nullptr;
     void (*deallocate)(void*, void*, size_t, size_t) noexcept = nullptr;
 };
+
+template <typename Sender>
+struct AsyncExecutionScopeSlot;
+template <typename Sender>
+struct AsyncExecutionScopePool;
 
 struct AsyncExecutionScopeSummary
 {
@@ -1978,6 +1984,7 @@ struct AsyncExecutionScopeSummary
 namespace detail
 {
 struct AsyncExecutionScopeNode;
+struct AsyncExecutionScopeSlotState;
 template <typename Sender>
 struct AsyncExecutionScopeChild;
 template <typename Receiver>
@@ -1994,9 +2001,15 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScope
     AsyncExecutionScope(const AsyncExecutionScope&) = delete;
     AsyncExecutionScope(AsyncExecutionScope&&)      = delete;
 
+    /// Allocating overload: requires explicit allocator callbacks (heap() is named opt-in).
     /// Reports acceptance, not child completion. Avoid SC_TRY early returns after an earlier accepted root.
     template <typename Sender>
     Result spawn(Sender&& sender);
+
+    template <typename Stored, typename Sender>
+    Result spawn(AsyncExecutionScopeSlot<Stored>& slot, Sender&& sender);
+    template <typename Stored, typename Sender>
+    Result spawn(AsyncExecutionScopePool<Stored>& pool, Sender&& sender);
 
     void requestStop() noexcept;
 
@@ -2025,6 +2038,9 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScope
     bool  contextBound = false;
 
     Result checkSpawn();
+    template <typename Sender>
+    Result startChild(detail::AsyncExecutionScopeAssociation association, void* memory,
+                      detail::AsyncExecutionScopeSlotState* slot, Sender&& sender);
     Result beginChild(detail::AsyncExecutionScopeAssociation& association);
     Result beginJoin();
 
@@ -2037,6 +2053,47 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScope
 
 namespace detail
 {
+struct AsyncExecutionScopePoolState;
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScopeSlotState
+{
+    explicit AsyncExecutionScopeSlotState(void* memory) : memory(memory) {}
+    ~AsyncExecutionScopeSlotState();
+    Result reserve();
+    void   release() noexcept;
+
+    void* memory;
+    Mutex mutex;
+
+    AsyncExecutionScopePoolState* pool = nullptr;
+
+    AsyncExecutionScopeSlotState* nextFree  = nullptr;
+    AsyncExecutionScopeSlotState* nextBound = nullptr;
+
+    bool busy = false;
+};
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionScopePoolState
+{
+    ~AsyncExecutionScopePoolState();
+    Result create();
+    Result bind(AsyncExecutionScopeSlotState& slot);
+    Result close();
+    Result reserve(AsyncExecutionScopeSlotState*& slot);
+    void   release(AsyncExecutionScopeSlotState& slot) noexcept;
+    size_t capacity();
+    size_t activeCount();
+    size_t availableCount();
+
+    Mutex mutex;
+
+    AsyncExecutionScopeSlotState* free  = nullptr;
+    AsyncExecutionScopeSlotState* bound = nullptr;
+
+    size_t count  = 0;
+    size_t active = 0;
+
+    bool open = false;
+};
+
 struct AsyncExecutionScopeEnvironment
 {
     AsyncExecutionScheduler  scheduler;
@@ -2076,24 +2133,38 @@ struct AsyncExecutionScopeReceiver
     void set_stopped() && noexcept { node->complete(Result(true), true); }
 };
 
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4324) // Complete connected state can require extended alignment.
+#endif
 template <typename Sender>
 struct AsyncExecutionScopeChild : AsyncExecutionScopeNode
 {
     using Wrapped   = decltype(std::declval<AsyncExecutionScopeToken>().wrap(std::declval<Sender>()));
     using Operation = decltype(AsyncExecutionProtocol::connect(std::declval<Wrapped>(), AsyncExecutionScopeReceiver{}));
+    AsyncExecutionScopeSlotState* slot;
+
     Operation operation;
 
-    AsyncExecutionScopeChild(AsyncExecutionScope& scope, AsyncExecutionScopeAssociation association, Sender&& sender)
+    template <typename Input>
+    AsyncExecutionScopeChild(AsyncExecutionScope& scope, AsyncExecutionScopeAssociation association,
+                             AsyncExecutionScopeSlotState* slot, Input&& sender)
         : AsyncExecutionScopeNode(scope, move(association),
                                   [](AsyncExecutionScopeNode* node) noexcept
                                   {
                                       auto*      self      = static_cast<AsyncExecutionScopeChild*>(node);
+                                      auto*      slot      = self->slot;
                                       const auto allocator = self->scope.allocator;
                                       self->~AsyncExecutionScopeChild();
-                                      allocator.deallocate(allocator.userData, self, sizeof(AsyncExecutionScopeChild),
-                                                           alignof(AsyncExecutionScopeChild));
+                                      if (slot)
+                                          slot->release();
+                                      else
+                                          allocator.deallocate(allocator.userData, self,
+                                                               sizeof(AsyncExecutionScopeChild),
+                                                               alignof(AsyncExecutionScopeChild));
                                   }),
-          operation(AsyncExecutionProtocol::connect(scope.provider.get_token().wrap(forward<Sender>(sender)),
+          slot(slot),
+          operation(AsyncExecutionProtocol::connect(scope.provider.get_token().wrap(Sender(forward<Input>(sender))),
                                                     AsyncExecutionScopeReceiver{this}))
     {}
 };
@@ -2177,6 +2248,64 @@ struct AsyncExecutionScopeJoinOperation
 };
 } // namespace detail
 
+/// Stable storage for one exact decayed sender's complete scope-wrapped connected operation.
+/// No payload ownership. Keep this immovable slot alive through joined completion and producer shutdown.
+template <typename Sender>
+struct AsyncExecutionScopeSlot
+{
+    static_assert(std::is_same_v<Sender, std::remove_cvref_t<Sender>>, "Use the decayed sender type");
+    AsyncExecutionScopeSlot() : state(&storage) {}
+    AsyncExecutionScopeSlot(const AsyncExecutionScopeSlot&) = delete;
+    AsyncExecutionScopeSlot(AsyncExecutionScopeSlot&&)      = delete;
+
+  private:
+    friend struct AsyncExecutionScope;
+    template <typename>
+    friend struct AsyncExecutionScopePool;
+    using Child = detail::AsyncExecutionScopeChild<Sender>;
+
+    detail::AsyncExecutionScopeSlotState state;
+
+    AlignedStorage<sizeof(Child), alignof(Child)> storage;
+};
+
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+
+/// Bounded homogeneous operation storage. No growth, byte arena, payload provisioning or allocating fallback.
+/// create/close require producer coordination; reserve/release and counters are synchronized.
+template <typename Sender>
+struct AsyncExecutionScopePool
+{
+    AsyncExecutionScopePool() = default;
+
+    AsyncExecutionScopePool(const AsyncExecutionScopePool&) = delete;
+    AsyncExecutionScopePool(AsyncExecutionScopePool&&)      = delete;
+    Result create(Span<AsyncExecutionScopeSlot<Sender>> slots)
+    {
+        SC_TRY(state.create());
+        for (auto& slot : slots)
+        {
+            const Result bound = state.bind(slot.state);
+            if (not bound)
+            {
+                SC_ASYNC_TRUST_RESULT(state.close());
+                return bound;
+            }
+        }
+        return Result(true);
+    }
+    Result close() { return state.close(); }
+    size_t capacity() { return state.capacity(); }
+    size_t activeCount() { return state.activeCount(); }
+    size_t availableCount() { return state.availableCount(); }
+
+  private:
+    friend struct AsyncExecutionScope;
+    detail::AsyncExecutionScopePoolState state;
+};
+
 struct AsyncExecutionScopeJoinSender
 {
     using sender_concept = AsyncExecutionProtocol::sender_tag;
@@ -2196,26 +2325,68 @@ struct AsyncExecutionScopeJoinSender
 };
 
 template <typename Sender>
+Result AsyncExecutionScope::startChild(detail::AsyncExecutionScopeAssociation association, void* memory,
+                                       detail::AsyncExecutionScopeSlotState* slot, Sender&& sender)
+{
+    using Child = detail::AsyncExecutionScopeChild<std::remove_cvref_t<Sender>>;
+    auto* child = static_cast<Child*>(memory);
+    placementNew(*child, *this, move(association), slot, forward<Sender>(sender));
+    acceptedChild();
+    AsyncExecutionProtocol::start(child->operation);
+    return Result(true); // start can destroy the child, reclaim its slot and finish join synchronously.
+}
+
+template <typename Sender>
 Result AsyncExecutionScope::spawn(Sender&& sender)
 {
     SC_TRY(checkSpawn());
-    using Child  = detail::AsyncExecutionScopeChild<Sender>;
+    if (not allocator.allocate or not allocator.deallocate)
+        return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::InvalidAllocator);
+    using Child  = detail::AsyncExecutionScopeChild<std::remove_cvref_t<Sender>>;
     void* memory = allocator.allocate(allocator.userData, sizeof(Child), alignof(Child));
     if (memory == nullptr)
         return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
     detail::AsyncExecutionScopeAssociation association;
-
-    const Result associated = beginChild(association);
+    const Result                           associated = beginChild(association);
     if (not associated)
     {
         allocator.deallocate(allocator.userData, memory, sizeof(Child), alignof(Child));
         return associated;
     }
-    auto* child = static_cast<Child*>(memory);
-    placementNew(*child, *this, move(association), forward<Sender>(sender));
-    acceptedChild();
-    AsyncExecutionProtocol::start(child->operation);
-    return Result(true); // start may have synchronously destroyed the child and completed join.
+    return startChild(move(association), memory, nullptr, forward<Sender>(sender));
+}
+
+template <typename Stored, typename Sender>
+Result AsyncExecutionScope::spawn(AsyncExecutionScopeSlot<Stored>& slot, Sender&& sender)
+{
+    static_assert(std::is_same_v<Stored, std::remove_cvref_t<Sender>>, "Slot must match the sender type");
+    SC_TRY(checkSpawn());
+    SC_TRY(slot.state.reserve());
+    detail::AsyncExecutionScopeAssociation association;
+    const Result                           associated = beginChild(association);
+    if (not associated)
+    {
+        slot.state.release();
+        return associated;
+    }
+    return startChild(move(association), slot.state.memory, &slot.state, forward<Sender>(sender));
+}
+
+template <typename Stored, typename Sender>
+Result AsyncExecutionScope::spawn(AsyncExecutionScopePool<Stored>& pool, Sender&& sender)
+{
+    static_assert(std::is_same_v<Stored, std::remove_cvref_t<Sender>>, "Pool must match the sender type");
+    SC_TRY(checkSpawn());
+    detail::AsyncExecutionScopeSlotState* slot = nullptr;
+    SC_TRY(pool.state.reserve(slot));
+    detail::AsyncExecutionScopeAssociation association;
+    const Result                           associated = beginChild(association);
+    if (not associated)
+    {
+        slot->release();
+        return associated;
+    }
+    return startChild(move(association), slot->memory, slot, forward<Sender>(sender));
 }
 
 #endif // SC_ASYNC_EXECUTION_SCOPES_AVAILABLE
