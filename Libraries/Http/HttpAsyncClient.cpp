@@ -11,6 +11,58 @@
 
 namespace SC
 {
+Result HttpAsyncClient::checkTransportQuiescence() const
+{
+    return (state == State::Idle and currentRequest == nullptr and not hasOpenConnection and not webSocketUpgraded and
+            not reconnectCloseInProgress and not reconnectPending and reconnectClosuresPending == 0 and
+            transportCallbackDepth == 0 and connectAsync.isFree() and
+            (connection == nullptr or
+             (not connection->socket.isValid() and connection->readableSocketStream.request.isFree() and
+              connection->writableSocketStream.request.isFree())))
+               ? Result(true)
+               : Result::Error(HttpResultCategory, HttpError::TransportMutationRequiresQuiescence);
+}
+
+Result HttpAsyncClient::checkTransportMutation(const void* owner) const
+{
+    SC_TRY((owner == transportOwner) ? Result(true)
+                                     : Result::Error(HttpResultCategory, HttpError::TransportOwnerMismatch));
+    return checkTransportQuiescence();
+}
+
+Result HttpAsyncClient::claimTransport(const void* owner)
+{
+    SC_TRY(owner != nullptr ? Result(true) : Result::Error(HttpResultCategory, HttpError::TransportOwnerRequired));
+    SC_TRY(transportOwner == nullptr ? Result(true)
+                                     : Result::Error(HttpResultCategory, HttpError::TransportAlreadyClaimed));
+    SC_TRY(checkTransportQuiescence());
+    SC_TRY((not transportPreflight.isValid() and not externalConnector.isValid() and not transportSetup.isValid() and
+            not transportShutdown.isValid() and not transportClose.isValid())
+               ? Result(true)
+               : Result::Error(HttpResultCategory, HttpError::TransportHooksAlreadyConfigured));
+    transportOwner = owner;
+    return Result(true);
+}
+
+Result HttpAsyncClient::clearTransportSetup(const void* owner)
+{
+    SC_TRY(checkTransportMutation(owner));
+    transportPreflight = {};
+    externalConnector  = {};
+    transportSetup     = {};
+    transportShutdown  = {};
+    transportClose     = {};
+    return Result(true);
+}
+
+Result HttpAsyncClient::releaseTransport(const void* owner)
+{
+    SC_TRY(owner != nullptr ? Result(true) : Result::Error(HttpResultCategory, HttpError::TransportOwnerRequired));
+    SC_TRY(clearTransportSetup(owner));
+    transportOwner = nullptr;
+    return Result(true);
+}
+
 Result HttpAsyncClient::init(HttpConnectionBase& storage)
 {
     connection = &storage;
@@ -212,7 +264,10 @@ Result HttpAsyncClient::prepareRequest(const RequestPreset& preset)
         return Result::Error(HttpResultCategory, HttpError::ClientUserInfoUnsupported);
     if (transportPreflight.isValid())
     {
-        SC_TRY(transportPreflight(currentURL));
+        transportCallbackDepth++;
+        Result preflight = transportPreflight(currentURL);
+        transportCallbackDepth--;
+        SC_TRY(preflight);
     }
     return Result(true);
 }
@@ -249,7 +304,9 @@ Result HttpAsyncClient::closeConnectionForReconnect()
     if (transportShutdown.isValid())
     {
         Function<void(Result)> complete = {[this](Result result) { onReconnectTransportShutdown(result); }};
-        Result                 shutdown = transportShutdown(move(complete));
+        transportCallbackDepth++;
+        Result shutdown = transportShutdown(move(complete));
+        transportCallbackDepth--;
         if (not shutdown)
         {
             reconnectPending = false;
@@ -485,7 +542,9 @@ Result HttpAsyncClient::beginExternalConnection()
     externalConnection.complete   = {[this](Result result) { completeTransportSetup(result); }};
     externalConnection.fail       = {[this](Result result) { fail(result); }};
 
+    transportCallbackDepth++;
     Result result = externalConnector(externalConnection);
+    transportCallbackDepth--;
     if (not result)
     {
         response.abortBodyStream();
@@ -550,7 +609,9 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
             return;
         }
 
+        transportCallbackDepth++;
         Result setupResult = transportSetup(setup);
+        transportCallbackDepth--;
         if (not setupResult)
         {
             fail(setupResult);
@@ -1189,7 +1250,9 @@ void HttpAsyncClient::closeConnection(bool preserveReconnectListeners)
     (void)connection->pipeline.unpipe();
     if (transportClose.isValid())
     {
+        transportCallbackDepth++;
         transportClose();
+        transportCallbackDepth--;
     }
     connection->readableSocketStream.destroy();
     connection->writableSocketStream.destroy();

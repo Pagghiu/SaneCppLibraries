@@ -314,6 +314,13 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::WebSocketFrameEmpty: formatter.append("WebSocket encoded frame is empty"); break;
     case HttpError::WebSocketHubFull: formatter.append("WebSocket hub has no free client slot"); break;
     case HttpError::WebSocketHubClientIndexInvalid: formatter.append("WebSocket hub client index is invalid"); break;
+    case HttpError::TransportOwnerRequired: formatter.append("Transport owner token is required"); break;
+    case HttpError::TransportAlreadyClaimed: formatter.append("Transport hooks already have an owner"); break;
+    case HttpError::TransportHooksAlreadyConfigured: formatter.append("Transport hooks are already configured"); break;
+    case HttpError::TransportOwnerMismatch: formatter.append("Transport owner does not match"); break;
+    case HttpError::TransportMutationRequiresQuiescence:
+        formatter.append("Transport mutation requires quiescence");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

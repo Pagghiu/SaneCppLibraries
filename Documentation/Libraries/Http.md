@@ -108,6 +108,13 @@ A transport adapter can also install a preflight hook. It runs after URL parsing
 activity, allowing transport-specific URL policy to fail without opening a connection. The later setup hook still owns
 stream replacement and asynchronous transport readiness after TCP connects.
 
+Transport adapters claim the complete callback group with a non-null, address-stable owner token. Every hook setter
+returns `Result` and accepts that token; another adapter or an unowned setter cannot replace claimed hooks.
+`clearTransportSetup(owner)` retains the claim; `releaseTransport(owner)` clears and releases it. Configure or release
+only after requests, keep-alive connections and pending cancellation have fully retired, never inside a transport
+callback. A server must be fully stopped, not merely stopping. Existing unowned setters use the default null token,
+but their results must now be checked. See [transport ownership](../../Architecture/Http/http-0008-own-transport-hooks-as-an-exclusive-group.md).
+
 Optional gzip/deflate response decoding is also a composition: the client inserts AsyncStreams transform streams when
 enabled, while the caller still consumes the decoded readable stream and provides the fixed storage used by the
 connection.

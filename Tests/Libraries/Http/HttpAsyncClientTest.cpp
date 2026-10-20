@@ -99,6 +99,65 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
 {
     HttpAsyncClientTest(SC::TestReport& report) : TestCase(report, "HttpAsyncClientTest")
     {
+        if (test_section("transport hook ownership"))
+        {
+            AsyncEventLoop loop;
+            SC_TEST_EXPECT(loop.create());
+            ClientConnection storage;
+            HttpAsyncClient  client;
+            SC_TEST_EXPECT(client.init(storage));
+            char firstOwner       = 0;
+            char replacementOwner = 0;
+            SC_TEST_EXPECT(
+                client.claimTransport(nullptr).isError(HttpResultCategory, HttpError::TransportOwnerRequired));
+            SC_TEST_EXPECT(client.claimTransport(&firstOwner));
+            SC_TEST_EXPECT(
+                client.claimTransport(&firstOwner).isError(HttpResultCategory, HttpError::TransportAlreadyClaimed));
+            SC_TEST_EXPECT(not client.claimTransport(&replacementOwner));
+            SC_TEST_EXPECT(client.setTransportPreflight({}, &firstOwner));
+            SC_TEST_EXPECT(client.clearTransportSetup(&firstOwner));
+            SC_TEST_EXPECT(not client.claimTransport(&replacementOwner));
+            unsigned calls           = 0;
+            Result   callbackRelease = Result(true);
+            struct Context
+            {
+                HttpAsyncClient& client;
+                const void*      owner;
+                unsigned&        calls;
+                Result&          release;
+            } context{client, &firstOwner, calls, callbackRelease};
+            SC_TEST_EXPECT(
+                client.setTransportPreflight({[&context](const HttpURLParser&) -> Result
+                                              {
+                                                  context.calls++;
+                                                  context.release = context.client.releaseTransport(context.owner);
+                                                  return fixtureError(HttpAsyncClientFixtureError::PreflightRejected);
+                                              }},
+                                             &firstOwner));
+            SC_TEST_EXPECT(client.setTransportPreflight({[](const HttpURLParser&) { return Result(true); }})
+                               .isError(HttpResultCategory, HttpError::TransportOwnerMismatch));
+            SC_TEST_EXPECT(not client.setTransportSetup({}, &replacementOwner));
+            SC_TEST_EXPECT(not client.setExternalConnector({}, &replacementOwner));
+            SC_TEST_EXPECT(not client.setTransportShutdown({}, &replacementOwner));
+            SC_TEST_EXPECT(not client.setTransportClose({}, &replacementOwner));
+            SC_TEST_EXPECT(not client.clearTransportSetup());
+            SC_TEST_EXPECT(not client.releaseTransport(&replacementOwner));
+            SC_TEST_EXPECT(client.get(loop, "http://not-resolvable.invalid/") ==
+                           fixtureError(HttpAsyncClientFixtureError::PreflightRejected));
+            SC_TEST_EXPECT(calls == 1);
+            SC_TEST_EXPECT(callbackRelease.isError(HttpResultCategory, HttpError::TransportMutationRequiresQuiescence));
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(client.releaseTransport(&firstOwner));
+            SC_TEST_EXPECT(client.claimTransport(&replacementOwner));
+            SC_TEST_EXPECT(not client.releaseTransport(&firstOwner));
+            SC_TEST_EXPECT(client.setTransportSetup({}, &replacementOwner));
+            SC_TEST_EXPECT(client.releaseTransport(&replacementOwner));
+            SC_TEST_EXPECT(client.setTransportClose({[] {}}));
+            SC_TEST_EXPECT(client.claimTransport(&firstOwner)
+                               .isError(HttpResultCategory, HttpError::TransportHooksAlreadyConfigured));
+            SC_TEST_EXPECT(client.clearTransportSetup());
+            SC_TEST_EXPECT(loop.close());
+        }
         if (test_section("collector completion lifetime"))
         {
             collectorCompletionLifetime();
@@ -460,6 +519,9 @@ void SC::HttpAsyncClientTest::basicGet()
 
     SC_TEST_EXPECT(client.get(loop, url.view()));
     //! [HttpAsyncClientBasicSnippet]
+
+    SC_TEST_EXPECT(
+        client.clearTransportSetup().isError(HttpResultCategory, HttpError::TransportMutationRequiresQuiescence));
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(loop.run());
@@ -1400,7 +1462,11 @@ void SC::HttpAsyncClientTest::keepAliveAndReconnect()
         {
             switch (deferredAction)
             {
-            case DeferredAction::RepeatFirstRequest: SC_ASSERT_RELEASE(client.get(loop, url1.view(), true)); break;
+            case DeferredAction::RepeatFirstRequest:
+                SC_ASSERT_RELEASE(client.clearTransportSetup().isError(HttpResultCategory,
+                                                                       HttpError::TransportMutationRequiresQuiescence));
+                SC_ASSERT_RELEASE(client.get(loop, url1.view(), true));
+                break;
             case DeferredAction::SecondOriginRequest: SC_ASSERT_RELEASE(client.get(loop, url2.view(), true)); break;
             case DeferredAction::StopServers:
                 SC_ASSERT_RELEASE(server1.stop());
@@ -1414,8 +1480,9 @@ void SC::HttpAsyncClientTest::keepAliveAndReconnect()
              completions, server1Requests, server2Requests, loop,    deferredStep};
 
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.setTransportShutdown({[&transportShutdown](Function<void(Result)> complete) -> Result
-                                 { return transportShutdown.start(move(complete)); }});
+    Function<Result(Function<void(Result)>)> shutdown = {[&transportShutdown](Function<void(Result)> complete) -> Result
+                                                         { return transportShutdown.start(move(complete)); }};
+    SC_TEST_EXPECT(client.setTransportShutdown(move(shutdown)));
     SC_TEST_EXPECT(StringBuilder::format(url1, "http://127.0.0.1:{}/first", port1));
     SC_TEST_EXPECT(StringBuilder::format(url2, "http://127.0.0.1:{}/second", port2));
 
@@ -1530,7 +1597,8 @@ void SC::HttpAsyncClientTest::transportSetupHookDefersRequest()
     };
 
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.setTransportSetup({[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }});
+    SC_TEST_EXPECT(client.setTransportSetup(
+        {[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }}));
     SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/deferred", port));
 
     client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
@@ -1568,18 +1636,20 @@ void SC::HttpAsyncClientTest::transportPreflightRejectsBeforeDNS()
 
     bool preflightCalled = false;
     bool setupCalled     = false;
-    client.setTransportPreflight({[&preflightCalled](const HttpURLParser& url) -> Result
-                                  {
-                                      preflightCalled = true;
-                                      if (url.hostname != "not-resolvable.invalid")
-                                          return fixtureError(HttpAsyncClientFixtureError::UnexpectedUrl);
-                                      return fixtureError(HttpAsyncClientFixtureError::PreflightRejected);
-                                  }});
-    client.setTransportSetup({[&setupCalled](HttpAsyncClientTransportSetup&) -> Result
-                              {
-                                  setupCalled = true;
-                                  return fixtureError(HttpAsyncClientFixtureError::UnexpectedTransportSetup);
-                              }});
+    SC_TEST_EXPECT(
+        client.setTransportPreflight({[&preflightCalled](const HttpURLParser& url) -> Result
+                                      {
+                                          preflightCalled = true;
+                                          if (url.hostname != "not-resolvable.invalid")
+                                              return fixtureError(HttpAsyncClientFixtureError::UnexpectedUrl);
+                                          return fixtureError(HttpAsyncClientFixtureError::PreflightRejected);
+                                      }}));
+    SC_TEST_EXPECT(client.setTransportSetup({[&setupCalled](HttpAsyncClientTransportSetup&) -> Result
+                                             {
+                                                 setupCalled = true;
+                                                 return fixtureError(
+                                                     HttpAsyncClientFixtureError::UnexpectedTransportSetup);
+                                             }}));
 
     const Result result = client.get(loop, "https://not-resolvable.invalid/");
     SC_TEST_EXPECT(result.isError(HttpAsyncClientFixtureCategory, HttpAsyncClientFixtureError::PreflightRejected));
@@ -1682,13 +1752,14 @@ void SC::HttpAsyncClientTest::externalConnectorOwnsConnectionEstablishment()
     };
 
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.setExternalConnector(
-        {[&context](HttpAsyncClientExternalConnection& request) -> Result { return context.onConnect(request); }});
-    client.setTransportSetup({[&context](HttpAsyncClientTransportSetup&) -> Result
-                              {
-                                  context.setupCalled = true;
-                                  return fixtureError(HttpAsyncClientFixtureError::UnexpectedTransportSetup);
-                              }});
+    SC_TEST_EXPECT(client.setExternalConnector(
+        {[&context](HttpAsyncClientExternalConnection& request) -> Result { return context.onConnect(request); }}));
+    SC_TEST_EXPECT(client.setTransportSetup({[&context](HttpAsyncClientTransportSetup&) -> Result
+                                             {
+                                                 context.setupCalled = true;
+                                                 return fixtureError(
+                                                     HttpAsyncClientFixtureError::UnexpectedTransportSetup);
+                                             }}));
 
     String url = StringEncoding::Ascii;
     SC_TEST_EXPECT(StringBuilder::format(url, "http://not-resolvable.invalid:{}/external", port));
@@ -1729,20 +1800,21 @@ void SC::HttpAsyncClientTest::externalConnectorSynchronousFailureIsReusable()
     uint32_t errorCallbacks  = 0;
     uint32_t transportCloses = 0;
     bool     transportOwned  = false;
-    client.setExternalConnector({[&connectorCalls, &transportOwned](HttpAsyncClientExternalConnection&) -> Result
-                                 {
-                                     connectorCalls++;
-                                     transportOwned = true;
-                                     return fixtureError(HttpAsyncClientFixtureError::ExternalConnectorRejected);
-                                 }});
-    client.setTransportClose({[&transportCloses, &transportOwned]
-                              {
-                                  if (transportOwned)
-                                  {
-                                      transportCloses++;
-                                      transportOwned = false;
-                                  }
-                              }});
+    SC_TEST_EXPECT(
+        client.setExternalConnector({[&connectorCalls, &transportOwned](HttpAsyncClientExternalConnection&) -> Result
+                                     {
+                                         connectorCalls++;
+                                         transportOwned = true;
+                                         return fixtureError(HttpAsyncClientFixtureError::ExternalConnectorRejected);
+                                     }}));
+    SC_TEST_EXPECT(client.setTransportClose({[&transportCloses, &transportOwned]
+                                             {
+                                                 if (transportOwned)
+                                                 {
+                                                     transportCloses++;
+                                                     transportOwned = false;
+                                                 }
+                                             }}));
     client.onError = [&errorCallbacks](Result) { errorCallbacks++; };
 
     const Result first = client.get(loop, "http://example.invalid/first");
@@ -1821,7 +1893,8 @@ void SC::HttpAsyncClientTest::httpsTransportSetupHookDispatch()
     };
 
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.setTransportSetup({[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }});
+    SC_TEST_EXPECT(client.setTransportSetup(
+        {[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }}));
     SC_TEST_EXPECT(StringBuilder::format(url, "https://127.0.0.1:{}/hook", port));
 
     client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
@@ -1894,7 +1967,8 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
     httpServer.onRequest = [this](HttpConnection&) { SC_TEST_EXPECT(false); };
 
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.setTransportSetup({[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }});
+    SC_TEST_EXPECT(client.setTransportSetup(
+        {[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }}));
     SC_TEST_EXPECT(StringBuilder::format(url, "https://127.0.0.1:{}/tls-error", port));
 
     client.onResponse = [this](HttpAsyncClientResponse&) { SC_TEST_EXPECT(false); };
@@ -1965,8 +2039,8 @@ void SC::HttpAsyncClientTest::httpsTransportFailureAfterSetup()
     httpServer.onRequest = [](HttpConnection&) {};
 
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.setTransportSetup(
-        {[&context](HttpAsyncClientTransportSetup& setup) -> Result { return context.onSetup(setup); }});
+    SC_TEST_EXPECT(client.setTransportSetup(
+        {[&context](HttpAsyncClientTransportSetup& setup) -> Result { return context.onSetup(setup); }}));
 
     client.onResponse = [this](HttpAsyncClientResponse&) { SC_TEST_EXPECT(false); };
     client.onError    = [this, &context](Result result)

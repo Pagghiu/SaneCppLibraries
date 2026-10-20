@@ -129,6 +129,46 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
 {
     HttpAsyncServerTest(SC::TestReport& report) : TestCase(report, "HttpAsyncServerTest")
     {
+        if (test_section("transport hook ownership"))
+        {
+            HttpAsyncServer server;
+            using Connection = HttpAsyncConnection<2, 2, 1024, 1024>;
+            Connection storage[1];
+            SC_TEST_EXPECT(server.init(Span<Connection>(storage)));
+            char firstOwner       = 0;
+            char replacementOwner = 0;
+            SC_TEST_EXPECT(
+                server.claimTransport(nullptr).isError(HttpResultCategory, HttpError::TransportOwnerRequired));
+            SC_TEST_EXPECT(server.claimTransport(&firstOwner));
+            SC_TEST_EXPECT(not server.claimTransport(&firstOwner));
+            SC_TEST_EXPECT(not server.claimTransport(&replacementOwner));
+            SC_TEST_EXPECT(not server.setTransportSetup({}));
+            SC_TEST_EXPECT(not server.setTransportReuse({}, &replacementOwner));
+            SC_TEST_EXPECT(not server.setTransportShutdown({}, &replacementOwner));
+            SC_TEST_EXPECT(not server.setTransportClose({}, &replacementOwner));
+            SC_TEST_EXPECT(not server.clearTransportSetup());
+            SC_TEST_EXPECT(server.clearTransportSetup(&firstOwner));
+            SC_TEST_EXPECT(not server.claimTransport(&replacementOwner));
+            AsyncEventLoop loop;
+            SC_TEST_EXPECT(loop.create());
+            SC_TEST_EXPECT(server.startExternal(loop));
+            SC_TEST_EXPECT(server.releaseTransport(&firstOwner)
+                               .isError(HttpResultCategory, HttpError::TransportMutationRequiresQuiescence));
+            SC_TEST_EXPECT(server.stop());
+            SC_TEST_EXPECT(server.releaseTransport(&firstOwner)
+                               .isError(HttpResultCategory, HttpError::TransportMutationRequiresQuiescence));
+            SC_TEST_EXPECT(server.close());
+            SC_TEST_EXPECT(server.releaseTransport(&firstOwner));
+            SC_TEST_EXPECT(server.claimTransport(&replacementOwner));
+            SC_TEST_EXPECT(not server.releaseTransport(&firstOwner));
+            SC_TEST_EXPECT(server.setTransportClose({}, &replacementOwner));
+            SC_TEST_EXPECT(server.releaseTransport(&replacementOwner));
+            SC_TEST_EXPECT(server.setTransportClose({[](HttpConnection&) {}}));
+            SC_TEST_EXPECT(server.claimTransport(&firstOwner)
+                               .isError(HttpResultCategory, HttpError::TransportHooksAlreadyConfigured));
+            SC_TEST_EXPECT(server.clearTransportSetup());
+            SC_TEST_EXPECT(loop.close());
+        }
         if (test_section("HttpAsyncServer"))
         {
             httpAsyncServerTest();

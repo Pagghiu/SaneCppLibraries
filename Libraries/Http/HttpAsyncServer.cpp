@@ -4,6 +4,52 @@
 
 namespace SC
 {
+Result HttpAsyncServer::checkTransportQuiescence() const
+{
+    return (state == State::Stopped and transportCallbackDepth == 0 and asyncServerAccept.isFree() and
+            connections.getNumActiveConnections() == 0)
+               ? Result(true)
+               : Result::Error(HttpResultCategory, HttpError::TransportMutationRequiresQuiescence);
+}
+
+Result HttpAsyncServer::checkTransportMutation(const void* owner) const
+{
+    SC_TRY((owner == transportOwner) ? Result(true)
+                                     : Result::Error(HttpResultCategory, HttpError::TransportOwnerMismatch));
+    return checkTransportQuiescence();
+}
+
+Result HttpAsyncServer::claimTransport(const void* owner)
+{
+    SC_TRY(owner != nullptr ? Result(true) : Result::Error(HttpResultCategory, HttpError::TransportOwnerRequired));
+    SC_TRY(transportOwner == nullptr ? Result(true)
+                                     : Result::Error(HttpResultCategory, HttpError::TransportAlreadyClaimed));
+    SC_TRY(checkTransportQuiescence());
+    SC_TRY((not transportSetup.isValid() and not transportReuse.isValid() and not transportShutdown.isValid() and
+            not transportClose.isValid())
+               ? Result(true)
+               : Result::Error(HttpResultCategory, HttpError::TransportHooksAlreadyConfigured));
+    transportOwner = owner;
+    return Result(true);
+}
+
+Result HttpAsyncServer::clearTransportSetup(const void* owner)
+{
+    SC_TRY(checkTransportMutation(owner));
+    transportSetup    = {};
+    transportReuse    = {};
+    transportShutdown = {};
+    transportClose    = {};
+    return Result(true);
+}
+
+Result HttpAsyncServer::releaseTransport(const void* owner)
+{
+    SC_TRY(owner != nullptr ? Result(true) : Result::Error(HttpResultCategory, HttpError::TransportOwnerRequired));
+    SC_TRY(clearTransportSetup(owner));
+    transportOwner = nullptr;
+    return Result(true);
+}
 
 Result HttpAsyncServer::initInternal(SpanWithStride<HttpConnection> connectionsSpan)
 {
@@ -275,7 +321,10 @@ Result HttpAsyncServer::beginTransportConnection(HttpConnection& client)
                       }
                       closeAsync(client);
                   }};
-    return transportSetup(setup);
+    transportCallbackDepth++;
+    Result result = transportSetup(setup);
+    transportCallbackDepth--;
+    return result;
 }
 
 void HttpAsyncServer::onTransportSetupComplete(HttpConnection& client, Result result)
@@ -406,7 +455,9 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                     }
                     else if (pself.transportReuse.isValid())
                     {
+                        pself.transportCallbackDepth++;
                         Result reuseResult = pself.transportReuse(client);
+                        pself.transportCallbackDepth--;
                         if (not reuseResult)
                         {
                             if (pself.onError.isValid())
@@ -497,7 +548,9 @@ void HttpAsyncServer::shutdownTransport(HttpConnection& client)
                                            }
                                            closeAsync(client);
                                        }};
-    Result                 shutdown = transportShutdown(client, move(complete));
+    transportCallbackDepth++;
+    Result shutdown = transportShutdown(client, move(complete));
+    transportCallbackDepth--;
     if (not shutdown)
     {
         if (onError.isValid())
@@ -597,7 +650,9 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
 
     if (transportClose.isValid())
     {
+        transportCallbackDepth++;
         transportClose(client);
+        transportCallbackDepth--;
     }
     if (not readable->hasBeenDestroyed())
     {

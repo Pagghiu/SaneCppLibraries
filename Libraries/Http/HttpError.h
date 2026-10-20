@@ -211,6 +211,11 @@ enum class HttpError : uint32_t
     WebSocketFrameEmpty,
     WebSocketHubFull,
     WebSocketHubClientIndexInvalid,
+    TransportOwnerRequired,
+    TransportAlreadyClaimed,
+    TransportHooksAlreadyConfigured,
+    TransportOwnerMismatch,
+    TransportMutationRequiresQuiescence,
 };
 
 /// @brief Stable category assigned to Http-owned errors.

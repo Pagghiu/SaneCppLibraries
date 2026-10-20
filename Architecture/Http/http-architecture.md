@@ -71,6 +71,8 @@ Do not model `Http` after heap-backed web frameworks, full-message AST parsers, 
 
 ## Decision Log
 
+- [HTTP-0008 - Own transport hooks as an exclusive group](http-0008-own-transport-hooks-as-an-exclusive-group.md)
+
 - [HTTP-0001 - Keep HTTP on caller-provided async connection storage](http-0001-keep-http-on-caller-provided-async-connection-storage.md)
 - [HTTP-0002 - Share incoming/outgoing message cores across server and async client](http-0002-share-incoming-outgoing-message-cores-across-server-and-async-client.md)
 - [HTTP-0003 - Keep HTTP parser and body framing incremental, not AST-based](http-0003-keep-http-parser-and-body-framing-incremental-not-ast-based.md)

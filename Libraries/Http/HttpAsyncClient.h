@@ -198,49 +198,68 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     ///
     /// The hook can leave the socket streams active for plain HTTP, or install alternate active streams and complete
     /// later. This keeps TLS and other transport adapters outside the core Http library.
-    void setTransportSetup(Function<Result(HttpAsyncClientTransportSetup&)>&& setup) { transportSetup = move(setup); }
+    Result setTransportSetup(Function<Result(HttpAsyncClientTransportSetup&)>&& setup, const void* owner = nullptr)
+    {
+        SC_TRY(checkTransportMutation(owner));
+        transportSetup = move(setup);
+        return Result(true);
+    }
 
     /// @brief Sets an optional transport policy hook invoked after URL parsing and before DNS or socket activity.
     ///
     /// This hook can reject URL forms that a transport adapter cannot represent safely. It must not retain the parser.
-    void setTransportPreflight(Function<Result(const HttpURLParser&)>&& preflight)
+    Result setTransportPreflight(Function<Result(const HttpURLParser&)>&& preflight, const void* owner = nullptr)
     {
+        SC_TRY(checkTransportMutation(owner));
         transportPreflight = move(preflight);
+        return Result(true);
     }
 
     /// @brief Sets an optional connector that owns DNS and connection establishment for future requests.
     ///
     /// When configured, Http invokes it after URL parsing and before any socket activity. The connector must install
     /// ready plaintext streams and complete the request asynchronously or synchronously.
-    void setExternalConnector(Function<Result(HttpAsyncClientExternalConnection&)>&& connector)
+    Result setExternalConnector(Function<Result(HttpAsyncClientExternalConnection&)>&& connector,
+                                const void*                                            owner = nullptr)
     {
+        SC_TRY(checkTransportMutation(owner));
         externalConnector = move(connector);
+        return Result(true);
     }
 
     /// @brief Sets an optional transport teardown hook invoked before HTTP destroys the connected socket streams.
     ///
     /// An adapter that installs alternate transport streams must release its listeners and state from this hook.
-    void setTransportClose(Function<void()>&& close) { transportClose = move(close); }
+    Result setTransportClose(Function<void()>&& close, const void* owner = nullptr)
+    {
+        SC_TRY(checkTransportMutation(owner));
+        transportClose = move(close);
+        return Result(true);
+    }
 
     /// @brief Sets an optional asynchronous hook that drains a transport before reconnecting to another origin.
     ///
     /// The hook must call `complete` exactly once after pending transport output has reached the underlying stream.
     /// Returning an error rejects the reconnect synchronously and means `complete` will not be called. The completion
     /// callback becomes invalid when the transport close hook runs and must then be discarded without invocation.
-    void setTransportShutdown(Function<Result(Function<void(Result)>)>&& shutdown)
+    Result setTransportShutdown(Function<Result(Function<void(Result)>)>&& shutdown, const void* owner = nullptr)
     {
+        SC_TRY(checkTransportMutation(owner));
         transportShutdown = move(shutdown);
+        return Result(true);
     }
 
     /// @brief Clears the optional transport setup hook and restores default socket transport setup.
-    void clearTransportSetup()
-    {
-        transportPreflight = {};
-        externalConnector  = {};
-        transportSetup     = {};
-        transportShutdown  = {};
-        transportClose     = {};
-    }
+    Result clearTransportSetup(const void* owner = nullptr);
+
+    /// @brief Claims the complete transport hook group on a quiescent client without existing hooks or an owner.
+    /// The non-null token must remain address-stable until release and completion of adapter callbacks. Serialize
+    /// configuration on the owning loop thread; mutation/release inside transport callbacks is rejected.
+    Result claimTransport(const void* owner);
+
+    /// @brief Clears hooks and releases only the matching owner's claim on a quiescent client.
+    /// A live idle keep-alive connection is not quiescent. Clear alone retains ownership.
+    Result releaseTransport(const void* owner);
 
     /// @brief Hands the connected socket streams to a WebSocket owner after a validated `101` response.
     Result detachWebSocketTransport(HttpWebSocketTransportView& transport);
@@ -303,6 +322,9 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     Function<void(Result)> onError;
 
   private:
+    Result checkTransportMutation(const void* owner) const;
+    Result checkTransportQuiescence() const;
+
     struct RequestPreset
     {
         enum class BodyMode : uint8_t
@@ -407,6 +429,10 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     Function<Result(HttpAsyncClientTransportSetup&)>     transportSetup;
     Function<Result(Function<void(Result)>)>             transportShutdown;
     Function<void()>                                     transportClose;
+
+    const void* transportOwner = nullptr;
+
+    uint32_t transportCallbackDepth = 0;
 
     State state = State::Idle;
 

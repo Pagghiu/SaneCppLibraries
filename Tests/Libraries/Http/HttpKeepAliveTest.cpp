@@ -98,20 +98,22 @@ void SC::HttpKeepAliveTest::runScenario(uint16_t port, int requests, bool defaul
     } ctx = {loop,         server,   client,           collector,        url,
              deferredStep, requests, responseOverride, defaultKeepAlive, terminal};
 
-    server.setTransportSetup({[&ctx](HttpAsyncServerTransportSetup& setup) -> Result
-                              {
-                                  ctx.accepted++;
-                                  ctx.acceptedConnection = setup.connection;
-                                  setup.complete(Result(true));
-                                  return Result(true);
-                              }});
-    server.setTransportShutdown({[&ctx](HttpConnection& connection, Function<void(Result)> complete) -> Result
-                                 {
-                                     ctx.shutdowns++;
-                                     ctx.shutdownOrdinal = static_cast<int>(connection.requestCount + 1);
-                                     complete(Result(true));
-                                     return Result(true);
-                                 }});
+    SC_TEST_EXPECT(server.setTransportSetup({[&ctx](HttpAsyncServerTransportSetup& setup) -> Result
+                                             {
+                                                 ctx.accepted++;
+                                                 ctx.acceptedConnection = setup.connection;
+                                                 setup.complete(Result(true));
+                                                 return Result(true);
+                                             }}));
+    Function<Result(HttpConnection&, Function<void(Result)>)> shutdown = {
+        [&ctx](HttpConnection& connection, Function<void(Result)> complete) -> Result
+        {
+            ctx.shutdowns++;
+            ctx.shutdownOrdinal = static_cast<int>(connection.requestCount + 1);
+            complete(Result(true));
+            return Result(true);
+        }};
+    SC_TEST_EXPECT(server.setTransportShutdown(move(shutdown)));
     server.onRequest = [this, &ctx](HttpConnection& connection)
     {
         SC_TEST_EXPECT(ctx.accepted == 1);

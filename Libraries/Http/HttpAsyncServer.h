@@ -102,29 +102,50 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     [[nodiscard]] uint32_t getMaxHeaderSize() const { return maxHeaderSize; }
 
     /// @brief Sets an optional transport setup hook invoked after accepting TCP and before HTTP reads request bytes.
-    void setTransportSetup(Function<Result(HttpAsyncServerTransportSetup&)>&& setup) { transportSetup = move(setup); }
+    Result setTransportSetup(Function<Result(HttpAsyncServerTransportSetup&)>&& setup, const void* owner = nullptr)
+    {
+        SC_TRY(checkTransportMutation(owner));
+        transportSetup = move(setup);
+        return Result(true);
+    }
 
     /// @brief Sets an optional transport teardown hook invoked before HTTP destroys the installed transport streams.
     /// The hook may start asynchronous stream destruction but must not reset the connection's transport streams.
-    void setTransportClose(Function<void(HttpConnection&)>&& close) { transportClose = move(close); }
+    Result setTransportClose(Function<void(HttpConnection&)>&& close, const void* owner = nullptr)
+    {
+        SC_TRY(checkTransportMutation(owner));
+        transportClose = move(close);
+        return Result(true);
+    }
 
     /// @brief Sets an optional hook that reopens an alternate writable transport for the next keep-alive response.
-    void setTransportReuse(Function<Result(HttpConnection&)>&& reuse) { transportReuse = move(reuse); }
+    Result setTransportReuse(Function<Result(HttpConnection&)>&& reuse, const void* owner = nullptr)
+    {
+        SC_TRY(checkTransportMutation(owner));
+        transportReuse = move(reuse);
+        return Result(true);
+    }
 
     /// @brief Sets an optional asynchronous hook that drains a terminal response before closing its socket.
-    void setTransportShutdown(Function<Result(HttpConnection&, Function<void(Result)>)>&& shutdown)
+    Result setTransportShutdown(Function<Result(HttpConnection&, Function<void(Result)>)>&& shutdown,
+                                const void*                                                 owner = nullptr)
     {
+        SC_TRY(checkTransportMutation(owner));
         transportShutdown = move(shutdown);
+        return Result(true);
     }
 
     /// @brief Clears optional transport setup, reuse, shutdown, and teardown hooks.
-    void clearTransportSetup()
-    {
-        transportSetup    = {};
-        transportReuse    = {};
-        transportShutdown = {};
-        transportClose    = {};
-    }
+    Result clearTransportSetup(const void* owner = nullptr);
+
+    /// @brief Claims the transport hook group with a non-null address-stable owner token.
+    /// Requires a fully stopped server, no existing hooks/owner and no transport callback dispatch. Configuration
+    /// is serialized on the owning loop thread; retain the token through release and adapter callback completion.
+    Result claimTransport(const void* owner);
+
+    /// @brief Clears hooks and releases only the matching owner's claim after complete server teardown.
+    /// Clear alone retains ownership; Stopping is not quiescent.
+    Result releaseTransport(const void* owner);
 
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return state == State::Started; }
@@ -153,6 +174,9 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     [[nodiscard]] uint32_t getMaxRequestsPerConnection() const { return maxRequestsPerConnection; }
 
   private:
+    Result checkTransportMutation(const void* owner) const;
+    Result checkTransportQuiescence() const;
+
     HttpConnectionsPool connections;
 
     uint32_t maxHeaderSize = 8 * 1024;
@@ -161,6 +185,10 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     Function<Result(HttpConnection&)>                         transportReuse;
     Function<Result(HttpConnection&, Function<void(Result)>)> transportShutdown;
     Function<void(HttpConnection&)>                           transportClose;
+
+    const void* transportOwner = nullptr;
+
+    uint32_t transportCallbackDepth = 0;
 
     enum class State
     {
