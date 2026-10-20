@@ -125,15 +125,11 @@ Result runDemo(bool failFile, uint16_t port)
     const StringSpan first  = "_Build/AsyncExecutionDemo-Linux-first.txt";
     const StringSpan second = "_Build/AsyncExecutionDemo-Linux-second.txt";
 #endif
-    AsyncExecutionBuffer input;
-    SC_TRY(input.resize(32768));
-    for (size_t i = 0; i < input.size(); ++i)
-        input.bytes()[i] = Message[i % (sizeof(Message) - 1)];
-    SC_TRY(app.run(app.writeFile(first, move(input))));
-    SC_TRY(input.resize(32767));
-    for (size_t i = 0; i < input.size(); ++i)
-        input.bytes()[i] = Message[i % (sizeof(Message) - 1)];
-    SC_TRY(app.run(app.writeFile(second, move(input))));
+    char input[32768];
+    for (size_t i = 0; i < sizeof(input); ++i)
+        input[i] = Message[i % (sizeof(Message) - 1)];
+    SC_TRY(app.run(app.writeFile(first, input)));
+    SC_TRY(app.run(app.writeFile(second, {input, sizeof(input) - 1})));
     LoopbackPeer firstPeer(port, 32768), secondPeer(static_cast<uint16_t>(port + 1), 32767);
     SC_TRY(firstPeer.start());
     const Result secondStarted = secondPeer.start();
@@ -145,25 +141,29 @@ Result runDemo(bool failFile, uint16_t port)
 
     const auto  ownerThread       = Thread::CurrentThreadID();
     Atomic<int> encodersOnWorkers = 0;
-    auto        encode = [&](AsyncExecutionBuffer data) noexcept -> AsyncExecutionValueResult<AsyncExecutionBuffer>
+    struct TransferBuffers
     {
-        if (Thread::CurrentThreadID() != ownerThread)
-            encodersOnWorkers.fetch_add(1);
-        return base64Encode(move(data));
-    };
-
+        char input[32768];
+        char encoded[43692];
+    } storage[2];
     static_assert(std::is_nothrow_move_constructible_v<AsyncExecutionConnection>);
-    static_assert(std::is_nothrow_move_constructible_v<AsyncExecutionValueResult<AsyncExecutionBuffer>>);
-    // Presentation snippet: each transfer is sequential; when_all runs the two transfers concurrently.
-    auto sendEncoded = [&](StringSpan file, uint16_t destination)
+    // Separate payload records; the graph owns execution state and borrows these arrays until run completes.
+    auto sendEncoded = [&](StringSpan file, TransferBuffers& buffers, uint16_t destination)
     {
-        return app.readFile(file) | ex::on(app.getPoolScheduler(), SC::tryThen(encode)) |
-               ex::let_value([&, destination](auto& encoded) noexcept
-                             { return app.sendTCP("127.0.0.1", destination, move(encoded)); });
+        return app.readFile(file, buffers.input) |
+               ex::on(app.getPoolScheduler(), SC::tryThen(
+                                                  [&](Span<const char> bytes) noexcept
+                                                  {
+                                                      if (Thread::CurrentThreadID() != ownerThread)
+                                                          encodersOnWorkers.fetch_add(1);
+                                                      return base64Encode(bytes, buffers.encoded);
+                                                  })) |
+               ex::let_value([&, destination](Span<const char>& encoded) noexcept
+                             { return app.sendTCP("127.0.0.1", destination, encoded); });
     };
     const StringSpan missing = "_Build/AsyncExecutionDemo-does-not-exist.txt";
-    const Result     result  = app.run(ex::when_all(sendEncoded(failFile ? missing : first, port),
-                                                    sendEncoded(second, static_cast<uint16_t>(port + 1))));
+    const Result     result  = app.run(ex::when_all(sendEncoded(failFile ? missing : first, storage[0], port),
+                                                    sendEncoded(second, storage[1], static_cast<uint16_t>(port + 1))));
 
     SC_TRY(firstPeer.join());
     SC_TRY(secondPeer.join());

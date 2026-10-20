@@ -1526,28 +1526,6 @@ struct AsyncExecutionExternalCompletionSender
     }
 };
 
-/// Move-only owned bytes. Allocation failures are Result errors; no C++ exceptions are used.
-struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionBuffer
-{
-    AsyncExecutionBuffer() = default;
-
-    AsyncExecutionBuffer(const AsyncExecutionBuffer&)            = delete;
-    AsyncExecutionBuffer& operator=(const AsyncExecutionBuffer&) = delete;
-
-    AsyncExecutionBuffer(AsyncExecutionBuffer&& other) noexcept;
-    AsyncExecutionBuffer& operator=(AsyncExecutionBuffer&& other) noexcept;
-    ~AsyncExecutionBuffer();
-    Result           resize(size_t bytes);
-    Span<char>       bytes() noexcept { return {memory, length}; }
-    Span<const char> bytes() const noexcept { return {memory, length}; }
-    size_t           size() const noexcept { return length; }
-
-  private:
-    char*  memory   = nullptr;
-    size_t length   = 0;
-    size_t capacity = 0;
-};
-
 /// Owning connection value with a nothrow transfer contract for standard sender composition.
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionConnection
 {
@@ -1688,44 +1666,18 @@ auto tryThen(Sender&& sender, Procedure procedure)
 
 namespace detail
 {
-struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionOwnedRead
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionReadFile
 {
     using Request = AsyncLoopWork;
-    using Value   = AsyncExecutionBuffer;
-    ThreadPool&          pool;
-    StringPath           path;
-    Result               initialization{true};
-    AsyncExecutionBuffer data;
-    size_t               maximumBytes;
+    using Value   = Span<const char>;
+    ThreadPool& pool;
+    StringPath  path;
+    Result      initialization{true};
+    Span<char>  destination;
+    size_t      used = 0;
 
     Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&);
-    Value  value(Request::Result&) { return move(data); }
-};
-
-template <typename Procedure>
-struct AsyncExecutionOwnedTransform
-{
-    using Request = AsyncLoopWork;
-    using Value   = AsyncExecutionBuffer;
-    ThreadPool&          pool;
-    AsyncExecutionBuffer data;
-    Procedure            procedure;
-    Result               submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&)
-    {
-        SC_TRY(request.setThreadPool(pool));
-        request.work = [this]() -> Result
-        {
-            if constexpr (std::is_void_v<decltype(procedure(data))>)
-            {
-                procedure(data);
-                return Result(true);
-            }
-            else
-                return procedure(data);
-        };
-        return request.start(loop);
-    }
-    Value value(Request::Result&) { return move(data); }
+    Value  value(Request::Result&) { return {destination.data(), used}; }
 };
 
 template <typename Procedure>
@@ -1785,16 +1737,16 @@ struct AsyncExecutionOwnedCompute
     }
 };
 
-struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionOwnedWrite
+struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionWriteFile
 {
     using Request = AsyncLoopWork;
     using Value   = AsyncCompletionData;
-    ThreadPool&          pool;
-    StringPath           path;
-    Result               initialization{true};
-    AsyncExecutionBuffer data;
-    Result               submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&);
-    static Value         value(Request::Result&) { return {}; }
+    ThreadPool&      pool;
+    StringPath       path;
+    Result           initialization{true};
+    Span<const char> data;
+    Result           submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&);
+    static Value     value(Request::Result&) { return {}; }
 };
 
 SC_ASYNC_EXECUTION_EXPORT Result AsyncExecutionResolvePath(StringSpan path, StringPath& output);
@@ -1810,28 +1762,12 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionOwnedConnect
     Value            value(Request::Result&) { return Value(move(socket)); }
 };
 
-struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionOwnedSend
-{
-    using Request = AsyncSocketSend;
-    using Value   = size_t;
-    AsyncExecutionBuffer  data;
-    AsyncExecutionSendAll send;
-    AsyncExecutionOwnedSend(const SocketDescriptor& socket, AsyncExecutionBuffer data)
-        : data(move(data)), send{socket, this->data.bytes()}
-    {}
-    Result submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task);
-    Result advance(Request::Result& result) { return send.advance(result); }
-    bool   hasRemaining() const { return send.hasRemaining(); }
-    bool   completesImmediately() const { return send.completesImmediately(); }
-    Value  immediateValue() const { return send.immediateValue(); }
-    Value  value(Request::Result& result) { return send.value(result); }
-};
 struct SC_ASYNC_EXECUTION_EXPORT AsyncExecutionSendConnected
 {
     AsyncExecutionContext* context;
-    AsyncExecutionBuffer   data;
+    Span<const char>       data;
 
-    AsyncExecutionSender<AsyncExecutionOwnedSend> operator()(AsyncExecutionConnection& connection) noexcept;
+    AsyncExecutionSender<AsyncExecutionSendAll> operator()(AsyncExecutionConnection& connection) noexcept;
 };
 using AsyncExecutionTCPSender = decltype(AsyncExecutionProtocol::let_value(
     std::declval<AsyncExecutionSender<AsyncExecutionOwnedConnect>>(), std::declval<AsyncExecutionSendConnected>()));
@@ -1857,20 +1793,14 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
 
     AsyncExecutionSender<detail::AsyncExecutionTimer> sleep(TimeMs duration);
 
-    AsyncExecutionSender<detail::AsyncExecutionOwnedRead> readFile(StringSpan path,
-                                                                   size_t     maximumBytes = 64 * 1024 * 1024);
+    /// Whole file through observed EOF. Borrows destination through completion; overflow reports FileTooLarge.
+    /// Failure/stop can modify a prefix. Close completes before delivery; concurrent file changes are not a snapshot.
+    AsyncExecutionSender<detail::AsyncExecutionReadFile> readFile(StringSpan path, Span<char> destination);
 
-    AsyncExecutionSender<detail::AsyncExecutionOwnedWrite> writeFile(StringSpan path, AsyncExecutionBuffer data);
+    AsyncExecutionSender<detail::AsyncExecutionWriteFile> writeFile(StringSpan path, Span<const char> data);
 
     /// SC extension: run the body on the owned pool and complete on this runtime's owner loop.
     /// Standard on restores the caller's scheduler; schedule(pool) continues on a worker.
-    template <typename Procedure>
-    auto onPool(AsyncExecutionBuffer data, Procedure procedure)
-    {
-        using Setup = detail::AsyncExecutionOwnedTransform<Procedure>;
-        return AsyncExecutionSender<Setup>{context, {pool, move(data), move(procedure)}};
-    }
-
     template <typename Procedure>
     auto onPool(Procedure procedure)
     {
@@ -1880,7 +1810,7 @@ struct SC_ASYNC_EXECUTION_EXPORT AsyncExecution
 
     AsyncExecutionSender<detail::AsyncExecutionOwnedConnect> connectTCP(StringSpan host, uint16_t port);
 
-    detail::AsyncExecutionTCPSender sendTCP(StringSpan host, uint16_t port, AsyncExecutionBuffer data);
+    detail::AsyncExecutionTCPSender sendTCP(StringSpan host, uint16_t port, Span<const char> data);
 
     AsyncExecutionContext& getContext() noexcept { return context; }
 

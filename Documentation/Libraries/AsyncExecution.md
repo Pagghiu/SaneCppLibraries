@@ -71,9 +71,8 @@ choosing pipe handles or default addressing. `runInto` is an owner-thread consum
 with no other active consumer; an application already driving the loop uses connect/start instead.
 
 Borrowed native-operation connected storage contains its request; pool scheduling embeds its task node.
-These paths avoid a separate per-request heap ticket. Owning paths/buffers and whole-file conveniences may
-allocate. Scopes allocate connected nodes, with optional caller allocator callbacks. Arbitrary provider algorithms
-have their own allocation behavior: the complete library has no blanket no-allocation guarantee.
+Payloads always belong to the application. Paths are copied into bounded inline storage. Scope root storage
+has its own policy; provider/user algorithms and OS resources retain their own allocation requirements.
 
 # Move CPU work to the pool
 
@@ -110,49 +109,63 @@ promised worker affinity. The [scheduling reference](@ref library_async_executio
 Use `then` when your callable returns a value. Use `let_value` when it returns another sender: the returned
 asynchronous operation becomes part of the graph, and its input values stay alive until it completes.
 
-# Read, encode and write a file
+# Read, encode and send
 
-The owning runtime provides whole-file conveniences with owned buffers. This pipeline reads a file,
-encodes it on a worker, then writes the result:
-
-```cpp
-auto encodeFile = app.readFile("input.txt")
-    | ex::on(app.getPoolScheduler(), SC::tryThen(base64Encode))
-    | ex::let_value([&](auto& encoded) noexcept {
-          return app.writeFile("encoded.txt", SC::move(encoded));
-      });
-
-SC_TRY(app.run(SC::move(encodeFile)));
-```
-
-Include `Examples/AsyncExecutionDemo/Base64.h` for the example's `base64Encode` helper. It returns
-`AsyncExecutionValueResult<AsyncExecutionBuffer>`, containing a `Result` and owned bytes.
-`SC::tryThen` converts a failing `Result` into the error channel, so the write never starts on encoding failure.
-Ordinary `then` does not inspect or unwrap a returned `Result`.
-
-Whole-file reads and writes use the pool. These conveniences may allocate; the borrowing API below lets you
-supply your own descriptors and buffers instead.
-
-# Send two encoded files concurrently
-
-Replace the final write with TCP sending, then join two pipelines:
+The runtime owns the loop and workers; you own the payloads. Include
+`Examples/AsyncExecutionDemo/Base64.h` for this example codec. Define this factory at namespace scope:
 
 ```cpp
-auto sendEncoded = [&](SC::StringSpan path, uint16_t port) {
-    return app.readFile(path)
-        | ex::on(app.getPoolScheduler(), SC::tryThen(base64Encode))
-        | ex::let_value([&, port](auto& encoded) noexcept {
-              return app.sendTCP("127.0.0.1", port, SC::move(encoded));
-          });
+namespace ex = SC::AsyncExecutionProtocol;
+struct TransferBuffers {
+    char input[4096];
+    char encoded[5464];
 };
-
-SC_TRY(app.run(ex::when_all(sendEncoded("first.txt", 19092),
-                          sendEncoded("second.txt", 19093))));
+auto makeTransfer(SC::AsyncExecution& app, SC::StringSpan path,
+                  TransferBuffers& storage, uint16_t port)
+{
+    return app.readFile(path, storage.input)
+        | ex::on(app.getPoolScheduler(), SC::tryThen(
+              [&storage](SC::Span<const char> bytes) noexcept {
+                  return base64Encode(bytes, storage.encoded);
+              }))
+        | ex::let_value([&app, port](SC::Span<const char>& bytes) noexcept {
+              return app.sendTCP("127.0.0.1", port, bytes);
+          });
+}
 ```
 
-Start listening peers on those ports before trying this snippet. `sendTCP` owns its connection and buffer and
-retries partial writes. Addresses must be numeric IP addresses. The runnable demo supplies its own peers and
-verifies the received Base64 data.
+Inside your Result-returning application function, with `app` created and a listening TCP peer:
+
+```cpp
+TransferBuffers storage;
+SC_TRY(app.run(makeTransfer(app, "input.txt", storage, 19092)));
+```
+
+`readFile` reads through observed EOF and emits the written prefix. Capacity overflow reports `FileTooLarge`,
+including a nonempty file with an empty destination. Exact capacity succeeds after an EOF probe. Reads repeat
+positive short transfers, close before completion and use the pool. Failure/stop can modify a destination prefix;
+the operation is not a snapshot or transaction. Larger files need application storage or existing descriptor/chunk APIs.
+
+The codec requires disjoint spans, checks capacity before writing, and returns
+`AsyncExecutionValueResult<Span<const char>>`. `tryThen` unwraps it into success/error; `then` alone does not.
+`on` runs encoding on a worker and restores the caller's scheduler. `let_value` starts dependent asynchronous
+sending. It retains the span object, **not the array it points to**. `sendTCP` owns its connection and borrows
+bytes through its complete send. Addresses must be numeric. `writeFile(path, bytes)` similarly writes a complete
+borrowed span on the pool and closes before completion; file side effects can survive failure/stop.
+
+For concurrent transfers use separate writable records:
+
+```cpp
+TransferBuffers storage[2];
+SC_TRY(app.run(ex::when_all(
+    makeTransfer(app, "first.txt", storage[0], 19092),
+    makeTransfer(app, "second.txt", storage[1], 19093))));
+```
+
+The runnable demo supplies listening peers and verifies both encoded streams. Local arrays are safe here because
+`run` joins. Externally driven graphs require persistent records through joined completion. Do not move, resize
+or modify active backing storage; stop/timeout alone does not permit reuse. Large records belong in deliberately
+provisioned application storage, rather than being copied into sender captures or placed indiscriminately on a stack.
 
 # Reuse an existing Async loop
 
@@ -202,7 +215,7 @@ An explicit range does not depend on an assumed portable shared file cursor.
 
 | Need | Choose | Storage, addressing and execution |
 | --- | --- | --- |
-| Whole file with owned bytes | `app.readFile` / `writeFile` | Owned path/buffer conveniences; pool work; may allocate |
+| Whole file in caller storage | `app.readFile` / `writeFile` | Required spans; copied inline paths; pool work; explicit close |
 | One borrowed regular-file transfer | `context.fileReadAt` / `fileWriteAt` | Caller descriptor/buffer; explicit offset; optional pool supplies backend fallback |
 | Complete an explicit range | `fileReadExactAt` / `fileWriteAllAt` | Retry partial transfers; explicit offsets advance by actual progress |
 | Fill up to EOF | `fileReadUntilFullOrEOF` with `options.useOffset=true` and `options.offset` | Caller storage; explicit range start; may return a final prefix |

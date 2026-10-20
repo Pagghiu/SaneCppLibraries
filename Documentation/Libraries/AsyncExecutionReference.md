@@ -50,7 +50,14 @@ move construction. Reference payloads are rejected. The bridge does not schedule
 
 `tryThen` checks stop before invoking work. A running procedure cannot be preempted; failure wins over a
 concurrent stop, and successful work observes stop after returning. The earlier experimental
-`AsyncExecutionBufferResult` and checked-carrier `sendTCP` overloads were removed; use `tryThen` before I/O.
+Payloads are caller-owned spans; AsyncExecutionBuffer and buffer-specific onPool are removed.
+`app.readFile(path, destination)` reads through observed EOF or fails with FileTooLarge; exact capacity uses
+one extra byte of internal scratch to probe EOF. Empty capacity only accepts empty files. Positive short reads
+repeat. Earlier I/O errors take precedence over close errors; files close before delivery. Failure/stop may modify
+a prefix, while runInto outputs remain unchanged. Concurrent file changes are not a snapshot. `writeFile` retries
+short writes and rejects zero progress; sendTCP retains complete-send behavior. Both borrow immutable spans.
+No payload heap fallback exists. Codec input/output must be disjoint; capacity/arithmetic checks precede writes.
+Use `tryThen` to route a checked codec Result into the error channel before dependent I/O.
 
 # TCP operations
 

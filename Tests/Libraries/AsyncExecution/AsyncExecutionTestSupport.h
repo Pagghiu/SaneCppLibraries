@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Libraries/AsyncExecution/AsyncExecution.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC
 {
@@ -15,6 +16,19 @@ using ExecutionStopSource = ex::inplace_stop_source;
 using ExecutionStopToken  = std::inplace_stop_token;
 using ExecutionStopSource = std::inplace_stop_source;
 #endif
+// Explicit application/test-owned dynamic storage. The adapter only receives its spans.
+struct ExecutionTestBytes
+{
+    Buffer storage;
+    ExecutionTestBytes()                                         = default;
+    ExecutionTestBytes(ExecutionTestBytes&&) noexcept            = default;
+    ExecutionTestBytes& operator=(ExecutionTestBytes&&) noexcept = default;
+    ExecutionTestBytes(const ExecutionTestBytes&)                = delete;
+    Result           resize(size_t size) { return Result(storage.resize(size)); }
+    size_t           size() const { return storage.size(); }
+    Span<char>       bytes() { return storage.toSpan(); }
+    Span<const char> bytes() const { return storage.toSpanConst(); }
+};
 struct ExecutionOutcome
 {
     int    values  = 0;

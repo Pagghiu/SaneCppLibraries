@@ -251,7 +251,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         SC_TEST_EXPECT(consumeBounded(context, context.fileReadExact(file, extra, options, &progress), result)
                            .isError(AsyncExecutionResultCategory, AsyncExecutionError::UnexpectedEndOfFile));
         SC_TEST_EXPECT(progress.data.sizeInBytes() == 4 and progress.endOfFile);
-        AsyncExecutionBuffer source, reply;
+        ExecutionTestBytes source, reply;
         SC_TEST_EXPECT(source.resize(35000));
         SC_TEST_EXPECT(reply.resize(35000));
         for (size_t index = 0; index < source.size(); ++index)
@@ -366,7 +366,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
 #endif
         // Cross the native splice pipe/chunk boundary with an independent explicit range.
         SC_TEST_EXPECT(file.close());
-        AsyncExecutionBuffer source, received;
+        ExecutionTestBytes source, received;
         SC_TEST_EXPECT(source.resize(131081));
         SC_TEST_EXPECT(received.resize(131075));
         for (size_t index = 0; index < source.size(); ++index)
@@ -1042,7 +1042,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                                         context.receiveExact(accepted.socket, exactStorage)),
                            sent, exact));
         SC_TEST_EXPECT(sent == 2 and contiguousProgress == 2 and memcmp(exactStorage, "ab", 2) == 0);
-        AsyncExecutionBuffer largeSource, largeReply;
+        ExecutionTestBytes largeSource, largeReply;
         SC_TEST_EXPECT(largeSource.resize(35000));
         SC_TEST_EXPECT(largeReply.resize(35000));
         for (size_t index = 0; index < largeSource.size(); ++index)
@@ -1281,7 +1281,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                                       sentLineBytes, nextLine));
         SC_TEST_EXPECT(nextLine.lineComplete and nextLine.line.empty());
         // Cancel between bounded send chunks; the progress count covers observed completions, not unreported OS bytes.
-        AsyncExecutionBuffer payload;
+        ExecutionTestBytes payload;
         SC_TEST_EXPECT(payload.resize(65536));
         memset(payload.bytes().data(), 'p', payload.size());
         Span<const char>    parts[] = {payload.bytes(), {}};
@@ -1428,54 +1428,38 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         SC_TEST_EXPECT(app.create(2));
         const auto  owner            = Thread::CurrentThreadID();
         Atomic<int> encodersOnWorker = 0;
-        auto        encode           = [&](AsyncExecutionBuffer bytes) noexcept
+        char        encodedStorage[4];
+        auto        encode = [&](Span<const char> bytes) noexcept
         {
             if (Thread::CurrentThreadID() != owner)
                 encodersOnWorker.fetch_add(1);
-            return base64Encode(move(bytes));
+            return base64Encode(bytes, encodedStorage);
         };
-        auto source = [&]()
-        {
-            return app.onPool(
-                       []() noexcept
-                       {
-                           AsyncExecutionBuffer bytes;
-                           Result               status = bytes.resize(3);
-                           if (status)
-                               memcpy(bytes.bytes().data(), "foo", 3);
-                           return AsyncExecutionValueResult<AsyncExecutionBuffer>{status, move(bytes)};
-                       }) |
-                   SC::tryThen([](auto checked) noexcept { return checked; });
-        };
-        size_t count = 0;
-        // The same fallible CPU transform is independent of its downstream computation or I/O operation.
+        auto   source = [&]() { return app.onPool([]() noexcept { return Span<const char>{"foo", 3}; }); };
+        size_t count  = 0;
         SC_TEST_EXPECT(app.runInto(source() | ex::continues_on(app.getPoolScheduler()) | SC::tryThen(encode) |
-                                       ex::then([](auto bytes) noexcept { return bytes.size(); }),
+                                       ex::then([](auto bytes) noexcept { return bytes.sizeInBytes(); }),
                                    count));
         SC_TEST_EXPECT(count == 4);
         StringPath path;
         SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionFallibleTest.txt"}));
         SC_TEST_EXPECT(app.run(source() | ex::continues_on(app.getPoolScheduler()) | SC::tryThen(encode) |
-                               ex::let_value([&](auto& bytes) { return app.writeFile(path.view(), move(bytes)); })));
-        AsyncExecutionBuffer read;
-        SC_TEST_EXPECT(app.runInto(app.readFile(path.view()), read));
-        SC_TEST_EXPECT(read.size() == 4 and memcmp(read.bytes().data(), "Zm9v", 4) == 0);
+                               ex::let_value([&](auto& bytes) { return app.writeFile(path.view(), bytes); })));
+        char             destination[4];
+        Span<const char> read;
+        SC_TEST_EXPECT(app.runInto(app.readFile(path.view(), destination), read));
+        SC_TEST_EXPECT(read.sizeInBytes() == 4 and memcmp(read.data(), "Zm9v", 4) == 0);
         SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
         SC_TEST_EXPECT(encodersOnWorker.load() == 2);
-        const Result failure    = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
+        const Result failure    = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::FileTooLarge);
         int          downstream = 0;
-        auto         fail       = []() noexcept
-        {
-            return AsyncExecutionValueResult<AsyncExecutionBuffer>{
-                Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory), {}};
-        };
-        // A checked allocation failure must never reach the dependent file sender or computation.
+        auto         fail = [failure]() noexcept { return AsyncExecutionValueResult<Span<const char>>{failure, {}}; };
         SC_TEST_EXPECT(app.run(ex::just() | SC::tryThen(fail) |
                                ex::let_value(
                                    [&](auto& bytes)
                                    {
                                        ++downstream;
-                                       return app.writeFile(path.view(), move(bytes));
+                                       return app.writeFile(path.view(), bytes);
                                    }))
                            .isError(failure.category(), failure.errorValue()));
         SC_TEST_EXPECT(downstream == 0);
@@ -1487,7 +1471,7 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                                    [&](auto& bytes)
                                    {
                                        ++downstream;
-                                       return app.sendTCP("127.0.0.1", report.mapPort(19095), move(bytes));
+                                       return app.sendTCP("127.0.0.1", report.mapPort(19095), bytes);
                                    }))
                            .isError(failure.category(), failure.errorValue()));
         SC_TEST_EXPECT(downstream == 0);
@@ -1516,13 +1500,6 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                 SC::tryThen([]() noexcept { return AsyncExecutionValueResult<MoveOnly>{Result(true), MoveOnly{42}}; }),
             retained));
         SC_TEST_EXPECT(retained.value == 42);
-        AsyncExecutionBuffer moved;
-        SC_TEST_EXPECT(app.runInto(
-            ex::just() |
-                SC::tryThen([owned = move(read)]() mutable noexcept
-                            { return AsyncExecutionValueResult<AsyncExecutionBuffer>{Result(true), move(owned)}; }),
-            moved));
-        SC_TEST_EXPECT(moved.size() == 4 and memcmp(moved.bytes().data(), "Zm9v", 4) == 0);
         // Destroy the complete let_value parent from synchronous value/stopped notification.
         auto selfDestroying = []()
         {
@@ -1646,10 +1623,10 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
                                    answer));
         SC_TEST_EXPECT(onWorker.load() and restored and answer == 42);
         // Retain multiple outputs, including a move-only value, from standard composition.
-        AsyncExecutionBuffer buffer;
+        ExecutionTestBytes buffer;
         SC_TEST_EXPECT(buffer.resize(3));
-        int                  first = 0, second = 0;
-        AsyncExecutionBuffer output;
+        int                first = 0, second = 0;
+        ExecutionTestBytes output;
         SC_TEST_EXPECT(
             app.runInto(ex::when_all(ex::just(17), ex::just(25), ex::just(move(buffer))), first, second, output));
         SC_TEST_EXPECT(first == 17 and second == 25 and output.size() == 3);
@@ -2535,68 +2512,77 @@ struct AsyncExecutionTest : AsyncExecutionTestCase
         // A codec selects its own error channel before a dependent transport is even constructed.
         const Result encodingFailure = Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::FileTooLarge);
         bool         attemptedTCP    = false;
-        auto         failedCodec =
-            ex::just() |
-            ex::on(app.getPoolScheduler(),
-                   tryThen([encodingFailure]() noexcept -> AsyncExecutionValueResult<AsyncExecutionBuffer>
-                           { return {encodingFailure, {}}; })) |
-            ex::let_value(
-                [&](auto& bytes) noexcept
-                {
-                    attemptedTCP = true;
-                    return app.sendTCP("invalid-IP", report.mapPort(19092), move(bytes));
-                });
+        auto         failedCodec     = ex::just() |
+                           ex::on(app.getPoolScheduler(),
+                                  tryThen([encodingFailure]() noexcept -> AsyncExecutionValueResult<Span<const char>>
+                                          { return {encodingFailure, {}}; })) |
+                           ex::let_value(
+                               [&](auto& bytes) noexcept
+                               {
+                                   attemptedTCP = true;
+                                   return app.sendTCP("invalid-IP", report.mapPort(19092), bytes);
+                               });
         SC_TEST_EXPECT(app.run(move(failedCodec)).isError(encodingFailure.category(), encodingFailure.errorValue()));
         SC_TEST_EXPECT(not attemptedTCP);
         const char* vectors[]  = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
         const char* expected[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"};
         for (size_t i = 0; i < 7; ++i)
         {
-            AsyncExecutionBuffer bytes;
-            SC_TEST_EXPECT(bytes.resize(strlen(vectors[i])));
-            if (bytes.size() != 0)
-                memcpy(bytes.bytes().data(), vectors[i], bytes.size());
-            auto encoded = base64Encode(move(bytes));
+            char output[12] = {};
+            auto encoded    = base64Encode({vectors[i], strlen(vectors[i])}, output);
             SC_TEST_EXPECT(encoded.status);
-            SC_TEST_EXPECT(encoded.value.size() == strlen(expected[i]));
-            SC_TEST_EXPECT(encoded.value.size() == 0 or
-                           memcmp(encoded.value.bytes().data(), expected[i], encoded.value.size()) == 0);
+            SC_TEST_EXPECT(encoded.value.sizeInBytes() == strlen(expected[i]));
+            SC_TEST_EXPECT(encoded.value.empty() or
+                           memcmp(encoded.value.data(), expected[i], encoded.value.sizeInBytes()) == 0);
         }
+        char             output[4] = {'?', '?', '?', '?'};
+        const char       old[]     = "old";
+        Span<const char> written{old, 3};
+        SC_TEST_EXPECT(not base64Encode({"foobar", 6}, output, written));
+        SC_TEST_EXPECT(written.data() == old and written.sizeInBytes() == 3);
+        SC_TEST_EXPECT(memcmp(output, "????", 4) == 0);
+        // Impossible input size must fail arithmetic checks before accessing either span.
+        SC_TEST_EXPECT(not base64Encode({nullptr, size_t(-1)}, output, written));
+        SC_TEST_EXPECT(memcmp(output, "????", 4) == 0);
         // An external synchronous sender must not leave a stale loop interrupt behind.
         SC_TEST_EXPECT(app.run(ex::just()));
         SC_TEST_EXPECT(app.run(app.sleep({1})));
-        AsyncExecutionBuffer input;
-        SC_TEST_EXPECT(input.resize(5));
-        memcpy(input.bytes().data(), "hello", 5);
+        char input[] = "hello";
+        char destination[8];
+        memset(destination, '?', sizeof(destination));
         StringPath path;
-        SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionOwnedTest.txt"}));
-        SC_TEST_EXPECT(app.run(app.writeFile(path.view(), move(input))));
+        SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "AsyncExecutionSpanTest.txt"}));
+        SC_TEST_EXPECT(app.run(app.writeFile(path.view(), {input, 5})));
         bool checked = false;
-        auto job     = app.readFile(path.view()) |
+        auto job     = app.readFile(path.view(), destination) |
                    ex::let_value(
-                       [&](auto& bytes)
+                       [&](Span<const char>& bytes)
                        {
-                           return app.onPool(move(bytes),
-                                             [](auto& data)
-                                             {
-                                                 for (auto& c : data.bytes())
-                                                     c = static_cast<char>(c - 'a' + 'A');
-                                             });
+                           return app.onPool(
+                               [&, bytes]() noexcept
+                               {
+                                   for (size_t i = 0; i < bytes.sizeInBytes(); ++i)
+                                       destination[i] = static_cast<char>(destination[i] - 'a' + 'A');
+                                   return Span<const char>{destination, bytes.sizeInBytes()};
+                               });
                        }) |
-                   ex::then([&](const auto& bytes) noexcept
-                            { checked = bytes.size() == 5 and memcmp(bytes.bytes().data(), "HELLO", 5) == 0; });
+                   ex::then([&](Span<const char> bytes) noexcept
+                            { checked = bytes.sizeInBytes() == 5 and memcmp(bytes.data(), "HELLO", 5) == 0; });
         SC_TEST_EXPECT(app.run(move(job)));
-        SC_TEST_EXPECT(checked);
-        SC_TEST_EXPECT(app.run(app.readFile(path.view(), 2))
+        SC_TEST_EXPECT(checked and destination[5] == '?');
+        Span<const char> result{"unchanged", 9};
+        SC_TEST_EXPECT(app.runInto(app.readFile(path.view(), {destination, 2}), result)
                            .isError(AsyncExecutionResultCategory, AsyncExecutionError::FileTooLarge));
-        // Owning senders preserve normal operation errors and support an empty file.
+        SC_TEST_EXPECT(result.sizeInBytes() == 9 and memcmp(destination, "he", 2) == 0);
+        SC_TEST_EXPECT(app.run(app.readFile(path.view(), {}))
+                           .isError(AsyncExecutionResultCategory, AsyncExecutionError::FileTooLarge));
+        SC_TEST_EXPECT(app.runInto(app.readFile(path.view(), {destination, 5}), result));
+        SC_TEST_EXPECT(result.sizeInBytes() == 5 and memcmp(result.data(), "hello", 5) == 0);
         SC_TEST_EXPECT(app.run(app.writeFile(path.view(), {})));
-        bool empty = false;
-        SC_TEST_EXPECT(app.run(app.readFile(path.view()) |
-                               ex::then([&](const auto& bytes) noexcept { empty = bytes.size() == 0; })));
-        SC_TEST_EXPECT(empty);
+        SC_TEST_EXPECT(app.runInto(app.readFile(path.view(), {}), result));
+        SC_TEST_EXPECT(result.empty());
         SC_TEST_EXPECT(FileSystem::Operations::removeFile(path.view()));
-        SC_TEST_EXPECT(not app.run(app.readFile(path.view())));
+        SC_TEST_EXPECT(not app.run(app.readFile(path.view(), destination)));
         ExecutionStopSource source;
         source.request_stop();
         SC_TEST_EXPECT(app.run(app.sleep({60000}), source.get_token())

@@ -10,9 +10,6 @@ namespace SC
 {
 namespace detail
 {
-static void* AsyncExecutionReallocate(void* memory, size_t bytes) noexcept { return ::realloc(memory, bytes); }
-static void  AsyncExecutionRelease(void* memory) noexcept { ::free(memory); }
-
 static constexpr uint64_t AsyncExecutionMaximumFileOffset = uint64_t(-1) >> 1;
 static constexpr size_t   AsyncExecutionFileChunk         = 16384;
 
@@ -1016,7 +1013,7 @@ Result detail::AsyncExecutionWork::submit(Request& request, AsyncEventLoop& loop
     return request.start(loop);
 }
 
-Result detail::AsyncExecutionOwnedRead::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&)
+Result detail::AsyncExecutionReadFile::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&)
 {
     SC_TRY(initialization);
     SC_TRY(request.setThreadPool(pool));
@@ -1026,33 +1023,31 @@ Result detail::AsyncExecutionOwnedRead::submit(Request& request, AsyncEventLoop&
         FileOpen       options;
         options.mode = FileOpen::Read;
         SC_TRY(file.open(path.view(), options));
-        size_t used = 0;
-        while (true)
+        used                = 0;
+        const Result status = [&]() -> Result
         {
-            if (used == maximumBytes)
+            while (true)
             {
-                char       probe;
-                Span<char> read;
-                SC_TRY(file.read({&probe, 1}, read));
-                if (not read.empty())
+                char         probe;
+                Span<char>   read;
+                const bool   full      = used == destination.sizeInBytes();
+                const size_t available = destination.sizeInBytes() - used;
+                const size_t count     = available > 32768 ? 32768 : available;
+                SC_TRY(file.read(full ? Span<char>{&probe, 1} : Span<char>{destination.data() + used, count}, read));
+                if (read.empty())
+                    return Result(true);
+                if (full)
                     return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::FileTooLarge);
-                break;
+                used += read.sizeInBytes();
             }
-            const size_t available = maximumBytes - used;
-            const size_t count     = available > 32768 ? 32768 : available;
-            SC_TRY(data.resize(used + count));
-            Span<char> read;
-            SC_TRY(file.read({data.bytes().data() + used, count}, read));
-            used += read.sizeInBytes();
-            if (read.empty())
-                break;
-        }
-        return data.resize(used);
+        }();
+        const Result closed = file.close();
+        return status ? closed : status;
     };
     return request.start(loop);
 }
 
-Result detail::AsyncExecutionOwnedWrite::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&)
+Result detail::AsyncExecutionWriteFile::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence&)
 {
     SC_TRY(initialization);
     SC_TRY(request.setThreadPool(pool));
@@ -1062,7 +1057,27 @@ Result detail::AsyncExecutionOwnedWrite::submit(Request& request, AsyncEventLoop
         FileOpen       options;
         options.mode = FileOpen::Write;
         SC_TRY(file.open(path.view(), options));
-        return file.write(data.bytes());
+        const Result status = [&]() -> Result
+        {
+            size_t used = 0;
+            while (used < data.sizeInBytes())
+            {
+                const size_t     available = data.sizeInBytes() - used;
+                const size_t     count     = available > 32768 ? 32768 : available;
+                const ResultFile written   = file.write({data.data() + used, count});
+                if (written)
+                    used += count;
+                else if (written.isError(FileError::IncompleteWrite) and
+                         written.contextKind == FileErrorContextKind::ActualBytes and
+                         written.context.actualBytes > 0 and written.context.actualBytes <= count)
+                    used += written.context.actualBytes;
+                else
+                    return written;
+            }
+            return Result(true);
+        }();
+        const Result closed = file.close();
+        return status ? closed : status;
     };
     return request.start(loop);
 }
@@ -1074,11 +1089,6 @@ Result detail::AsyncExecutionOwnedConnect::submit(Request& request, AsyncEventLo
     SC_TRY(socket.setBlocking(false));
     SC_TRY(loop.associateExternallyCreatedSocket(socket));
     return request.start(loop, socket, address);
-}
-
-Result detail::AsyncExecutionOwnedSend::submit(Request& request, AsyncEventLoop& loop, AsyncTaskSequence& task)
-{
-    return send.submit(request, loop, task);
 }
 
 Result detail::AsyncExecutionSendAll::advance(Request::Result& result)
@@ -1121,38 +1131,6 @@ AsyncExecutionConnection& AsyncExecutionConnection::operator=(AsyncExecutionConn
         socket = move(other.socket);
     }
     return *this;
-}
-
-AsyncExecutionBuffer::AsyncExecutionBuffer(AsyncExecutionBuffer&& other) noexcept { *this = move(other); }
-
-AsyncExecutionBuffer& AsyncExecutionBuffer::operator=(AsyncExecutionBuffer&& other) noexcept
-{
-    if (this != &other)
-    {
-        detail::AsyncExecutionRelease(memory);
-        memory       = other.memory;
-        length       = other.length;
-        capacity     = other.capacity;
-        other.memory = nullptr;
-        other.length = other.capacity = 0;
-    }
-    return *this;
-}
-
-AsyncExecutionBuffer::~AsyncExecutionBuffer() { detail::AsyncExecutionRelease(memory); }
-
-Result AsyncExecutionBuffer::resize(size_t bytes)
-{
-    if (bytes > capacity)
-    {
-        auto* replacement = static_cast<char*>(detail::AsyncExecutionReallocate(memory, bytes));
-        if (not replacement)
-            return Result::Error(AsyncExecutionResultCategory, AsyncExecutionError::OutOfMemory);
-        memory   = replacement;
-        capacity = bytes;
-    }
-    length = bytes;
-    return Result(true);
 }
 
 Result detail::AsyncExecutionResolvePath(StringSpan path, StringPath& output)
@@ -1492,19 +1470,18 @@ AsyncExecutionSender<detail::AsyncExecutionTimer> AsyncExecutionScheduler::sched
     return AsyncExecutionSender<detail::AsyncExecutionTimer>{*context, {{0}}};
 }
 
-AsyncExecutionSender<detail::AsyncExecutionOwnedRead> AsyncExecution::readFile(StringSpan path, size_t maximumBytes)
+AsyncExecutionSender<detail::AsyncExecutionReadFile> AsyncExecution::readFile(StringSpan path, Span<char> destination)
 {
-    detail::AsyncExecutionOwnedRead setup{pool, {}, Result(true), {}, maximumBytes};
+    detail::AsyncExecutionReadFile setup{pool, {}, Result(true), destination};
     setup.initialization = detail::AsyncExecutionResolvePath(path, setup.path);
-    return AsyncExecutionSender<detail::AsyncExecutionOwnedRead>{context, move(setup)};
+    return AsyncExecutionSender<detail::AsyncExecutionReadFile>{context, move(setup)};
 }
 
-AsyncExecutionSender<detail::AsyncExecutionOwnedWrite> AsyncExecution::writeFile(StringSpan           path,
-                                                                                 AsyncExecutionBuffer data)
+AsyncExecutionSender<detail::AsyncExecutionWriteFile> AsyncExecution::writeFile(StringSpan path, Span<const char> data)
 {
-    detail::AsyncExecutionOwnedWrite setup{pool, {}, Result(true), move(data)};
+    detail::AsyncExecutionWriteFile setup{pool, {}, Result(true), move(data)};
     setup.initialization = detail::AsyncExecutionResolvePath(path, setup.path);
-    return AsyncExecutionSender<detail::AsyncExecutionOwnedWrite>{context, move(setup)};
+    return AsyncExecutionSender<detail::AsyncExecutionWriteFile>{context, move(setup)};
 }
 
 AsyncExecutionSender<detail::AsyncExecutionOwnedConnect> AsyncExecution::connectTCP(StringSpan host, uint16_t port)
@@ -1519,13 +1496,13 @@ AsyncExecutionSender<detail::AsyncExecutionTimer> AsyncExecution::sleep(TimeMs d
     return context.sleep(duration);
 }
 
-AsyncExecutionSender<detail::AsyncExecutionOwnedSend> detail::AsyncExecutionSendConnected::operator()(
+AsyncExecutionSender<detail::AsyncExecutionSendAll> detail::AsyncExecutionSendConnected::operator()(
     AsyncExecutionConnection& connection) noexcept
 {
     return {*context, {connection.socket, move(data)}};
 }
 
-detail::AsyncExecutionTCPSender AsyncExecution::sendTCP(StringSpan host, uint16_t port, AsyncExecutionBuffer data)
+detail::AsyncExecutionTCPSender AsyncExecution::sendTCP(StringSpan host, uint16_t port, Span<const char> data)
 {
     detail::AsyncExecutionOwnedConnect setup;
     setup.initialization = setup.address.fromAddressPort(host, port);
@@ -1572,7 +1549,7 @@ static void* AsyncExecutionScopeAllocate(void*, size_t bytes, size_t alignment) 
     const size_t overhead = sizeof(void*) + alignment - 1;
     if (bytes > size_t(-1) - overhead)
         return nullptr;
-    void* raw = AsyncExecutionReallocate(nullptr, bytes + overhead);
+    void* raw = ::malloc(bytes + overhead);
     if (raw == nullptr)
         return nullptr;
     const size_t address                  = (reinterpret_cast<size_t>(raw) + overhead) & ~(alignment - 1);
@@ -1582,7 +1559,7 @@ static void* AsyncExecutionScopeAllocate(void*, size_t bytes, size_t alignment) 
 }
 static void AsyncExecutionScopeDeallocate(void*, void* memory, size_t, size_t) noexcept
 {
-    AsyncExecutionRelease(reinterpret_cast<void**>(memory)[-1]);
+    ::free(reinterpret_cast<void**>(memory)[-1]);
 }
 } // namespace detail
 

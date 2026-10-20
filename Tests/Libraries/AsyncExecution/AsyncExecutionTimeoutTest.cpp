@@ -212,10 +212,10 @@ struct AsyncExecutionTimeoutTest : AsyncExecutionTestCase
         int number = 0;
         SC_TEST_EXPECT(consumeBounded(context, timeout(context, ex::just(42), {5000}), number));
         SC_TEST_EXPECT(number == 42);
-        AsyncExecutionBuffer owned;
+        ExecutionTestBytes owned;
         SC_TEST_EXPECT(owned.resize(3));
         owned.bytes()[0] = 'A';
-        AsyncExecutionBuffer received;
+        ExecutionTestBytes received;
         number = 0;
         SC_TEST_EXPECT(consumeBounded(context, timeout(context, ex::just(7, move(owned)), {5000}), number, received));
         SC_TEST_EXPECT(number == 7 and received.size() == 3 and received.bytes()[0] == 'A');
@@ -223,7 +223,7 @@ struct AsyncExecutionTimeoutTest : AsyncExecutionTestCase
         auto delayed =
             timeout(context, ex::just(move(received)), {5000}) |
             ex::let_value(
-                [&](AsyncExecutionBuffer& bytes) noexcept
+                [&](ExecutionTestBytes& bytes) noexcept
                 {
                     return context.sleep({1}) | ex::then([&bytes, &retained]() noexcept
                                                          { retained = bytes.size() == 3 and bytes.bytes()[0] == 'A'; });

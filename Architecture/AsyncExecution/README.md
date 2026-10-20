@@ -23,3 +23,5 @@ These records describe the current experimental design. Superseded pool-ticket a
 | ASYNCEXECUTION-0017 | [External Producer Acknowledgement](asyncexecution-0017-external-producer-acknowledgement.md) |
 | ASYNCEXECUTION-0018 | [Filesystem Sender Ownership](asyncexecution-0018-filesystem-sender-ownership.md) |
 | ASYNCEXECUTION-0019 | [Defer Direct Await Conversion](asyncexecution-0019-defer-direct-await-conversion.md) |
+| ASYNCEXECUTION-0020 | [Caller-Owned Payloads](asyncexecution-0020-caller-owned-payloads.md) |
+| ASYNCEXECUTION-0021 | [Typed Scope Root Storage](asyncexecution-0021-typed-scope-storage.md) |

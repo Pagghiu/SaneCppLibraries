@@ -72,15 +72,11 @@ SC::Result runAsyncExecutionLifetimeDemo(bool stall, bool cancel, uint16_t port,
 
     AsyncExecutionScope scope(context);
 
-    auto codec = [&]() noexcept -> AsyncExecutionValueResult<AsyncExecutionBuffer>
+    char encodedStorage[8];
+    auto codec = [&]() noexcept
     {
         encodedOnWorker = Thread::CurrentThreadID() != owner;
-        AsyncExecutionBuffer bytes;
-        const Result         allocated = bytes.resize(4);
-        if (not allocated)
-            return {allocated, {}};
-        memcpy(bytes.bytes().data(), "ping", 4);
-        return base64Encode(move(bytes));
+        return base64Encode({"ping", 4}, encodedStorage);
     };
 
     // Prepare CPU data and the connection concurrently. The receive deadline measures the transfer phase;
@@ -105,7 +101,7 @@ SC::Result runAsyncExecutionLifetimeDemo(bool stall, bool cancel, uint16_t port,
                     ex::let_value(
                         [&]() noexcept
                         {
-                            return context.sendAll(client, encoded.bytes()) |
+                            return context.sendAll(client, encoded) |
                                    ex::let_value([&](size_t&) noexcept { return context.receiveExact(client, reply); });
                         });
                 return ex::when_all(move(server), move(sender));
