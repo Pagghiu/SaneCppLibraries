@@ -291,6 +291,11 @@ Result HttpAsyncServer::beginHttpConnection(HttpConnection& client)
     EventDataListener dataListener{*this, client};
     if (not client.getReadableTransportStream().eventData.addListener(dataListener))
         return Result::Error(HttpResultCategory, HttpError::ServerDataListenerUnavailable);
+    if (not client.getReadableTransportStream().eventEnd.addListener(EventEndListener{*this, client}))
+    {
+        (void)client.getReadableTransportStream().eventData.removeListener(dataListener);
+        return Result::Error(HttpResultCategory, HttpError::ServerEndListenerUnavailable);
+    }
     if (client.getReadableTransportStream().canStart())
     {
         SC_TRY(client.getReadableTransportStream().start());
@@ -375,11 +380,8 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         // Both with and without body we should stop listening to data events
         SC_HTTP_ASSERT_RELEASE(
             client.getReadableTransportStream().eventData.removeListener(EventDataListener{*this, client}));
-        if (client.requestCount > 0)
-        {
-            SC_HTTP_ASSERT_RELEASE(
-                client.getReadableTransportStream().eventEnd.removeListener(EventEndListener{*this, client}));
-        }
+        SC_HTTP_ASSERT_RELEASE(
+            client.getReadableTransportStream().eventEnd.removeListener(EventEndListener{*this, client}));
         Result prepareBody =
             client.request.prepareBodyStream(client.buffersPool,
                                              {[&client]() -> Result

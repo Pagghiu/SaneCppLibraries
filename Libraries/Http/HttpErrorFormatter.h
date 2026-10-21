@@ -171,6 +171,9 @@ inline ResultErrorFormat formatHttpError(HttpError error, Span<char> output)
     case HttpError::ServerDataListenerUnavailable:
         formatter.append("HTTP server readable data listener is unavailable");
         break;
+    case HttpError::ServerEndListenerUnavailable:
+        formatter.append("HTTP server readable end listener is unavailable");
+        break;
     case HttpError::FileServerAlreadyInitialized: formatter.append("HTTP file server is already initialized"); break;
     case HttpError::FileServerDirectoryUnavailable:
         formatter.append("HTTP file server directory is unavailable");

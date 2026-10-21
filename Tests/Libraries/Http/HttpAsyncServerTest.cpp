@@ -84,6 +84,43 @@ struct ProbeHttpResponse : SC::HttpResponse
     void disableKeepAlive() { forceDisableKeepAlive = true; }
 };
 
+struct EmptyRequestStream : SC::AsyncReadableStream
+{
+    SC::AsyncReadableStream::Request queue[2];
+
+    EmptyRequestStream() { setReadQueue(queue); }
+
+  private:
+    virtual SC::Result asyncRead() override
+    {
+        pushEnd();
+        return SC::Result(true);
+    }
+};
+
+struct ManualRequestStream : SC::AsyncReadableStream
+{
+    SC::AsyncReadableStream::Request queue[2];
+
+    ManualRequestStream() { setReadQueue(queue); }
+
+    SC::Result deliver(SC::StringView data)
+    {
+        resumeReading();
+        SC::AsyncBufferView::ID bufferID;
+        SC::Span<char>          storage;
+        SC_TRY(getBuffersPool().requestNewBuffer(data.sizeInBytes(), bufferID, storage));
+        ::memcpy(storage.data(), data.bytesWithoutTerminator(), data.sizeInBytes());
+        (void)push(bufferID, data.sizeInBytes());
+        getBuffersPool().unrefBuffer(bufferID);
+        reactivate(false);
+        return SC::Result(true);
+    }
+
+  private:
+    virtual SC::Result asyncRead() override { return SC::Result(true); }
+};
+
 struct ProbeHttpIncomingMessage : SC::HttpIncomingMessage
 {
     void setContentLength(SC::uint64_t bytes)
@@ -177,6 +214,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             externalListenerInjectsAcceptedStreams();
         }
+        if (test_section("peer EOF before first request recycles external slot"))
+        {
+            peerEndBeforeFirstRequestReleasesSlot();
+        }
         if (test_section("custom response status"))
         {
             customResponseStatus();
@@ -255,12 +296,110 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void connectionPoolStorageErrors();
     void parsedHeaderErrorsPreserveIdentity();
     void connectionBodyCopyHelper();
+    void peerEndBeforeFirstRequestReleasesSlot();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void maxHeaderSizeError();
     void chunkedResponseWriting();
     void chunkedClientRequestWriting();
 };
+
+void SC::HttpAsyncServerTest::peerEndBeforeFirstRequestReleasesSlot()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+    using ServerConnection = HttpAsyncConnection<3, 3, 1024, 1024>;
+    ServerConnection connections[1];
+    HttpAsyncServer  server;
+    SC_TEST_EXPECT(server.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(server.startExternal(loop));
+    EmptyRequestStream     readable;
+    RecordedWritableStream writable;
+    SC_TEST_EXPECT(readable.init(connections[0].buffersPool));
+    SC_TEST_EXPECT(writable.init(connections[0].buffersPool));
+    size_t requests  = 0;
+    size_t errors    = 0;
+    server.onRequest = [&requests](HttpConnection&) { requests++; };
+    server.onError   = [this, &errors](Result result)
+    {
+        errors++;
+        recordExpectation("EOF regression unexpected server error", result);
+    };
+    SC_TEST_EXPECT(server.acceptExternalConnection(connections[0], readable, writable));
+    const bool recycled = server.getConnections().getNumActiveConnections() == 0;
+    SC_TEST_EXPECT(requests == 0);
+    SC_TEST_EXPECT(errors == 0);
+    SC_TEST_EXPECT(recycled);
+
+    // Reuse the actual slot with fresh streams, including EOF after incomplete headers.
+    for (int attempt = 0; attempt < 2; ++attempt)
+    {
+        ManualRequestStream    partial;
+        RecordedWritableStream output;
+        const StringView       headers = "GET / HTTP/1.1\r\nHost:";
+        SC_TEST_EXPECT(partial.init(connections[0].buffersPool));
+        SC_TEST_EXPECT(output.init(connections[0].buffersPool));
+        SC_TEST_EXPECT(server.acceptExternalConnection(connections[0], partial, output));
+        SC_TEST_EXPECT(partial.deliver(headers));
+        recordExpectation("partial header slot active before EOF",
+                          server.getConnections().getNumActiveConnections() == 1);
+        partial.pushEnd();
+        SC_TEST_EXPECT(server.getConnections().getNumActiveConnections() == 0);
+        SC_TEST_EXPECT(requests == 0);
+        SC_TEST_EXPECT(errors == 0);
+    }
+    {
+        EmptyRequestStream     capacity;
+        RecordedWritableStream output;
+        SC_TEST_EXPECT(capacity.init(connections[0].buffersPool));
+        SC_TEST_EXPECT(output.init(connections[0].buffersPool));
+        for (int idx = 0; idx < AsyncReadableStream::MaxListeners; ++idx)
+        {
+            SC_TEST_EXPECT(capacity.eventEnd.addListener([]() {}));
+        }
+        SC_TEST_EXPECT(server.acceptExternalConnection(connections[0], capacity, output)
+                           .isError(HttpResultCategory, HttpError::ServerEndListenerUnavailable));
+        SC_TEST_EXPECT(server.getConnections().getNumActiveConnections() == 0);
+        // Every data-listener slot remains available after registration rollback.
+        for (int idx = 0; idx < AsyncReadableStream::MaxListeners; ++idx)
+        {
+            SC_TEST_EXPECT(capacity.eventData.addListener([](AsyncBufferView::ID) {}));
+        }
+    }
+    {
+        ManualRequestStream    complete;
+        RecordedWritableStream output;
+        SC_TEST_EXPECT(complete.init(connections[0].buffersPool));
+        SC_TEST_EXPECT(output.init(connections[0].buffersPool));
+        server.onRequest = [this, &requests](HttpConnection& connection)
+        {
+            requests++;
+            SC_TEST_EXPECT(connection.request.getURL() == "/");
+            SC_TEST_EXPECT(connection.response.sendBody(200, "half-close"));
+        };
+        SC_TEST_EXPECT(server.acceptExternalConnection(connections[0], complete, output));
+        SC_TEST_EXPECT(complete.deliver("GET / HTTP/1.1\r\nHost:"));
+        SC_TEST_EXPECT(requests == 0);
+        SC_TEST_EXPECT(errors == 0);
+        SC_TEST_EXPECT(complete.deliver(" localhost\r\nConnection: close\r\n\r"));
+        SC_TEST_EXPECT(requests == 0);
+        SC_TEST_EXPECT(errors == 0);
+        SC_TEST_EXPECT(complete.deliver("\n"));
+        SC_TEST_EXPECT(requests == 1);
+        recordExpectation("complete request slot active before half-close",
+                          server.getConnections().getNumActiveConnections() == 1);
+        complete.pushEnd();
+        recordExpectation("complete request slot active after half-close",
+                          server.getConnections().getNumActiveConnections() == 1);
+        while (output.flushOne()) {}
+        SC_TEST_EXPECT(StringView(output.output.toSpanConst(), false, StringEncoding::Ascii).endsWith("half-close"));
+        SC_TEST_EXPECT(server.getConnections().getNumActiveConnections() == 0);
+        SC_TEST_EXPECT(errors == 0);
+    }
+    SC_TEST_EXPECT(server.stop());
+    SC_TEST_EXPECT(server.close());
+    SC_TEST_EXPECT(loop.close());
+}
 
 void SC::HttpAsyncServerTest::externalListenerInjectsAcceptedStreams()
 {

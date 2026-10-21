@@ -153,6 +153,10 @@ enum class HttpError : uint32_t
     ClientUserInfoUnsupported,
     ClientReconnectNotPending,
     ClientReconnectListenerUnavailable,
+
+    // Keep this ID stable when backporting without the transport-owner error range (209-213).
+    ServerEndListenerUnavailable = 214,
+
     ClientSocketInvalid = 145,
     ClientHttpsTransportMissing,
     ClientProtocolStorageTooSmall,

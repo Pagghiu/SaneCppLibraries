@@ -824,6 +824,10 @@ Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readDa
                                  AsyncBufferView::ID bufferID)
 {
     SC_TRY(HttpIncomingMessage::writeHeaders(maxSize, readData, stream, bufferID, false));
+    if (not hasReceivedHeaders())
+    {
+        return Result(true);
+    }
     SC_TRY(findParserToken(HttpParser::Token::Url, url));
     setBodyBytesRemaining(getParser().contentLength);
     return Result(true);
