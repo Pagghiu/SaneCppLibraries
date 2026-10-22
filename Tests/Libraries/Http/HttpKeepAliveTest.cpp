@@ -34,12 +34,200 @@ struct SC::HttpKeepAliveTest : public SC::TestCase
             // An explicit response override must win, including after each response reset.
             runScenario(6164, 3, false, 1, 0, false);
         }
+        if (test_section("request close cannot be overridden"))
+        {
+            runRequestClose(6165, false, false);
+            runRequestClose(6166, true, false);
+            runRequestClose(6167, true, true);
+        }
     }
 
     // responseOverride: -1 leaves the server default intact, 0 disables, 1 enables persistence.
     void runScenario(uint16_t port, int requests, bool defaultKeepAlive, int responseOverride, uint32_t maxRequests,
                      bool terminal);
+
+    void runRequestClose(uint16_t port, bool overrideResponse, bool pipeline);
 };
+
+void SC::HttpKeepAliveTest::runRequestClose(uint16_t port, bool overrideResponse, bool pipeline)
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    using ServerConnection = HttpAsyncConnection<2, 2, 8 * 1024, 1024>;
+    ServerConnection connections[2];
+    HttpAsyncServer  server;
+    SC_TEST_EXPECT(server.init(Span<ServerConnection>(connections)));
+
+    SocketIPAddress address;
+    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(port)));
+    SocketDescriptor peer;
+    SC_TEST_EXPECT(loop.createAsyncTCPSocket(address.getAddressFamily(), peer));
+
+    AsyncSocketConnect connect;
+    AsyncSocketSend    send;
+    AsyncSocketReceive receive;
+
+    AsyncLoopTimeout deadline;
+    AsyncLoopTimeout checkReclaimed;
+
+    struct Context
+    {
+        AsyncEventLoop&     loop;
+        HttpAsyncServer&    server;
+        SocketDescriptor&   peer;
+        AsyncSocketSend&    send;
+        AsyncSocketReceive& receive;
+        AsyncLoopTimeout&   checkReclaimed;
+
+        bool       overrideResponse;
+        StringView request;
+
+        int requests  = 0;
+        int shutdowns = 0;
+
+        bool peerEOF   = false;
+        bool reclaimed = false;
+        bool timedOut  = false;
+
+        char   received[4096]      = {};
+        size_t receivedSize        = 0;
+        char   receiveBuffer[1024] = {};
+    } ctx = {loop,
+             server,
+             peer,
+             send,
+             receive,
+             checkReclaimed,
+             overrideResponse,
+             pipeline ? StringView("GET /first HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+                                   "GET /second HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                      : StringView("GET /first HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")};
+
+    Function<Result(HttpConnection&, Function<void(Result)>)> shutdown = {
+        [this, &ctx](HttpConnection& connection, Function<void(Result)> complete) -> Result
+        {
+            ctx.shutdowns++;
+            SC_TEST_EXPECT(not connection.request.getKeepAlive());
+            SC_TEST_EXPECT(connection.requestCount == 0);
+            complete(Result(true));
+            return Result(true);
+        }};
+    // The callback count below also verifies installation with the legacy void-returning setter.
+    (void)server.setTransportShutdown(move(shutdown));
+    server.onRequest = [this, &ctx](HttpConnection& connection)
+    {
+        ctx.requests++;
+        SC_TEST_EXPECT(not connection.request.getKeepAlive());
+        HttpResponse& response = connection.response;
+        SC_TEST_EXPECT(not response.getKeepAlive());
+        if (ctx.overrideResponse)
+        {
+            response.setKeepAlive(true);
+            SC_TEST_EXPECT(not response.getKeepAlive());
+        }
+        SC_TEST_EXPECT(response.startResponse(200));
+        if (ctx.overrideResponse)
+        {
+            SC_TEST_EXPECT(response.addHeader("Connection", "keep-alive")
+                               .isError(HttpResultCategory, HttpError::KeepAliveDisabled));
+        }
+        SC_TEST_EXPECT(response.addHeader("Content-Length", "2"));
+        SC_TEST_EXPECT(response.sendHeaders());
+        SC_TEST_EXPECT(response.getWritableStream().write("OK"));
+        SC_TEST_EXPECT(response.end());
+    };
+    server.onError = [this, &loop](Result result)
+    {
+        SC_TEST_EXPECT(result);
+        loop.interrupt();
+    };
+    checkReclaimed.callback = [&ctx](AsyncLoopTimeout::Result& result)
+    {
+        if (ctx.server.getConnections().getNumActiveConnections() == 0)
+        {
+            ctx.reclaimed = true;
+            ctx.loop.interrupt();
+        }
+        else
+        {
+            result.reactivateRequest(true);
+        }
+    };
+    receive.callback = [this, &ctx](AsyncSocketReceive::Result& result)
+    {
+        Span<char> data;
+        SC_TEST_EXPECT(result.get(data));
+        if (result.completionData.disconnected)
+        {
+            ctx.peerEOF = true;
+            SC_TEST_EXPECT(ctx.checkReclaimed.start(ctx.loop, TimeMs{1}));
+        }
+        else
+        {
+            SC_TEST_EXPECT(ctx.receivedSize + data.sizeInBytes() <= sizeof(ctx.received));
+            if (ctx.receivedSize + data.sizeInBytes() <= sizeof(ctx.received))
+            {
+                ::memcpy(ctx.received + ctx.receivedSize, data.data(), data.sizeInBytes());
+                ctx.receivedSize += data.sizeInBytes();
+                result.reactivateRequest(true);
+            }
+            else
+            {
+                ctx.loop.interrupt();
+            }
+        }
+    };
+    connect.callback = [this, &ctx](AsyncSocketConnect::Result& result)
+    {
+        SC_TEST_EXPECT(result.isValid());
+        SC_TEST_EXPECT(ctx.receive.start(ctx.loop, ctx.peer, ctx.receiveBuffer));
+        SC_TEST_EXPECT(ctx.send.start(ctx.loop, ctx.peer, ctx.request.toCharSpan()));
+    };
+    send.callback = [this, &ctx](AsyncSocketSend::Result& result)
+    {
+        SC_TEST_EXPECT(result.isValid());
+        SC_TEST_EXPECT(result.completionData.numBytes == ctx.request.sizeInBytes());
+    };
+    deadline.callback = [&ctx, &loop](AsyncLoopTimeout::Result&)
+    {
+        ctx.timedOut = true;
+        loop.interrupt();
+    };
+
+    SC_TEST_EXPECT(server.start(loop, "127.0.0.1", report.mapPort(port)));
+    SC_TEST_EXPECT(deadline.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(connect.start(loop, peer, address));
+    SC_TEST_EXPECT(loop.run());
+
+    SC_TEST_EXPECT(not ctx.timedOut);
+    SC_TEST_EXPECT(ctx.peerEOF);
+    SC_TEST_EXPECT(ctx.reclaimed);
+    SC_TEST_EXPECT(ctx.requests == 1);
+    SC_TEST_EXPECT(ctx.shutdowns == 1);
+    SC_TEST_EXPECT(server.getConnections().getNumActiveConnections() == 0);
+    SC_TEST_EXPECT(StringView({ctx.received, ctx.receivedSize}, false, StringEncoding::Ascii) ==
+                   "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK");
+
+    // The peer never closes or half-closes until server EOF and reclamation were observed.
+    if (not receive.isFree())
+    {
+        SC_TEST_EXPECT(receive.stop(loop));
+    }
+    if (not checkReclaimed.isFree())
+    {
+        SC_TEST_EXPECT(checkReclaimed.stop(loop));
+    }
+    if (not deadline.isFree())
+    {
+        SC_TEST_EXPECT(deadline.stop(loop));
+    }
+    SC_TEST_EXPECT(server.stop());
+    SC_TEST_EXPECT(server.close());
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(peer.close());
+    SC_TEST_EXPECT(loop.close());
+}
 
 void SC::HttpKeepAliveTest::runScenario(uint16_t port, int requests, bool defaultKeepAlive, int responseOverride,
                                         uint32_t maxRequests, bool terminal)

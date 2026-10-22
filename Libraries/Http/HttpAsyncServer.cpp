@@ -376,6 +376,11 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         client.response.grabUnusedHeaderMemory(client.request);
         client.response.reset();
         client.response.setKeepAlive(defaultKeepAlive);
+        // A request close policy is mandatory, unlike the overridable server default.
+        if (not client.request.getKeepAlive())
+        {
+            client.response.forceDisableKeepAlive = true;
+        }
 
         // Both with and without body we should stop listening to data events
         SC_HTTP_ASSERT_RELEASE(
@@ -436,8 +441,8 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                 // Determine if we should keep the connection alive
                 const bool underMaxRequests =
                     (pself.maxRequestsPerConnection == 0) or (client.requestCount + 1 < pself.maxRequestsPerConnection);
-                const bool shouldKeepAlive = client.response.getKeepAlive() and underMaxRequests and
-                                             not client.getReadableTransportStream().isEnded();
+                const bool shouldKeepAlive = client.request.getKeepAlive() and client.response.getKeepAlive() and
+                                             underMaxRequests and not client.getReadableTransportStream().isEnded();
 
                 if (shouldKeepAlive and pself.state == State::Started) // We may get some after-writes after server stop
                 {
