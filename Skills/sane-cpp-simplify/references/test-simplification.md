@@ -10,6 +10,8 @@ Trace fixture setup and diagnostics through `TestReport::isTestEnabled` and `qui
 
 Check whether a test proves the contract it names or only a weaker side effect. For copy/move or const/mutable cases, inspect the value category and overload actually selected: a conditional expression can materialize a temporary, making a nominal copy-assignment test move-assign from it. Check exact destination size and the relevant source ownership/state; matching a destination prefix alone does not establish either. For example, an HTTP response body does not prove connection reuse or peer closure. Observe the relevant connection lifecycle separately, and distinguish server-side cleanup from peer EOF. Fixture capacity, implicit defaults and cleanup can accidentally determine the behavior under test; ensure the scenario actually reaches the intended path.
 
+For encoding and buffer transforms, account for bytes versus code units at each resize and output offset. Check nonempty destination prefixes, exact final capacity and both conversion directions; an empty-buffer shrinking example can miss expansion and append defects. Padded diagnostic storage can establish logical capacity or span violations without a deliberate allocator overrun; distinguish that evidence from physical overflow or sanitizer checks.
+
 ## Evaluate whole-helper replacement costs
 
 Before retiring a test utility, inventory its consumers and less obvious capabilities: raw protocol observations, malformed inputs, staged delivery, timing controls and cleanup. Include replacement code in net savings. Prefer a narrow private consolidation when removing the utility would scatter its responsibilities across callers.
