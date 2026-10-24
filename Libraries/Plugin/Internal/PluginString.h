@@ -169,35 +169,45 @@ namespace PluginString
     if (path.getEncoding() != StringEncoding::Utf16)
         return path;
     const size_t units = path.sizeInBytes() / sizeof(wchar_t);
-    const auto   at    = [&](size_t index) -> char
-    { return index < units ? path.bytesWithoutTerminator()[index * sizeof(wchar_t)] : 0; };
-    const auto isSeparator = [&](size_t index) { return at(index) == '\\' or at(index) == '/'; };
-    size_t     rootUnits   = 0;
-    if (units >= 3 and at(1) == ':' and isSeparator(2))
+    struct PathUnits
+    {
+        StringSpan path;
+        size_t     units;
+
+        constexpr char at(size_t index) const
+        {
+            return index < units ? path.bytesWithoutTerminator()[index * sizeof(wchar_t)] : 0;
+        }
+        constexpr bool isSeparator(size_t index) const { return at(index) == '\\' or at(index) == '/'; }
+    };
+    const PathUnits text = {path, units};
+
+    size_t rootUnits = 0;
+    if (units >= 3 and text.at(1) == ':' and text.isSeparator(2))
     {
         rootUnits = 3;
     }
-    else if (units >= 2 and isSeparator(0) and isSeparator(1))
+    else if (units >= 2 and text.isSeparator(0) and text.isSeparator(1))
     {
         size_t index = 2;
-        if (units >= 4 and at(2) == '?' and isSeparator(3))
+        if (units >= 4 and text.at(2) == '?' and text.isSeparator(3))
         {
             index = 4;
-            if (units >= 7 and at(5) == ':' and isSeparator(6))
+            if (units >= 7 and text.at(5) == ':' and text.isSeparator(6))
                 rootUnits = 7;
         }
         if (rootUnits == 0)
         {
-            while (index < units and not isSeparator(index))
+            while (index < units and not text.isSeparator(index))
                 ++index;
             if (index < units)
                 ++index;
-            while (index < units and not isSeparator(index))
+            while (index < units and not text.isSeparator(index))
                 ++index;
             rootUnits = index < units ? index + 1 : index;
         }
     }
-    else if (units > 0 and isSeparator(0))
+    else if (units > 0 and text.isSeparator(0))
     {
         rootUnits = 1;
     }

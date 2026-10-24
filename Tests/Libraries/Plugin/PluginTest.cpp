@@ -26,6 +26,73 @@
 #include "Libraries/Plugin/Internal/VisualStudioPathFinder.h"
 #endif
 
+#if SC_PLATFORM_WINDOWS
+namespace PluginWindowsRootConstexprTests
+{
+// Byte-backed UTF16 permits constant evaluation in C++14 without wide-literal union access.
+using namespace SC;
+static_assert(sizeof(wchar_t) == 2, "Windows model requires two-byte wchar_t");
+template <size_t N>
+struct BytePath
+{
+    char bytes[2 * N] = {};
+    constexpr BytePath(const char (&text)[N])
+    {
+        for (size_t i = 0; i < N; ++i)
+            bytes[2 * i] = text[i];
+    }
+};
+template <size_t N>
+constexpr bool check(const char (&text)[N], size_t removed)
+{
+    BytePath<N> storage(text);
+    StringSpan  input({storage.bytes, 2 * (N - 1)}, true, StringEncoding::Utf16);
+    StringSpan  result = PluginString::withoutWindowsRoot(input);
+    return result.bytesWithoutTerminator() == input.bytesWithoutTerminator() + 2 * removed and
+           result.sizeInBytes() == input.sizeInBytes() - 2 * removed and
+           result.getEncoding() == StringEncoding::Utf16 and not result.isNullTerminated();
+}
+static_assert(check("", 0), "empty backed UTF16 span");
+static_assert(check("relative\\file", 0), "relative path");
+static_assert(check("C:relative", 0), "drive-relative path");
+static_assert(check("C:\\file", 3), "drive absolute backslash");
+static_assert(check("C:/file", 3), "drive absolute slash");
+static_assert(check("C:\\", 3), "drive root only");
+static_assert(check("\\file", 1), "rooted path");
+static_assert(check("/file", 1), "slash rooted path");
+static_assert(check("\\", 1), "single root");
+static_assert(check("\\\\", 2), "empty UNC");
+static_assert(check("\\\\server", 8), "server only UNC");
+static_assert(check("\\\\server\\share", 14), "share root only UNC");
+static_assert(check("\\\\server\\share\\file", 15), "UNC path");
+static_assert(check("//server/share/file", 15), "slash UNC");
+static_assert(check("\\/server/share\\file", 15), "mixed UNC separators");
+static_assert(check("\\\\?\\C:\\file", 7), "extended drive");
+static_assert(check("\\\\?\\C:\\", 7), "extended drive root only");
+static_assert(check("\\\\?\\UNC\\server\\share\\file", 15), "existing extended UNC drops UNC and server only");
+static_assert(check("\\\\?\\", 4), "truncated extended prefix");
+constexpr bool passthrough(StringEncoding encoding)
+{
+    StringSpan input({"C:\\file", 7}, true, encoding);
+    StringSpan result = PluginString::withoutWindowsRoot(input);
+    return result.bytesWithoutTerminator() == input.bytesWithoutTerminator() and result.sizeInBytes() == 7 and
+           result.getEncoding() == encoding and result.isNullTerminated();
+}
+static_assert(passthrough(StringEncoding::Ascii), "ASCII unchanged");
+static_assert(passthrough(StringEncoding::Utf8), "UTF8 unchanged");
+constexpr bool lowByteAndOddLength()
+{
+    // Preserve the current low-byte policy and trailing unmatched byte.
+    const char bytes[] = {'C', 1, ':', 1, '\\', 1, 'x'};
+    StringSpan input({bytes, sizeof(bytes)}, false, StringEncoding::Utf16);
+    StringSpan result = PluginString::withoutWindowsRoot(input);
+    return result.bytesWithoutTerminator() == bytes + 6 and result.sizeInBytes() == 1 and
+           result.getEncoding() == StringEncoding::Utf16 and not result.isNullTerminated();
+}
+static_assert(lowByteAndOddLength(), "preserve low-byte interpretation and odd byte count");
+} // namespace PluginWindowsRootConstexprTests
+#endif
+
 namespace SC
 {
 struct PluginTest;
