@@ -7,6 +7,12 @@
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/ThreadPool.h"
+#if SC_PLATFORM_LINUX
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 namespace SC
 {
@@ -25,6 +31,36 @@ struct SC::AsyncContractTest : public SC::TestCase
             options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
             numRuns         = 2;
         }
+#if SC_PLATFORM_LINUX
+        if (numRuns == 2 and test_section("io_uring initialization preserves stdin"))
+        {
+            const pid_t child = ::fork();
+            SC_TEST_EXPECT(child >= 0);
+            if (child == 0)
+            {
+                (void)::close(STDIN_FILENO);
+                if (::open("/dev/null", O_RDONLY) != STDIN_FILENO)
+                    ::_exit(1);
+                AsyncEventLoop          loop;
+                AsyncEventLoop::Options childOptions;
+                childOptions.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
+                if (not loop.create(childOptions) or not loop.close())
+                    ::_exit(2);
+                ::_exit(::fcntl(STDIN_FILENO, F_GETFD) >= 0 ? 0 : 3);
+            }
+            if (child > 0)
+            {
+                int status = 0;
+                int waited;
+                do
+                {
+                    waited = ::waitpid(child, &status, 0);
+                } while (waited < 0 and errno == EINTR);
+                SC_TEST_EXPECT(waited == child);
+                SC_TEST_EXPECT(WIFEXITED(status) and WEXITSTATUS(status) == 0);
+            }
+        }
+#endif
 
         for (int idx = 0; idx < numRuns; ++idx)
         {

@@ -39,8 +39,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     AsyncFileReadiness wakeUpPoll;
     FileDescriptor     wakeUpEventFd;
 
-    KernelQueueIoURing() { memset(&ring, 0, sizeof(ring)); }
-
     ~KernelQueueIoURing() { SC_ASYNC_TRUST_RESULT(close()); }
 
     Result close()
