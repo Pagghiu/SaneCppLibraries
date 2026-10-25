@@ -181,7 +181,7 @@ SC::Time::Relative SC::Time::HighResolutionCounter::subtractApproximate(HighReso
 SC::Time::Relative SC::Time::HighResolutionCounter::getRelative() const
 {
 #if SC_PLATFORM_WINDOWS
-    return Relative::fromSeconds(static_cast<double>(part1) / part2);
+    return Relative::fromSeconds(static_cast<double>(part1) / static_cast<double>(part2));
 #else
     constexpr int32_t secondsToNanoseconds = 1000000000;
     return Relative::fromSeconds(static_cast<double>(part1) + static_cast<double>(part2) / secondsToNanoseconds);
