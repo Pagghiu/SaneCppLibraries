@@ -246,6 +246,9 @@ jobs:
     - name: compile SCTest
       shell: cmd
       run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: compile SCAsyncUVTest
+      shell: cmd
+      run: SC.bat build compile SCAsyncUVTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: Stage OpenSSL 3 runtime
       shell: pwsh
       run: |
@@ -291,6 +294,10 @@ jobs:
       shell: cmd
       run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
+    - name: test SCAsyncUVTest
+      shell: cmd
+      run: SC.bat build run SCAsyncUVTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+      timeout-minutes: 3
     - name: test InteropSTL
       shell: cmd
       run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%

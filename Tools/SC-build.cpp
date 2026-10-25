@@ -19,6 +19,26 @@ namespace SC
 {
 namespace Tools
 {
+Result installLibuv(const Build::Directories& directories, Package& package)
+{
+    Download download;
+    download.packagesCacheDirectory   = directories.packagesCacheDirectory;
+    download.packagesInstallDirectory = directories.packagesInstallDirectory;
+
+    download.packageName    = "libuv";
+    download.packageVersion = "ec5a4b5";
+    download.url            = "https://github.com/libuv/libuv.git";
+    download.isGitClone     = true;
+    download.createLink     = false;
+    package.packageBaseName = "libuv";
+
+    CustomFunctions functions;
+    functions.testFunction = &verifyGitCommitHashCache;
+
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
 Result installSokol(const Build::Directories& directories, Package& package)
 {
     Download download;
@@ -602,6 +622,225 @@ Result configureSCAwaitCoroutineShimTest(const Parameters& parameters, Workspace
     return Result(true);
 }
 
+Result configureAsyncUVTest(const Parameters& parameters, Workspace& workspace)
+{
+    Project project = {"SCAsyncUVTest"};
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
+
+    project.addFiles("Extra/Experimental/AsyncUV/Code", "*.cpp");
+    project.addFiles("Extra/Experimental/AsyncUV/Tests", "*.cpp");
+
+    Tools::Package libuv;
+    SC_TRY(Tools::installLibuv(parameters.directories, libuv));
+
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+    if (parameters.platform == Platform::Windows)
+    {
+        project.addDefines({"_CRT_SECURE_NO_WARNINGS=1"});
+    }
+    else
+    {
+        project.addDefines({"__POSIX__=1"});
+    }
+    if (parameters.platform == Platform::Linux)
+    {
+        project.addDefines({"_GNU_SOURCE=1"});
+    }
+
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-pass-always.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-platform-output.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-active.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-process-title-threadsafe.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-timer.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-timer-again.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-timer-from-check.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-run-nowait.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-run-once.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-walk-handles.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-loop-handles.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-loop-alive.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-loop-stop.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-loop-close.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-loop-configure.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-loop-time.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-async.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-async-null-cb.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-fail-always.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-barrier.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-callback-stack.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-cwd-and-chdir.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-get-currentexe.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-get-loadavg.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-get-memory.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-get-passwd.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-gethostname.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-gettimeofday.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-homedir.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-env-vars.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-hrtime.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-ip6-addr.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-ip-name.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-getaddrinfo.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-getnameinfo.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-getsockname.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-getters-setters.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tmpdir.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-uname.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-idna.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-process-priority.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-semaphore.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-signal.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-mutexes.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-condvar.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-thread-name.c");
+    }
+    if (parameters.platform == Platform::Apple)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-thread-affinity.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-thread.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-thread-equal.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tty.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-ip4-addr.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-close.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-close-after-read-timeout.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-close-reset.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-bind-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-bind6-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-connect-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-connect-error-after-write.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-connect6-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-connection-fail.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-emfile.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-write-after-connect.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-write-to-half-open-connection.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-write-queue-order.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-close-while-connecting.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-connect-timeout.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-connect-unspecified.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-create-socket-early.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-flags.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-send-and-recv.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-connect.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-connect6.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-multicast-interface.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-multicast-interface6.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-multicast-join.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-multicast-join6.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-mmsg.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-sendmmsg-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-multicast-ttl.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-options.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-open.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-socket-buffer-size.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-strtok.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-strscpy.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-close-order.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-default-loop-close.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-dlerror.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-test-macros.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-shutdown-eof.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-shutdown-simultaneous.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-shutdown-twice.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-idle.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-multiple-listen.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-read-stop.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-read-stop-start.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-unexpected-read.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-oob.c");
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-open.c");
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-rst.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-shutdown-after-write.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-try-write-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-try-write.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-write-fail.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-write-in-a-row.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-writealot.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-readable-on-eof.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-not-readable-nor-writable-on-read-error.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-not-writable-after-shutdown.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-pipe-pending-instances.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-send-immediate.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-bind.c");
+    if (parameters.platform != Platform::Windows)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-create-socket-early.c");
+    }
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-ipv6.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-dgram-too-big.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-send-hang-loop.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-send-unreachable.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-close-accept.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-alloc-cb-fail.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-alloc-cb-fail.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-delayed-accept.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-watcher-cross-stop.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-random.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-threadpool.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-recv-in-a-row.c");
+    project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-try-send.c");
+    if (parameters.platform != Platform::Linux)
+    {
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-tcp-reuseport.c");
+        project.addFiles(libuv.packageLocalDirectory.view(), "test/test-udp-reuseport.c");
+    }
+
+    SourceFiles libuvTests;
+    libuvTests.selection = {{FilesSelection::Add, libuv.packageLocalDirectory.view(), "test/*.c"},
+                            {FilesSelection::Add, "Extra/Experimental/AsyncUV/Code", "SCAsyncUV.cpp"},
+                            {FilesSelection::Add, "Extra/Experimental/AsyncUV/Tests", "SCAsyncUVTest.cpp"}};
+    libuvTests.compile.disableWarnings({4100, 4127, 4201, 4244, 4245, 4459, 4267, 4702});
+    libuvTests.compile.disableWarnings({"implicit-fallthrough", "unused-parameter", "sign-conversion", "shadow",
+                                        "shorten-64-to-32", "implicit-int-conversion", "assign-enum"});
+    // Upstream's currently disabled tty_pty case passes an uninitialized winsize to openpty.
+    libuvTests.compile.disableClangWarnings({"uninitialized"});
+
+    String libuvIncludeRelative;
+    SC_TRY(Path::relativeFromTo(libuvIncludeRelative, project.rootDirectory.view(), libuv.packageLocalDirectory.view(),
+                                Path::AsNative));
+
+    String libuvInclude;
+    Path::join(libuvInclude, {libuvIncludeRelative.view(), "include"});
+    project.addIncludePaths({"Extra/Experimental/AsyncUV/Code", libuvInclude.view()});
+    project.addSpecificFileFlags(libuvTests);
+
+    project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
+    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
+    project.addIncludePaths({".", "Tests/SCTest"});
+
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    project.removeFiles("Libraries/Foundation", "**.cpp");
+    project.removeFiles("Libraries/Foundation", "**.h");
+    project.removeFiles("Libraries/Foundation", "**.inl");
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
+    addSaneCppDebugVisualizers(project, parameters);
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
+}
+
 Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {"SC", TargetType::SharedLibrary};
@@ -928,6 +1167,7 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureStdCppHeaderNoLinkTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitCoroutineShimTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));
+    SC_TRY(configureAsyncUVTest(parameters, defaultWorkspace));
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));
     SC_TRY(configureExamplesGUI(parameters, defaultWorkspace));

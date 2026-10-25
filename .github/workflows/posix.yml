@@ -240,6 +240,9 @@ jobs:
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: compile SCAsyncExecutionTest
       run: ./SC.sh build compile SCAsyncExecutionTest ${{ matrix.config }}
+    - name: compile SCAsyncUVTest
+      run: ./SC.sh build compile SCAsyncUVTest ${{ matrix.config }}
+      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: compile SCBuildTest
       run: ./SC.sh build compile SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release'
@@ -268,6 +271,10 @@ jobs:
     - name: test SCBuildTest
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release'
+    - name: test SCAsyncUVTest
+      run: ./SC.sh build run SCAsyncUVTest ${{ matrix.config }}
+      timeout-minutes: 3
+      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: test SCBuildTest real QEMU Linux target profiles
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }} -- --test SCBuildTest --test-section "native backend smoke-runs Linux target profiles through real qemu on macOS"
       env:
@@ -278,10 +285,17 @@ jobs:
     - name: compile SCTest xcode
       run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: compile SCAsyncUVTest xcode
+      run: ./SC.sh build compile SCAsyncUVTest ${{ matrix.config }} xcode
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: test SCTest xcode
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
       env:
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: test SCAsyncUVTest xcode
+      run: ./SC.sh build run SCAsyncUVTest ${{ matrix.config }} xcode
+      timeout-minutes: 3
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Save llvm-mingw cache
       if: matrix.config == 'Release' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''

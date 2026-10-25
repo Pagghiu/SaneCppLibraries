@@ -4,6 +4,7 @@ Experimental code maintained for evaluation. APIs, layout and availability may c
 compatibility guarantees. Inclusion in this repository does not make it part of the supported library set.
 
 - [AsyncExecution](AsyncExecution/README.md): optional C++ sender/receiver adapter over SC::Async.
+- [AsyncUV](AsyncUV/README.md): experimental source-compatible subset of the libuv C API over SC::Async.
 
 Experiments are self-contained, with explicit build targets and their own examples/tests. They may depend on
 core libraries; core libraries must never depend on experiments. Default SC.cpp, core dependency discovery,
