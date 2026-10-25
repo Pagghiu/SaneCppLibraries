@@ -1,0 +1,51 @@
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+
+namespace SC
+{
+struct TestReport;
+void runAsyncExecutionTest(TestReport& report);
+void runAsyncExecutionTimeoutTest(TestReport& report);
+void runAsyncExecutionParityTest(TestReport& report);
+void runAsyncExecutionReadinessTest(TestReport& report);
+void runAsyncExecutionNotificationTest(TestReport& report);
+void runAsyncExecutionExternalCompletionTest(TestReport& report);
+void runAsyncExecutionFileSystemTest(TestReport& report);
+} // namespace SC
+
+#include "Libraries/Memory/Globals.h"
+#include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/Console.h"
+#include "Libraries/Testing/Testing.h"
+
+SC::Console* globalConsole;
+
+int main(int argc, const char* argv[])
+{
+    using namespace SC;
+
+    Globals::init(Globals::Global, {1024 * 1024});
+    Console::tryAttachingToParentConsole();
+    SocketNetworking::initNetworking();
+
+    Console console;
+    globalConsole = &console;
+
+    TestReport::Output<Console> trConsole = {console};
+    TestReport                  report(trConsole, argc, argv);
+    if (report.hasStartupFailure())
+    {
+        return report.getTestReturnCode();
+    }
+    report.debugBreakOnFailedTest = true;
+
+    runAsyncExecutionTest(report);
+    runAsyncExecutionTimeoutTest(report);
+    runAsyncExecutionParityTest(report);
+    runAsyncExecutionReadinessTest(report);
+    runAsyncExecutionNotificationTest(report);
+    runAsyncExecutionExternalCompletionTest(report);
+    runAsyncExecutionFileSystemTest(report);
+
+    return report.getTestReturnCode();
+}

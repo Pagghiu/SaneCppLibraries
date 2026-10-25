@@ -24,4 +24,4 @@ Check explicit-offset scalar/vector contents, empty entries between nonempty pip
 ## Related
 
 - [Microsoft IOCP notification modes](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
-- [Borrowed file options](../AsyncExecution/asyncexecution-0008-borrowed-file-options-and-complete-transfers.md)
+- [Borrowed file options](../AsyncExecution/asyncexecution-0007-borrowed-file-options-and-complete-transfers.md)

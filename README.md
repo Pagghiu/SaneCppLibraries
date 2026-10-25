@@ -92,6 +92,11 @@ See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_u
 - [Tools](https://pagghiu.github.io/SaneCppLibraries/page_tools.html) is a collection of repository / code automation tools built using libraries themselves
   - Includes a fully self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/page_build.html) build system where builds are imperatively described using C++ code, can generate XCode / Visual Studio / Make projects, and can also build directly through a native backend on macOS, Linux, and Windows.
 
+## Experimental code
+
+[Extra/Experimental](Extra/Experimental/README.md) contains optional prototypes outside the supported library set.
+Their APIs and availability may change without compatibility guarantees; builds require explicit opt-in.
+
 ## No Allocations (*)
 
 - All libraries are designed to work inside user-provided memory buffers and can be used without dynamic memory allocation.

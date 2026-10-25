@@ -142,6 +142,13 @@
       "owner": "Package",
       "declaration": "Tools/SC-package/PackageError.h",
       "constant": "PackageResultCategory"
+    },
+    {
+      "value": 23,
+      "owner": "AsyncExecution",
+      "status": "experimental",
+      "declaration": "Extra/Experimental/AsyncExecution/AsyncExecutionError.h",
+      "constant": "AsyncExecutionResultCategory"
     }
   ]
 }

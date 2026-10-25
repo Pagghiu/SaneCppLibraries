@@ -525,6 +525,49 @@ Result configureSCAwaitTest(const Parameters& parameters, Workspace& workspace)
     return Result(true);
 }
 
+Result configureSCAsyncExecutionTest(const Parameters& parameters, Workspace& workspace, bool demo = false,
+                                     bool controlFlowDemo = false)
+{
+    const StringView name    = controlFlowDemo ? StringView("SCAsyncControlFlowEcho")
+                               : demo          ? StringView("SCAsyncExecutionDemo")
+                                               : StringView("SCAsyncExecutionTest");
+    Project          project = {name};
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+    project.files.compile.cppStandard      = CppStandard::CPP20;
+    project.files.compile.includeStdCpp    = true;
+    project.link.linkStdCpp                = true;
+    project.saneCpp.enabled                = true;
+    project.saneCpp.provideCppRuntimeShims = false;
+
+    ProcessEnvironment environment;
+    StringSpan         includeDirectory;
+    if (environment.get("SC_ASYNC_EXECUTION_STDEXEC_INCLUDE", includeDirectory) and not includeDirectory.isEmpty())
+    {
+        SC_TRY(project.addIncludePaths({includeDirectory}));
+        project.addDefines({"SC_ASYNC_EXECUTION_USE_STDEXEC=1"});
+        // stdexec's erased allocator base deliberately has a non-virtual destructor.
+        project.files.compile.disableClangWarnings({"non-virtual-dtor"});
+    }
+    project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
+    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
+    project.addIncludePaths({"."});
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
+    // Experimental code is excluded from core library discovery and SC.cpp; opt in per target.
+    project.addFiles("Extra/Experimental/AsyncExecution", "*.h");
+    project.addFiles("Extra/Experimental/AsyncExecution", "AsyncExecution.cpp");
+    if (controlFlowDemo)
+        project.addFiles("Extra/Experimental/AsyncExecution/Examples/AsyncControlFlowEcho", "*.cpp");
+    else if (demo)
+        project.addFiles("Extra/Experimental/AsyncExecution/Examples/AsyncExecutionDemo", "*.cpp");
+    else
+        project.addFiles("Extra/Experimental/AsyncExecution/Tests", "*.cpp");
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
+}
+
 Result configureStdCppHeaderNoLinkTest(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {STD_CPP_HEADER_NO_LINK_TEST_PROJECT_NAME};
@@ -879,6 +922,9 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureTests(parameters, defaultWorkspace));
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitTest(parameters, defaultWorkspace));
+    SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace));
+    SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace, true));
+    SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace, false, true));
     SC_TRY(configureStdCppHeaderNoLinkTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitCoroutineShimTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));

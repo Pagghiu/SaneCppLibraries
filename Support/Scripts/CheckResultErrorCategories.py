@@ -56,7 +56,8 @@ def main():
         registered[expected[0]] = expected[1]
 
     declared = {}
-    for header in list((ROOT / "Libraries").rglob("*.h")) + list((ROOT / "Tools").rglob("*.h")):
+    header_roots = [ROOT / "Libraries", ROOT / "Tools", ROOT / "Extra/Experimental"]
+    for header in (header for directory in header_roots for header in directory.rglob("*.h")):
         for match in CATEGORY_PATTERN.finditer(header.read_text(encoding="utf-8")):
             constant = match.group("constant")
             value = int(match.group("value"))
