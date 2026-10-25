@@ -832,64 +832,81 @@ SC::Result SC::HttpClientOperation::platformStart()
                 GlobalFree(effectiveUrl);
             }
 
+            uint64_t   bodyBytesRemaining = 0;
+            const int  responseStatus     = operation->currentResponse->statusCode;
+            const bool checkBodyLength    = operation->currentRequest.method != HttpClientRequest::HttpHEAD and
+                                         responseStatus >= 200 and responseStatus != 204 and responseStatus != 304 and
+                                         not operation->currentResponse->hasHeader("Transfer-Encoding") and
+                                         operation->currentResponse->getContentLength(bodyBytesRemaining);
+
             operation->enqueueResponseHead();
 
+            Result bodyResult(true);
             for (;;)
             {
                 DWORD available = 0;
                 if (not WinHttpQueryDataAvailable(internalRef.hRequest, &available))
                 {
+                    bodyResult = Result::Error(HttpClientResultCategory, isCancelRequested(internalRef)
+                                                                             ? HttpClientError::RequestCancelled
+                                                                             : HttpClientError::ResponseBodyReadFailed);
                     break;
                 }
-                if (available == 0)
+
+                size_t     bufferIndex = 0;
+                Span<char> data;
+                bodyResult = operation->allocateResponseBuffer(1, bufferIndex, data);
+                if (not bodyResult)
                 {
                     break;
                 }
 
-                size_t      bufferIndex = 0;
-                Span<char>  data;
-                const DWORD toRead = available;
-                if (not operation->allocateResponseBuffer(1, bufferIndex, data))
-                {
-                    operation->enqueueError(
-                        Result::Error(HttpClientResultCategory, HttpClientError::ResponseBufferCapacityInsufficient));
-                    internalRef.workerRunning = false;
-                    return 0;
-                }
-
+                // A successful read of zero bytes establishes EOF, rather than availability alone.
+                const DWORD requested = available > 0 ? available : 1;
+                const DWORD toRead =
+                    static_cast<DWORD>(data.sizeInBytes() < requested ? data.sizeInBytes() : requested);
                 DWORD bytesRead = 0;
-                if (not WinHttpReadData(internalRef.hRequest, data.data(),
-                                        static_cast<DWORD>(data.sizeInBytes() < toRead ? data.sizeInBytes() : toRead),
-                                        &bytesRead))
+                if (not WinHttpReadData(internalRef.hRequest, data.data(), toRead, &bytesRead))
                 {
                     operation->releaseResponseBuffer(bufferIndex);
-                    operation->enqueueError(
-                        Result::Error(HttpClientResultCategory, HttpClientError::ResponseBodyReadFailed));
-                    internalRef.workerRunning = false;
-                    return 0;
+                    bodyResult = Result::Error(HttpClientResultCategory, isCancelRequested(internalRef)
+                                                                             ? HttpClientError::RequestCancelled
+                                                                             : HttpClientError::ResponseBodyReadFailed);
+                    break;
                 }
                 if (bytesRead == 0)
                 {
                     operation->releaseResponseBuffer(bufferIndex);
+                    // WinHTTP can report successful EOF even when Content-Length has not been satisfied.
+                    if (checkBodyLength and bodyBytesRemaining != 0)
+                    {
+                        bodyResult = Result::Error(HttpClientResultCategory, HttpClientError::ResponseBodyReadFailed);
+                    }
                     break;
+                }
+                if (checkBodyLength)
+                {
+                    if (bytesRead > bodyBytesRemaining)
+                    {
+                        operation->releaseResponseBuffer(bufferIndex);
+                        bodyResult = Result::Error(HttpClientResultCategory, HttpClientError::ResponseBodyReadFailed);
+                        break;
+                    }
+                    bodyBytesRemaining -= bytesRead;
                 }
                 operation->enqueueResponseBuffer(bufferIndex, bytesRead);
             }
 
-            operation->enqueueResponseComplete();
+            if (bodyResult)
+            {
+                operation->enqueueResponseComplete();
+            }
+            else
+            {
+                operation->enqueueError(bodyResult);
+            }
 
-            internalRef.handlesMutex.lock();
-            if (internalRef.hRequest != NULL)
-            {
-                WinHttpCloseHandle(internalRef.hRequest);
-                internalRef.hRequest = NULL;
-            }
-            if (internalRef.hConnect != NULL)
-            {
-                WinHttpCloseHandle(internalRef.hConnect);
-                internalRef.hConnect = NULL;
-            }
-            internalRef.handlesMutex.unlock();
+            closeHandles();
             internalRef.workerRunning = false;
             return 0;
         },

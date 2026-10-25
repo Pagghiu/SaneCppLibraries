@@ -77,6 +77,14 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             blockingResponseHeaderBufferOverflow();
         }
+        if (test_section("blocking truncated response"))
+        {
+            blockingTruncatedResponse();
+        }
+        if (test_section("blocking bodyless response"))
+        {
+            blockingBodylessResponse();
+        }
         if (test_section("blocking POST local"))
         {
             blockingPost();
@@ -1131,18 +1139,142 @@ struct SC::HttpClientTest : public SC::TestCase
             });
     }
 
+    void blockingTruncatedResponse()
+    {
+        for (size_t caseIndex = 0; caseIndex < 2; ++caseIndex)
+        {
+            struct Scenario
+            {
+                bool sendPrefix;
+                bool responseSent = false;
+            } scenario{caseIndex != 0};
+            runBlockingScenario(
+                [this, &scenario](HttpConnection& client)
+                {
+                    SC_TEST_EXPECT(client.response.startResponse(200));
+                    SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
+                    SC_TEST_EXPECT(client.response.sendHeaders());
+                    if (scenario.sendPrefix)
+                    {
+                        SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
+                    }
+                    SC_TEST_EXPECT(client.response.end());
+                    scenario.responseSent = true;
+                },
+                [this](StringView endpoint)
+                {
+                    CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+
+                    HttpClientRequest  request;
+                    HttpClientResponse response;
+                    char               body[64]   = {};
+                    size_t             bodyLength = 0;
+
+                    request.url = endpoint;
+                    const Result result =
+                        HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory);
+                    SC_TEST_EXPECT(not result);
+#if SC_PLATFORM_WINDOWS
+                    SC_TEST_EXPECT(result.isError(HttpClientResultCategory, HttpClientError::ResponseBodyReadFailed));
+                    SC_TEST_EXPECT(response.statusCode == 200);
+                    uint64_t declaredLength = 0;
+                    SC_TEST_EXPECT(response.getContentLength(declaredLength));
+                    SC_TEST_EXPECT(declaredLength == 9);
+#endif
+                    SC_TEST_EXPECT(bodyLength < 9);
+                });
+            SC_TEST_EXPECT(scenario.responseSent);
+        }
+    }
+
+    void blockingBodylessResponse()
+    {
+        for (size_t caseIndex = 0; caseIndex < 3; ++caseIndex)
+        {
+            struct Scenario
+            {
+                HttpClientRequest::Method method;
+
+                int statusCode;
+            } scenario{caseIndex == 0 ? HttpClientRequest::HttpHEAD : HttpClientRequest::HttpGET,
+                       caseIndex == 0 ? 200 : (caseIndex == 1 ? 304 : 204)};
+
+            runBlockingScenario(
+                [this, &scenario](HttpConnection& client)
+                {
+                    SC_TEST_EXPECT(client.response.startResponse(scenario.statusCode));
+                    if (scenario.statusCode != 204)
+                    {
+                        SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
+                    }
+                    SC_TEST_EXPECT(client.response.sendHeaders());
+                    SC_TEST_EXPECT(client.response.end());
+                },
+                [this, &scenario](StringView endpoint)
+                {
+                    CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+
+                    HttpClientRequest  request;
+                    HttpClientResponse response;
+                    char               body[64]   = {};
+                    size_t             bodyLength = 0;
+
+                    request.url    = endpoint;
+                    request.method = scenario.method;
+                    SC_TEST_EXPECT(HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
+                                                               memory.memory));
+                    SC_TEST_EXPECT(response.statusCode == scenario.statusCode);
+                    SC_TEST_EXPECT(bodyLength == 0);
+                });
+        }
+    }
+
     void blockingPost()
     {
+        struct UploadCollector
+        {
+            HttpConnection* connection = nullptr;
+
+            char   received[9]  = {};
+            size_t receivedSize = 0;
+
+            void onData(AsyncBufferView::ID bufferID)
+            {
+                AsyncReadableStream& readable = connection->request.getReadableStream();
+                Span<const char>     data;
+                SC_ASSERT_RELEASE(readable.getBuffersPool().getReadableData(bufferID, data));
+                SC_ASSERT_RELEASE(receivedSize + data.sizeInBytes() <= sizeof(received));
+                memcpy(received + receivedSize, data.data(), data.sizeInBytes());
+                receivedSize += data.sizeInBytes();
+                SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
+            }
+
+            void onEnd()
+            {
+                SC_ASSERT_RELEASE(receivedSize == sizeof(received));
+                SC_ASSERT_RELEASE(connection->response.startResponse(200));
+                SC_ASSERT_RELEASE(connection->response.addHeader("Content-Length"_a8, "2"_a8));
+                SC_ASSERT_RELEASE(connection->response.sendHeaders());
+                SC_ASSERT_RELEASE(connection->response.getWritableStream().write("OK"));
+                SC_ASSERT_RELEASE(connection->response.end());
+            }
+        } upload;
+
         runBlockingScenario(
-            [this](HttpConnection& client)
+            [this, &upload](HttpConnection& client)
             {
                 SC_TEST_EXPECT(client.request.getParser().method == HttpParser::Method::HttpPOST);
                 SC_TEST_EXPECT(client.request.getBodyBytesRemaining() == 9);
-                SC_TEST_EXPECT(client.response.startResponse(200));
-                SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "2"_a8));
-                SC_TEST_EXPECT(client.response.sendHeaders());
-                SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
-                SC_TEST_EXPECT(client.response.end());
+                upload.connection = &client;
+                // Reply only after draining the upload, so closing cannot reset an unread request body.
+                const bool dataListenerAdded =
+                    client.request.getReadableStream().eventData.addListener<UploadCollector, &UploadCollector::onData>(
+                        upload);
+                SC_TEST_EXPECT(dataListenerAdded);
+                const bool endListenerAdded =
+                    client.request.getReadableStream().eventEnd.addListener<UploadCollector, &UploadCollector::onEnd>(
+                        upload);
+                SC_TEST_EXPECT(endListenerAdded);
             },
             [this](StringView endpoint)
             {
@@ -1162,6 +1294,8 @@ struct SC::HttpClientTest : public SC::TestCase
                 SC_TEST_EXPECT(response.statusCode == 200);
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "OK");
             });
+        SC_TEST_EXPECT(upload.receivedSize == sizeof(upload.received));
+        SC_TEST_EXPECT(memcmp(upload.received, "HelloBody", sizeof(upload.received)) == 0);
     }
 
     void blockingCustomHeaders()
