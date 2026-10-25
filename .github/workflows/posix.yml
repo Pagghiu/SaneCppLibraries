@@ -31,9 +31,26 @@ jobs:
             params: { os: macos-latest }
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 20
+    env:
+      SC_ASYNC_EXECUTION_STDEXEC_INCLUDE: _Build/_AsyncExecutionStdexec/include
+      SC_ASYNC_EXECUTION_STDEXEC_REVISION: 34fa94719f97f49a553811423fa1200172f22a0e
 
     steps:
     - uses: actions/checkout@v5
+    - name: Cache stdexec headers
+      id: stdexec-cache
+      uses: actions/cache@v5
+      with:
+        path: _Build/_AsyncExecutionStdexec/include
+        key: sc-stdexec-headers-v1-${{ runner.os }}-${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+    - name: Download pinned stdexec
+      if: steps.stdexec-cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v5
+      with:
+        repository: NVIDIA/stdexec
+        ref: ${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+        path: _Build/_AsyncExecutionStdexec
+        persist-credentials: false
     - name: LibC Compatibility Check
       run: ./Support/Scripts/CheckLibC.sh
     - name: Standard C++ Header No Runtime Link Check
@@ -221,6 +238,8 @@ jobs:
     - name: compile SCTest
       run: ./SC.sh build compile SCTest ${{ matrix.config }}
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: compile SCAsyncExecutionTest
+      run: ./SC.sh build compile SCAsyncExecutionTest ${{ matrix.config }}
     - name: compile SCBuildTest
       run: ./SC.sh build compile SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release'
@@ -244,6 +263,8 @@ jobs:
       env:
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: test SCAsyncExecutionTest
+      run: ./SC.sh build run SCAsyncExecutionTest ${{ matrix.config }}
     - name: test SCBuildTest
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release'

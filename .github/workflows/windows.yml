@@ -131,10 +131,26 @@ jobs:
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 12
     env:
+      SC_ASYNC_EXECUTION_STDEXEC_INCLUDE: _Build/_AsyncExecutionStdexec/include
+      SC_ASYNC_EXECUTION_STDEXEC_REVISION: 34fa94719f97f49a553811423fa1200172f22a0e
       WINDOWS_LONG_PATH_ARGS: ${{ matrix.config == 'Debug' && matrix.params.os == 'windows-2022' && '--windows-long-path-aware off' || '' }}
 
     steps:
     - uses: actions/checkout@v5
+    - name: Cache stdexec headers
+      id: stdexec-cache
+      uses: actions/cache@v5
+      with:
+        path: _Build/_AsyncExecutionStdexec/include
+        key: sc-stdexec-headers-v1-${{ runner.os }}-${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+    - name: Download pinned stdexec
+      if: steps.stdexec-cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v5
+      with:
+        repository: NVIDIA/stdexec
+        ref: ${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+        path: _Build/_AsyncExecutionStdexec
+        persist-credentials: false
     - name: Verify OpenSSL 3
       shell: pwsh
       run: |
@@ -246,6 +262,11 @@ jobs:
         }
 
         Copy-Item $openSSLDll $scTest.Directory.FullName
+    - name: compile SCAsyncExecutionTest
+      shell: cmd
+      env:
+        CL: /Zc:__cplusplus /Zc:preprocessor /external:anglebrackets /external:W0
+      run: SC.bat build compile SCAsyncExecutionTest ${{ matrix.config }}
     - name: compile SCBuildTest
       shell: cmd
       run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
@@ -261,6 +282,11 @@ jobs:
       run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS% -- --all-tests
       env:
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+    - name: test SCAsyncExecutionTest
+      shell: cmd
+      env:
+        CL: /Zc:__cplusplus /Zc:preprocessor /external:anglebrackets /external:W0
+      run: SC.bat build run SCAsyncExecutionTest ${{ matrix.config }}
     - name: test SCBuildTest
       shell: cmd
       run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%

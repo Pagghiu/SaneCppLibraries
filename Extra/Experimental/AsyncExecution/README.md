@@ -182,3 +182,7 @@ export SC_ASYNC_EXECUTION_STDEXEC_INCLUDE=/absolute/path/to/stdexec/include
 
 Repeat compile/run for Release. Windows setup and provider gates are in the [reference](Documentation/Reference.md).
 External-provider interoperability is separate from native standard-library conformance.
+
+The [Posix](../../../.github/workflows/posix.yml) and [Windows](../../../.github/workflows/windows.yml) CI workflows
+run `SCAsyncExecutionTest` in Debug and Release. CI downloads pinned stdexec headers on a cache miss and
+reuses them through GitHub Actions cache; changing the pinned revision changes the cache key.
