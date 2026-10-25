@@ -5,6 +5,7 @@
 #include "../../Common/Result.h"
 #include "../../Strings/StringConverter.h"
 #include <memory.h> // memcpy
+#include <stdint.h> // uintptr_t
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -15,11 +16,11 @@
 
 struct SC::StringConverter::Internal
 {
-    // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
-    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, IGrowableBuffer& destination,
-                                                     int& writtenCodeUnits);
-    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, IGrowableBuffer& destination,
-                                                     int& writtenCodeUnits);
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE
+    [[nodiscard]] static bool readCodePoint(const char*& source, const char* end, bool utf16, uint32_t& codePoint);
+    [[nodiscard]] static bool convertFallback(StringSpan text, IGrowableBuffer& buffer, StringTermination terminate,
+                                              StringEncoding destinationEncoding);
+#endif
     [[nodiscard]] static bool convertSameEncoding(StringSpan text, IGrowableBuffer& buffer,
                                                   StringTermination terminate);
     [[nodiscard]] static bool convertEncodingToUTF8(StringSpan text, IGrowableBuffer& ibuffer,
@@ -84,15 +85,18 @@ void SC::StringConverter::Internal::eventuallyNullTerminate(IGrowableBuffer&    
 bool SC::StringConverter::Internal::convertEncodingToUTF8(StringSpan text, IGrowableBuffer& ibuffer,
                                                           StringTermination terminate)
 {
-    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
     if (text.getEncoding() == StringEncoding::Utf8 || text.getEncoding() == StringEncoding::Ascii)
     {
-        return Internal::convertSameEncoding(text, buffer, terminate);
+        return Internal::convertSameEncoding(text, ibuffer, terminate);
     }
     else if (text.getEncoding() == StringEncoding::Utf16)
     {
-        const bool nullTerminate = terminate == NullTerminate;
-        const auto oldSize       = buffer.size();
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE
+        return Internal::convertFallback(text, ibuffer, terminate, StringEncoding::Utf8);
+#else
+        Internal::ConverterBuffer& buffer        = static_cast<Internal::ConverterBuffer&>(ibuffer);
+        const bool                 nullTerminate = terminate == NullTerminate;
+        const auto                 oldSize       = buffer.size();
 #if SC_PLATFORM_WINDOWS
         const int      sourceSizeInBytes = static_cast<int>(text.sizeInBytes());
         const wchar_t* source            = reinterpret_cast<const wchar_t*>(text.bytesWithoutTerminator());
@@ -107,9 +111,6 @@ bool SC::StringConverter::Internal::convertEncodingToUTF8(StringSpan text, IGrow
         auto    deferDeleteTempString = MakeDeferred([&] { CFRelease(tmpStr); });
         CFRange charRange             = {0, CFStringGetLength(tmpStr)};
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF8, 0, false, NULL, 0, &numChars);
-#else
-        int numChars = -1;
-        SC_TRY(Internal::convertUTF16LE_to_UTF8(text, buffer, numChars));
 #endif
 
         if (numChars <= 0)
@@ -127,6 +128,7 @@ bool SC::StringConverter::Internal::convertEncodingToUTF8(StringSpan text, IGrow
 #endif
         Internal::eventuallyNullTerminate(buffer, StringEncoding::Utf8, terminate);
         return true;
+#endif
     }
     return false;
 }
@@ -134,14 +136,17 @@ bool SC::StringConverter::Internal::convertEncodingToUTF8(StringSpan text, IGrow
 bool SC::StringConverter::Internal::convertEncodingToUTF16(StringSpan text, IGrowableBuffer& ibuffer,
                                                            StringTermination terminate)
 {
-    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
     if (text.getEncoding() == StringEncoding::Utf16)
     {
-        return Internal::convertSameEncoding(text, buffer, terminate);
+        return Internal::convertSameEncoding(text, ibuffer, terminate);
     }
     else if (text.getEncoding() == StringEncoding::Utf8 || text.getEncoding() == StringEncoding::Ascii)
     {
-        const StringEncoding destinationEncoding = StringEncoding::Utf16;
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE
+        return Internal::convertFallback(text, ibuffer, terminate, StringEncoding::Utf16);
+#else
+        Internal::ConverterBuffer& buffer              = static_cast<Internal::ConverterBuffer&>(ibuffer);
+        const StringEncoding       destinationEncoding = StringEncoding::Utf16;
 
         const bool nullTerminate       = terminate == NullTerminate;
         const auto destinationCharSize = StringEncodingGetSize(destinationEncoding);
@@ -162,9 +167,6 @@ bool SC::StringConverter::Internal::convertEncodingToUTF16(StringSpan text, IGro
         CFRange charRange             = {0, CFStringGetLength(tmpStr)};
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF16, 0, false, NULL, 0, &numChars);
         CFIndex writtenCodeUnits = numChars / static_cast<CFIndex>(destinationCharSize);
-#else
-        int writtenCodeUnits = -1;
-        SC_TRY(Internal::convertUTF8_to_UTF16LE(text, buffer, writtenCodeUnits));
 #endif
         if (writtenCodeUnits <= 0)
         {
@@ -182,6 +184,7 @@ bool SC::StringConverter::Internal::convertEncodingToUTF16(StringSpan text, IGro
 #endif
         Internal::eventuallyNullTerminate(buffer, destinationEncoding, terminate);
         return true;
+#endif
     }
     return false;
 }
@@ -209,148 +212,100 @@ bool SC::StringConverter::appendEncodingTo(StringEncoding encoding, StringSpan t
 
 #if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE
 
-bool SC::StringConverter::Internal::convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, IGrowableBuffer& ibuffer,
-                                                           int& writtenCodeUnits)
+bool SC::StringConverter::Internal::readCodePoint(const char*& source, const char* end, bool utf16, uint32_t& codePoint)
 {
-    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
-
-    const char*  utf8    = sourceUtf8.bytesWithoutTerminator();
-    const size_t utf8Len = sourceUtf8.sizeInBytes();
-
-    // Calculate the maximum possible size for the UTF-16 string
-    // Each UTF-8 character can be represented by at most one UTF-16 code unit
-    SC_TRY(buffer.resizeWithoutInitializing(utf8Len + 1));
-
-    uint16_t* utf16 = reinterpret_cast<uint16_t*>(buffer.data());
-
-    size_t srcIndex = 0;
-    size_t dstIndex = 0;
-
-    // Assuming little-endian byte order for UTF-16
-    while (srcIndex < utf8Len)
+    const char* start = source;
+    if (utf16)
     {
-        uint32_t codePoint;
-
-        // Decode the next UTF-8 character
-        if ((utf8[srcIndex] & 0x80) == 0x00)
-        {
-            // Single-byte character
-            codePoint = static_cast<uint32_t>(utf8[srcIndex++]);
-        }
-        else if ((utf8[srcIndex] & 0xE0) == 0xC0)
-        {
-            // Two-byte character
-            codePoint = static_cast<uint32_t>(((utf8[srcIndex] & 0x1F) << 6) | (utf8[srcIndex + 1] & 0x3F));
-            srcIndex += 2;
-        }
-        else if ((utf8[srcIndex] & 0xF0) == 0xE0)
-        {
-            // Three-byte character
-            codePoint = static_cast<uint32_t>(((utf8[srcIndex] & 0x0F) << 12) | ((utf8[srcIndex + 1] & 0x3F) << 6) |
-                                              (utf8[srcIndex + 2] & 0x3F));
-            srcIndex += 3;
-        }
-        else if ((utf8[srcIndex] & 0xF8) == 0xF0)
-        {
-            // Four-byte character
-            codePoint = static_cast<uint32_t>(((utf8[srcIndex] & 0x07) << 18) | ((utf8[srcIndex + 1] & 0x3F) << 12) |
-                                              ((utf8[srcIndex + 2] & 0x3F) << 6) | (utf8[srcIndex + 3] & 0x3F));
-            srcIndex += 4;
-        }
-        else
-        {
-            return false;
-        }
-
-        // Encode the code point in UTF-16
-        if (codePoint <= 0xFFFF)
-        {
-            // Single 16-bit code unit
-            utf16[dstIndex++] = (uint16_t)codePoint;
-        }
-        else if (codePoint <= 0x10FFFF)
-        {
-            // Surrogate pair
-            utf16[dstIndex++] = (uint16_t)(((codePoint - 0x10000) >> 10) | 0xD800);
-            utf16[dstIndex++] = (uint16_t)(((codePoint - 0x10000) & 0x3FF) | 0xDC00);
-        }
-        else
-        {
-            return false;
-        }
+        const size_t remaining = static_cast<size_t>(end - source);
+        SC_TRY(remaining >= 2);
+        const uint16_t lead = static_cast<uint16_t>(static_cast<uint8_t>(source[0]) |
+                                                    (static_cast<uint16_t>(static_cast<uint8_t>(source[1])) << 8));
+        // Common's decoder forms source + 2 before checking the end, including after a surrogate lead.
+        SC_TRY(lead < 0xD800 or lead > 0xDFFF or remaining >= 4);
+        codePoint = StringSpan::advanceUTF16(source, end);
+        return codePoint != 0 or lead == 0;
     }
-    writtenCodeUnits = static_cast<int>(dstIndex);
-    return true;
+    codePoint = StringSpan::advanceUTF8(source, end);
+    return codePoint != 0 or *start == 0;
 }
 
-bool SC::StringConverter::Internal::convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, IGrowableBuffer& ibuffer,
-                                                           int& writtenCodeUnits)
+bool SC::StringConverter::Internal::convertFallback(StringSpan text, IGrowableBuffer& buffer,
+                                                    StringTermination terminate, StringEncoding destinationEncoding)
 {
-    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
-
-    const uint16_t* utf16    = reinterpret_cast<const uint16_t*>(sourceUtf16.bytesWithoutTerminator());
-    const size_t    utf16Len = sourceUtf16.sizeInBytes() / sizeof(uint16_t);
-
-    // Calculate the maximum possible size for the UTF-8 string
-    // UTF-8 uses at most 4 bytes per character
-    SC_TRY(buffer.resizeWithoutInitializing(4 * utf16Len + 1));
-
-    char*  utf8     = buffer.data();
-    size_t srcIndex = 0;
-    size_t dstIndex = 0;
-
-    // Assuming little-endian byte order for UTF-16
-    while (srcIndex < utf16Len)
+    const bool   sourceUtf16  = text.getEncoding() == StringEncoding::Utf16;
+    const bool   outputUtf16  = destinationEncoding == StringEncoding::Utf16;
+    const char*  source       = text.bytesWithoutTerminator();
+    const char*  end          = source + text.sizeInBytes();
+    const size_t oldSize      = buffer.size();
+    const size_t maxSize      = ~static_cast<size_t>(0);
+    size_t       encodedBytes = 0;
+    const char*  cursor       = source;
+    while (cursor != end)
     {
-        uint32_t codePoint;
+        uint32_t codePoint = 0;
+        SC_TRY(readCodePoint(cursor, end, sourceUtf16, codePoint));
+        const size_t width = outputUtf16 ? (codePoint <= 0xFFFF ? 2 : 4)
+                                         : (codePoint <= 0x7F     ? 1
+                                            : codePoint <= 0x7FF  ? 2
+                                            : codePoint <= 0xFFFF ? 3
+                                                                  : 4);
+        SC_TRY(width <= maxSize - encodedBytes);
+        encodedBytes += width;
+    }
+    const size_t nullBytes = terminate == NullTerminate ? (outputUtf16 ? 2 : 1) : 0;
+    SC_TRY(encodedBytes <= maxSize - oldSize);
+    const size_t payloadSize = oldSize + encodedBytes;
+    SC_TRY(nullBytes <= maxSize - payloadSize);
 
-        if ((utf16[srcIndex] & 0xFC00) == 0xD800 && (srcIndex + 1) < utf16Len &&
-            (utf16[srcIndex + 1] & 0xFC00) == 0xDC00)
+    // A source inside the logical prefix is preserved by growth, but its address may change.
+    // Compare integer addresses so unrelated source/destination allocations need no pointer ordering/subtraction.
+    const uintptr_t sourceAddress  = reinterpret_cast<uintptr_t>(source);
+    const uintptr_t bufferAddress  = reinterpret_cast<uintptr_t>(buffer.data());
+    const bool      sourceInPrefix = sourceAddress >= bufferAddress and sourceAddress - bufferAddress <= oldSize and
+                                text.sizeInBytes() <= oldSize - static_cast<size_t>(sourceAddress - bufferAddress);
+    const size_t sourceOffset = sourceInPrefix ? static_cast<size_t>(sourceAddress - bufferAddress) : 0;
+    SC_TRY(buffer.resizeWithoutInitializing(payloadSize + nullBytes));
+    if (sourceInPrefix)
+    {
+        source = buffer.data() + sourceOffset;
+        end    = source + text.sizeInBytes();
+    }
+    cursor       = source;
+    char* output = buffer.data() + oldSize;
+    while (cursor != end)
+    {
+        uint32_t codePoint = 0;
+        SC_TRY(readCodePoint(cursor, end, sourceUtf16, codePoint)); // Already validated before resizing.
+        if (outputUtf16)
         {
-            // Surrogate pair
-            codePoint = 0x10000U + ((utf16[srcIndex] & 0x3FFU) << 10U) + (utf16[srcIndex + 1] & 0x3FF);
-            srcIndex += 2;
+            const uint32_t units[] = {codePoint <= 0xFFFF ? codePoint : 0xD800u + ((codePoint - 0x10000u) >> 10),
+                                      0xDC00u + ((codePoint - 0x10000u) & 0x3FFu)};
+            const size_t count = codePoint <= 0xFFFF ? 1 : 2;
+            for (size_t idx = 0; idx < count; ++idx)
+            {
+                *output++ = static_cast<char>(units[idx] & 0xFFu);
+                *output++ = static_cast<char>(units[idx] >> 8);
+            }
+        }
+        else if (codePoint <= 0x7F)
+        {
+            *output++ = static_cast<char>(codePoint);
         }
         else
         {
-            // Single 16-bit code unit
-            codePoint = utf16[srcIndex];
-            srcIndex += 1;
-        }
-
-        // Encode the code point in UTF-8
-        if (codePoint <= 0x7F)
-        {
-            // Single-byte character
-            utf8[dstIndex++] = static_cast<char>(codePoint);
-        }
-        else if (codePoint <= 0x7FF)
-        {
-            // Two-byte character
-            utf8[dstIndex++] = static_cast<char>(0xC0 | ((codePoint >> 6) & 0x1F));
-            utf8[dstIndex++] = static_cast<char>(0x80 | (codePoint & 0x3F));
-        }
-        else if (codePoint <= 0xFFFF)
-        {
-            // Three-byte character
-            utf8[dstIndex++] = static_cast<char>(0xE0 | ((codePoint >> 12) & 0x0F));
-            utf8[dstIndex++] = static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
-            utf8[dstIndex++] = static_cast<char>(0x80 | (codePoint & 0x3F));
-        }
-        else if (codePoint <= 0x10FFFF)
-        {
-            // Four-byte character
-            utf8[dstIndex++] = static_cast<char>(0xF0 | ((codePoint >> 18) & 0x07));
-            utf8[dstIndex++] = static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));
-            utf8[dstIndex++] = static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
-            utf8[dstIndex++] = static_cast<char>(0x80 | (codePoint & 0x3F));
-        }
-        else
-        {
-            return false; // Invalid sequence
+            const size_t width = codePoint <= 0x7FF ? 2 : codePoint <= 0xFFFF ? 3 : 4;
+            for (size_t idx = width - 1; idx > 0; --idx)
+            {
+                output[idx] = static_cast<char>(0x80u | (codePoint & 0x3Fu));
+                codePoint >>= 6;
+            }
+            output[0] = static_cast<char>((width == 2 ? 0xC0u : width == 3 ? 0xE0u : 0xF0u) | codePoint);
+            output += width;
         }
     }
-    writtenCodeUnits = static_cast<int>(dstIndex);
+    if (nullBytes > 0)
+        ::memset(output, 0, nullBytes);
     return true;
 }
 #endif

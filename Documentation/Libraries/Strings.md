@@ -83,6 +83,12 @@ storage. It can also append the destination encoding's null terminator for an op
 conversion or terminator is needed, higher-level platform code can often pass the original `StringSpan` through
 instead of allocating a temporary.
 
+On Linux, cross-encoding conversion strictly rejects malformed UTF-8 and UTF-16 before changing the destination;
+embedded NUL characters remain valid data. The required capacity is the existing byte prefix plus the exact converted
+bytes and any requested terminator. Sources wholly contained in the existing logical prefix survive buffer relocation.
+These rules apply to the Linux fallback; Windows and Apple use their operating-system converters. They do not establish
+a general overlap or allocation-failure transaction guarantee.
+
 @snippet Tests/Libraries/Strings/StringConverterTest.cpp stringConverterTestSnippet
 
 The destination's declared encoding is not changed by conversion. In particular, constructing an owning `String` with

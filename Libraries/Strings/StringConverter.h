@@ -13,7 +13,11 @@ namespace SC
 /// @brief Converts String to a different encoding (UTF8, UTF16).
 ///
 /// SC::StringConverter converts strings between different UTF encodings and can add null-terminator if requested.
-/// When the SC::StringSpan is already null-terminated, the class just forwards the original SC::StringSpan.
+/// Output is appended to the supplied buffer, including a terminator when requested.
+/// On Linux, cross-encoding conversion rejects malformed UTF8/UTF16 before changing the buffer and accepts embedded
+/// NUL. It requires only the exact output capacity, including the existing prefix and requested terminator. In that
+/// fallback, a source wholly inside the existing logical buffer remains valid across growth; other overlaps are not
+/// covered.
 ///
 /// Example:
 /// \snippet Tests/Libraries/Strings/StringConverterTest.cpp stringConverterTestSnippet
