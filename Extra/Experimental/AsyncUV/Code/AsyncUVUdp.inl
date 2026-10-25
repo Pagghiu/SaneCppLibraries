@@ -36,7 +36,11 @@ int mapUdpSendStatus()
 #else
     const int systemError = errno;
 #endif
-    return AsyncUVMapSystemErrorToUv(systemError);
+    const int status = AsyncUVMapSystemErrorToUv(systemError);
+#if defined(SC_ASYNC_UV_TEST_DIAGNOSTICS)
+    fprintf(stderr, "AsyncUV UDP send error: native=%d uv=%d (%s)\n", systemError, status, uv_err_name(status));
+#endif
+    return status;
 }
 
 int getCurrentUdpError()

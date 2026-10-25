@@ -626,6 +626,7 @@ Result configureAsyncUVTest(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {"SCAsyncUVTest"};
     project.setRootDirectory(parameters.directories.projectDirectory.view());
+    project.addDefines({"SC_ASYNC_UV_TEST_DIAGNOSTICS=1"});
 
     project.addFiles("Extra/Experimental/AsyncUV/Code", "*.cpp");
     project.addFiles("Extra/Experimental/AsyncUV/Tests", "*.cpp");
