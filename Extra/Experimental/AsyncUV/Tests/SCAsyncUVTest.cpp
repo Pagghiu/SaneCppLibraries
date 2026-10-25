@@ -258,6 +258,90 @@ const char* test_udp_send_preserves_error()
 #endif
 
 #if !SC_PLATFORM_WINDOWS
+const char* check_ipv4_multicast(bool& available)
+{
+    available = false;
+
+    uv_loop_t loop   = {};
+    uv_udp_t  handle = {};
+    if (uv_loop_init(&loop) != 0)
+        return "multicast probe loop initialization failed";
+    if (uv_udp_init_ex(&loop, &handle, AF_INET) != 0)
+    {
+        (void)uv_loop_close(&loop);
+        return "multicast probe handle initialization failed";
+    }
+
+    struct Context
+    {
+        int calls  = 0;
+        int status = 0;
+    } context;
+    handle.data = &context;
+
+    sockaddr_in destination = {};
+    sockaddr_in local       = {};
+    uv_os_fd_t  descriptor;
+    const char* failure     = nullptr;
+    int         nativeError = 0;
+    if (uv_ip4_addr("239.255.0.1", TCP_READ_STOP_TEST_PORT, &destination) != 0 or
+        uv_ip4_addr("0.0.0.0", 0, &local) != 0 or
+        uv_udp_bind(&handle, reinterpret_cast<const sockaddr*>(&local), 0) != 0 or
+        uv_udp_set_multicast_interface(&handle, "0.0.0.0") != 0 or
+        uv_fileno(reinterpret_cast<uv_handle_t*>(&handle), &descriptor) != 0)
+    {
+        failure = "multicast probe socket setup failed";
+    }
+    else
+    {
+        char          bytes[] = "PING";
+        const ssize_t sent =
+            ::sendto(descriptor, bytes, 4, 0, reinterpret_cast<const sockaddr*>(&destination), sizeof(destination));
+        if (sent == 4)
+        {
+            available = true;
+        }
+        else
+        {
+            nativeError = errno;
+            if (sent >= 0 or (nativeError != EHOSTUNREACH and nativeError != ENETUNREACH and nativeError != EACCES and
+                              nativeError != EPERM))
+            {
+                failure = "multicast probe returned an unexpected native result";
+            }
+            else
+            {
+                uv_udp_send_t request = {};
+                uv_buf_t      buffer  = uv_buf_init(bytes, 4);
+                const int     queued =
+                    uv_udp_send(&request, &handle, &buffer, 1, reinterpret_cast<const sockaddr*>(&destination),
+                                [](uv_udp_send_t* req, int status)
+                                {
+                                    Context& ctx = *static_cast<Context*>(req->handle->data);
+                                    ctx.calls++;
+                                    ctx.status = status;
+                                });
+                const bool deferred = context.calls == 0;
+                errno               = 0;
+                (void)uv_run(&loop, UV_RUN_DEFAULT);
+                if (queued != 0 or not deferred or context.calls != 1 or context.status != -nativeError or
+                    handle.send_queue_size != 0)
+                    failure = "AsyncUV multicast error does not match native sendto";
+            }
+        }
+    }
+    uv_close(reinterpret_cast<uv_handle_t*>(&handle), [](uv_handle_t*) {});
+    (void)uv_run(&loop, UV_RUN_DEFAULT);
+    if (uv_loop_close(&loop) != 0)
+        return "multicast probe loop did not close";
+    if (failure == nullptr and not available)
+        fprintf(stderr,
+                "Skipping IPv4 multicast delivery tests: native sendto returned %s (%d); "
+                "AsyncUV callback matched.\n",
+                uv_err_name(-nativeError), nativeError);
+    return failure;
+}
+
 const char* run_test_in_child(LibuvIntTest test, const char* failure)
 {
     const pid_t pid = ::fork();
@@ -1448,7 +1532,13 @@ extern "C" const char* sc_async_test(void)
     }
 
     // test-udp-multicast-interface.c
-    const int udpMulticastInterfaceResult = run_test_udp_multicast_interface();
+    bool ipv4MulticastAvailable = true;
+#if !SC_PLATFORM_WINDOWS
+    if (const char* failure = check_ipv4_multicast(ipv4MulticastAvailable))
+        return failure;
+#endif
+    const int udpMulticastInterfaceResult =
+        ipv4MulticastAvailable ? run_test_udp_multicast_interface() : LIBUV_TEST_SKIP;
     if (udpMulticastInterfaceResult != 0 and udpMulticastInterfaceResult != LIBUV_TEST_SKIP)
     {
         return "run_test_udp_multicast_interface failed";
@@ -1460,7 +1550,7 @@ extern "C" const char* sc_async_test(void)
     }
 
     // test-udp-multicast-join.c
-    const int udpMulticastJoinResult = run_test_udp_multicast_join();
+    const int udpMulticastJoinResult = ipv4MulticastAvailable ? run_test_udp_multicast_join() : LIBUV_TEST_SKIP;
     if (udpMulticastJoinResult != 0 and udpMulticastJoinResult != LIBUV_TEST_SKIP)
     {
         return "run_test_udp_multicast_join failed";
@@ -1484,7 +1574,7 @@ extern "C" const char* sc_async_test(void)
     // run_test_udp_sendmmsg_error(); // Close callback is not delivered before uv_run returns yet
 
     // test-udp-multicast-ttl.c
-    const int udpMulticastTtlResult = run_test_udp_multicast_ttl();
+    const int udpMulticastTtlResult = ipv4MulticastAvailable ? run_test_udp_multicast_ttl() : LIBUV_TEST_SKIP;
     if (udpMulticastTtlResult != 0 and udpMulticastTtlResult != LIBUV_TEST_SKIP)
     {
         return "run_test_udp_multicast_ttl failed";

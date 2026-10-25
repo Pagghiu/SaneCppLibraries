@@ -6,6 +6,10 @@ This page tracks progress for the source-compatible `uv` wrapper implemented in 
 
 The standalone runner also checks on Linux that an immediate UDP send error survives changes to `errno`
 before its deferred callback, and that the callback is not invoked synchronously from `uv_udp_send`.
+On POSIX, a native multicast send probes route availability before IPv4 multicast delivery tests.
+If the native socket reports a missing route or permission denial, the runner verifies that AsyncUV delivers
+the same error asynchronously and skips only the three IPv4 multicast delivery cases with an explicit reason.
+IPv6 cases retain their upstream capability checks.
 
 # Current Snapshot
 - Upstream inventory discovered from `_Build/_PackagesCache/libuv/*/test/test-*.c`: **175** tests
