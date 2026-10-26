@@ -688,11 +688,28 @@ void SC::HttpWebSocketHandshakeTest::asyncServerReleasesUpgradedConnectionOnClie
     HttpWebSocketTransportView   clientTransport;
     SC_TEST_EXPECT(client.init(clientStorage));
 
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/chat", serverPort));
+
     struct ClientContext
     {
-        HttpWebSocketHandshakeTest* test;
-        HttpAsyncClient*            client;
-        bool                        connected = false;
+        HttpWebSocketHandshakeTest*   test;
+        HttpAsyncClient*              client;
+        HttpWebSocketClientHandshake* handshake;
+        AsyncEventLoop*               eventLoop;
+        HttpWebSocketTransportView*   transportOutput;
+        StringView                    endpoint;
+
+        bool connected      = false;
+        bool connectStarted = false;
+
+        void beginConnect()
+        {
+            connectStarted = true;
+            test->recordExpectation(
+                "start client handshake",
+                handshake->connect(*client, *eventLoop, endpoint, "dGhlIHNhbXBsZSBub25jZQ==", *transportOutput));
+        }
 
         void onConnected(HttpWebSocketTransportView& transport)
         {
@@ -702,29 +719,35 @@ void SC::HttpWebSocketHandshakeTest::asyncServerReleasesUpgradedConnectionOnClie
         }
 
         void onError(Result result) { test->recordExpectation("client websocket connect", result); }
-    } clientContext = {this, &client, false};
+    } clientContext = {this, &client, &handshake, &eventLoop, &clientTransport, endpoint.view(), false, false};
 
     handshake.onConnected.bind<ClientContext, &ClientContext::onConnected>(clientContext);
     handshake.onError.bind<ClientContext, &ClientContext::onError>(clientContext);
-
-    String endpoint = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/chat", serverPort));
-    SC_TEST_EXPECT(handshake.connect(client, eventLoop, endpoint.view(), "dGhlIHNhbXBsZSBub25jZQ==", clientTransport));
 
     struct ReleaseCheck
     {
         HttpWebSocketHandshakeTest* test;
         HttpAsyncServer*            httpServer;
+        ClientContext*              clientContext;
         bool                        released = false;
         int                         attempts = 0;
 
         void onTimeout(AsyncLoopTimeout::Result& result)
         {
-            if (httpServer->getConnections().getNumActiveConnections() == 0)
+            if (clientContext->connected and httpServer->getConnections().getNumActiveConnections() == 0)
             {
                 released = true;
                 test->recordExpectation("stop server", httpServer->stop());
                 return;
+            }
+
+            // Force the first poll to observe zero connections before starting the handshake.
+            // Zero means released only after the client has actually connected and closed.
+            if (not clientContext->connectStarted)
+            {
+                test->recordExpectation("initial connection count is zero",
+                                        httpServer->getConnections().getNumActiveConnections() == 0);
+                clientContext->beginConnect();
             }
 
             attempts++;
@@ -738,7 +761,7 @@ void SC::HttpWebSocketHandshakeTest::asyncServerReleasesUpgradedConnectionOnClie
             result.getAsync().relativeTimeout = TimeMs{10};
             result.reactivateRequest(true);
         }
-    } releaseCheck = {this, &httpServer, false, 0};
+    } releaseCheck = {this, &httpServer, &clientContext, false, 0};
 
     AsyncLoopTimeout releaseTimeout;
     releaseTimeout.callback.bind<ReleaseCheck, &ReleaseCheck::onTimeout>(releaseCheck);
