@@ -214,12 +214,14 @@ struct OutputMode
     }
 };
 
-/// @brief Controls how the standalone native backend executes jobs
+/// @brief Controls backend job execution
 struct ExecutionOptions
 {
-    size_t maxParallelJobs         = 0;     ///< Native backend max parallel compile jobs, 0 means auto-detect
-    bool   useCompilerDependencies = true;  ///< Enables native backend to consume compiler-generated dependencies
-    bool   verbose                 = false; ///< Legacy compatibility alias for outputMode == Verbose
+    /// Native compile jobs or Visual Studio solution project jobs. Zero selects the backend's automatic limit.
+    size_t maxParallelJobs = 0;
+
+    bool useCompilerDependencies = true;  ///< Enables native backend to consume compiler-generated dependencies
+    bool verbose                 = false; ///< Legacy compatibility alias for outputMode == Verbose
 
     Parameter<OutputMode::Type> outputMode = OutputMode::Normal;
 };

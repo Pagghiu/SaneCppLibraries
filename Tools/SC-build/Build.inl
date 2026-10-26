@@ -1561,6 +1561,26 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
         {
             arguments[numArgs++] = platform.view(); // 4
         }
+
+        SmallString<64> projectJobs;
+        SmallString<64> compilerJobs;
+        if (action.allTargets and action.action == Action::Compile)
+        {
+            const size_t processors = Process::getNumberOfProcessors();
+            const size_t cpuBudget  = processors == 0 ? 1 : processors;
+            size_t       maxJobs    = action.parameters.execution.maxParallelJobs;
+            if (maxJobs == 0)
+            {
+                maxJobs = cpuBudget < 2 ? cpuBudget : 2;
+            }
+            // Bound nested /MP compilation as well as MSBuild project workers.
+            const size_t compileJobs = cpuBudget > maxJobs ? cpuBudget / maxJobs : 1;
+            SC_TRY(StringBuilder::format(projectJobs, "/maxcpucount:{}", maxJobs));
+            SC_TRY(StringBuilder::format(compilerJobs, "/p:CL_MPCount={}", compileJobs));
+            arguments[numArgs++] = projectJobs.view();
+            arguments[numArgs++] = compilerJobs.view();
+            arguments[numArgs++] = "/nodeReuse:false";
+        }
         switch (action.action)
         {
         case Action::Compile:
