@@ -111,6 +111,14 @@ struct SC::FibersTest : public SC::TestCase
 {
     bool useRuntimeStacks = SC_COMPILER_FILC != 0;
 
+    // Keep independent fixtures out of one large optimizer graph during MSVC whole-program code generation.
+    // Each procedure runs immediately, retaining the original fixture destruction order.
+    template <typename Procedure>
+    static SC_FIBERS_TEST_NO_INLINE void runIndependentScenario(Procedure&& procedure)
+    {
+        procedure();
+    }
+
     inline void structuredErrorsAndFormatter();
 
     struct ContextState
@@ -391,6 +399,10 @@ struct SC::FibersTest : public SC::TestCase
         if (test_section("worker pool primitives"))
         {
             workerPoolPrimitives();
+        }
+        if (test_section("worker pool auto-reset event coalescing"))
+        {
+            workerPoolAutoResetEventCoalescing();
         }
         if (test_section("worker pool counter cancellation stress"))
         {
@@ -1748,493 +1760,512 @@ struct SC::FibersTest : public SC::TestCase
             }
         };
 
-        {
-            FiberJob                  jobs[NumChildren + 1];
-            FiberJob*                 readyStorage[1] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[NumWorkers];
-            FiberJobWorkerThread      threads[NumWorkers];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[NumWorkers * NumChildren * sizeof(FiberJob*) + 4096] = {};
-            FiberAllocator            allocator;
-            State                     state;
-            state.scheduler                = &scheduler;
-            state.children                 = &jobs[1];
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = NumChildren;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(workerPool.start(scheduler, {}, threads, options)
-                               .isError(FibersResultCategory, FibersError::InvalidConfiguration));
-            State* statePointer = &state;
-            SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
-                                                                        { return statePointer->spawnChildren(); })));
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            SC_TEST_EXPECT(workerPool.isRunning());
-            SC_TEST_EXPECT(workerPool.workerCount() == NumWorkers);
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(NumChildren));
-            SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumChildren));
-            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
-            size_t executedJobs = 0;
-            size_t claimedJobs  = 0;
-            for (FiberJobWorker& worker : workers)
+        runIndependentScenario(
+            [&]
             {
-                FiberJobWorkerDiagnostics diagnostics;
-                scheduler.workerDiagnostics(worker, diagnostics);
-                executedJobs += diagnostics.executedJobs;
-                claimedJobs += diagnostics.claimedJobs;
-                SC_TEST_EXPECT(diagnostics.dequeCapacity == NumChildren);
-            }
-            SC_TEST_EXPECT(executedJobs == NumChildren + 1);
-            SC_TEST_EXPECT(claimedJobs > 0);
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
+                FiberJob                  jobs[NumChildren + 1];
+                FiberJob*                 readyStorage[1] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[NumWorkers];
+                FiberJobWorkerThread      threads[NumWorkers];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[NumWorkers * NumChildren * sizeof(FiberJob*) + 4096] = {};
+                FiberAllocator            allocator;
+                State                     state;
+                state.scheduler                = &scheduler;
+                state.children                 = &jobs[1];
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = NumChildren;
 
-        {
-            watchdog.phase.store(1);
-            static constexpr size_t BatchWorkers  = 2;
-            static constexpr size_t BatchChildren = 8;
-
-            struct BatchState
-            {
-                FiberJobScheduler* scheduler = nullptr;
-                FiberJob*          children  = nullptr;
-                Atomic<int32_t>    started;
-                Atomic<int32_t>    completed;
-                Atomic<bool>       parentEntered;
-                Atomic<bool>       publishBatch;
-
-                Result spawnChildren()
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                SC_TEST_EXPECT(workerPool.start(scheduler, {}, threads, options)
+                                   .isError(FibersResultCategory, FibersError::InvalidConfiguration));
+                State* statePointer = &state;
+                SC_TEST_EXPECT(scheduler.spawn(
+                    jobs[0],
+                    FiberJob::Procedure([statePointer](FiberJobContext&) { return statePointer->spawnChildren(); })));
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                SC_TEST_EXPECT(workerPool.isRunning());
+                SC_TEST_EXPECT(workerPool.workerCount() == NumWorkers);
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(NumChildren));
+                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumChildren));
+                SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+                size_t executedJobs = 0;
+                size_t claimedJobs  = 0;
+                for (FiberJobWorker& worker : workers)
                 {
-                    parentEntered.store(true);
-                    while (not publishBatch.load()) {}
-                    BatchState* state = this;
-                    return scheduler->spawn({children, BatchChildren},
-                                            FiberJob::Procedure(
-                                                [state](FiberJobContext&)
-                                                {
-                                                    const int32_t ticket = state->started.fetch_add(1);
-                                                    if (ticket == 0)
-                                                    {
-                                                        while (state->started.load() <
-                                                               static_cast<int32_t>(BatchWorkers))
-                                                        {}
-                                                    }
-                                                    state->completed.fetch_add(1);
-                                                    return Result(true);
-                                                }));
+                    FiberJobWorkerDiagnostics diagnostics;
+                    scheduler.workerDiagnostics(worker, diagnostics);
+                    executedJobs += diagnostics.executedJobs;
+                    claimedJobs += diagnostics.claimedJobs;
+                    SC_TEST_EXPECT(diagnostics.dequeCapacity == NumChildren);
                 }
-            };
+                SC_TEST_EXPECT(executedJobs == NumChildren + 1);
+                SC_TEST_EXPECT(claimedJobs > 0);
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
 
-            FiberJob                  jobs[BatchChildren + 1];
-            FiberJob*                 readyStorage[1] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[BatchWorkers];
-            FiberJobWorkerThread      threads[BatchWorkers];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[2048] = {};
-            FiberAllocator            allocator;
-            BatchState                state;
-            state.scheduler                = &scheduler;
-            state.children                 = &jobs[1];
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = BatchChildren;
-            options.idleSpinAttempts       = 0;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            BatchState* statePointer = &state;
-            SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
-                                                                        { return statePointer->spawnChildren(); })));
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            while (not state.parentEntered.load()) {}
-            while (workerPool.parkedWorkerCount() != 1) {}
-            state.publishBatch.store(true);
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(BatchChildren));
-            SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(BatchChildren));
-            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            watchdog.phase.store(2);
-            static constexpr size_t SingleWorkers  = 2;
-            static constexpr size_t SingleChildren = 8;
-
-            struct SingleState
+        runIndependentScenario(
+            [&]
             {
-                FiberJobScheduler* scheduler = nullptr;
-                FiberJob*          children  = nullptr;
-                Atomic<int32_t>    started;
-                Atomic<int32_t>    completed;
-                Atomic<bool>       parentEntered;
-                Atomic<bool>       publishChildren;
-                Atomic<bool>       childrenPublished;
+                watchdog.phase.store(1);
+                static constexpr size_t BatchWorkers  = 2;
+                static constexpr size_t BatchChildren = 8;
 
-                Result spawnChildren()
+                struct BatchState
                 {
-                    parentEntered.store(true);
-                    while (not publishChildren.load()) {}
-                    SingleState* state = this;
-                    for (size_t index = 0; index < SingleChildren; ++index)
+                    FiberJobScheduler* scheduler = nullptr;
+                    FiberJob*          children  = nullptr;
+                    Atomic<int32_t>    started;
+                    Atomic<int32_t>    completed;
+                    Atomic<bool>       parentEntered;
+                    Atomic<bool>       publishBatch;
+
+                    Result spawnChildren()
                     {
-                        SC_TRY(scheduler->spawn(children[index], FiberJob::Procedure(
-                                                                     [state](FiberJobContext&)
-                                                                     {
-                                                                         const int32_t ticket =
-                                                                             state->started.fetch_add(1);
-                                                                         if (ticket == 0)
-                                                                         {
-                                                                             while (not state->childrenPublished.load())
-                                                                             {}
-                                                                         }
-                                                                         state->completed.fetch_add(1);
-                                                                         return Result(true);
-                                                                     })));
-                    }
-                    childrenPublished.store(true);
-                    return Result(true);
-                }
-            };
-
-            FiberJob                  jobs[SingleChildren + 1];
-            FiberJob*                 readyStorage[1] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[SingleWorkers];
-            FiberJobWorkerThread      threads[SingleWorkers];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[2048] = {};
-            FiberAllocator            allocator;
-            SingleState               state;
-            state.scheduler                = &scheduler;
-            state.children                 = &jobs[1];
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = SingleChildren;
-            options.idleSpinAttempts       = 0;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SingleState* statePointer = &state;
-            SC_TEST_EXPECT(scheduler.spawn(jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&)
-                                                                        { return statePointer->spawnChildren(); })));
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            while (not state.parentEntered.load()) {}
-            while (workerPool.parkedWorkerCount() != 1) {}
-            state.publishChildren.store(true);
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(SingleChildren));
-            SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(SingleChildren));
-            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            watchdog.phase.store(3);
-            static constexpr size_t CancelWorkers = 2;
-            static constexpr size_t CancelJobs    = 64;
-
-            struct CancelState
-            {
-                Atomic<int32_t> invoked;
-                Atomic<int32_t> entered;
-                Atomic<bool>    release;
-            };
-
-            FiberJob                  jobs[CancelJobs];
-            FiberJob*                 readyStorage[CancelJobs] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[CancelWorkers];
-            FiberJobWorkerThread      threads[CancelWorkers];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[CancelWorkers * CancelJobs * sizeof(FiberJob*) + 4096] = {};
-            FiberAllocator            allocator;
-            CancelState               state;
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = CancelJobs;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            for (FiberJob& job : jobs)
-            {
-                SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
-                                                        [&state](FiberJobContext& context)
-                                                        {
-                                                            const int32_t ticket = state.invoked.fetch_add(1);
-                                                            if (ticket < static_cast<int32_t>(CancelWorkers))
-                                                            {
-                                                                state.entered.fetch_add(1);
-                                                                while (not state.release.load()) {}
-                                                            }
-                                                            return context.checkCancellation();
-                                                        })));
-            }
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            while (state.entered.load() != static_cast<int32_t>(CancelWorkers)) {}
-            SC_TEST_EXPECT(scheduler.readyJobCount() == CancelJobs - CancelWorkers);
-            SC_TEST_EXPECT(scheduler.activeJobCount() == CancelJobs);
-            SC_TEST_EXPECT(scheduler.requestCancelAll());
-            state.release.store(true);
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(state.invoked.load() == static_cast<int32_t>(CancelWorkers));
-            SC_TEST_EXPECT(not scheduler.hasReadyJobs());
-            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
-            size_t claimBatchPeak = 0;
-            for (FiberJobWorker& worker : workers)
-            {
-                FiberJobWorkerDiagnostics diagnostics;
-                scheduler.workerDiagnostics(worker, diagnostics);
-                if (diagnostics.claimBatchPeak > claimBatchPeak)
-                {
-                    claimBatchPeak = diagnostics.claimBatchPeak;
-                }
-            }
-            SC_TEST_EXPECT(claimBatchPeak > 1);
-            for (FiberJob& job : jobs)
-            {
-                SC_TEST_EXPECT(job.isCompleted());
-                SC_TEST_EXPECT(not job.result());
-            }
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            struct StopState
-            {
-                Atomic<int32_t> invoked;
-            };
-            watchdog.phase.store(4);
-
-            static constexpr size_t StopJobs = 4;
-
-            FiberJob                  jobs[StopJobs];
-            FiberJob*                 readyStorage[StopJobs] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            worker;
-            FiberJobWorkerThread      thread;
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[1024] = {};
-            FiberAllocator            allocator;
-            StopState                 stopState;
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = StopJobs;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(scheduler.spawn(jobs, FiberJob::Procedure(
-                                                     [&stopState](FiberJobContext& context)
-                                                     {
-                                                         stopState.invoked.fetch_add(1);
-                                                         while (not context.isCancellationRequested()) {}
-                                                         return context.checkCancellation();
-                                                     })));
-            SC_TEST_EXPECT(workerPool.start(scheduler, {worker}, {thread}, options));
-            while (stopState.invoked.load() == 0) {}
-            SC_TEST_EXPECT(workerPool.requestStop());
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(stopState.invoked.load() == 1);
-            for (FiberJob& job : jobs)
-            {
-                SC_TEST_EXPECT(job.isCompleted());
-                SC_TEST_EXPECT(not job.result());
-            }
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            struct ParkState
-            {
-                Atomic<bool> entered;
-                Atomic<bool> release;
-            };
-            watchdog.phase.store(5);
-
-            FiberJob                  job;
-            FiberJob*                 readyStorage[1] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[2];
-            FiberJobWorkerThread      threads[2];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[1024] = {};
-            FiberAllocator            allocator;
-            ParkState                 parkState;
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = 1;
-            options.idleSpinAttempts       = 0;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
-                                                    [&parkState](FiberJobContext&)
+                        parentEntered.store(true);
+                        while (not publishBatch.load()) {}
+                        BatchState* state = this;
+                        return scheduler->spawn({children, BatchChildren},
+                                                FiberJob::Procedure(
+                                                    [state](FiberJobContext&)
                                                     {
-                                                        parkState.entered.store(true);
-                                                        while (not parkState.release.load()) {}
+                                                        const int32_t ticket = state->started.fetch_add(1);
+                                                        if (ticket == 0)
+                                                        {
+                                                            while (state->started.load() <
+                                                                   static_cast<int32_t>(BatchWorkers))
+                                                            {}
+                                                        }
+                                                        state->completed.fetch_add(1);
+                                                        return Result(true);
+                                                    }));
+                    }
+                };
+
+                FiberJob                  jobs[BatchChildren + 1];
+                FiberJob*                 readyStorage[1] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[BatchWorkers];
+                FiberJobWorkerThread      threads[BatchWorkers];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[2048] = {};
+                FiberAllocator            allocator;
+                BatchState                state;
+                state.scheduler                = &scheduler;
+                state.children                 = &jobs[1];
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = BatchChildren;
+                options.idleSpinAttempts       = 0;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                BatchState* statePointer = &state;
+                SC_TEST_EXPECT(scheduler.spawn(
+                    jobs[0],
+                    FiberJob::Procedure([statePointer](FiberJobContext&) { return statePointer->spawnChildren(); })));
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                while (not state.parentEntered.load()) {}
+                while (workerPool.parkedWorkerCount() != 1) {}
+                state.publishBatch.store(true);
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(BatchChildren));
+                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(BatchChildren));
+                SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                watchdog.phase.store(2);
+                static constexpr size_t SingleWorkers  = 2;
+                static constexpr size_t SingleChildren = 8;
+
+                struct SingleState
+                {
+                    FiberJobScheduler* scheduler = nullptr;
+                    FiberJob*          children  = nullptr;
+                    Atomic<int32_t>    started;
+                    Atomic<int32_t>    completed;
+                    Atomic<bool>       parentEntered;
+                    Atomic<bool>       publishChildren;
+                    Atomic<bool>       childrenPublished;
+
+                    Result spawnChildren()
+                    {
+                        parentEntered.store(true);
+                        while (not publishChildren.load()) {}
+                        SingleState* state = this;
+                        for (size_t index = 0; index < SingleChildren; ++index)
+                        {
+                            SC_TRY(scheduler->spawn(children[index],
+                                                    FiberJob::Procedure(
+                                                        [state](FiberJobContext&)
+                                                        {
+                                                            const int32_t ticket = state->started.fetch_add(1);
+                                                            if (ticket == 0)
+                                                            {
+                                                                while (not state->childrenPublished.load()) {}
+                                                            }
+                                                            state->completed.fetch_add(1);
+                                                            return Result(true);
+                                                        })));
+                        }
+                        childrenPublished.store(true);
+                        return Result(true);
+                    }
+                };
+
+                FiberJob                  jobs[SingleChildren + 1];
+                FiberJob*                 readyStorage[1] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[SingleWorkers];
+                FiberJobWorkerThread      threads[SingleWorkers];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[2048] = {};
+                FiberAllocator            allocator;
+                SingleState               state;
+                state.scheduler                = &scheduler;
+                state.children                 = &jobs[1];
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = SingleChildren;
+                options.idleSpinAttempts       = 0;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                SingleState* statePointer = &state;
+                SC_TEST_EXPECT(scheduler.spawn(
+                    jobs[0],
+                    FiberJob::Procedure([statePointer](FiberJobContext&) { return statePointer->spawnChildren(); })));
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                while (not state.parentEntered.load()) {}
+                while (workerPool.parkedWorkerCount() != 1) {}
+                state.publishChildren.store(true);
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(SingleChildren));
+                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(SingleChildren));
+                SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                watchdog.phase.store(3);
+                static constexpr size_t CancelWorkers = 2;
+                static constexpr size_t CancelJobs    = 64;
+
+                struct CancelState
+                {
+                    Atomic<int32_t> invoked;
+                    Atomic<int32_t> entered;
+                    Atomic<bool>    release;
+                };
+
+                FiberJob                  jobs[CancelJobs];
+                FiberJob*                 readyStorage[CancelJobs] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[CancelWorkers];
+                FiberJobWorkerThread      threads[CancelWorkers];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[CancelWorkers * CancelJobs * sizeof(FiberJob*) + 4096] = {};
+                FiberAllocator            allocator;
+                CancelState               state;
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = CancelJobs;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                for (FiberJob& job : jobs)
+                {
+                    SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
+                                                            [&state](FiberJobContext& context)
+                                                            {
+                                                                const int32_t ticket = state.invoked.fetch_add(1);
+                                                                if (ticket < static_cast<int32_t>(CancelWorkers))
+                                                                {
+                                                                    state.entered.fetch_add(1);
+                                                                    while (not state.release.load()) {}
+                                                                }
+                                                                return context.checkCancellation();
+                                                            })));
+                }
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                while (state.entered.load() != static_cast<int32_t>(CancelWorkers)) {}
+                SC_TEST_EXPECT(scheduler.readyJobCount() == CancelJobs - CancelWorkers);
+                SC_TEST_EXPECT(scheduler.activeJobCount() == CancelJobs);
+                SC_TEST_EXPECT(scheduler.requestCancelAll());
+                state.release.store(true);
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(state.invoked.load() == static_cast<int32_t>(CancelWorkers));
+                SC_TEST_EXPECT(not scheduler.hasReadyJobs());
+                SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+                size_t claimBatchPeak = 0;
+                for (FiberJobWorker& worker : workers)
+                {
+                    FiberJobWorkerDiagnostics diagnostics;
+                    scheduler.workerDiagnostics(worker, diagnostics);
+                    if (diagnostics.claimBatchPeak > claimBatchPeak)
+                    {
+                        claimBatchPeak = diagnostics.claimBatchPeak;
+                    }
+                }
+                SC_TEST_EXPECT(claimBatchPeak > 1);
+                for (FiberJob& job : jobs)
+                {
+                    SC_TEST_EXPECT(job.isCompleted());
+                    SC_TEST_EXPECT(not job.result());
+                }
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                struct StopState
+                {
+                    Atomic<int32_t> invoked;
+                };
+                watchdog.phase.store(4);
+
+                static constexpr size_t StopJobs = 4;
+
+                FiberJob                  jobs[StopJobs];
+                FiberJob*                 readyStorage[StopJobs] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            worker;
+                FiberJobWorkerThread      thread;
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[1024] = {};
+                FiberAllocator            allocator;
+                StopState                 stopState;
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = StopJobs;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                SC_TEST_EXPECT(scheduler.spawn(jobs, FiberJob::Procedure(
+                                                         [&stopState](FiberJobContext& context)
+                                                         {
+                                                             stopState.invoked.fetch_add(1);
+                                                             while (not context.isCancellationRequested()) {}
+                                                             return context.checkCancellation();
+                                                         })));
+                SC_TEST_EXPECT(workerPool.start(scheduler, {worker}, {thread}, options));
+                while (stopState.invoked.load() == 0) {}
+                SC_TEST_EXPECT(workerPool.requestStop());
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(stopState.invoked.load() == 1);
+                for (FiberJob& job : jobs)
+                {
+                    SC_TEST_EXPECT(job.isCompleted());
+                    SC_TEST_EXPECT(not job.result());
+                }
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                struct ParkState
+                {
+                    Atomic<bool> entered;
+                    Atomic<bool> release;
+                };
+                watchdog.phase.store(5);
+
+                FiberJob                  job;
+                FiberJob*                 readyStorage[1] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[2];
+                FiberJobWorkerThread      threads[2];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[1024] = {};
+                FiberAllocator            allocator;
+                ParkState                 parkState;
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = 1;
+                options.idleSpinAttempts       = 0;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
+                                                        [&parkState](FiberJobContext&)
+                                                        {
+                                                            parkState.entered.store(true);
+                                                            while (not parkState.release.load()) {}
+                                                            return Result(true);
+                                                        })));
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                while (not parkState.entered.load()) {}
+                while (workerPool.parkedWorkerCount() == 0) {}
+                parkState.release.store(true);
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(job.result());
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                watchdog.phase.store(6);
+                static constexpr size_t PersistentWorkers = 2;
+                static constexpr size_t PersistentJobs    = 8;
+
+                struct PersistentState
+                {
+                    Atomic<int32_t> completed;
+                };
+
+                FiberJob                  jobs[PersistentJobs];
+                FiberJob*                 readyStorage[PersistentJobs] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[PersistentWorkers];
+                FiberJobWorkerThread      threads[PersistentWorkers];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[4096] = {};
+                FiberAllocator            allocator;
+                PersistentState           state;
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = PersistentJobs;
+                options.idleSpinAttempts       = 0;
+                options.keepAliveWhenIdle      = true;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                while (workerPool.parkedWorkerCount() != PersistentWorkers) {}
+
+                for (size_t wave = 0; wave < 2; ++wave)
+                {
+                    SC_TEST_EXPECT(scheduler.spawn(jobs, FiberJob::Procedure(
+                                                             [&state](FiberJobContext&)
+                                                             {
+                                                                 state.completed.fetch_add(1);
+                                                                 return Result(true);
+                                                             })));
+                    SC_TEST_EXPECT(workerPool.waitIdle());
+                    SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * PersistentJobs));
+                    SC_TEST_EXPECT(workerPool.isRunning());
+                }
+
+                SC_TEST_EXPECT(workerPool.join().isError(FibersResultCategory, FibersError::InvalidState));
+                SC_TEST_EXPECT(workerPool.isRunning());
+                SC_TEST_EXPECT(workerPool.requestStop());
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(workerPool.waitIdle().isError(FibersResultCategory, FibersError::InvalidState));
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                watchdog.phase.store(7);
+                static constexpr size_t RaceWorkers  = 4;
+                static constexpr size_t RaceChildren = 16;
+                static constexpr size_t RaceWaves    = 128;
+
+                struct RaceState
+                {
+                    FiberJobScheduler* scheduler = nullptr;
+                    FiberJob*          children  = nullptr;
+                    Atomic<int32_t>    completed;
+                    Atomic<bool>       batchesPublished;
+
+                    Result spawnBatches()
+                    {
+                        RaceState* state = this;
+                        SC_TRY(scheduler->spawn({children, RaceChildren / 2},
+                                                FiberJob::Procedure(
+                                                    [state](FiberJobContext&)
+                                                    {
+                                                        while (not state->batchesPublished.load()) {}
+                                                        state->completed.fetch_add(1);
                                                         return Result(true);
                                                     })));
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            while (not parkState.entered.load()) {}
-            while (workerPool.parkedWorkerCount() == 0) {}
-            parkState.release.store(true);
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(job.result());
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
+                        SC_TRY(scheduler->spawn({children + RaceChildren / 2, RaceChildren / 2},
+                                                FiberJob::Procedure(
+                                                    [state](FiberJobContext&)
+                                                    {
+                                                        while (not state->batchesPublished.load()) {}
+                                                        state->completed.fetch_add(1);
+                                                        return Result(true);
+                                                    })));
+                        batchesPublished.store(true);
+                        return Result(true);
+                    }
+                };
 
-        {
-            watchdog.phase.store(6);
-            static constexpr size_t PersistentWorkers = 2;
-            static constexpr size_t PersistentJobs    = 8;
+                FiberJob                  root;
+                FiberJob                  children[RaceChildren];
+                FiberJob*                 readyStorage[1] = {};
+                FiberJobScheduler         scheduler;
+                FiberJobWorker            workers[RaceWorkers];
+                FiberJobWorkerThread      threads[RaceWorkers];
+                FiberJobWorkerPool        workerPool;
+                FiberJobWorkerPoolOptions options;
+                char                      allocatorStorage[RaceWorkers * RaceChildren * sizeof(FiberJob*) + 4096] = {};
+                FiberAllocator            allocator;
+                RaceState                 state;
+                state.scheduler                = &scheduler;
+                state.children                 = children;
+                options.dequeAllocator         = &allocator;
+                options.dequeCapacityPerWorker = RaceChildren;
+                options.idleSpinAttempts       = 0;
+                options.keepAliveWhenIdle      = true;
 
-            struct PersistentState
-            {
-                Atomic<int32_t> completed;
-            };
-
-            FiberJob                  jobs[PersistentJobs];
-            FiberJob*                 readyStorage[PersistentJobs] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[PersistentWorkers];
-            FiberJobWorkerThread      threads[PersistentWorkers];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[4096] = {};
-            FiberAllocator            allocator;
-            PersistentState           state;
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = PersistentJobs;
-            options.idleSpinAttempts       = 0;
-            options.keepAliveWhenIdle      = true;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            while (workerPool.parkedWorkerCount() != PersistentWorkers) {}
-
-            for (size_t wave = 0; wave < 2; ++wave)
-            {
-                SC_TEST_EXPECT(scheduler.spawn(jobs, FiberJob::Procedure(
-                                                         [&state](FiberJobContext&)
-                                                         {
-                                                             state.completed.fetch_add(1);
-                                                             return Result(true);
-                                                         })));
-                SC_TEST_EXPECT(workerPool.waitIdle());
-                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * PersistentJobs));
-                SC_TEST_EXPECT(workerPool.isRunning());
-            }
-
-            SC_TEST_EXPECT(workerPool.join().isError(FibersResultCategory, FibersError::InvalidState));
-            SC_TEST_EXPECT(workerPool.isRunning());
-            SC_TEST_EXPECT(workerPool.requestStop());
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(workerPool.waitIdle().isError(FibersResultCategory, FibersError::InvalidState));
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            watchdog.phase.store(7);
-            static constexpr size_t RaceWorkers  = 4;
-            static constexpr size_t RaceChildren = 16;
-            static constexpr size_t RaceWaves    = 128;
-
-            struct RaceState
-            {
-                FiberJobScheduler* scheduler = nullptr;
-                FiberJob*          children  = nullptr;
-                Atomic<int32_t>    completed;
-                Atomic<bool>       batchesPublished;
-
-                Result spawnBatches()
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.create(readyStorage));
+                SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+                for (size_t wave = 0; wave < RaceWaves; ++wave)
                 {
-                    RaceState* state = this;
-                    SC_TRY(scheduler->spawn({children, RaceChildren / 2},
-                                            FiberJob::Procedure(
-                                                [state](FiberJobContext&)
-                                                {
-                                                    while (not state->batchesPublished.load()) {}
-                                                    state->completed.fetch_add(1);
-                                                    return Result(true);
-                                                })));
-                    SC_TRY(scheduler->spawn({children + RaceChildren / 2, RaceChildren / 2},
-                                            FiberJob::Procedure(
-                                                [state](FiberJobContext&)
-                                                {
-                                                    while (not state->batchesPublished.load()) {}
-                                                    state->completed.fetch_add(1);
-                                                    return Result(true);
-                                                })));
-                    batchesPublished.store(true);
-                    return Result(true);
+                    state.batchesPublished.store(false);
+                    RaceState* statePointer = &state;
+                    SC_TEST_EXPECT(
+                        scheduler.spawn(root, FiberJob::Procedure([statePointer](FiberJobContext&)
+                                                                  { return statePointer->spawnBatches(); })));
+                    SC_TEST_EXPECT(workerPool.waitIdle());
+                    SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * RaceChildren));
+                    SC_TEST_EXPECT(root.result());
+                    for (FiberJob& child : children)
+                    {
+                        SC_TEST_EXPECT(child.result());
+                    }
                 }
-            };
 
-            FiberJob                  root;
-            FiberJob                  children[RaceChildren];
-            FiberJob*                 readyStorage[1] = {};
-            FiberJobScheduler         scheduler;
-            FiberJobWorker            workers[RaceWorkers];
-            FiberJobWorkerThread      threads[RaceWorkers];
-            FiberJobWorkerPool        workerPool;
-            FiberJobWorkerPoolOptions options;
-            char                      allocatorStorage[RaceWorkers * RaceChildren * sizeof(FiberJob*) + 4096] = {};
-            FiberAllocator            allocator;
-            RaceState                 state;
-            state.scheduler                = &scheduler;
-            state.children                 = children;
-            options.dequeAllocator         = &allocator;
-            options.dequeCapacityPerWorker = RaceChildren;
-            options.idleSpinAttempts       = 0;
-            options.keepAliveWhenIdle      = true;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.create(readyStorage));
-            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
-            for (size_t wave = 0; wave < RaceWaves; ++wave)
-            {
-                state.batchesPublished.store(false);
-                RaceState* statePointer = &state;
-                SC_TEST_EXPECT(scheduler.spawn(root, FiberJob::Procedure([statePointer](FiberJobContext&)
-                                                                         { return statePointer->spawnBatches(); })));
-                SC_TEST_EXPECT(workerPool.waitIdle());
-                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * RaceChildren));
-                SC_TEST_EXPECT(root.result());
-                for (FiberJob& child : children)
-                {
-                    SC_TEST_EXPECT(child.result());
-                }
-            }
-
-            SC_TEST_EXPECT(workerPool.requestStop());
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
-            SC_TEST_EXPECT(allocator.used() == 0);
-            SC_TEST_EXPECT(scheduler.close());
-            SC_TEST_EXPECT(allocator.close());
-        }
+                SC_TEST_EXPECT(workerPool.requestStop());
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+                SC_TEST_EXPECT(allocator.used() == 0);
+                SC_TEST_EXPECT(scheduler.close());
+                SC_TEST_EXPECT(allocator.close());
+            });
     }
 
     void fiberJobIdleObserverWake()
@@ -4885,155 +4916,161 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(group.pending() == 0);
         }
 
-        {
-            FiberScheduler scheduler;
-            FiberTask      firstFailingTask;
-            FiberTask      secondFailingTask;
-            FiberTask      successfulTask;
-
-            char       firstFailingStackMemory[64 * 1024]  = {};
-            char       secondFailingStackMemory[64 * 1024] = {};
-            char       successfulStackMemory[64 * 1024]    = {};
-            FiberStack firstFailingStack({firstFailingStackMemory, sizeof(firstFailingStackMemory)});
-            FiberStack secondFailingStack({secondFailingStackMemory, sizeof(secondFailingStackMemory)});
-            FiberStack successfulStack({successfulStackMemory, sizeof(successfulStackMemory)});
-
-            FiberTaskGroup group(scheduler);
-            SC_TEST_EXPECT(
-                group.spawn(firstFailingTask, firstFailingStack,
-                            FiberTask::Procedure([](FiberScheduler&)
-                                                 { return Result::Error(ResultCategory(0x80000000u), 101u); })));
-            SC_TEST_EXPECT(group.spawn(successfulTask, successfulStack,
-                                       FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
-            SC_TEST_EXPECT(group.spawn(secondFailingTask, secondFailingStack,
-                                       FiberTask::Procedure(
-                                           [](FiberScheduler& scheduler)
-                                           {
-                                               SC_TRY(scheduler.yield());
-                                               return Result::Error(ResultCategory(0x80000000u), 102u);
-                                           })));
-
-            Result firstError(true);
-            Result waitResult = group.waitAll(&firstError);
-            SC_TEST_EXPECT(not waitResult);
-            SC_TEST_EXPECT(not firstError);
-            SC_TEST_EXPECT(firstFailingTask.isCompleted());
-            SC_TEST_EXPECT(secondFailingTask.isCompleted());
-            SC_TEST_EXPECT(successfulTask.isCompleted());
-            SC_TEST_EXPECT(firstFailingTask.result().isError(ResultCategory(0x80000000u), 101u));
-            SC_TEST_EXPECT(secondFailingTask.result().isError(ResultCategory(0x80000000u), 102u));
-            SC_TEST_EXPECT(group.pending() == 0);
-            SC_TEST_EXPECT(group.countErrors() == 2);
-
-            FiberTaskGroupError errors[2];
-            size_t              numErrors = 0;
-            SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
-            SC_TEST_EXPECT(numErrors == 2);
-
-            bool foundFirstError  = false;
-            bool foundSecondError = false;
-            for (const FiberTaskGroupError& error : errors)
+        runIndependentScenario(
+            [&]
             {
-                if (error.task == &firstFailingTask)
+                FiberScheduler scheduler;
+                FiberTask      firstFailingTask;
+                FiberTask      secondFailingTask;
+                FiberTask      successfulTask;
+
+                char       firstFailingStackMemory[64 * 1024]  = {};
+                char       secondFailingStackMemory[64 * 1024] = {};
+                char       successfulStackMemory[64 * 1024]    = {};
+                FiberStack firstFailingStack({firstFailingStackMemory, sizeof(firstFailingStackMemory)});
+                FiberStack secondFailingStack({secondFailingStackMemory, sizeof(secondFailingStackMemory)});
+                FiberStack successfulStack({successfulStackMemory, sizeof(successfulStackMemory)});
+
+                FiberTaskGroup group(scheduler);
+                SC_TEST_EXPECT(
+                    group.spawn(firstFailingTask, firstFailingStack,
+                                FiberTask::Procedure([](FiberScheduler&)
+                                                     { return Result::Error(ResultCategory(0x80000000u), 101u); })));
+                SC_TEST_EXPECT(group.spawn(successfulTask, successfulStack,
+                                           FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
+                SC_TEST_EXPECT(group.spawn(secondFailingTask, secondFailingStack,
+                                           FiberTask::Procedure(
+                                               [](FiberScheduler& scheduler)
+                                               {
+                                                   SC_TRY(scheduler.yield());
+                                                   return Result::Error(ResultCategory(0x80000000u), 102u);
+                                               })));
+
+                Result firstError(true);
+                Result waitResult = group.waitAll(&firstError);
+                SC_TEST_EXPECT(not waitResult);
+                SC_TEST_EXPECT(not firstError);
+                SC_TEST_EXPECT(firstFailingTask.isCompleted());
+                SC_TEST_EXPECT(secondFailingTask.isCompleted());
+                SC_TEST_EXPECT(successfulTask.isCompleted());
+                SC_TEST_EXPECT(firstFailingTask.result().isError(ResultCategory(0x80000000u), 101u));
+                SC_TEST_EXPECT(secondFailingTask.result().isError(ResultCategory(0x80000000u), 102u));
+                SC_TEST_EXPECT(group.pending() == 0);
+                SC_TEST_EXPECT(group.countErrors() == 2);
+
+                FiberTaskGroupError errors[2];
+                size_t              numErrors = 0;
+                SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
+                SC_TEST_EXPECT(numErrors == 2);
+
+                bool foundFirstError  = false;
+                bool foundSecondError = false;
+                for (const FiberTaskGroupError& error : errors)
                 {
-                    foundFirstError = true;
-                    SC_TEST_EXPECT(error.result.isError(ResultCategory(0x80000000u), 101u));
+                    if (error.task == &firstFailingTask)
+                    {
+                        foundFirstError = true;
+                        SC_TEST_EXPECT(error.result.isError(ResultCategory(0x80000000u), 101u));
+                    }
+                    if (error.task == &secondFailingTask)
+                    {
+                        foundSecondError = true;
+                        SC_TEST_EXPECT(error.result.isError(ResultCategory(0x80000000u), 102u));
+                    }
                 }
-                if (error.task == &secondFailingTask)
-                {
-                    foundSecondError = true;
-                    SC_TEST_EXPECT(error.result.isError(ResultCategory(0x80000000u), 102u));
-                }
-            }
-            SC_TEST_EXPECT(foundFirstError);
-            SC_TEST_EXPECT(foundSecondError);
+                SC_TEST_EXPECT(foundFirstError);
+                SC_TEST_EXPECT(foundSecondError);
 
-            FiberTaskGroupError smallErrors[1];
-            numErrors          = 0;
-            Result smallResult = group.collectErrors(smallErrors, numErrors);
-            SC_TEST_EXPECT(smallResult.isError(FibersResultCategory, FibersError::GroupStorageTooSmall));
-            SC_TEST_EXPECT(numErrors == 1);
-        }
+                FiberTaskGroupError smallErrors[1];
+                numErrors          = 0;
+                Result smallResult = group.collectErrors(smallErrors, numErrors);
+                SC_TEST_EXPECT(smallResult.isError(FibersResultCategory, FibersError::GroupStorageTooSmall));
+                SC_TEST_EXPECT(numErrors == 1);
+            });
 
-        {
-            FiberScheduler scheduler;
-            FiberTask      tasks[2];
-            char           stackMemory[2 * 64 * 1024] = {};
-            FiberTaskPool  pool({tasks, 2}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
-            FiberTaskGroup group(scheduler);
+        runIndependentScenario(
+            [&]
+            {
+                FiberScheduler scheduler;
+                FiberTask      tasks[2];
+                char           stackMemory[2 * 64 * 1024] = {};
+                FiberTaskPool  pool({tasks, 2}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
+                FiberTaskGroup group(scheduler);
 
-            SC_TEST_EXPECT(group.spawn(pool, FiberTask::Procedure(
-                                                 [](FiberScheduler& scheduler)
-                                                 {
-                                                     SC_TRY(scheduler.yield());
-                                                     return Result(true);
-                                                 })));
-            SC_TEST_EXPECT(group.spawn(pool, FiberTask::Procedure(
-                                                 [](FiberScheduler& scheduler)
-                                                 {
-                                                     SC_TRY(scheduler.yield());
-                                                     return Result(true);
-                                                 })));
-            FiberTask* noSlotTask = &tasks[0];
-            Result     noSlot =
-                group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &noSlotTask);
-            SC_TEST_EXPECT(noSlot.isError(FibersResultCategory, FibersError::SlotUnavailable));
-            SC_TEST_EXPECT(noSlotTask == nullptr);
-            SC_TEST_EXPECT(group.waitAll());
-        }
+                SC_TEST_EXPECT(group.spawn(pool, FiberTask::Procedure(
+                                                     [](FiberScheduler& scheduler)
+                                                     {
+                                                         SC_TRY(scheduler.yield());
+                                                         return Result(true);
+                                                     })));
+                SC_TEST_EXPECT(group.spawn(pool, FiberTask::Procedure(
+                                                     [](FiberScheduler& scheduler)
+                                                     {
+                                                         SC_TRY(scheduler.yield());
+                                                         return Result(true);
+                                                     })));
+                FiberTask* noSlotTask = &tasks[0];
+                Result     noSlot =
+                    group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &noSlotTask);
+                SC_TEST_EXPECT(noSlot.isError(FibersResultCategory, FibersError::SlotUnavailable));
+                SC_TEST_EXPECT(noSlotTask == nullptr);
+                SC_TEST_EXPECT(group.waitAll());
+            });
 
-        {
-            FiberScheduler scheduler;
-            FiberTask      task;
-            char           stackMemory[64 * 1024] = {};
-            FiberTaskPool  pool({&task, 1}, {stackMemory, sizeof(stackMemory)}, sizeof(stackMemory));
-            FiberTaskGroup group(scheduler);
+        runIndependentScenario(
+            [&]
+            {
+                FiberScheduler scheduler;
+                FiberTask      task;
+                char           stackMemory[64 * 1024] = {};
+                FiberTaskPool  pool({&task, 1}, {stackMemory, sizeof(stackMemory)}, sizeof(stackMemory));
+                FiberTaskGroup group(scheduler);
 
-            FiberTask* firstTask = nullptr;
-            SC_TEST_EXPECT(group.spawn(
-                pool,
-                FiberTask::Procedure([](FiberScheduler&)
-                                     { return fibersTestFailure(FibersTestFailure::ExpectedRetainedError); }),
-                &firstTask));
-            SC_TEST_EXPECT(firstTask == &task);
-            SC_TEST_EXPECT(group.reset().isError(FibersResultCategory, FibersError::InvalidState));
+                FiberTask* firstTask = nullptr;
+                SC_TEST_EXPECT(group.spawn(
+                    pool,
+                    FiberTask::Procedure([](FiberScheduler&)
+                                         { return fibersTestFailure(FibersTestFailure::ExpectedRetainedError); }),
+                    &firstTask));
+                SC_TEST_EXPECT(firstTask == &task);
+                SC_TEST_EXPECT(group.reset().isError(FibersResultCategory, FibersError::InvalidState));
 
-            Result firstWait = group.waitAll();
-            SC_TEST_EXPECT(not firstWait);
-            SC_TEST_EXPECT(group.pending() == 0);
-            SC_TEST_EXPECT(group.countErrors() == 1);
-            SC_TEST_EXPECT(pool.availableCount() == 0);
+                Result firstWait = group.waitAll();
+                SC_TEST_EXPECT(not firstWait);
+                SC_TEST_EXPECT(group.pending() == 0);
+                SC_TEST_EXPECT(group.countErrors() == 1);
+                SC_TEST_EXPECT(pool.availableCount() == 0);
 
-            FiberTaskGroupError errors[1];
-            size_t              numErrors = 0;
-            SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
-            SC_TEST_EXPECT(numErrors == 1);
-            SC_TEST_EXPECT(errors[0].task == firstTask);
-            SC_TEST_EXPECT(not errors[0].result);
+                FiberTaskGroupError errors[1];
+                size_t              numErrors = 0;
+                SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
+                SC_TEST_EXPECT(numErrors == 1);
+                SC_TEST_EXPECT(errors[0].task == firstTask);
+                SC_TEST_EXPECT(not errors[0].result);
 
-            FiberTask* unavailableTask = &task;
-            SC_TEST_EXPECT(not pool.spawn(scheduler, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }),
-                                          &unavailableTask));
-            SC_TEST_EXPECT(unavailableTask == nullptr);
-            FiberStack directStack({stackMemory, sizeof(stackMemory)});
-            SC_TEST_EXPECT(not scheduler.spawn(task, directStack,
-                                               FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
+                FiberTask* unavailableTask = &task;
+                SC_TEST_EXPECT(not pool.spawn(
+                    scheduler, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &unavailableTask));
+                SC_TEST_EXPECT(unavailableTask == nullptr);
+                FiberStack directStack({stackMemory, sizeof(stackMemory)});
+                SC_TEST_EXPECT(not scheduler.spawn(task, directStack,
+                                                   FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
 
-            FiberTask* nextWaveTask = &task;
-            SC_TEST_EXPECT(
-                group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &nextWaveTask)
-                    .isError(FibersResultCategory, FibersError::GroupNotReset));
-            SC_TEST_EXPECT(nextWaveTask == nullptr);
+                FiberTask* nextWaveTask = &task;
+                SC_TEST_EXPECT(
+                    group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &nextWaveTask)
+                        .isError(FibersResultCategory, FibersError::GroupNotReset));
+                SC_TEST_EXPECT(nextWaveTask == nullptr);
 
-            SC_TEST_EXPECT(group.reset());
-            SC_TEST_EXPECT(pool.availableCount() == 1);
-            SC_TEST_EXPECT(
-                group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &nextWaveTask));
-            SC_TEST_EXPECT(nextWaveTask == &task);
-            SC_TEST_EXPECT(group.waitAll());
-            SC_TEST_EXPECT(group.reset());
-            SC_TEST_EXPECT(pool.availableCount() == 1);
-        }
+                SC_TEST_EXPECT(group.reset());
+                SC_TEST_EXPECT(pool.availableCount() == 1);
+                SC_TEST_EXPECT(group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }),
+                                           &nextWaveTask));
+                SC_TEST_EXPECT(nextWaveTask == &task);
+                SC_TEST_EXPECT(group.waitAll());
+                SC_TEST_EXPECT(group.reset());
+                SC_TEST_EXPECT(pool.availableCount() == 1);
+            });
     }
 
     void taskPool()
@@ -5619,370 +5656,383 @@ struct SC::FibersTest : public SC::TestCase
         static constexpr size_t NumTasks   = 16;
         static constexpr int    NumYields  = 8;
 
-        {
-            FiberScheduler    scheduler;
-            FiberWorker       workers[NumWorkers];
-            FiberWorkerThread threads[NumWorkers];
-            FiberWorkerPool   workerPool;
-
-            SC_TEST_EXPECT(workerPool.requestStop());
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(workerPool.shutdown());
-            SC_TEST_EXPECT(workerPool.shutdown());
-            SC_TEST_EXPECT(not workerPool.isRunning());
-
-            Result noWorkers = workerPool.start(scheduler, {}, {threads, NumWorkers});
-            SC_TEST_EXPECT(noWorkers.isError(FibersResultCategory, FibersError::InvalidConfiguration));
-            SC_TEST_EXPECT(not workerPool.isRunning());
-
-            Result noThreads = workerPool.start(scheduler, {workers, NumWorkers}, {});
-            SC_TEST_EXPECT(noThreads.isError(FibersResultCategory, FibersError::InvalidConfiguration));
-            SC_TEST_EXPECT(not workerPool.isRunning());
-
-            Result mismatch = workerPool.start(scheduler, {workers, NumWorkers - 1}, {threads, NumWorkers});
-            SC_TEST_EXPECT(mismatch.isError(FibersResultCategory, FibersError::InvalidConfiguration));
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            for (FiberWorkerThread& thread : threads)
+        runIndependentScenario(
+            [&]
             {
-                SC_TEST_EXPECT(not thread.wasStarted());
-            }
+                FiberScheduler    scheduler;
+                FiberWorker       workers[NumWorkers];
+                FiberWorkerThread threads[NumWorkers];
+                FiberWorkerPool   workerPool;
 
-            char           dequeAllocatorStorage[4096]   = {};
-            char           existingAllocatorStorage[256] = {};
-            FiberAllocator dequeAllocator;
-            FiberAllocator existingAllocator;
-            SC_TEST_EXPECT(dequeAllocator.createFixed(dequeAllocatorStorage));
-            SC_TEST_EXPECT(existingAllocator.createFixed(existingAllocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(existingAllocator, {workers + 1, 1}, 4));
-
-            FiberWorkerPoolOptions partialDequeOptions;
-            partialDequeOptions.dequeAllocator         = &dequeAllocator;
-            partialDequeOptions.dequeCapacityPerWorker = 4;
-            Result partialDequeStart =
-                workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, partialDequeOptions);
-            SC_TEST_EXPECT(not partialDequeStart);
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(dequeAllocator.used() == 0);
-            SC_TEST_EXPECT(existingAllocator.used() != 0);
-            for (FiberWorkerThread& thread : threads)
-            {
-                SC_TEST_EXPECT(not thread.wasStarted());
-            }
-
-            scheduler.releaseWorkerDeques({workers + 1, 1});
-            SC_TEST_EXPECT(existingAllocator.used() == 0);
-            SC_TEST_EXPECT(
-                workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, partialDequeOptions));
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(dequeAllocator.used() == 0);
-            SC_TEST_EXPECT(dequeAllocator.close());
-            SC_TEST_EXPECT(existingAllocator.close());
-
-            char           allocatorStorage[4096] = {};
-            FiberAllocator allocator;
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            FiberWorkerPoolOptions exhaustedOptions;
-            exhaustedOptions.dequeAllocator         = &allocator;
-            exhaustedOptions.dequeCapacityPerWorker = 64;
-            exhaustedOptions.injectionAllocator     = &allocator;
-            exhaustedOptions.injectionCapacity      = 1024;
-            Result exhausted =
-                workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, exhaustedOptions);
-            SC_TEST_EXPECT(not exhausted);
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(allocator.used() == 0);
-            for (FiberWorkerThread& thread : threads)
-            {
-                SC_TEST_EXPECT(not thread.wasStarted());
-            }
-            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(allocator.close());
-
-            if (FiberStackGrowthRuntime::isSupported())
-            {
-                FiberStackGrowthRuntime growthRuntime;
-                SC_TEST_EXPECT(growthRuntime.create());
-
-                FiberWorkerPoolOptions growthOptions;
-                growthOptions.stackGrowthRuntime = &growthRuntime;
-#if !SC_PLATFORM_WINDOWS
-                char growthSignalStacks[NumWorkers * FiberStackGrowthSignalStackSize] = {};
-                growthOptions.stackGrowthSignalStackStorage                           = growthSignalStacks;
-
-                FiberWorkerPoolOptions insufficientGrowthOptions        = growthOptions;
-                insufficientGrowthOptions.stackGrowthSignalStackStorage = {growthSignalStacks,
-                                                                           sizeof(growthSignalStacks) - 1};
-                SC_TEST_EXPECT(not workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers},
-                                                    insufficientGrowthOptions));
+                SC_TEST_EXPECT(workerPool.requestStop());
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(workerPool.shutdown());
+                SC_TEST_EXPECT(workerPool.shutdown());
                 SC_TEST_EXPECT(not workerPool.isRunning());
-                SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+
+                Result noWorkers = workerPool.start(scheduler, {}, {threads, NumWorkers});
+                SC_TEST_EXPECT(noWorkers.isError(FibersResultCategory, FibersError::InvalidConfiguration));
+                SC_TEST_EXPECT(not workerPool.isRunning());
+
+                Result noThreads = workerPool.start(scheduler, {workers, NumWorkers}, {});
+                SC_TEST_EXPECT(noThreads.isError(FibersResultCategory, FibersError::InvalidConfiguration));
+                SC_TEST_EXPECT(not workerPool.isRunning());
+
+                Result mismatch = workerPool.start(scheduler, {workers, NumWorkers - 1}, {threads, NumWorkers});
+                SC_TEST_EXPECT(mismatch.isError(FibersResultCategory, FibersError::InvalidConfiguration));
+                SC_TEST_EXPECT(not workerPool.isRunning());
                 for (FiberWorkerThread& thread : threads)
                 {
                     SC_TEST_EXPECT(not thread.wasStarted());
                 }
+
+                char           dequeAllocatorStorage[4096]   = {};
+                char           existingAllocatorStorage[256] = {};
+                FiberAllocator dequeAllocator;
+                FiberAllocator existingAllocator;
+                SC_TEST_EXPECT(dequeAllocator.createFixed(dequeAllocatorStorage));
+                SC_TEST_EXPECT(existingAllocator.createFixed(existingAllocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(existingAllocator, {workers + 1, 1}, 4));
+
+                FiberWorkerPoolOptions partialDequeOptions;
+                partialDequeOptions.dequeAllocator         = &dequeAllocator;
+                partialDequeOptions.dequeCapacityPerWorker = 4;
+                Result partialDequeStart =
+                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, partialDequeOptions);
+                SC_TEST_EXPECT(not partialDequeStart);
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(dequeAllocator.used() == 0);
+                SC_TEST_EXPECT(existingAllocator.used() != 0);
+                for (FiberWorkerThread& thread : threads)
+                {
+                    SC_TEST_EXPECT(not thread.wasStarted());
+                }
+
+                scheduler.releaseWorkerDeques({workers + 1, 1});
+                SC_TEST_EXPECT(existingAllocator.used() == 0);
+                SC_TEST_EXPECT(
+                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, partialDequeOptions));
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(dequeAllocator.used() == 0);
+                SC_TEST_EXPECT(dequeAllocator.close());
+                SC_TEST_EXPECT(existingAllocator.close());
+
+                char           allocatorStorage[4096] = {};
+                FiberAllocator allocator;
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                FiberWorkerPoolOptions exhaustedOptions;
+                exhaustedOptions.dequeAllocator         = &allocator;
+                exhaustedOptions.dequeCapacityPerWorker = 64;
+                exhaustedOptions.injectionAllocator     = &allocator;
+                exhaustedOptions.injectionCapacity      = 1024;
+                Result exhausted =
+                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, exhaustedOptions);
+                SC_TEST_EXPECT(not exhausted);
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(allocator.used() == 0);
+                for (FiberWorkerThread& thread : threads)
+                {
+                    SC_TEST_EXPECT(not thread.wasStarted());
+                }
+                SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(allocator.close());
+
+                if (FiberStackGrowthRuntime::isSupported())
+                {
+                    FiberStackGrowthRuntime growthRuntime;
+                    SC_TEST_EXPECT(growthRuntime.create());
+
+                    FiberWorkerPoolOptions growthOptions;
+                    growthOptions.stackGrowthRuntime = &growthRuntime;
+#if !SC_PLATFORM_WINDOWS
+                    char growthSignalStacks[NumWorkers * FiberStackGrowthSignalStackSize] = {};
+                    growthOptions.stackGrowthSignalStackStorage                           = growthSignalStacks;
+
+                    FiberWorkerPoolOptions insufficientGrowthOptions        = growthOptions;
+                    insufficientGrowthOptions.stackGrowthSignalStackStorage = {growthSignalStacks,
+                                                                               sizeof(growthSignalStacks) - 1};
+                    SC_TEST_EXPECT(not workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers},
+                                                        insufficientGrowthOptions));
+                    SC_TEST_EXPECT(not workerPool.isRunning());
+                    SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+                    for (FiberWorkerThread& thread : threads)
+                    {
+                        SC_TEST_EXPECT(not thread.wasStarted());
+                    }
 #endif
 
-                SC_TEST_EXPECT(
-                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, growthOptions));
-                SC_TEST_EXPECT(workerPool.join());
-                SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
-                SC_TEST_EXPECT(
-                    workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, growthOptions));
-                SC_TEST_EXPECT(workerPool.join());
-                SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
-                SC_TEST_EXPECT(growthRuntime.close());
-            }
+                    SC_TEST_EXPECT(
+                        workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, growthOptions));
+                    SC_TEST_EXPECT(workerPool.join());
+                    SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+                    SC_TEST_EXPECT(
+                        workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, growthOptions));
+                    SC_TEST_EXPECT(workerPool.join());
+                    SC_TEST_EXPECT(growthRuntime.registeredThreadCount() == 0);
+                    SC_TEST_EXPECT(growthRuntime.close());
+                }
 
-            uint64_t               mismatchedAffinityMasks[1] = {1};
-            FiberWorkerPoolOptions badAffinityOptions;
-            FiberWorkerThread      affinityThreads[NumWorkers];
-            FiberWorkerPool        affinityPool;
-            badAffinityOptions.affinityMasks = {mismatchedAffinityMasks, 1};
-            Result badAffinity =
-                affinityPool.start(scheduler, {workers, NumWorkers}, {affinityThreads, NumWorkers}, badAffinityOptions);
-            SC_TEST_EXPECT(badAffinity.isError(FibersResultCategory, FibersError::InvalidConfiguration));
-            SC_TEST_EXPECT(not affinityPool.isRunning());
+                uint64_t               mismatchedAffinityMasks[1] = {1};
+                FiberWorkerPoolOptions badAffinityOptions;
+                FiberWorkerThread      affinityThreads[NumWorkers];
+                FiberWorkerPool        affinityPool;
+                badAffinityOptions.affinityMasks = {mismatchedAffinityMasks, 1};
+                Result badAffinity = affinityPool.start(scheduler, {workers, NumWorkers}, {affinityThreads, NumWorkers},
+                                                        badAffinityOptions);
+                SC_TEST_EXPECT(badAffinity.isError(FibersResultCategory, FibersError::InvalidConfiguration));
+                SC_TEST_EXPECT(not affinityPool.isRunning());
 
-            FiberWorkerPoolOptions priorityOptions;
-            FiberWorkerThread      priorityThreads[NumWorkers];
-            FiberWorkerPool        priorityPool;
-            priorityOptions.threadPriority = FiberWorkerThreadPriority::High;
-            Result priorityStart =
-                priorityPool.start(scheduler, {workers, NumWorkers}, {priorityThreads, NumWorkers}, priorityOptions);
+                FiberWorkerPoolOptions priorityOptions;
+                FiberWorkerThread      priorityThreads[NumWorkers];
+                FiberWorkerPool        priorityPool;
+                priorityOptions.threadPriority = FiberWorkerThreadPriority::High;
+                Result priorityStart           = priorityPool.start(scheduler, {workers, NumWorkers},
+                                                                    {priorityThreads, NumWorkers}, priorityOptions);
 #if SC_PLATFORM_WINDOWS
-            SC_TEST_EXPECT(priorityStart);
-            SC_TEST_EXPECT(priorityPool.join());
+                SC_TEST_EXPECT(priorityStart);
+                SC_TEST_EXPECT(priorityPool.join());
 #else
-            SC_TEST_EXPECT(priorityStart.isError(FibersResultCategory, FibersError::OperationUnsupported));
-            SC_TEST_EXPECT(not priorityPool.isRunning());
+                SC_TEST_EXPECT(priorityStart.isError(FibersResultCategory, FibersError::OperationUnsupported));
+                SC_TEST_EXPECT(not priorityPool.isRunning());
 #endif
-        }
+            });
 
-        {
-            struct State
+        runIndependentScenario(
+            [&]
             {
-                Atomic<int32_t> completed;
-            };
+                struct State
+                {
+                    Atomic<int32_t> completed;
+                };
 
-            FiberScheduler    scheduler;
-            FiberTask         tasks[NumTasks];
-            static char       stackMemory[NumTasks * 64 * 1024] = {};
-            FiberTaskPool     taskPool({tasks, NumTasks}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
-            FiberWorker       workers[NumWorkers];
-            FiberWorkerThread threads[NumWorkers];
-            FiberWorkerPool   workerPool;
-            State             state;
+                FiberScheduler    scheduler;
+                FiberTask         tasks[NumTasks];
+                static char       stackMemory[NumTasks * 64 * 1024] = {};
+                FiberTaskPool     taskPool({tasks, NumTasks}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
+                FiberWorker       workers[NumWorkers];
+                FiberWorkerThread threads[NumWorkers];
+                FiberWorkerPool   workerPool;
+                State             state;
 
-            for (size_t idx = 0; idx < NumTasks; ++idx)
-            {
-                SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
-                                                             [&state](FiberScheduler& scheduler)
-                                                             {
-                                                                 for (int loop = 0; loop < NumYields; ++loop)
+                for (size_t idx = 0; idx < NumTasks; ++idx)
+                {
+                    SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
+                                                                 [&state](FiberScheduler& scheduler)
                                                                  {
-                                                                     SC_TRY(scheduler.yield());
-                                                                 }
-                                                                 state.completed.fetch_add(1);
-                                                                 return Result(true);
-                                                             })));
-            }
+                                                                     for (int loop = 0; loop < NumYields; ++loop)
+                                                                     {
+                                                                         SC_TRY(scheduler.yield());
+                                                                     }
+                                                                     state.completed.fetch_add(1);
+                                                                     return Result(true);
+                                                                 })));
+                }
 
-            Result startResult = workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers});
-            SC_TEST_EXPECT(startResult);
-            SC_TEST_EXPECT(workerPool.isRunning());
-            SC_TEST_EXPECT(workerPool.workerCount() == NumWorkers);
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(workerPool.shutdown());
-            SC_TEST_EXPECT(not workerPool.isRunning());
-            SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumTasks));
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            for (size_t idx = 0; idx < NumTasks; ++idx)
+                Result startResult = workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers});
+                SC_TEST_EXPECT(startResult);
+                SC_TEST_EXPECT(workerPool.isRunning());
+                SC_TEST_EXPECT(workerPool.workerCount() == NumWorkers);
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(workerPool.shutdown());
+                SC_TEST_EXPECT(not workerPool.isRunning());
+                SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumTasks));
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                for (size_t idx = 0; idx < NumTasks; ++idx)
+                {
+                    SC_TEST_EXPECT(tasks[idx].result());
+                }
+            });
+
+        runIndependentScenario(
+            [&]
             {
-                SC_TEST_EXPECT(tasks[idx].result());
-            }
-        }
+                struct State
+                {
+                    Atomic<int32_t> iterations;
+                    EventObject     iterationsReached;
+                    bool            canceled = false;
+                };
 
-        {
-            struct State
-            {
-                Atomic<int32_t> iterations;
-                EventObject     iterationsReached;
-                bool            canceled = false;
-            };
+                FiberScheduler    scheduler;
+                FiberTask         task;
+                char              stackMemory[64 * 1024] = {};
+                FiberStack        stack({stackMemory, sizeof(stackMemory)});
+                FiberWorker       workers[NumWorkers];
+                FiberWorkerThread threads[NumWorkers];
+                FiberWorkerPool   workerPool;
+                State             state;
 
-            FiberScheduler    scheduler;
-            FiberTask         task;
-            char              stackMemory[64 * 1024] = {};
-            FiberStack        stack({stackMemory, sizeof(stackMemory)});
-            FiberWorker       workers[NumWorkers];
-            FiberWorkerThread threads[NumWorkers];
-            FiberWorkerPool   workerPool;
-            State             state;
-
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler& scheduler)
-                                               {
-                                                   while (true)
+                SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                               FiberTask::Procedure(
+                                                   [&state](FiberScheduler& scheduler)
                                                    {
-                                                       Result result = scheduler.yield();
-                                                       if (state.iterations.fetch_add(1) == 3)
+                                                       while (true)
                                                        {
-                                                           state.iterationsReached.signal();
+                                                           Result result = scheduler.yield();
+                                                           if (state.iterations.fetch_add(1) == 3)
+                                                           {
+                                                               state.iterationsReached.signal();
+                                                           }
+                                                           if (not result)
+                                                           {
+                                                               state.canceled = true;
+                                                               return result;
+                                                           }
                                                        }
-                                                       if (not result)
-                                                       {
-                                                           state.canceled = true;
-                                                           return result;
-                                                       }
-                                                   }
-                                               })));
+                                                   })));
 
-            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            state.iterationsReached.wait();
-            SC_TEST_EXPECT(state.iterations.load() >= 4);
-            SC_TEST_EXPECT(workerPool.shutdown());
-            SC_TEST_EXPECT(state.canceled);
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-        }
+                SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+                state.iterationsReached.wait();
+                SC_TEST_EXPECT(state.iterations.load() >= 4);
+                SC_TEST_EXPECT(workerPool.shutdown());
+                SC_TEST_EXPECT(state.canceled);
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            });
 
-        {
-            struct State
+        runIndependentScenario(
+            [&]
             {
-                Atomic<int32_t> step;
-                FiberCounter*   counter = nullptr;
-                EventObject     waiting;
-            };
+                struct State
+                {
+                    Atomic<int32_t> step;
+                    FiberCounter*   counter = nullptr;
+                    EventObject     waiting;
+                };
 
-            FiberScheduler    scheduler;
-            FiberCounter      counter;
-            FiberTask         task;
-            char              stackMemory[64 * 1024] = {};
-            FiberStack        stack({stackMemory, sizeof(stackMemory)});
-            FiberWorker       workers[NumWorkers];
-            FiberWorkerThread threads[NumWorkers];
-            FiberWorkerPool   workerPool;
-            State             state;
-            state.counter = &counter;
+                FiberScheduler    scheduler;
+                FiberCounter      counter;
+                FiberTask         task;
+                char              stackMemory[64 * 1024] = {};
+                FiberStack        stack({stackMemory, sizeof(stackMemory)});
+                FiberWorker       workers[NumWorkers];
+                FiberWorkerThread threads[NumWorkers];
+                FiberWorkerPool   workerPool;
+                State             state;
+                state.counter = &counter;
 
-            scheduler.add(counter);
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler& scheduler)
-                                               {
-                                                   state.step.store(1);
-                                                   state.waiting.signal();
-                                                   SC_TRY(scheduler.wait(*state.counter));
-                                                   state.step.store(2);
-                                                   return Result(true);
-                                               })));
+                scheduler.add(counter);
+                SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                               FiberTask::Procedure(
+                                                   [&state](FiberScheduler& scheduler)
+                                                   {
+                                                       state.step.store(1);
+                                                       state.waiting.signal();
+                                                       SC_TRY(scheduler.wait(*state.counter));
+                                                       state.step.store(2);
+                                                       return Result(true);
+                                                   })));
 
-            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            state.waiting.wait();
-            SC_TEST_EXPECT(state.step.load() == 1);
-            SC_TEST_EXPECT(scheduler.done(counter));
-            SC_TEST_EXPECT(workerPool.join());
-            SC_TEST_EXPECT(state.step.load() == 2);
-            SC_TEST_EXPECT(task.result());
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-        }
+                SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+                state.waiting.wait();
+                SC_TEST_EXPECT(state.step.load() == 1);
+                SC_TEST_EXPECT(scheduler.done(counter));
+                SC_TEST_EXPECT(workerPool.join());
+                SC_TEST_EXPECT(state.step.load() == 2);
+                SC_TEST_EXPECT(task.result());
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            });
 
-        {
-            struct State
+        runIndependentScenario(
+            [&]
             {
-                FiberCounter* counter = nullptr;
-                Atomic<bool>  waiting;
-                EventObject   enteredWait;
-            };
+                struct State
+                {
+                    FiberCounter* counter = nullptr;
+                    Atomic<bool>  waiting;
+                    EventObject   enteredWait;
+                };
 
-            FiberScheduler    scheduler;
-            FiberCounter      counter;
-            FiberTask         task;
-            char              stackMemory[64 * 1024] = {};
-            FiberStack        stack({stackMemory, sizeof(stackMemory)});
-            FiberWorker       workers[NumWorkers];
-            FiberWorkerThread threads[NumWorkers];
-            FiberWorkerPool   workerPool;
-            State             state;
-            state.counter = &counter;
+                FiberScheduler    scheduler;
+                FiberCounter      counter;
+                FiberTask         task;
+                char              stackMemory[64 * 1024] = {};
+                FiberStack        stack({stackMemory, sizeof(stackMemory)});
+                FiberWorker       workers[NumWorkers];
+                FiberWorkerThread threads[NumWorkers];
+                FiberWorkerPool   workerPool;
+                State             state;
+                state.counter = &counter;
 
-            scheduler.add(counter);
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler& scheduler)
-                                               {
-                                                   state.waiting.store(true);
-                                                   state.enteredWait.signal();
-                                                   return scheduler.wait(*state.counter);
-                                               })));
-            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            state.enteredWait.wait();
-            SC_TEST_EXPECT(state.waiting.load());
-            SC_TEST_EXPECT(workerPool.shutdown());
-            SC_TEST_EXPECT(task.isCompleted());
-            SC_TEST_EXPECT(not task.result());
-            SC_TEST_EXPECT(counter.value() == 1);
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            SC_TEST_EXPECT(scheduler.done(counter));
-            SC_TEST_EXPECT(counter.value() == 0);
-        }
+                scheduler.add(counter);
+                SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                               FiberTask::Procedure(
+                                                   [&state](FiberScheduler& scheduler)
+                                                   {
+                                                       state.waiting.store(true);
+                                                       state.enteredWait.signal();
+                                                       return scheduler.wait(*state.counter);
+                                                   })));
+                SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+                state.enteredWait.wait();
+                SC_TEST_EXPECT(state.waiting.load());
+                SC_TEST_EXPECT(workerPool.shutdown());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(not task.result());
+                SC_TEST_EXPECT(counter.value() == 1);
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                SC_TEST_EXPECT(scheduler.done(counter));
+                SC_TEST_EXPECT(counter.value() == 0);
+            });
 
-        {
-            struct State
+        runIndependentScenario(
+            [&]
             {
-                Atomic<int32_t> step;
-                FiberCounter*   counter = nullptr;
-                EventObject     waiting;
-            };
+                struct State
+                {
+                    Atomic<int32_t> step;
+                    FiberCounter*   counter = nullptr;
+                    EventObject     waiting;
+                };
 
-            FiberScheduler    scheduler;
-            FiberCounter      counter;
-            FiberTask         task;
-            char              stackMemory[64 * 1024] = {};
-            FiberStack        stack({stackMemory, sizeof(stackMemory)});
-            FiberWorker       firstWorkers[NumWorkers];
-            FiberWorkerThread firstThreads[NumWorkers];
-            FiberWorkerPool   firstPool;
-            FiberWorker       secondWorkers[NumWorkers];
-            FiberWorkerThread secondThreads[NumWorkers];
-            FiberWorkerPool   secondPool;
-            State             state;
-            state.counter = &counter;
+                FiberScheduler    scheduler;
+                FiberCounter      counter;
+                FiberTask         task;
+                char              stackMemory[64 * 1024] = {};
+                FiberStack        stack({stackMemory, sizeof(stackMemory)});
+                FiberWorker       firstWorkers[NumWorkers];
+                FiberWorkerThread firstThreads[NumWorkers];
+                FiberWorkerPool   firstPool;
+                FiberWorker       secondWorkers[NumWorkers];
+                FiberWorkerThread secondThreads[NumWorkers];
+                FiberWorkerPool   secondPool;
+                State             state;
+                state.counter = &counter;
 
-            scheduler.add(counter);
-            SC_TEST_EXPECT(scheduler.spawn(task, stack,
-                                           FiberTask::Procedure(
-                                               [&state](FiberScheduler& scheduler)
-                                               {
-                                                   state.step.store(1);
-                                                   state.waiting.signal();
-                                                   SC_TRY(scheduler.wait(*state.counter));
-                                                   state.step.store(2);
-                                                   return Result(true);
-                                               })));
+                scheduler.add(counter);
+                SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                               FiberTask::Procedure(
+                                                   [&state](FiberScheduler& scheduler)
+                                                   {
+                                                       state.step.store(1);
+                                                       state.waiting.signal();
+                                                       SC_TRY(scheduler.wait(*state.counter));
+                                                       state.step.store(2);
+                                                       return Result(true);
+                                                   })));
 
-            SC_TEST_EXPECT(firstPool.start(scheduler, {firstWorkers, NumWorkers}, {firstThreads, NumWorkers}));
-            state.waiting.wait();
-            SC_TEST_EXPECT(state.step.load() == 1);
+                SC_TEST_EXPECT(firstPool.start(scheduler, {firstWorkers, NumWorkers}, {firstThreads, NumWorkers}));
+                state.waiting.wait();
+                SC_TEST_EXPECT(state.step.load() == 1);
 
-            Result secondStart = secondPool.start(scheduler, {secondWorkers, NumWorkers}, {secondThreads, NumWorkers});
-            SC_TEST_EXPECT(not secondStart);
-            SC_TEST_EXPECT(not secondPool.isRunning());
-            for (FiberWorkerThread& thread : secondThreads)
-            {
-                SC_TEST_EXPECT(not thread.wasStarted());
-            }
+                Result secondStart =
+                    secondPool.start(scheduler, {secondWorkers, NumWorkers}, {secondThreads, NumWorkers});
+                SC_TEST_EXPECT(not secondStart);
+                SC_TEST_EXPECT(not secondPool.isRunning());
+                for (FiberWorkerThread& thread : secondThreads)
+                {
+                    SC_TEST_EXPECT(not thread.wasStarted());
+                }
 
-            SC_TEST_EXPECT(scheduler.done(counter));
-            SC_TEST_EXPECT(firstPool.join());
-            SC_TEST_EXPECT(state.step.load() == 2);
-            SC_TEST_EXPECT(task.result());
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-        }
+                SC_TEST_EXPECT(scheduler.done(counter));
+                SC_TEST_EXPECT(firstPool.join());
+                SC_TEST_EXPECT(state.step.load() == 2);
+                SC_TEST_EXPECT(task.result());
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            });
     }
 
     void workerPoolTaskWaves()
@@ -6156,6 +6206,82 @@ struct SC::FibersTest : public SC::TestCase
         }
     }
 
+    void workerPoolAutoResetEventCoalescing()
+    {
+        static constexpr size_t NumWorkers = 4;
+        static constexpr size_t NumWaiters = 4;
+
+        struct State
+        {
+            FiberAutoResetEvent* event = nullptr;
+            Atomic<int32_t>      started;
+            Atomic<int32_t>      completed;
+
+            Semaphore   releaseWaiters;
+            EventObject signalsFinished;
+            Semaphore   completions;
+        } state;
+
+        FiberScheduler      scheduler;
+        FiberAutoResetEvent event;
+        FiberTask           tasks[NumWaiters + 1];
+        static char         stackMemory[(NumWaiters + 1) * 64 * 1024] = {};
+        FiberTaskPool       taskPool({tasks, NumWaiters + 1}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
+        FiberWorker         workers[NumWorkers];
+        FiberWorkerThread   threads[NumWorkers];
+        FiberWorkerPool     workerPool;
+        state.event = &event;
+
+        for (size_t idx = 0; idx < NumWaiters; ++idx)
+        {
+            SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
+                                                         [&state, idx](FiberScheduler& owner)
+                                                         {
+                                                             state.started.fetch_add(1);
+                                                             if (idx != 0)
+                                                                 state.releaseWaiters.acquire();
+                                                             SC_TRY(state.event->wait(owner));
+                                                             state.completed.fetch_add(1);
+                                                             state.completions.release();
+                                                             return Result(true);
+                                                         })));
+        }
+        SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
+                                                     [&state](FiberScheduler& owner)
+                                                     {
+                                                         while (state.started.load() !=
+                                                                static_cast<int32_t>(NumWaiters))
+                                                             SC_TRY(owner.yield());
+                                                         for (size_t idx = 0; idx < NumWaiters; ++idx)
+                                                         {
+                                                             SC_TRY(state.event->signal(owner));
+                                                             SC_TRY(owner.yield());
+                                                         }
+                                                         state.signalsFinished.signal();
+                                                         return Result(true);
+                                                     })));
+
+        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+        state.signalsFinished.wait();
+        SC_TEST_EXPECT(event.isSignaled());
+        for (size_t idx = 1; idx < NumWaiters; ++idx)
+            state.releaseWaiters.release();
+        state.completions.acquire();
+        state.completions.acquire();
+
+        // One enrolled waiter and one retained signal consume all four signal calls.
+        SC_TEST_EXPECT(state.completed.load() == 2);
+        SC_TEST_EXPECT(not event.isSignaled());
+        for (size_t idx = 2; idx < NumWaiters; ++idx)
+        {
+            SC_TEST_EXPECT(event.signal(scheduler));
+            state.completions.acquire();
+        }
+        SC_TEST_EXPECT(workerPool.join());
+        SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumWaiters));
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+    }
+
     void workerPoolPrimitives()
     {
         static constexpr size_t NumWorkers    = 4;
@@ -6240,21 +6366,26 @@ struct SC::FibersTest : public SC::TestCase
                                                                  return Result(true);
                                                              })));
             }
-            SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
-                                                         [&state](FiberScheduler& scheduler)
-                                                         {
-                                                             while (state.started.load() !=
-                                                                    static_cast<int32_t>(NumWaiters))
-                                                             {
-                                                                 SC_TRY(scheduler.yield());
-                                                             }
-                                                             for (size_t idx = 0; idx < NumWaiters; ++idx)
-                                                             {
-                                                                 SC_TRY(state.event->signal(scheduler));
-                                                                 SC_TRY(scheduler.yield());
-                                                             }
-                                                             return Result(true);
-                                                         })));
+            SC_TEST_EXPECT(
+                taskPool.spawn(scheduler, FiberTask::Procedure(
+                                              [&state](FiberScheduler& scheduler)
+                                              {
+                                                  while (state.started.load() != static_cast<int32_t>(NumWaiters))
+                                                  {
+                                                      SC_TRY(scheduler.yield());
+                                                  }
+                                                  for (size_t idx = 0; idx < NumWaiters; ++idx)
+                                                  {
+                                                      SC_TRY(state.event->signal(scheduler));
+                                                      // Yields do not guarantee enrollment; consume each
+                                                      // signal before the next one can coalesce with it.
+                                                      do
+                                                      {
+                                                          SC_TRY(scheduler.yield());
+                                                      } while (state.completed.load() != static_cast<int32_t>(idx + 1));
+                                                  }
+                                                  return Result(true);
+                                              })));
 
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
             SC_TEST_EXPECT(workerPool.join());
@@ -7531,370 +7662,384 @@ struct SC::FibersTest : public SC::TestCase
             return Result(true);
         };
 
-        {
-            FiberScheduler   scheduler;
-            FiberAllocator   allocator;
-            char             allocatorStorage[4096] = {};
-            FiberWorker      workers[2];
-            static FiberTask tasks[4];
-            static char      stackMemory[4][64 * 1024] = {};
-            FiberStack       stacks[4]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
-                FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
-                FiberStack({stackMemory[3], sizeof(stackMemory[3])}),
-            };
-            WaitContext  contexts[3];
-            FiberCounter counter;
-            State        state;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
-            SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
-            SC_TEST_EXPECT(scheduler.spawn(
-                tasks[3], stacks[3],
-                FiberTask::Procedure([&counter](FiberScheduler& scheduler) { return scheduler.done(counter); })));
-            for (size_t idx = 0; idx < 3; ++idx)
+        runIndependentScenario(
+            [&]
             {
+                FiberScheduler   scheduler;
+                FiberAllocator   allocator;
+                char             allocatorStorage[4096] = {};
+                FiberWorker      workers[2];
+                static FiberTask tasks[4];
+                static char      stackMemory[4][64 * 1024] = {};
+                FiberStack       stacks[4]                 = {
+                    FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                    FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+                    FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
+                    FiberStack({stackMemory[3], sizeof(stackMemory[3])}),
+                };
+                WaitContext  contexts[3];
+                FiberCounter counter;
+                State        state;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
+                SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
+                SC_TEST_EXPECT(scheduler.spawn(
+                    tasks[3], stacks[3],
+                    FiberTask::Procedure([&counter](FiberScheduler& scheduler) { return scheduler.done(counter); })));
+                for (size_t idx = 0; idx < 3; ++idx)
+                {
+                    SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                }
                 SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            }
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 3);
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(state.numResumed == 3);
-            SC_TEST_EXPECT(state.resumeOrder[0] == 2);
-            SC_TEST_EXPECT(state.resumeOrder[1] == 1);
-            SC_TEST_EXPECT(state.resumeOrder[2] == 0);
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            FiberScheduler   scheduler;
-            FiberAllocator   allocator;
-            char             allocatorStorage[4096] = {};
-            FiberWorker      workers[2];
-            static FiberTask tasks[4];
-            static char      stackMemory[4][64 * 1024] = {};
-            FiberStack       stacks[4]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
-                FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
-                FiberStack({stackMemory[3], sizeof(stackMemory[3])}),
-            };
-            WaitContext  contexts[3];
-            FiberCounter counter;
-            State        state;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
-            SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
-            SC_TEST_EXPECT(scheduler.spawn(
-                tasks[3], stacks[3],
-                FiberTask::Procedure([&counter](FiberScheduler& scheduler) { return scheduler.done(counter); })));
-            for (size_t idx = 0; idx < 3; ++idx)
-            {
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 3);
                 SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            }
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 3);
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(state.numResumed == 3);
-            SC_TEST_EXPECT(state.resumeOrder[0] == 0);
-            SC_TEST_EXPECT(state.resumeOrder[1] == 1);
-            SC_TEST_EXPECT(state.resumeOrder[2] == 2);
-            SC_TEST_EXPECT(scheduler.stolenFiberCount(workers[1]) == 3);
-            FiberWorkerDiagnostics thiefDiagnostics;
-            scheduler.workerDiagnostics(workers[1], thiefDiagnostics);
-            SC_TEST_EXPECT(thiefDiagnostics.stealAttempts == 1);
-            SC_TEST_EXPECT(thiefDiagnostics.stealVictimProbes == 1);
-            SC_TEST_EXPECT(thiefDiagnostics.stolenFibers == 3);
-            SC_TEST_EXPECT(thiefDiagnostics.stolenBatches == 1);
-            SC_TEST_EXPECT(thiefDiagnostics.stolenBatchPeak == 3);
-            SC_TEST_EXPECT(thiefDiagnostics.failedSteals == 0);
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            FiberScheduler   scheduler;
-            FiberAllocator   allocator;
-            char             allocatorStorage[4096] = {};
-            FiberWorker      workers[2];
-            static FiberTask tasks[4];
-            static char      stackMemory[4][64 * 1024] = {};
-            FiberStack       stacks[4]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
-                FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
-                FiberStack({stackMemory[3], sizeof(stackMemory[3])}),
-            };
-            WaitContext  contexts[3];
-            FiberCounter counter;
-            State        state;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 2));
-            SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
-            SC_TEST_EXPECT(scheduler.spawn(
-                tasks[3], stacks[3],
-                FiberTask::Procedure([&counter](FiberScheduler& scheduler) { return scheduler.done(counter); })));
-            for (size_t idx = 0; idx < 3; ++idx)
-            {
                 SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            }
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 2);
-            FiberWorkerDiagnostics spillDiagnostics;
-            scheduler.workerDiagnostics(workers[0], spillDiagnostics);
-            SC_TEST_EXPECT(spillDiagnostics.readyFibers == 2);
-            SC_TEST_EXPECT(spillDiagnostics.readyPeakFibers == 2);
-            SC_TEST_EXPECT(spillDiagnostics.dequeCapacity == 2);
-            SC_TEST_EXPECT(spillDiagnostics.spilledFibers == 1);
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(state.numResumed == 3);
-            SC_TEST_EXPECT(state.resumeOrder[0] == 1);
-            SC_TEST_EXPECT(state.resumeOrder[1] == 0);
-            SC_TEST_EXPECT(state.resumeOrder[2] == 2);
-            scheduler.workerDiagnostics(workers[0], spillDiagnostics);
-            SC_TEST_EXPECT(spillDiagnostics.readyFibers == 0);
-            SC_TEST_EXPECT(spillDiagnostics.readyPeakFibers == 2);
-            SC_TEST_EXPECT(spillDiagnostics.spilledFibers == 1);
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                SC_TEST_EXPECT(state.numResumed == 3);
+                SC_TEST_EXPECT(state.resumeOrder[0] == 2);
+                SC_TEST_EXPECT(state.resumeOrder[1] == 1);
+                SC_TEST_EXPECT(state.resumeOrder[2] == 0);
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
 
-        {
-            FiberScheduler scheduler;
-            FiberAllocator allocator;
-            char           allocatorStorage[4096] = {};
-            FiberWorker    workers[2];
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 1));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-
-            FiberWorkerDiagnostics diagnostics;
-            scheduler.workerDiagnostics(workers[0], diagnostics);
-            SC_TEST_EXPECT(diagnostics.stealAttempts == 0);
-            SC_TEST_EXPECT(diagnostics.stealVictimProbes == 0);
-            SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
-            SC_TEST_EXPECT(diagnostics.failedSteals == 0);
-
-            scheduler.resetWorkerDiagnostics(workers[0]);
-            scheduler.workerDiagnostics(workers[0], diagnostics);
-            SC_TEST_EXPECT(diagnostics.readyPeakFibers == 0);
-            SC_TEST_EXPECT(diagnostics.spilledFibers == 0);
-            SC_TEST_EXPECT(diagnostics.stealAttempts == 0);
-            SC_TEST_EXPECT(diagnostics.stealVictimProbes == 0);
-            SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
-            SC_TEST_EXPECT(diagnostics.stolenBatches == 0);
-            SC_TEST_EXPECT(diagnostics.stolenBatchPeak == 0);
-            SC_TEST_EXPECT(diagnostics.failedSteals == 0);
-            SC_TEST_EXPECT(diagnostics.runAttempts == 0);
-            SC_TEST_EXPECT(diagnostics.idlePolls == 0);
-            SC_TEST_EXPECT(diagnostics.executedFibers == 0);
-            SC_TEST_EXPECT(diagnostics.completedFibers == 0);
-            SC_TEST_EXPECT(diagnostics.yieldedFibers == 0);
-            SC_TEST_EXPECT(diagnostics.waitingFibers == 0);
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
-
-        {
-            struct CancelState
+        runIndependentScenario(
+            [&]
             {
-                int cancelled[2] = {};
-            };
+                FiberScheduler   scheduler;
+                FiberAllocator   allocator;
+                char             allocatorStorage[4096] = {};
+                FiberWorker      workers[2];
+                static FiberTask tasks[4];
+                static char      stackMemory[4][64 * 1024] = {};
+                FiberStack       stacks[4]                 = {
+                    FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                    FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+                    FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
+                    FiberStack({stackMemory[3], sizeof(stackMemory[3])}),
+                };
+                WaitContext  contexts[3];
+                FiberCounter counter;
+                State        state;
 
-            struct CancelContext
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
+                SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
+                SC_TEST_EXPECT(scheduler.spawn(
+                    tasks[3], stacks[3],
+                    FiberTask::Procedure([&counter](FiberScheduler& scheduler) { return scheduler.done(counter); })));
+                for (size_t idx = 0; idx < 3; ++idx)
+                {
+                    SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                }
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 3);
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(state.numResumed == 3);
+                SC_TEST_EXPECT(state.resumeOrder[0] == 0);
+                SC_TEST_EXPECT(state.resumeOrder[1] == 1);
+                SC_TEST_EXPECT(state.resumeOrder[2] == 2);
+                SC_TEST_EXPECT(scheduler.stolenFiberCount(workers[1]) == 3);
+                FiberWorkerDiagnostics thiefDiagnostics;
+                scheduler.workerDiagnostics(workers[1], thiefDiagnostics);
+                SC_TEST_EXPECT(thiefDiagnostics.stealAttempts == 1);
+                SC_TEST_EXPECT(thiefDiagnostics.stealVictimProbes == 1);
+                SC_TEST_EXPECT(thiefDiagnostics.stolenFibers == 3);
+                SC_TEST_EXPECT(thiefDiagnostics.stolenBatches == 1);
+                SC_TEST_EXPECT(thiefDiagnostics.stolenBatchPeak == 3);
+                SC_TEST_EXPECT(thiefDiagnostics.failedSteals == 0);
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
             {
-                FiberEvent*  event = nullptr;
-                CancelState* state = nullptr;
-                int          id    = 0;
-            };
+                FiberScheduler   scheduler;
+                FiberAllocator   allocator;
+                char             allocatorStorage[4096] = {};
+                FiberWorker      workers[2];
+                static FiberTask tasks[4];
+                static char      stackMemory[4][64 * 1024] = {};
+                FiberStack       stacks[4]                 = {
+                    FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                    FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+                    FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
+                    FiberStack({stackMemory[3], sizeof(stackMemory[3])}),
+                };
+                WaitContext  contexts[3];
+                FiberCounter counter;
+                State        state;
 
-            FiberScheduler   scheduler;
-            FiberAllocator   allocator;
-            char             allocatorStorage[4096] = {};
-            FiberWorker      workers[2];
-            FiberEvent       event;
-            static FiberTask tasks[2];
-            static char      stackMemory[2][64 * 1024] = {};
-            FiberStack       stacks[2]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
-            };
-            CancelContext contexts[2];
-            CancelState   state;
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 2));
+                SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
+                SC_TEST_EXPECT(scheduler.spawn(
+                    tasks[3], stacks[3],
+                    FiberTask::Procedure([&counter](FiberScheduler& scheduler) { return scheduler.done(counter); })));
+                for (size_t idx = 0; idx < 3; ++idx)
+                {
+                    SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                }
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 2);
+                FiberWorkerDiagnostics spillDiagnostics;
+                scheduler.workerDiagnostics(workers[0], spillDiagnostics);
+                SC_TEST_EXPECT(spillDiagnostics.readyFibers == 2);
+                SC_TEST_EXPECT(spillDiagnostics.readyPeakFibers == 2);
+                SC_TEST_EXPECT(spillDiagnostics.dequeCapacity == 2);
+                SC_TEST_EXPECT(spillDiagnostics.spilledFibers == 1);
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                SC_TEST_EXPECT(state.numResumed == 3);
+                SC_TEST_EXPECT(state.resumeOrder[0] == 1);
+                SC_TEST_EXPECT(state.resumeOrder[1] == 0);
+                SC_TEST_EXPECT(state.resumeOrder[2] == 2);
+                scheduler.workerDiagnostics(workers[0], spillDiagnostics);
+                SC_TEST_EXPECT(spillDiagnostics.readyFibers == 0);
+                SC_TEST_EXPECT(spillDiagnostics.readyPeakFibers == 2);
+                SC_TEST_EXPECT(spillDiagnostics.spilledFibers == 1);
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
 
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
-            for (size_t idx = 0; idx < 2; ++idx)
+        runIndependentScenario(
+            [&]
             {
-                contexts[idx].event    = &event;
-                contexts[idx].state    = &state;
-                contexts[idx].id       = static_cast<int>(idx);
-                CancelContext* context = &contexts[idx];
-                SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stacks[idx],
-                                               FiberTask::Procedure(
-                                                   [context](FiberScheduler& scheduler)
-                                                   {
-                                                       Result result = context->event->wait(scheduler);
-                                                       if (not result)
+                FiberScheduler scheduler;
+                FiberAllocator allocator;
+                char           allocatorStorage[4096] = {};
+                FiberWorker    workers[2];
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 1));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+
+                FiberWorkerDiagnostics diagnostics;
+                scheduler.workerDiagnostics(workers[0], diagnostics);
+                SC_TEST_EXPECT(diagnostics.stealAttempts == 0);
+                SC_TEST_EXPECT(diagnostics.stealVictimProbes == 0);
+                SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
+                SC_TEST_EXPECT(diagnostics.failedSteals == 0);
+
+                scheduler.resetWorkerDiagnostics(workers[0]);
+                scheduler.workerDiagnostics(workers[0], diagnostics);
+                SC_TEST_EXPECT(diagnostics.readyPeakFibers == 0);
+                SC_TEST_EXPECT(diagnostics.spilledFibers == 0);
+                SC_TEST_EXPECT(diagnostics.stealAttempts == 0);
+                SC_TEST_EXPECT(diagnostics.stealVictimProbes == 0);
+                SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
+                SC_TEST_EXPECT(diagnostics.stolenBatches == 0);
+                SC_TEST_EXPECT(diagnostics.stolenBatchPeak == 0);
+                SC_TEST_EXPECT(diagnostics.failedSteals == 0);
+                SC_TEST_EXPECT(diagnostics.runAttempts == 0);
+                SC_TEST_EXPECT(diagnostics.idlePolls == 0);
+                SC_TEST_EXPECT(diagnostics.executedFibers == 0);
+                SC_TEST_EXPECT(diagnostics.completedFibers == 0);
+                SC_TEST_EXPECT(diagnostics.yieldedFibers == 0);
+                SC_TEST_EXPECT(diagnostics.waitingFibers == 0);
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
+            {
+                struct CancelState
+                {
+                    int cancelled[2] = {};
+                };
+
+                struct CancelContext
+                {
+                    FiberEvent*  event = nullptr;
+                    CancelState* state = nullptr;
+                    int          id    = 0;
+                };
+
+                FiberScheduler   scheduler;
+                FiberAllocator   allocator;
+                char             allocatorStorage[4096] = {};
+                FiberWorker      workers[2];
+                FiberEvent       event;
+                static FiberTask tasks[2];
+                static char      stackMemory[2][64 * 1024] = {};
+                FiberStack       stacks[2]                 = {
+                    FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                    FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+                };
+                CancelContext contexts[2];
+                CancelState   state;
+
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
+                for (size_t idx = 0; idx < 2; ++idx)
+                {
+                    contexts[idx].event    = &event;
+                    contexts[idx].state    = &state;
+                    contexts[idx].id       = static_cast<int>(idx);
+                    CancelContext* context = &contexts[idx];
+                    SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stacks[idx],
+                                                   FiberTask::Procedure(
+                                                       [context](FiberScheduler& scheduler)
                                                        {
-                                                           context->state->cancelled[context->id]++;
-                                                       }
-                                                       return result;
-                                                   })));
-                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-                SC_TEST_EXPECT(tasks[idx].status() == FiberTaskStatus::Waiting);
-            }
+                                                           Result result = context->event->wait(scheduler);
+                                                           if (not result)
+                                                           {
+                                                               context->state->cancelled[context->id]++;
+                                                           }
+                                                           return result;
+                                                       })));
+                    SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                    SC_TEST_EXPECT(tasks[idx].status() == FiberTaskStatus::Waiting);
+                }
 
-            SC_TEST_EXPECT(scheduler.requestCancel(tasks[0]));
-            SC_TEST_EXPECT(scheduler.requestCancel(tasks[1]));
-            SC_TEST_EXPECT(scheduler.readyFiberCount() == 2);
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 0);
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(state.cancelled[0] == 1);
-            SC_TEST_EXPECT(state.cancelled[1] == 1);
-            SC_TEST_EXPECT(scheduler.stolenFiberCount(workers[1]) == 0);
-            SC_TEST_EXPECT(not tasks[0].result());
-            SC_TEST_EXPECT(not tasks[1].result());
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
+                SC_TEST_EXPECT(scheduler.requestCancel(tasks[0]));
+                SC_TEST_EXPECT(scheduler.requestCancel(tasks[1]));
+                SC_TEST_EXPECT(scheduler.readyFiberCount() == 2);
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 0);
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(state.cancelled[0] == 1);
+                SC_TEST_EXPECT(state.cancelled[1] == 1);
+                SC_TEST_EXPECT(scheduler.stolenFiberCount(workers[1]) == 0);
+                SC_TEST_EXPECT(not tasks[0].result());
+                SC_TEST_EXPECT(not tasks[1].result());
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
 
-        {
-            FiberScheduler   scheduler;
-            FiberAllocator   allocator;
-            char             allocatorStorage[4096] = {};
-            FiberWorker      workers[2];
-            static FiberTask tasks[3];
-            static char      stackMemory[3][64 * 1024] = {};
-            FiberStack       stacks[3]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
-                FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
-            };
-            WaitContext  contexts[3];
-            FiberCounter counter;
-            State        state;
-
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 1));
-            SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
-            for (size_t idx = 0; idx < 3; ++idx)
+        runIndependentScenario(
+            [&]
             {
-                SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            }
-            SC_TEST_EXPECT(scheduler.done(counter));
-            SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 0);
-            SC_TEST_EXPECT(scheduler.shutdown(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(not tasks[0].result());
-            SC_TEST_EXPECT(not tasks[1].result());
-            SC_TEST_EXPECT(not tasks[2].result());
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
+                FiberScheduler   scheduler;
+                FiberAllocator   allocator;
+                char             allocatorStorage[4096] = {};
+                FiberWorker      workers[2];
+                static FiberTask tasks[3];
+                static char      stackMemory[3][64 * 1024] = {};
+                FiberStack       stacks[3]                 = {
+                    FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                    FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+                    FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
+                };
+                WaitContext  contexts[3];
+                FiberCounter counter;
+                State        state;
 
-        {
-            struct RaceContext
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 1));
+                SC_TEST_EXPECT(spawnWaiters(scheduler, counter, state, {tasks, 3}, {stacks, 3}, {contexts, 3}));
+                for (size_t idx = 0; idx < 3; ++idx)
+                {
+                    SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                }
+                SC_TEST_EXPECT(scheduler.done(counter));
+                SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 0);
+                SC_TEST_EXPECT(scheduler.shutdown(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(not tasks[0].result());
+                SC_TEST_EXPECT(not tasks[1].result());
+                SC_TEST_EXPECT(not tasks[2].result());
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
+
+        runIndependentScenario(
+            [&]
             {
-                FiberCounter* counter = nullptr;
-                int*          runs    = nullptr;
-            };
+                struct RaceContext
+                {
+                    FiberCounter* counter = nullptr;
+                    int*          runs    = nullptr;
+                };
 
-            FiberScheduler   scheduler;
-            FiberAllocator   allocator;
-            char             allocatorStorage[4096] = {};
-            FiberWorker      workers[2];
-            static FiberTask tasks[3];
-            static char      stackMemory[3][64 * 1024] = {};
-            FiberStack       stacks[3]                 = {
-                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
-                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
-                FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
-            };
-            FiberCounter counters[2];
-            RaceContext  contexts[2];
-            int          waitRuns[2] = {};
-            int          yieldRuns   = 0;
+                FiberScheduler   scheduler;
+                FiberAllocator   allocator;
+                char             allocatorStorage[4096] = {};
+                FiberWorker      workers[2];
+                static FiberTask tasks[3];
+                static char      stackMemory[3][64 * 1024] = {};
+                FiberStack       stacks[3]                 = {
+                    FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                    FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+                    FiberStack({stackMemory[2], sizeof(stackMemory[2])}),
+                };
+                FiberCounter counters[2];
+                RaceContext  contexts[2];
+                int          waitRuns[2] = {};
+                int          yieldRuns   = 0;
 
-            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
-            SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
+                SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+                SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, {workers, 2}, 4));
 
-            for (size_t idx = 0; idx < 2; ++idx)
-            {
-                scheduler.add(counters[idx]);
-                contexts[idx].counter = &counters[idx];
-                contexts[idx].runs    = &waitRuns[idx];
-                RaceContext* context  = &contexts[idx];
-                SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stacks[idx],
+                for (size_t idx = 0; idx < 2; ++idx)
+                {
+                    scheduler.add(counters[idx]);
+                    contexts[idx].counter = &counters[idx];
+                    contexts[idx].runs    = &waitRuns[idx];
+                    RaceContext* context  = &contexts[idx];
+                    SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stacks[idx],
+                                                   FiberTask::Procedure(
+                                                       [context](FiberScheduler& scheduler)
+                                                       {
+                                                           SC_TRY(scheduler.wait(*context->counter));
+                                                           *context->runs += 1;
+                                                           return Result(true);
+                                                       })));
+                    SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
+                    SC_TEST_EXPECT(tasks[idx].status() == FiberTaskStatus::Waiting);
+                }
+
+                SC_TEST_EXPECT(scheduler.spawn(tasks[2], stacks[2],
                                                FiberTask::Procedure(
-                                                   [context](FiberScheduler& scheduler)
+                                                   [&yieldRuns](FiberScheduler& scheduler)
                                                    {
-                                                       SC_TRY(scheduler.wait(*context->counter));
-                                                       *context->runs += 1;
+                                                       SC_TRY(scheduler.yield());
+                                                       yieldRuns += 1;
                                                        return Result(true);
                                                    })));
                 SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-                SC_TEST_EXPECT(tasks[idx].status() == FiberTaskStatus::Waiting);
-            }
+                SC_TEST_EXPECT(tasks[2].status() == FiberTaskStatus::Ready);
 
-            SC_TEST_EXPECT(scheduler.spawn(tasks[2], stacks[2],
-                                           FiberTask::Procedure(
-                                               [&yieldRuns](FiberScheduler& scheduler)
-                                               {
-                                                   SC_TRY(scheduler.yield());
-                                                   yieldRuns += 1;
-                                                   return Result(true);
-                                               })));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[0], {workers, 2}));
-            SC_TEST_EXPECT(tasks[2].status() == FiberTaskStatus::Ready);
+                SC_TEST_EXPECT(scheduler.done(counters[0]));
+                SC_TEST_EXPECT(scheduler.requestCancel(tasks[0]));
+                SC_TEST_EXPECT(scheduler.readyFiberCount() == 2);
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 1);
 
-            SC_TEST_EXPECT(scheduler.done(counters[0]));
-            SC_TEST_EXPECT(scheduler.requestCancel(tasks[0]));
-            SC_TEST_EXPECT(scheduler.readyFiberCount() == 2);
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 1);
+                SC_TEST_EXPECT(scheduler.requestCancel(tasks[1]));
+                SC_TEST_EXPECT(scheduler.done(counters[1]));
+                SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 1);
 
-            SC_TEST_EXPECT(scheduler.requestCancel(tasks[1]));
-            SC_TEST_EXPECT(scheduler.done(counters[1]));
-            SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 1);
+                SC_TEST_EXPECT(scheduler.requestCancel(tasks[2]));
+                SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
+                SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 1);
 
-            SC_TEST_EXPECT(scheduler.requestCancel(tasks[2]));
-            SC_TEST_EXPECT(scheduler.readyFiberCount() == 3);
-            SC_TEST_EXPECT(scheduler.readyFiberCount(workers[0]) == 1);
-
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
-            SC_TEST_EXPECT(waitRuns[0] == 0);
-            SC_TEST_EXPECT(waitRuns[1] == 0);
-            SC_TEST_EXPECT(yieldRuns == 0);
-            SC_TEST_EXPECT(not tasks[0].result());
-            SC_TEST_EXPECT(not tasks[1].result());
-            SC_TEST_EXPECT(not tasks[2].result());
-            SC_TEST_EXPECT(scheduler.stolenFiberCount(workers[1]) == 1);
-            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
-            scheduler.releaseWorkerDeques({workers, 2});
-            SC_TEST_EXPECT(allocator.close());
-        }
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(scheduler.runNoWait(workers[1], {workers, 2}));
+                SC_TEST_EXPECT(waitRuns[0] == 0);
+                SC_TEST_EXPECT(waitRuns[1] == 0);
+                SC_TEST_EXPECT(yieldRuns == 0);
+                SC_TEST_EXPECT(not tasks[0].result());
+                SC_TEST_EXPECT(not tasks[1].result());
+                SC_TEST_EXPECT(not tasks[2].result());
+                SC_TEST_EXPECT(scheduler.stolenFiberCount(workers[1]) == 1);
+                SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+                scheduler.releaseWorkerDeques({workers, 2});
+                SC_TEST_EXPECT(allocator.close());
+            });
     }
 
     void workerDequeExternalWakeRouting()
