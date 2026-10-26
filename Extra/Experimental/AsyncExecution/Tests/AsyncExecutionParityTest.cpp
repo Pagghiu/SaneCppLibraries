@@ -3,6 +3,7 @@
 #include "Extra/Experimental/AsyncExecution/Tests/AsyncExecutionTestSupport.h"
 #include "Libraries/AsyncFibers/AsyncFibers.h"
 #include "Libraries/Await/Await.h"
+#include "Libraries/Threading/Threading.h"
 #include <stdio.h>
 namespace SC
 {
@@ -11,6 +12,24 @@ namespace
 struct AsyncExecutionParityTest : AsyncExecutionTestCase
 {
     Result nativeError{false};
+    Mutex  expectationsMutex;
+
+    bool recordExpectation(StringSpan expression, bool status, StringSpan details = {})
+    {
+        expectationsMutex.lock();
+        const bool recorded = TestCase::recordExpectation(expression, status, details);
+        expectationsMutex.unlock();
+        return recorded;
+    }
+
+    bool recordExpectation(StringSpan expression, Result status)
+    {
+        expectationsMutex.lock();
+        const bool recorded = TestCase::recordExpectation(expression, status);
+        expectationsMutex.unlock();
+        return recorded;
+    }
+
     struct Fixture
     {
         AsyncEventLoop    loop;
@@ -53,13 +72,35 @@ struct AsyncExecutionParityTest : AsyncExecutionTestCase
         if (test_section("native connect failure ready before cancellation delivery"))
         {
             callbacks(false);
-            callbacks(true);
-            senders(false);
-            senders(true);
-            coroutines(false);
-            coroutines(true);
-            fibers(false);
-            fibers(true);
+            // Publish the reference error first. The remaining cases only read it and own all of their I/O state.
+            struct Scenario
+            {
+                AsyncExecutionParityTest* test;
+                void (AsyncExecutionParityTest::*run)(bool);
+                bool cancel;
+            } scenarios[] = {
+                {this, &AsyncExecutionParityTest::callbacks, true},
+                {this, &AsyncExecutionParityTest::senders, false},
+                {this, &AsyncExecutionParityTest::senders, true},
+                {this, &AsyncExecutionParityTest::coroutines, false},
+                {this, &AsyncExecutionParityTest::coroutines, true},
+                {this, &AsyncExecutionParityTest::fibers, false},
+                {this, &AsyncExecutionParityTest::fibers, true},
+            };
+            constexpr size_t numScenarios = sizeof(scenarios) / sizeof(scenarios[0]);
+
+            Thread workers[numScenarios];
+            for (size_t index = 0; index < numScenarios; ++index)
+            {
+                Scenario* scenario = &scenarios[index];
+                SC_TEST_EXPECT(
+                    workers[index].start([scenario](Thread&) { (scenario->test->*scenario->run)(scenario->cancel); }));
+            }
+            for (Thread& worker : workers)
+            {
+                if (worker.wasStarted())
+                    SC_TEST_EXPECT(worker.join());
+            }
         }
     }
     void callbacks(bool cancel)
