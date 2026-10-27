@@ -152,6 +152,42 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y liburing-dev openssl
       if: startsWith(matrix.params.os, 'ubuntu-')
+    - name: Install compiler cache
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      run: sudo apt-get install -y --no-install-recommends ccache
+    - name: Restore compiler cache
+      id: compiler-cache
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      uses: actions/cache/restore@v5
+      with:
+        path: _Build/_CompilerCache
+        key: sc-compiler-cache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.params.os }}-${{ matrix.config }}-${{ github.sha }}
+        restore-keys: |
+          sc-compiler-cache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.params.os }}-${{ matrix.config }}-
+    - name: Set up compiler cache
+      id: compiler-cache-setup
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      shell: bash
+      run: |
+        set -euo pipefail
+        export CCACHE_DIR="$GITHUB_WORKSPACE/_Build/_CompilerCache"
+        ccache --set-config=compiler_check=content
+        ccache --set-config=max_size=256M
+        ccache --set-config=compression=true
+        ccache --zero-stats
+        compiler_wrappers="$GITHUB_WORKSPACE/_Build/_CompilerWrappers"
+        mkdir -p "$compiler_wrappers"
+        compiler_major="$(gcc -dumpversion | cut -d. -f1)"
+        for compiler in cc c++ gcc g++ clang clang++ "gcc-$compiler_major" "g++-$compiler_major"; do
+          if command -v "$compiler" >/dev/null 2>&1; then
+            ln -sf "$(command -v ccache)" "$compiler_wrappers/$compiler"
+          fi
+        done
+        echo "$compiler_wrappers" >> "$GITHUB_PATH"
+        echo "CCACHE_DIR=$CCACHE_DIR" >> "$GITHUB_ENV"
+    - name: Check compiler cache invalidation
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      run: python3 Support/Scripts/CheckCompilerCache.py
     - name: Install OpenSSL 3
       run: |
         HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
@@ -256,24 +292,33 @@ jobs:
         ./SC.sh build run SCTest Debug -- --test CryptographyAsyncStreamsTest
         ./SC.sh build run SCTest Debug -- --test CryptographyTransformStreamsTest
       env:
+        CCACHE_DISABLE: 1
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.config == 'Debug'
     - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
       env:
+        CCACHE_DISABLE: 1
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: test SCAsyncExecutionTest
+      env:
+        CCACHE_DISABLE: 1
       run: ./SC.sh build run SCAsyncExecutionTest ${{ matrix.config }}
     - name: test SCBuildTest
+      env:
+        CCACHE_DISABLE: 1
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release'
     - name: test SCBuildTest real QEMU Linux target profiles
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }} -- --test SCBuildTest --test-section "native backend smoke-runs Linux target profiles through real qemu on macOS"
       env:
+        CCACHE_DISABLE: 1
         SC_BUILD_REQUIRE_REAL_QEMU: 1
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.qemu-user-runners.outputs.available == 'true'
     - name: test InteropSTL
+      env:
+        CCACHE_DISABLE: 1
       run: ./SC.sh build run InteropSTL ${{ matrix.config }}
     - name: compile SCTest xcode
       run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
@@ -281,6 +326,7 @@ jobs:
     - name: test SCTest xcode
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
       env:
+        CCACHE_DISABLE: 1
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Save llvm-mingw cache
@@ -345,6 +391,15 @@ jobs:
     #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest
     # - name: test in lldb
     #   run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest
+    - name: Compiler cache statistics
+      if: always() && steps.compiler-cache-setup.outcome == 'success'
+      run: ccache --show-stats --verbose
+    - name: Save compiler cache
+      if: success() && steps.compiler-cache-setup.outcome == 'success' && steps.compiler-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: _Build/_CompilerCache
+        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
 
   filc-linux-experimental:
     strategy:
