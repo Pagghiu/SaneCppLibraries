@@ -213,6 +213,13 @@ struct SC::Build::WriterInternal
 
     [[nodiscard]] static bool isRenderItemInExportSet(const Project& project, StringView referencePath)
     {
+        // The unity object owns the exported definitions when the core sources are combined.
+        // Their visibility is still controlled by the project's SC_EXPORT_LIBRARY_* defines.
+        if (not project.exportLibraries.isEmpty() and
+            (referencePath == "SC.cpp" or referencePath.endsWith("/SC.cpp") or referencePath.endsWith("\\SC.cpp")))
+        {
+            return true;
+        }
         if (not referencePath.startsWith("Libraries/"_a8))
         {
             for (const String& exportDirectory : project.exportDirectories)

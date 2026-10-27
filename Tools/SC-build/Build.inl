@@ -311,6 +311,10 @@ bool SC::Build::Project::addDefines(Span<const StringView> defines) { return fil
 
 SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& parameters, Libraries mode)
 {
+    if (parameters.libraries.hasBeenSet())
+    {
+        mode = parameters.libraries;
+    }
     project.saneCpp.enabled = true;
 
     StringView projectRoot =

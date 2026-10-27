@@ -44,6 +44,7 @@ struct BuildCLIParseContext
     StringSpan runner           = {};
     StringSpan runnerPath       = {};
     StringSpan output           = {};
+    StringSpan libraries        = {};
     bool       quietRequested   = false;
     bool       normalRequested  = false;
     bool       verboseRequested = false;

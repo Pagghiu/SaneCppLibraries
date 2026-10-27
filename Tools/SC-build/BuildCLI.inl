@@ -523,6 +523,18 @@ static Result applyGeneratorValue(Build::Action& action, StringView generatorVal
     return Result(true);
 }
 
+static Result applyLibrariesValue(Build::Action& action, StringView value, Console& console)
+{
+    static constexpr StringView names[] = {"default", "separate", "unity"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--libraries", value, names, resolved, console));
+    if (resolved == "default")
+        action.parameters.libraries.unset();
+    else
+        action.parameters.libraries = resolved == "unity" ? Build::Libraries::SingleFile : Build::Libraries::Multiple;
+    return Result(true);
+}
+
 static Result applyArchitectureValue(Build::Action& action, StringView architectureValue, Console& console)
 {
     if (architectureValue.isEmpty())
@@ -1099,14 +1111,16 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     Span<const StringView> postArguments;
     SC_TRY(splitBuildArgumentsAtTerminator(arguments.arguments, preArguments, postArguments));
 
-    StringSpan argumentStorage[16];
+    StringSpan argumentStorage[32];
+    if (preArguments.sizeInElements() > sizeof(argumentStorage) / sizeof(argumentStorage[0]))
+        return Result::Error(BuildResultCategory, BuildError::InvalidArguments);
     for (size_t idx = 0; idx < preArguments.sizeInElements(); ++idx)
     {
         argumentStorage[idx] = preArguments[idx];
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[15];
+    CommandLineOption     options[16];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -1139,6 +1153,12 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     options[numOptions].help      = "Build generator (default/native, make, xcode, vs2022, vs2019)";
     options[numOptions].valueName = "NAME";
     options[numOptions].value     = CommandLineValue::stringSpan(context.generator);
+    numOptions++;
+
+    options[numOptions].longName  = "libraries";
+    options[numOptions].help      = "Core library compilation (default, separate, unity)";
+    options[numOptions].valueName = "MODE";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.libraries);
     numOptions++;
 
     options[numOptions].longName  = "arch";
@@ -1259,6 +1279,11 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     action.additionalArguments = postArguments;
 
     SC_TRY(setBuildActionTarget(action, context.target));
+
+    if (not context.libraries.isEmpty())
+    {
+        SC_TRY(markBuildCLIValueError(applyLibrariesValue(action, context.libraries, arguments.console), status));
+    }
 
     if (context.legacyValues.sizeInElements() >= 1)
     {
@@ -1390,6 +1415,15 @@ static Result prepareConfigureActionArguments(Tool::Arguments& arguments, Build:
             if (nameAndMaybeValue.splitBefore("=", longName))
             {
                 SC_TRY(nameAndMaybeValue.splitAfter("=", value));
+            }
+            if (longName.equalsIgnoreCaseASCII("libraries"))
+            {
+                if (value.isEmpty() and idx + 1 < arguments.arguments.sizeInElements())
+                {
+                    value = arguments.arguments[++idx];
+                }
+                SC_TRY(detail::applyLibrariesValue(action, value, arguments.console));
+                continue;
             }
             if (longName.equalsIgnoreCaseASCII("windows-long-path-aware"))
             {

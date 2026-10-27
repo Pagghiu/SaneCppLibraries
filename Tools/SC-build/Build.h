@@ -869,6 +869,8 @@ struct Parameters
 
     WindowsTargetOptions windows; ///< Default Windows target options for projects that do not set their own policy
     ExecutionOptions     execution;
+
+    Parameter<Libraries> libraries = Libraries::Multiple; ///< Optional override of addSaneCppLibraries source mode
 };
 
 /// @brief Add Sane C++ Libraries to a project using either `SC.cpp` or the individual library sources
