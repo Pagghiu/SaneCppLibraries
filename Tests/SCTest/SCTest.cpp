@@ -7,6 +7,7 @@ struct TestReport;
 
 // Foundation
 void runBaseTest(TestReport& report);
+void runTestingTest(TestReport& report);
 void runStringSpanTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
@@ -161,6 +162,7 @@ int main(int argc, const char* argv[])
 
     // Foundation tests
     runBaseTest(report);
+    runTestingTest(report);
     runStringSpanTest(report);
     runUniqueHandleTest(report);
     runFunctionTest(report);

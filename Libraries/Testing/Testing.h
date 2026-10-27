@@ -162,6 +162,31 @@ struct TestCase
     /// @return `false` if `status` Result is not valid
     bool recordExpectation(StringSpan expression, Result status);
 
+#if SC_PLATFORM_WINDOWS
+#define SC_TESTING_NO_INLINE __declspec(noinline)
+#else
+#define SC_TESTING_NO_INLINE __attribute__((noinline))
+#endif
+
+    /// @brief Shares literal-message construction while preserving the test's expectation overloads.
+    /// Keeping this boundary prevents repeated instrumentation of StringSpan temporaries at every assertion.
+    template <typename Test>
+    static SC_TESTING_NO_INLINE bool recordLiteralExpectation(Test& test, const char* expression, size_t length,
+                                                              bool status)
+    {
+        return test.recordExpectation(StringSpan({expression, length}, true, StringEncoding::Ascii), status);
+    }
+
+    /// @brief Forwards a Result expectation with the same literal text and error identity.
+    template <typename Test>
+    static SC_TESTING_NO_INLINE bool recordLiteralExpectation(Test& test, const char* expression, size_t length,
+                                                              Result status)
+    {
+        return test.recordExpectation(StringSpan({expression, length}, true, StringEncoding::Ascii), status);
+    }
+
+#undef SC_TESTING_NO_INLINE
+
     enum class Execute
     {
         Default,     ///< Test is executed if all tests are enabled or if this specific one matches --test-section
@@ -187,7 +212,7 @@ struct TestCase
 
 // clang-format off
 /// Records a test expectation (eventually aborting or breaking o n failed test)
-#define SC_TEST_EXPECT(e) recordExpectation(StringSpan(#e), (e)) ? (void)0  : (TestCase::report.debugBreakOnFailedTest ? SC_COMPILER_DEBUG_BREAK : (void)0)
+#define SC_TEST_EXPECT(e) TestCase::recordLiteralExpectation(*this, #e, sizeof(#e) - 1, (e)) ? (void)0 : (TestCase::report.debugBreakOnFailedTest ? SC_COMPILER_DEBUG_BREAK : (void)0)
 // clang-format on
 
 //! @}
