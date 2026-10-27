@@ -66,6 +66,9 @@ jobs:
         else
           echo "musl-x86_64-installed=false" >> "$GITHUB_OUTPUT"
         fi
+    - name: Initialize MSVC environment
+      shell: pwsh
+      run: ./Support/Scripts/InitializeMsvcEnvironment.ps1
     - name: Warm packaged LLVM toolchain
       if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: cmd
@@ -121,9 +124,9 @@ jobs:
           _Build/_Packages/linux-sysroot_musl_x86_64
         key: ${{ steps.linux_sysroot_musl_x64_cache.outputs.cache-primary-key }}
 
-  build:
-    needs: package-warmup
+  core:
     strategy:
+      fail-fast: false
       matrix:
         config: [ Debug, Release ]
         params: [ { os: windows-2022, generator: vs2022 },
@@ -131,26 +134,10 @@ jobs:
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 12
     env:
-      SC_ASYNC_EXECUTION_STDEXEC_INCLUDE: _Build/_AsyncExecutionStdexec/include
-      SC_ASYNC_EXECUTION_STDEXEC_REVISION: 34fa94719f97f49a553811423fa1200172f22a0e
       WINDOWS_LONG_PATH_ARGS: ${{ matrix.config == 'Debug' && matrix.params.os == 'windows-2022' && '--windows-long-path-aware off' || '' }}
 
     steps:
     - uses: actions/checkout@v5
-    - name: Cache stdexec headers
-      id: stdexec-cache
-      uses: actions/cache@v5
-      with:
-        path: _Build/_AsyncExecutionStdexec/include
-        key: sc-stdexec-headers-v1-${{ runner.os }}-${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
-    - name: Download pinned stdexec
-      if: steps.stdexec-cache.outputs.cache-hit != 'true'
-      uses: actions/checkout@v5
-      with:
-        repository: NVIDIA/stdexec
-        ref: ${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
-        path: _Build/_AsyncExecutionStdexec
-        persist-credentials: false
     - name: Verify OpenSSL 3
       shell: pwsh
       run: |
@@ -189,6 +176,114 @@ jobs:
         Write-Output $version
         Write-Output "OpenSSL runtime: $openSSLDll"
         "SC_OPENSSL_DLL=$openSSLDll" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    - name: Initialize MSVC environment
+      shell: pwsh
+      run: ./Support/Scripts/InitializeMsvcEnvironment.ps1
+    - name: configure SCTest
+      shell: cmd
+      run: SC.bat build configure SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: compile SCTest
+      shell: cmd
+      run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: Stage OpenSSL 3 runtime
+      shell: pwsh
+      run: |
+        $openSSLDll = $env:SC_OPENSSL_DLL
+        if (-not $openSSLDll -or -not (Test-Path $openSSLDll)) {
+          throw "The verified OpenSSL runtime was not found"
+        }
+
+        $scTest = Get-ChildItem "_Build/_Outputs" -Filter "SCTest.exe" -Recurse |
+          Where-Object { $_.Directory.Name -like "*-${{ matrix.config }}" } |
+          Select-Object -First 1
+        if (-not $scTest) {
+          throw "SCTest.exe was not found"
+        }
+
+        Copy-Item $openSSLDll $scTest.Directory.FullName
+    - name: compile InteropSTL
+      shell: cmd
+      run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: compile SCStdCppHeaderNoLinkTest
+      shell: cmd
+      run: SC.bat build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: test SCTest
+      shell: cmd
+      run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS% -- --all-tests
+      env:
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+    - name: test InteropSTL
+      shell: cmd
+      run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+
+  auxiliary:
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [ Debug, Release ]
+        params: [ { os: windows-2022, generator: vs2022 },
+                  { os: windows-2025, generator: vs2022 } ]
+    runs-on: ${{ matrix.params.os }}
+    timeout-minutes: 12
+    env:
+      SC_ASYNC_EXECUTION_STDEXEC_INCLUDE: _Build/_AsyncExecutionStdexec/include
+      SC_ASYNC_EXECUTION_STDEXEC_REVISION: 34fa94719f97f49a553811423fa1200172f22a0e
+      WINDOWS_LONG_PATH_ARGS: ${{ matrix.config == 'Debug' && matrix.params.os == 'windows-2022' && '--windows-long-path-aware off' || '' }}
+
+    steps:
+    - uses: actions/checkout@v5
+    - name: Cache stdexec headers
+      id: stdexec-cache
+      uses: actions/cache@v5
+      with:
+        path: _Build/_AsyncExecutionStdexec/include
+        key: sc-stdexec-headers-v1-${{ runner.os }}-${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+    - name: Download pinned stdexec
+      if: steps.stdexec-cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v5
+      with:
+        repository: NVIDIA/stdexec
+        ref: ${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+        path: _Build/_AsyncExecutionStdexec
+        persist-credentials: false
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: Initialize MSVC environment
+      shell: pwsh
+      run: ./Support/Scripts/InitializeMsvcEnvironment.ps1
+    - name: configure SCSingleFileLibs
+      shell: cmd
+      run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: compile SCSingleFileLibs
+      shell: cmd
+      run: SC.bat build compile "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+    - name: compile SCAsyncExecutionTest
+      shell: cmd
+      env:
+        CL: /Zc:__cplusplus /Zc:preprocessor /external:anglebrackets /external:W0
+      run: SC.bat build compile SCAsyncExecutionTest ${{ matrix.config }}
+    - name: test SCAsyncExecutionTest
+      shell: cmd
+      env:
+        CL: /Zc:__cplusplus /Zc:preprocessor /external:anglebrackets /external:W0
+      run: SC.bat build run SCAsyncExecutionTest ${{ matrix.config }}
+
+  build-fixtures:
+    needs: package-warmup
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [ Release ]
+        params: [ { os: windows-2022, generator: vs2022 },
+                  { os: windows-2025, generator: vs2022 } ]
+    runs-on: ${{ matrix.params.os }}
+    timeout-minutes: 12
+    env:
+      SC_BUILD_REUSE_MSVC_ENVIRONMENT: '1'
+      WINDOWS_LONG_PATH_ARGS: ${{ matrix.config == 'Debug' && matrix.params.os == 'windows-2022' && '--windows-long-path-aware off' || '' }}
+
+    steps:
+    - uses: actions/checkout@v5
     - name: Restore LLVM package cache
       id: llvm-cache
       if: matrix.config == 'Release'
@@ -232,72 +327,44 @@ jobs:
       if: matrix.config == 'Release'
       shell: bash
       run: ./Support/Scripts/PruneLLVMPackageCache.sh .
-    - name: Generate Single File Libs (Python)
-      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
-    - name: configure SCTest
-      shell: cmd
-      run: SC.bat build configure SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
-    - name: configure SCSingleFileLibs
-      shell: cmd
-      run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
-    - name: compile SCSingleFileLibs
-      shell: cmd
-      run: SC.bat build compile "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
-    - name: compile SCTest
-      shell: cmd
-      run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
-    - name: Stage OpenSSL 3 runtime
-      shell: pwsh
-      run: |
-        $openSSLDll = $env:SC_OPENSSL_DLL
-        if (-not $openSSLDll -or -not (Test-Path $openSSLDll)) {
-          throw "The verified OpenSSL runtime was not found"
-        }
-
-        $scTest = Get-ChildItem "_Build/_Outputs" -Filter "SCTest.exe" -Recurse |
-          Where-Object { $_.Directory.Name -like "*-${{ matrix.config }}" } |
-          Select-Object -First 1
-        if (-not $scTest) {
-          throw "SCTest.exe was not found"
-        }
-
-        Copy-Item $openSSLDll $scTest.Directory.FullName
-    - name: compile SCAsyncExecutionTest
-      shell: cmd
-      env:
-        CL: /Zc:__cplusplus /Zc:preprocessor /external:anglebrackets /external:W0
-      run: SC.bat build compile SCAsyncExecutionTest ${{ matrix.config }}
     - name: compile SCBuildTest
       shell: cmd
-      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} --libraries unity %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
-    - name: compile InteropSTL
-      shell: cmd
-      run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
-    - name: compile SCStdCppHeaderNoLinkTest
-      shell: cmd
-      run: SC.bat build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
-    - name: test SCTest
-      shell: cmd
-      run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS% -- --all-tests
-      env:
-        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
-    - name: test SCAsyncExecutionTest
-      shell: cmd
-      env:
-        CL: /Zc:__cplusplus /Zc:preprocessor /external:anglebrackets /external:W0
-      run: SC.bat build run SCAsyncExecutionTest ${{ matrix.config }}
     - name: test SCBuildTest
       shell: cmd
-      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} --libraries unity %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
-    - name: test InteropSTL
-      shell: cmd
-      run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
+
+  # Preserve existing matrix check names as gates over all required workload groups.
+  build:
+    if: always()
+    needs: [core, auxiliary, build-fixtures]
+    strategy:
+      matrix:
+        config: [ Debug, Release ]
+        params: [ { os: windows-2022, generator: vs2022 },
+                  { os: windows-2025, generator: vs2022 } ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Check required Windows workloads
+      env:
+        REQUIRED_RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PYCODE'
+        import json
+        import os
+        results = json.loads(os.environ['REQUIRED_RESULTS'])
+        for name, job in results.items():
+            print(f"{name}: {job['result']}")
+        if any(job['result'] != 'success' for job in results.values()):
+            raise SystemExit(1)
+        PYCODE
 
   timing-summary:
     runs-on: ubuntu-latest
-    needs: [package-warmup, build]
+    needs: [package-warmup, core, auxiliary, build-fixtures, build]
     if: always()
 
     steps:

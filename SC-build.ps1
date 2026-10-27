@@ -109,6 +109,19 @@ function Resolve-VcVarsAllPath() {
     return $VcVarsAll
 }
 
+function Get-MsvcCommand([string]$Command) {
+    $VcVarsAll = Resolve-VcVarsAllPath
+    $InstallPath = Split-Path (Split-Path (Split-Path (Split-Path $VcVarsAll -Parent) -Parent) -Parent) -Parent
+    if ($env:SC_BUILD_REUSE_MSVC_ENVIRONMENT -eq "1" -and
+        $env:VSCMD_VER -and $env:VSCMD_ARG_HOST_ARCH -eq "x86" -and
+        $env:VSCMD_ARG_TGT_ARCH -eq "x64" -and $env:VSINSTALLDIR -and
+        $env:VSINSTALLDIR.TrimEnd('\') -ieq $InstallPath.TrimEnd('\')) {
+        # Keep a non-quote first character for CMD /c, including quoted executable paths.
+        return '@' + $Command
+    }
+    return 'call "{0}" x86_amd64 >nul && {1}' -f $VcVarsAll, $Command
+}
+
 function Ensure-SharedRepositoryCheckout([string]$CacheBase) {
     Ensure-GitAvailable
     $RepositoryRoot = Join-Path $CacheBase "repository"
@@ -194,9 +207,8 @@ function Ensure-BootstrapExecutable([string]$LibrariesRoot) {
     $NeedsBuild = -not (Test-Path $BootstrapExe -PathType Leaf) -or ((Get-Item $SourceFile).LastWriteTimeUtc -gt (Get-Item $BootstrapExe).LastWriteTimeUtc)
     if ($NeedsBuild) {
         Write-Host "ToolsBootstrap.c"
-        $VcVarsAll = Resolve-VcVarsAllPath
         $ObjectFile = Join-Path $LibrariesRoot "_Build\_Tools\Windows\ToolsBootstrap.obj"
-        $Command = 'call "{0}" x86_amd64 >nul && cl.exe /nologo /MTd /Zi /Od /D_DEBUG=1 /Fo"{1}" /c "{2}" && link /nologo /DEBUG /OUT:"{3}" "{1}" Shell32.lib' -f $VcVarsAll, $ObjectFile, $SourceFile, $BootstrapExe
+        $Command = Get-MsvcCommand ('cl.exe /nologo /MTd /Zi /Od /D_DEBUG=1 /Fo"{0}" /c "{1}" && link /nologo /DEBUG /OUT:"{2}" "{0}" Shell32.lib' -f $ObjectFile, $SourceFile, $BootstrapExe)
         Push-Location $LibrariesRoot
         try {
             cmd.exe /d /c $Command | Out-Null
@@ -261,12 +273,11 @@ $BootstrapExe = Ensure-BootstrapExecutable $LibrariesRoot
 $BuildRoot = Join-Path $ProjectRoot "_Build"
 Ensure-Directory $BuildRoot
 
-$VcVarsAll = Resolve-VcVarsAllPath
 $EscapedArguments = New-Object System.Collections.Generic.List[string]
 foreach ($Argument in @($LibrariesRoot, (Join-Path $LibrariesRoot "Tools"), $BuildRoot, $ProjectRoot, $ProjectFile) + $ForwardedArguments) {
     $EscapedArguments.Add(('"{0}"' -f $Argument.Replace('"', '""'))) | Out-Null
 }
-$BootstrapCommand = 'call "{0}" x86_amd64 >nul && "{1}" {2}' -f $VcVarsAll, $BootstrapExe, ($EscapedArguments -join ' ')
+$BootstrapCommand = Get-MsvcCommand ('"{0}" {1}' -f $BootstrapExe, ($EscapedArguments -join ' '))
 $BootstrapExitCode = 1
 Push-Location $LibrariesRoot
 try {
