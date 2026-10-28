@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      profile-compiles:
+        description: Replay selected Xcode and Fil-C core compiles with phase diagnostics after tests
+        type: boolean
+        default: false
   schedule:
     - cron: '0 3 * * 0'
 
@@ -165,7 +170,14 @@ jobs:
         CCACHE_DISABLE: 1
       run: ./SC.sh build run InteropSTL ${{ matrix.config }}
     - name: compile SCTest xcode
-      run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
+      run: |
+        if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.profile-compiles }}" == "true" ]]; then
+          set -o pipefail
+          mkdir -p _Build/_CompileProfiles
+          ./SC.sh build compile SCTest ${{ matrix.config }} xcode 2>&1 | tee _Build/_CompileProfiles/xcode-build.log
+        else
+          ./SC.sh build compile SCTest ${{ matrix.config }} xcode
+        fi
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: test SCTest xcode
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
@@ -173,6 +185,22 @@ jobs:
         CCACHE_DISABLE: 1
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: Profile Xcode core compiler phases
+      if: github.event_name == 'workflow_dispatch' && inputs.profile-compiles && matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      run: >-
+        python3 Support/Scripts/ProfileCICompiles.py xcode
+        --build-log _Build/_CompileProfiles/xcode-build.log
+        --intermediate "_Build/_Intermediates/SCTest/macOS-arm64 x86_64-xcode-clang-Release"
+        --output _Build/_CompileProfiles/xcode
+    - name: Upload Xcode compiler profiles
+      if: always() && github.event_name == 'workflow_dispatch' && inputs.profile-compiles && matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      uses: actions/upload-artifact@v6
+      with:
+        name: compiler-phases-xcode
+        path: |
+          _Build/_CompileProfiles/xcode
+          _Build/_CompileProfiles/xcode-build.log
+        retention-days: 7
     - name: Print macOS crash reports
       if: failure() && matrix.params.os == 'macos-latest'
       shell: bash
@@ -798,6 +826,20 @@ jobs:
       run: |
         ./SC.sh build compile SCAwaitCoroutineShimTest Release native --toolchain filc
         ./SC.sh build run SCAwaitCoroutineShimTest Release native --toolchain filc
+
+    - name: Profile Fil-C core compiler phases
+      if: github.event_name == 'workflow_dispatch' && inputs.profile-compiles && matrix.partition == 'core'
+      run: >-
+        python3 Support/Scripts/ProfileCICompiles.py filc
+        --intermediate "_Build/_Intermediates/SCTestCore/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release"
+        --output _Build/_CompileProfiles/filc
+    - name: Upload Fil-C compiler profiles
+      if: always() && github.event_name == 'workflow_dispatch' && inputs.profile-compiles && matrix.partition == 'core'
+      uses: actions/upload-artifact@v6
+      with:
+        name: compiler-phases-filc-${{ runner.arch }}
+        path: _Build/_CompileProfiles/filc
+        retention-days: 7
 
   filc-linux-experimental:
     needs: [filc-linux-workloads]
