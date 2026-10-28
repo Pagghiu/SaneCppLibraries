@@ -5,6 +5,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      parallel-tests:
+        description: Compare serial and isolated parallel test processes after one build
+        type: boolean
+        default: false
       profile-compiles:
         description: Replay selected Xcode and Fil-C core compiles with phase diagnostics after tests
         type: boolean
@@ -151,7 +155,12 @@ jobs:
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
       if: matrix.config == 'Debug'
     - name: test SCTest
-      run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
+      run: |
+        if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.parallel-tests }}" == "true" ]]; then
+          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --compare-serial --output _Build/_TestShards/native
+        else
+          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --output _Build/_TestShards/native
+        fi
       env:
         CCACHE_DISABLE: 1
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
@@ -180,7 +189,12 @@ jobs:
         fi
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: test SCTest xcode
-      run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
+      run: |
+        if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.parallel-tests }}" == "true" ]]; then
+          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --generator xcode --compare-serial --output _Build/_TestShards/xcode
+        else
+          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --generator xcode --output _Build/_TestShards/xcode
+        fi
       env:
         CCACHE_DISABLE: 1
         SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
@@ -200,6 +214,13 @@ jobs:
         path: |
           _Build/_CompileProfiles/xcode
           _Build/_CompileProfiles/xcode-build.log
+        retention-days: 7
+    - name: Upload test process evidence
+      if: always() && (failure() || (github.event_name == 'workflow_dispatch' && inputs.parallel-tests))
+      uses: actions/upload-artifact@v6
+      with:
+        name: test-processes-${{ matrix.params.os }}-${{ matrix.config }}
+        path: _Build/_TestShards
         retention-days: 7
     - name: Print macOS crash reports
       if: failure() && matrix.params.os == 'macos-latest'
@@ -783,10 +804,19 @@ jobs:
         ./SC.sh package verify curl-filc
     - name: test SCTest Release with Fil-C
       if: matrix.partition == 'core'
+      env:
+        SC_FILC_TEST_SHARDS: ${{ github.event_name == 'workflow_dispatch' && inputs.parallel-tests && '1' || '2' }}
       run: SC_FILC_TEST_PROJECT=SCTestCore ./Support/Scripts/RunFilCTLSFixture.sh Release --all-tests
     - name: test SCTestTools Release with Fil-C
       if: matrix.partition == 'tools'
       run: ./SC.sh build run SCTestTools Release native --toolchain filc -- --all-tests
+    - name: Upload Fil-C test process evidence
+      if: always() && matrix.partition == 'core' && (failure() || (github.event_name == 'workflow_dispatch' && inputs.parallel-tests))
+      uses: actions/upload-artifact@v6
+      with:
+        name: test-processes-filc-${{ runner.arch }}
+        path: _Build/_FilCTLSFixture/run.*/test-shards
+        retention-days: 7
     - name: Save zlib-filc source cache
       if: always() && steps.zlib-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/zlib-filc/**') != ''
       uses: actions/cache/save@v5

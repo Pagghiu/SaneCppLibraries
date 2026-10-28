@@ -14,6 +14,20 @@ case "$CONFIGURATION" in
     Debug|Release) ;;
     *) echo "Expected Debug or Release" >&2; exit 2 ;;
 esac
+SHARD_MODE=${SC_FILC_TEST_SHARDS:-0}
+case "$SHARD_MODE" in
+    0) EXPECTED_CONNECTIONS=3; EXPECTED_REQUESTS=1 ;;
+    1|2)
+        if [[ $# -ne 1 || "${1:-}" != --all-tests ]]; then
+            echo "Sharded Fil-C execution requires --all-tests" >&2; exit 2
+        fi
+        if [[ "$SHARD_MODE" == 1 ]]; then
+            EXPECTED_CONNECTIONS=6; EXPECTED_REQUESTS=2
+        else
+            EXPECTED_CONNECTIONS=3; EXPECTED_REQUESTS=1
+        fi ;;
+    *) echo "Expected SC_FILC_TEST_SHARDS=0 (serial), 1 (compare), or 2 (parallel)" >&2; exit 2 ;;
+esac
 case "$(uname -s):$(uname -m)" in
     Linux:aarch64|Linux:arm64) FILC_VARIANT=linux_aarch64 ;;
     Linux:x86_64) FILC_VARIANT=linux_x86_64 ;;
@@ -57,7 +71,7 @@ env -u LD_LIBRARY_PATH "$COMPILER" -std=c11 -O2 -Wall -Wextra -Werror \
     -I"$PACKAGES/openssl_filc/include" -I"$PACKAGES/nghttp2_filc/include" \
     -L"$PACKAGES/openssl_filc/lib" -L"$PACKAGES/nghttp2_filc/lib" -L"$PACKAGES/zlib_filc/lib" \
     -lssl -lcrypto -lnghttp2 -lz -o "$RUN_DIR/server"
-env LD_LIBRARY_PATH="$RUNTIME_PATH" "$RUN_DIR/server" 0 3 120000 \
+env LD_LIBRARY_PATH="$RUNTIME_PATH" "$RUN_DIR/server" 0 "$EXPECTED_CONNECTIONS" 120000 \
     "$FIXTURES/server.pem" "$FIXTURES/server-key.pem" >"$RUN_DIR/server.log" 2>&1 &
 SERVER_PID=$!
 
@@ -75,13 +89,20 @@ if [[ ! "$PORT" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+TEST_COMMAND=(./SC.sh build run "$TEST_PROJECT" "$CONFIGURATION" native --toolchain filc -- "$@")
+if [[ "$SHARD_MODE" != 0 ]]; then
+    TEST_COMMAND=(python3 Support/Scripts/RunSCTestShards.py --project "$TEST_PROJECT"
+        --configuration "$CONFIGURATION" --toolchain filc --output "$RUN_DIR/test-shards")
+    if [[ "$SHARD_MODE" == 1 ]]; then TEST_COMMAND+=(--compare-serial); fi
+fi
+
 env SC_TEST_HTTP_TLS_URL="https://localhost:$PORT/" \
     SC_TEST_HTTP_TLS_CA="$FIXTURES/test-ca.pem" \
     SC_TEST_HTTP_TLS_BAD_CA="$FIXTURES/bad-ca.pem" \
     SC_TEST_HTTP_TLS_WRONG_HOST_URL="https://127.0.0.1:$PORT/" \
     SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 \
-    timeout 180 ./SC.sh build run "$TEST_PROJECT" "$CONFIGURATION" native --toolchain filc -- "$@"
+    timeout 180 "${TEST_COMMAND[@]}"
 wait "$SERVER_PID"
 SERVER_PID=
-grep -q '^SUMMARY accepted=3 requests=1 failures=0$' "$RUN_DIR/server.log"
+grep -q "^SUMMARY accepted=$EXPECTED_CONNECTIONS requests=$EXPECTED_REQUESTS failures=0$" "$RUN_DIR/server.log"
 cat "$RUN_DIR/server.log"
