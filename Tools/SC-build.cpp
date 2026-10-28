@@ -390,9 +390,20 @@ static Result configureZLibFilC(const Parameters& parameters, Workspace& workspa
     return Result(true);
 }
 
-Result configureTests(const Parameters& parameters, Workspace& workspace)
+enum class TestPartition
 {
-    Project project = {TEST_PROJECT_NAME};
+    All,
+    Core,
+    Tools,
+};
+
+Result configureTests(const Parameters& parameters, Workspace& workspace, TestPartition partition = TestPartition::All)
+{
+    const bool coreTests = partition != TestPartition::Tools;
+    const bool toolTests = partition != TestPartition::Core;
+    Project    project   = {partition == TestPartition::All    ? TEST_PROJECT_NAME
+                            : partition == TestPartition::Core ? StringView("SCTestCore")
+                                                               : StringView("SCTestTools")};
     project.setRootDirectory(parameters.directories.projectDirectory.view());
 
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -431,26 +442,35 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
     SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
-    project.addFiles("Tests/SCTest", "*.cpp");
     project.addFiles("Tests/SCTest", "*.h");
-    project.addFiles("Tests/Libraries", "**.c*");
-    project.addFiles("Tests/Libraries", "**.inl");
-    project.removeFiles("Tests/Libraries/Await", "AwaitTest.cpp");
-    project.removeFiles("Tests/Libraries/Build", "BuildTest.cpp");
-    project.addFiles("Tests/Support", "**.cpp");
-    project.addFiles("Tests/Tools", "**.cpp");
-    project.addFiles("Tools", "SC-*.cpp");
-    project.addFiles("Tools", "*.h");
+    if (coreTests)
+    {
+        project.addFiles("Tests/SCTest", "*.cpp");
+        project.addFiles("Tests/Libraries", "**.c*");
+        project.addFiles("Tests/Libraries", "**.inl");
+        project.removeFiles("Tests/Libraries/Await", "AwaitTest.cpp");
+        project.removeFiles("Tests/Libraries/Build", "BuildTest.cpp");
+        project.addFiles("Tests/Support", "**.cpp");
+        project.addFiles("Extra/Deprecated/Tests", "**.cpp");
+        project.addFiles("Extra/Deprecated/Libraries", "**.h");
+        project.addFiles("Extra/Deprecated/Libraries", "**.cpp");
+    }
+    else
+    {
+        project.addFiles("Tests/SCTest", "SCTest.cpp");
+    }
+    if (toolTests)
+    {
+        project.addFiles("Tests/Tools", "**.cpp");
+        project.addFiles("Tools", "SC-*.cpp");
+        project.addFiles("Tools", "*.h");
+    }
 
     if (not project.addExportLibraries({"Foundation", "Memory", "Strings", "Containers"}))
     {
         return Result::Error(BuildResultCategory, BuildError::ExportLibrariesConfigurationFailed);
     }
     project.link.preserveExportedSymbols = true;
-
-    project.addFiles("Extra/Deprecated/Tests", "**.cpp");
-    project.addFiles("Extra/Deprecated/Libraries", "**.h");
-    project.addFiles("Extra/Deprecated/Libraries", "**.cpp");
 
     SourceFiles specificFiles;
     specificFiles.addSelection("Tests/SCTest", "*.cpp");
@@ -461,6 +481,16 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     specificFiles.compile.disableWarnings({"unused-parameter"});
     specificFiles.compile.disableClangWarnings({"reserved-user-defined-literal"});
     project.addSpecificFileFlags(specificFiles);
+
+    if (partition != TestPartition::All)
+    {
+        SourceFiles entryPointFlags;
+        entryPointFlags.addSelection("Tests/SCTest", "SCTest.cpp");
+        const StringView selectionDefine =
+            coreTests ? StringView("SC_TEST_EXCLUDE_TOOLS=1") : StringView("SC_TEST_TOOLS_ONLY=1");
+        entryPointFlags.compile.addDefines({selectionDefine});
+        project.addSpecificFileFlags(entryPointFlags);
+    }
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
@@ -920,6 +950,8 @@ Result configure(Definition& definition, const Parameters& parameters)
 {
     Workspace defaultWorkspace = {"SCWorkspace"};
     SC_TRY(configureTests(parameters, defaultWorkspace));
+    SC_TRY(configureTests(parameters, defaultWorkspace, TestPartition::Core));
+    SC_TRY(configureTests(parameters, defaultWorkspace, TestPartition::Tools));
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAsyncExecutionTest(parameters, defaultWorkspace));

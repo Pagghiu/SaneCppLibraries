@@ -3,6 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
+TEST_PROJECT=${SC_FILC_TEST_PROJECT:-SCTest}
+case "$TEST_PROJECT" in
+    SCTest|SCTestCore) ;;
+    *) echo "Expected SC_FILC_TEST_PROJECT=SCTest or SCTestCore" >&2; exit 2 ;;
+esac
 CONFIGURATION=${1:-Debug}
 if [[ $# -gt 0 ]]; then shift; fi
 case "$CONFIGURATION" in
@@ -17,7 +22,7 @@ esac
 
 cd "$REPO_ROOT"
 ./SC.sh package install curl-filc
-./SC.sh build compile SCTest "$CONFIGURATION" native --toolchain filc --output quiet
+./SC.sh build compile "$TEST_PROJECT" "$CONFIGURATION" native --toolchain filc --output quiet
 
 PACKAGES="$REPO_ROOT/_Build/_Packages"
 COMPILER="$PACKAGES/filc_$FILC_VARIANT/build/bin/clang"
@@ -75,7 +80,7 @@ env SC_TEST_HTTP_TLS_URL="https://localhost:$PORT/" \
     SC_TEST_HTTP_TLS_BAD_CA="$FIXTURES/bad-ca.pem" \
     SC_TEST_HTTP_TLS_WRONG_HOST_URL="https://127.0.0.1:$PORT/" \
     SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 \
-    timeout 180 ./SC.sh build run SCTest "$CONFIGURATION" native --toolchain filc -- "$@"
+    timeout 180 ./SC.sh build run "$TEST_PROJECT" "$CONFIGURATION" native --toolchain filc -- "$@"
 wait "$SERVER_PID"
 SERVER_PID=
 grep -q '^SUMMARY accepted=3 requests=1 failures=0$' "$RUN_DIR/server.log"

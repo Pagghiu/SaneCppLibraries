@@ -509,11 +509,17 @@ jobs:
             raise SystemExit(1)
         PYCODE
 
-  filc-linux-experimental:
+  filc-linux-workloads:
     strategy:
       fail-fast: false
       matrix:
         runner: [ubuntu-26.04, ubuntu-24.04-arm]
+        partition: [core, tools]
+        include:
+        - partition: core
+          project: SCTestCore
+        - partition: tools
+          project: SCTestTools
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
 
@@ -539,8 +545,8 @@ jobs:
         ./SC.sh package install filc
     - name: verify Fil-C package receipt
       run: ./SC.sh package verify filc
-    - name: compile SCTest Release with Fil-C
-      run: ./SC.sh build compile SCTest Release native --toolchain filc --verbose
+    - name: compile ${{ matrix.project }} Release with Fil-C
+      run: ./SC.sh build compile ${{ matrix.project }} Release native --toolchain filc --verbose
     - name: Restore zlib-filc source cache
       id: zlib-filc-cache
       uses: actions/cache/restore@v5
@@ -583,7 +589,11 @@ jobs:
         ./SC.sh package verify nghttp2-filc
         ./SC.sh package verify curl-filc
     - name: test SCTest Release with Fil-C
-      run: ./Support/Scripts/RunFilCTLSFixture.sh Release --all-tests
+      if: matrix.partition == 'core'
+      run: SC_FILC_TEST_PROJECT=SCTestCore ./Support/Scripts/RunFilCTLSFixture.sh Release --all-tests
+    - name: test SCTestTools Release with Fil-C
+      if: matrix.partition == 'tools'
+      run: ./SC.sh build run SCTestTools Release native --toolchain filc -- --all-tests
     - name: Save zlib-filc source cache
       if: always() && steps.zlib-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/zlib-filc/**') != ''
       uses: actions/cache/save@v5
@@ -619,9 +629,31 @@ jobs:
         key: ${{ steps.filc-cache.outputs.cache-primary-key }}
 
     - name: Validate C++20 coroutine shim with Fil-C
+      if: matrix.partition == 'core'
       run: |
         ./SC.sh build compile SCAwaitCoroutineShimTest Release native --toolchain filc
         ./SC.sh build run SCAwaitCoroutineShimTest Release native --toolchain filc
+
+  filc-linux-experimental:
+    needs: [filc-linux-workloads]
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-26.04, ubuntu-24.04-arm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Check required Fil-C workloads
+      env:
+        WORKLOAD_RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PYTHON'
+        import json, os
+        results = json.loads(os.environ['WORKLOAD_RESULTS'])
+        if any(job['result'] != 'success' for job in results.values()):
+            raise SystemExit('A required Fil-C workload did not succeed')
+        PYTHON
 
   timing-summary:
     runs-on: ubuntu-latest

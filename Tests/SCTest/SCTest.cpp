@@ -160,6 +160,7 @@ int main(int argc, const char* argv[])
         return report.getTestReturnCode();
     report.debugBreakOnFailedTest = true;
 
+#if !defined(SC_TEST_TOOLS_ONLY)
     // Foundation tests
     runBaseTest(report);
     runTestingTest(report);
@@ -281,7 +282,10 @@ int main(int argc, const char* argv[])
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);
+#endif
+#if !defined(SC_TEST_EXCLUDE_TOOLS)
     runSupportToolsTest(report);
+#endif
 
     SocketNetworking::shutdownNetworking();
     report.runGlobalMemoryReport(Globals::get(Globals::Global).allocator.statistics);
