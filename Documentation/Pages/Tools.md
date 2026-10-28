@@ -137,7 +137,7 @@ Some large or host-specific tools can be registered from an existing directory i
 ./SC.sh package install qemu --import-directory /opt/qemu-user
 ```
 
-Fil-C 0.686 is available on native Linux Intel64 (`x86_64`) and ARM64 (`aarch64`) hosts. `package install filc`
+The default rootless Fil-C 0.687 is available on native Linux Intel64 (`x86_64`) and ARM64 (`aarch64`) hosts. `package install filc`
 selects the host-matching archive; an imported compiler must report the matching Linux target triple. The resulting
 toolchain capability is `toolchain.filc.x86_64` or `toolchain.filc.aarch64`, respectively.
 
@@ -151,12 +151,12 @@ release setup uses it to configure its bundled runtime. Download the host-matchi
 To register an existing ARM64 installation, use:
 
 ```bash
-./SC.sh package install filc --import-directory /home/user/filc-0.686-linux-aarch64
+./SC.sh package install filc --import-directory /home/user/filc-0.687-linux-aarch64
 ```
 
-For an Intel64 host, use the corresponding `filc-0.686-linux-x86_64` import directory.
+For an Intel64 host, use the corresponding `filc-0.687-linux-x86_64` import directory.
 
-The separate experimental glibc profile requires the host-matching upstream `/opt/fil` distribution to be
+The separate experimental glibc CI profile remains pinned to 0.686. It requires the host-matching upstream `/opt/fil` distribution to be
 installed beforehand. SC-Build does not perform privileged installation or replace system libraries:
 
 ```bash
@@ -178,7 +178,7 @@ checksum-pinned upstream archive and installs only its `/opt/fil` payload on dis
 For a preinstalled local distribution, run `./Support/Scripts/RunFilCFiberTests.sh Debug` (or `Release`).
 This runner requires actual runtime-owned stack support; unsupported-path test results cannot pass it.
 
-Fil-C 0.686 also supports the separate experimental C++20 Await target, without linking the C++ standard-library
+Fil-C also supports the separate experimental C++20 Await target, without linking the C++ standard-library
 runtime. Build before running it:
 
 ```bash

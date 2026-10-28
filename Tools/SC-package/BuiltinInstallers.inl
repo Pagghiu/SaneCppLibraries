@@ -2346,15 +2346,15 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
 
     if (HostInstructionSet != InstructionSet::Intel64 and HostInstructionSet != InstructionSet::ARM64)
         return Result::Error(PackageResultCategory, PackageError::ToolTargetUnsupported);
-    static constexpr StringView packageVersion = "0.686";
+    static constexpr StringView packageVersion = "0.687";
     static constexpr StringView packageFlavor  = "pizfix";
     const bool                  arm64          = HostInstructionSet == InstructionSet::ARM64;
     const StringView            architecture   = arm64 ? "aarch64"_a8 : "x86_64"_a8;
     const StringView            packageURL =
-        arm64 ? "https://github.com/pizlonator/fil-c/releases/download/v0.686/filc-0.686-linux-aarch64.tar.xz"_a8
-                         : "https://github.com/pizlonator/fil-c/releases/download/v0.686/filc-0.686-linux-x86_64.tar.xz"_a8;
-    const StringView packageHash = arm64 ? "142987830090df8c0cffa0bbcad32a930f661683f8c5073b21986e39aa7209f2"_a8
-                                         : "60bfbe8ee63d7e462394aa8d5e44fee675de892bcf800d9cc80d86378cad6b07"_a8;
+        arm64 ? "https://github.com/pizlonator/fil-c/releases/download/v0.687/filc-0.687-linux-aarch64.tar.xz"_a8
+                         : "https://github.com/pizlonator/fil-c/releases/download/v0.687/filc-0.687-linux-x86_64.tar.xz"_a8;
+    const StringView packageHash = arm64 ? "f1337799051664f93c7712141deaebe78571ae96ffcf05563d517b89440bcbc0"_a8
+                                         : "aab538401f78a47ab261ee79afed8c6b99e1d4848e263ae159a75b03c1288da1"_a8;
 
     package.packageFullName  = format("filc-{}-linux-{}-pizfix", packageVersion, architecture);
     package.packageBaseName  = format("filc-{}-linux-{}.tar.xz", packageVersion, architecture);

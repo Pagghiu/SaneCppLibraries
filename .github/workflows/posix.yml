@@ -10,6 +10,7 @@ on:
 env:
   ASAN_OPTIONS: halt_on_error=1
   UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+  SC_FILC_CI_VERSION: "0.687"
 
 permissions:
   actions: read
@@ -509,7 +510,173 @@ jobs:
             raise SystemExit(1)
         PYCODE
 
+  filc-package-warmup:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-26.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@v5
+    - name: Look up exact Fil-C cache
+      id: exact-0
+      uses: actions/cache/restore@v5
+      with:
+        lookup-only: true
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
+        key: sc-packages-posix-filc-v4-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl', 'Support/Scripts/PruneFilCPackageCache.py') }}
+    - name: Look up exact zlib-filc source cache
+      id: exact-1
+      uses: actions/cache/restore@v5
+      with:
+        lookup-only: true
+        path: |
+          _Build/_PackagesCache/zlib-filc
+        key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
+    - name: Look up exact curl-filc package cache
+      id: exact-2
+      uses: actions/cache/restore@v5
+      with:
+        lookup-only: true
+        path: |
+          _Build/_PackagesCache/curl-filc
+          _Build/_Packages/curl_filc
+        key: sc-packages-posix-curl-filc-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/CurlFilCSmoke.c') }}
+    - name: Look up exact Fil-C TLS package cache
+      id: exact-3
+      uses: actions/cache/restore@v5
+      with:
+        lookup-only: true
+        path: |
+          _Build/_PackagesCache/openssl-filc
+          _Build/_PackagesCache/nghttp2-filc
+          _Build/_Packages/openssl_filc
+          _Build/_Packages/nghttp2_filc
+        key: sc-packages-posix-filc-tls-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/OpenSSLFilCSmoke.c', 'Tools/Support/NGHTTP2FilCSmoke.c') }}
+    - name: Decide whether packages need preparation
+      id: prepare
+      env:
+        HIT_0: ${{ steps.exact-0.outputs.cache-hit }}
+        HIT_1: ${{ steps.exact-1.outputs.cache-hit }}
+        HIT_2: ${{ steps.exact-2.outputs.cache-hit }}
+        HIT_3: ${{ steps.exact-3.outputs.cache-hit }}
+      run: |
+        if [[ "$HIT_0" == true && "$HIT_1" == true && "$HIT_2" == true && "$HIT_3" == true ]]; then
+          echo "required=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "required=true" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Restore Fil-C cache
+      if: steps.prepare.outputs.required == 'true'
+      id: filc-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
+        key: sc-packages-posix-filc-v4-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl', 'Support/Scripts/PruneFilCPackageCache.py') }}
+        restore-keys: |
+          sc-packages-posix-filc-v4-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore zlib-filc source cache
+      if: steps.prepare.outputs.required == 'true'
+      id: zlib-filc-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          _Build/_PackagesCache/zlib-filc
+        key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
+        restore-keys: |
+          sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore curl-filc package cache
+      if: steps.prepare.outputs.required == 'true'
+      id: curl-filc-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          _Build/_PackagesCache/curl-filc
+          _Build/_Packages/curl_filc
+        key: sc-packages-posix-curl-filc-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/CurlFilCSmoke.c') }}
+        restore-keys: |
+          sc-packages-posix-curl-filc-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-curl-filc-v2-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Fil-C TLS package cache
+      if: steps.prepare.outputs.required == 'true'
+      id: filc-tls-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          _Build/_PackagesCache/openssl-filc
+          _Build/_PackagesCache/nghttp2-filc
+          _Build/_Packages/openssl_filc
+          _Build/_Packages/nghttp2_filc
+        key: sc-packages-posix-filc-tls-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/OpenSSLFilCSmoke.c', 'Tools/Support/NGHTTP2FilCSmoke.c') }}
+        restore-keys: |
+          sc-packages-posix-filc-tls-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-filc-tls-v2-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-filc-tls-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: install Fil-C
+      if: steps.prepare.outputs.required == 'true'
+      run: ./Support/Scripts/SetupFilCCICompiler.sh "$SC_FILC_CI_VERSION"
+    - name: verify Fil-C package receipt
+      if: steps.prepare.outputs.required == 'true'
+      run: ./SC.sh package verify filc
+    - name: Prune obsolete Fil-C compiler cache copies
+      if: steps.prepare.outputs.required == 'true'
+      run: |
+        python3 Support/Scripts/PruneFilCPackageCache.py --architecture "$(uname -m)"
+        ./SC.sh package install filc
+        ./SC.sh package verify filc
+    - name: Save Fil-C cache
+      if: success() && steps.prepare.outputs.required == 'true' && steps.filc-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
+        key: ${{ steps.filc-cache.outputs.cache-primary-key }}
+    - name: Prepare and verify Fil-C runtime packages
+      if: steps.prepare.outputs.required == 'true'
+      id: filc-runtime-packages
+      run: |
+        ./SC.sh package install curl-filc
+        ./SC.sh package verify zlib-filc
+        ./SC.sh package verify openssl-filc
+        ./SC.sh package verify nghttp2-filc
+        ./SC.sh package verify curl-filc
+    - name: Save zlib-filc source cache
+      if: success() && steps.prepare.outputs.required == 'true' && steps.filc-runtime-packages.outcome == 'success' && steps.zlib-filc-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          _Build/_PackagesCache/zlib-filc
+        key: ${{ steps.zlib-filc-cache.outputs.cache-primary-key }}
+    - name: Save curl-filc package cache
+      if: success() && steps.prepare.outputs.required == 'true' && steps.filc-runtime-packages.outcome == 'success' && steps.curl-filc-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          _Build/_PackagesCache/curl-filc
+          _Build/_Packages/curl_filc
+        key: ${{ steps.curl-filc-cache.outputs.cache-primary-key }}
+    - name: Save Fil-C TLS package cache
+      if: success() && steps.prepare.outputs.required == 'true' && steps.filc-runtime-packages.outcome == 'success' && steps.filc-tls-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          _Build/_PackagesCache/openssl-filc
+          _Build/_PackagesCache/nghttp2-filc
+          _Build/_Packages/openssl_filc
+          _Build/_Packages/nghttp2_filc
+        key: ${{ steps.filc-tls-cache.outputs.cache-primary-key }}
+
   filc-linux-workloads:
+    needs: [filc-package-warmup]
     strategy:
       fail-fast: false
       matrix:
@@ -532,17 +699,13 @@ jobs:
         path: |
           _Build/_PackagesCache/filc
           _Build/_Packages/filc_*
-        key: sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl') }}
+        key: sc-packages-posix-filc-v4-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h', 'Tools/SC-package/BuiltinInstallers.inl', 'Support/Scripts/PruneFilCPackageCache.py') }}
         restore-keys: |
+          sc-packages-posix-filc-v4-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
     - name: install Fil-C
-      run: |
-        if ! command -v patchelf >/dev/null; then
-          sudo apt-get update
-          sudo apt-get install -y patchelf
-        fi
-        ./SC.sh package install filc
+      run: ./Support/Scripts/SetupFilCCICompiler.sh "$SC_FILC_CI_VERSION"
     - name: verify Fil-C package receipt
       run: ./SC.sh package verify filc
     - name: compile ${{ matrix.project }} Release with Fil-C
@@ -563,8 +726,9 @@ jobs:
         path: |
           _Build/_PackagesCache/curl-filc
           _Build/_Packages/curl_filc
-        key: sc-packages-posix-curl-filc-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/CurlFilCSmoke.c') }}
+        key: sc-packages-posix-curl-filc-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/CurlFilCSmoke.c') }}
         restore-keys: |
+          sc-packages-posix-curl-filc-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-curl-filc-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-curl-filc-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Fil-C TLS package cache
@@ -576,8 +740,9 @@ jobs:
           _Build/_PackagesCache/nghttp2-filc
           _Build/_Packages/openssl_filc
           _Build/_Packages/nghttp2_filc
-        key: sc-packages-posix-filc-tls-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/OpenSSLFilCSmoke.c', 'Tools/Support/NGHTTP2FilCSmoke.c') }}
+        key: sc-packages-posix-filc-tls-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package/BuiltinInstallers.inl', 'Tools/SC-package/FilCRuntimeDependencies.inl', 'Tools/Support/FilCOpenSSL365.patch', 'Tools/Support/OpenSSLFilCSmoke.c', 'Tools/Support/NGHTTP2FilCSmoke.c') }}
         restore-keys: |
+          sc-packages-posix-filc-tls-v3-${{ env.SC_FILC_CI_VERSION }}-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-tls-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-tls-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Prepare and verify Fil-C runtime packages
