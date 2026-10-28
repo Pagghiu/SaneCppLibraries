@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  core:
     if: github.event_name != 'schedule'
     strategy:
       matrix:
@@ -55,6 +55,171 @@ jobs:
       run: ./Support/Scripts/CheckLibC.sh
     - name: Standard C++ Header No Runtime Link Check
       run: ./Support/Scripts/CheckStdCppHeaderNoLink.sh
+    - name: Restore llvm-mingw cache
+      id: llvm-mingw-cache
+      if: matrix.config == 'Release' && matrix.params.os != 'macos-latest'
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          _Build/_PackagesCache/llvm-mingw
+          _Build/_Packages/llvm-mingw_*
+        key: sc-packages-posix-llvm-mingw-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-llvm-mingw-v3-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-
+    - name: install
+      run:  |
+        sudo apt-get update
+        sudo apt-get install -y liburing-dev openssl
+      if: startsWith(matrix.params.os, 'ubuntu-')
+    - name: Install compiler cache
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      run: sudo apt-get install -y --no-install-recommends ccache
+    - name: Restore compiler cache
+      id: compiler-cache
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      uses: actions/cache/restore@v5
+      with:
+        path: _Build/_CompilerCache
+        key: sc-compiler-cache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.params.os }}-${{ matrix.config }}-${{ github.sha }}
+        restore-keys: |
+          sc-compiler-cache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.params.os }}-${{ matrix.config }}-
+    - name: Set up compiler cache
+      id: compiler-cache-setup
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      shell: bash
+      run: |
+        set -euo pipefail
+        export CCACHE_DIR="$GITHUB_WORKSPACE/_Build/_CompilerCache"
+        ccache --set-config=compiler_check=content
+        ccache --set-config=max_size=256M
+        ccache --set-config=compression=true
+        ccache --zero-stats
+        compiler_wrappers="$GITHUB_WORKSPACE/_Build/_CompilerWrappers"
+        mkdir -p "$compiler_wrappers"
+        compiler_major="$(gcc -dumpversion | cut -d. -f1)"
+        for compiler in cc c++ gcc g++ clang clang++ "gcc-$compiler_major" "g++-$compiler_major"; do
+          if command -v "$compiler" >/dev/null 2>&1; then
+            ln -sf "$(command -v ccache)" "$compiler_wrappers/$compiler"
+          fi
+        done
+        echo "$compiler_wrappers" >> "$GITHUB_PATH"
+        echo "CCACHE_DIR=$CCACHE_DIR" >> "$GITHUB_ENV"
+    - name: Check compiler cache invalidation
+      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
+      run: python3 Support/Scripts/CheckCompilerCache.py
+    - name: Install OpenSSL 3
+      run: |
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
+        "$(brew --prefix openssl@3)/bin/openssl" version
+        test -f "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib"
+      if: matrix.params.os == 'macos-latest'
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: configure SCTest
+      run: ./SC.sh build configure SCTest ${{ matrix.config }}
+    - name: configure SCSingleFileLibs
+      run: ./SC.sh build configure "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: compile SCTest
+      run: ./SC.sh build compile SCTest ${{ matrix.config }}
+      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: compile SCAsyncExecutionTest
+      run: ./SC.sh build compile SCAsyncExecutionTest ${{ matrix.config }}
+    - name: compile SCBuildTest
+      run: ./SC.sh build compile SCBuildTest ${{ matrix.config }}
+      if: matrix.config == 'Release' && matrix.params.os != 'macos-latest'
+    - name: compile SCSingleFileLibs
+      run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: compile InteropSTL
+      run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
+    - name: compile SCStdCppHeaderNoLinkTest
+      run: ./SC.sh build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }}
+    - name: test Cryptography with ASan and UBSan
+      run: |
+        ./SC.sh build run SCTest Debug -- --test CryptographyTest
+        ./SC.sh build run SCTest Debug -- --test CryptographyOpenSSLTest
+        ./SC.sh build run SCTest Debug -- --test CryptographyAsyncStreamsTest
+        ./SC.sh build run SCTest Debug -- --test CryptographyTransformStreamsTest
+      env:
+        CCACHE_DISABLE: 1
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+      if: matrix.config == 'Debug'
+    - name: test SCTest
+      run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
+      env:
+        CCACHE_DISABLE: 1
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: test SCAsyncExecutionTest
+      env:
+        CCACHE_DISABLE: 1
+      run: ./SC.sh build run SCAsyncExecutionTest ${{ matrix.config }}
+    - name: test SCBuildTest
+      env:
+        CCACHE_DISABLE: 1
+      run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
+      if: matrix.config == 'Release' && matrix.params.os != 'macos-latest'
+    - name: test InteropSTL
+      env:
+        CCACHE_DISABLE: 1
+      run: ./SC.sh build run InteropSTL ${{ matrix.config }}
+    - name: compile SCTest xcode
+      run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: test SCTest xcode
+      run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
+      env:
+        CCACHE_DISABLE: 1
+        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: Print macOS crash reports
+      if: failure() && matrix.params.os == 'macos-latest'
+      shell: bash
+      run: bash Support/Scripts/PrintMacOSCrashReports.sh
+    - name: Save macOS crash diagnostics
+      if: failure() && matrix.params.os == 'macos-latest'
+      uses: actions/upload-artifact@v6
+      with:
+        name: macos-crash-${{ matrix.params.os }}-${{ matrix.config }}-${{ github.run_attempt }}
+        if-no-files-found: ignore
+        retention-days: 7
+        path: |
+          ~/Library/Logs/DiagnosticReports/SC*.ips
+          ~/Library/Logs/DiagnosticReports/SC*.crash
+          _Build/_Outputs/**/SCTest
+          _Build/_Outputs/**/SCTest.dSYM/**
+          _Build/_Outputs/**/SCAsyncExecutionTest
+          _Build/_Outputs/**/SCAsyncExecutionTest.dSYM/**
+    - name: Save llvm-mingw cache
+      if: matrix.config == 'Release' && matrix.params.os != 'macos-latest' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          _Build/_PackagesCache/llvm-mingw
+          _Build/_Packages/llvm-mingw_*
+        key: ${{ steps.llvm-mingw-cache.outputs.cache-primary-key }}
+    - name: Compiler cache statistics
+      if: always() && steps.compiler-cache-setup.outcome == 'success'
+      run: ccache --show-stats --verbose
+    - name: Save compiler cache
+      if: success() && steps.compiler-cache-setup.outcome == 'success' && steps.compiler-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: _Build/_CompilerCache
+        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+
+
+  macos-build-fixtures:
+    if: github.event_name != 'schedule'
+    strategy:
+      matrix:
+        config: [ Release ]
+        params: [ { os: macos-latest } ]
+    runs-on: ${{ matrix.params.os }}
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v5
     - name: Restore llvm-mingw cache
       id: llvm-mingw-cache
       if: matrix.config == 'Release'
@@ -147,53 +312,6 @@ jobs:
         restore-keys: |
           sc-packages-posix-linux-sysroot-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
-    - name: install
-      run:  |
-        sudo apt-get update
-        sudo apt-get install -y liburing-dev openssl
-      if: startsWith(matrix.params.os, 'ubuntu-')
-    - name: Install compiler cache
-      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
-      run: sudo apt-get install -y --no-install-recommends ccache
-    - name: Restore compiler cache
-      id: compiler-cache
-      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
-      uses: actions/cache/restore@v5
-      with:
-        path: _Build/_CompilerCache
-        key: sc-compiler-cache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.params.os }}-${{ matrix.config }}-${{ github.sha }}
-        restore-keys: |
-          sc-compiler-cache-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.params.os }}-${{ matrix.config }}-
-    - name: Set up compiler cache
-      id: compiler-cache-setup
-      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
-      shell: bash
-      run: |
-        set -euo pipefail
-        export CCACHE_DIR="$GITHUB_WORKSPACE/_Build/_CompilerCache"
-        ccache --set-config=compiler_check=content
-        ccache --set-config=max_size=256M
-        ccache --set-config=compression=true
-        ccache --zero-stats
-        compiler_wrappers="$GITHUB_WORKSPACE/_Build/_CompilerWrappers"
-        mkdir -p "$compiler_wrappers"
-        compiler_major="$(gcc -dumpversion | cut -d. -f1)"
-        for compiler in cc c++ gcc g++ clang clang++ "gcc-$compiler_major" "g++-$compiler_major"; do
-          if command -v "$compiler" >/dev/null 2>&1; then
-            ln -sf "$(command -v ccache)" "$compiler_wrappers/$compiler"
-          fi
-        done
-        echo "$compiler_wrappers" >> "$GITHUB_PATH"
-        echo "CCACHE_DIR=$CCACHE_DIR" >> "$GITHUB_ENV"
-    - name: Check compiler cache invalidation
-      if: matrix.config == 'Release' && startsWith(matrix.params.os, 'ubuntu-')
-      run: python3 Support/Scripts/CheckCompilerCache.py
-    - name: Install OpenSSL 3
-      run: |
-        HOMEBREW_NO_AUTO_UPDATE=1 brew install openssl@3
-        "$(brew --prefix openssl@3)/bin/openssl" version
-        test -f "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib"
-      if: matrix.params.os == 'macos-latest'
     - name: Probe QEMU user runners
       id: qemu-user-runners
       shell: bash
@@ -265,46 +383,9 @@ jobs:
         ./SC.sh package verify linux-sysroot-musl-arm64
         ./SC.sh package lock
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-    - name: Generate Single File Libs (Python)
-      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
-    - name: configure SCTest
-      run: ./SC.sh build configure SCTest ${{ matrix.config }}
-    - name: configure SCSingleFileLibs
-      run: ./SC.sh build configure "SCSingleFileLibs:" ${{ matrix.config }}
-    - name: compile SCTest
-      run: ./SC.sh build compile SCTest ${{ matrix.config }}
-      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
-    - name: compile SCAsyncExecutionTest
-      run: ./SC.sh build compile SCAsyncExecutionTest ${{ matrix.config }}
     - name: compile SCBuildTest
       run: ./SC.sh build compile SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release'
-    - name: compile SCSingleFileLibs
-      run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
-    - name: compile InteropSTL
-      run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
-    - name: compile SCStdCppHeaderNoLinkTest
-      run: ./SC.sh build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }}
-    - name: test Cryptography with ASan and UBSan
-      run: |
-        ./SC.sh build run SCTest Debug -- --test CryptographyTest
-        ./SC.sh build run SCTest Debug -- --test CryptographyOpenSSLTest
-        ./SC.sh build run SCTest Debug -- --test CryptographyAsyncStreamsTest
-        ./SC.sh build run SCTest Debug -- --test CryptographyTransformStreamsTest
-      env:
-        CCACHE_DISABLE: 1
-        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
-      if: matrix.config == 'Debug'
-    - name: test SCTest
-      run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
-      env:
-        CCACHE_DISABLE: 1
-        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
-      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
-    - name: test SCAsyncExecutionTest
-      env:
-        CCACHE_DISABLE: 1
-      run: ./SC.sh build run SCAsyncExecutionTest ${{ matrix.config }}
     - name: test SCBuildTest
       env:
         CCACHE_DISABLE: 1
@@ -316,19 +397,22 @@ jobs:
         CCACHE_DISABLE: 1
         SC_BUILD_REQUIRE_REAL_QEMU: 1
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.qemu-user-runners.outputs.available == 'true'
-    - name: test InteropSTL
-      env:
-        CCACHE_DISABLE: 1
-      run: ./SC.sh build run InteropSTL ${{ matrix.config }}
-    - name: compile SCTest xcode
-      run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-    - name: test SCTest xcode
-      run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
-      env:
-        CCACHE_DISABLE: 1
-        SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL: 1
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: Print macOS crash reports
+      if: failure() && matrix.params.os == 'macos-latest'
+      shell: bash
+      run: bash Support/Scripts/PrintMacOSCrashReports.sh
+    - name: Save macOS crash diagnostics
+      if: failure() && matrix.params.os == 'macos-latest'
+      uses: actions/upload-artifact@v6
+      with:
+        name: macos-fixtures-crash-${{ matrix.params.os }}-${{ matrix.config }}-${{ github.run_attempt }}
+        if-no-files-found: ignore
+        retention-days: 7
+        path: |
+          ~/Library/Logs/DiagnosticReports/SC*.ips
+          ~/Library/Logs/DiagnosticReports/SC*.crash
+          _Build/_Outputs/**/SCBuildTest
+          _Build/_Outputs/**/SCBuildTest.dSYM/**
     - name: Save llvm-mingw cache
       if: matrix.config == 'Release' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
       uses: actions/cache/save@v5
@@ -391,15 +475,39 @@ jobs:
     #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest
     # - name: test in lldb
     #   run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest
-    - name: Compiler cache statistics
-      if: always() && steps.compiler-cache-setup.outcome == 'success'
-      run: ccache --show-stats --verbose
-    - name: Save compiler cache
-      if: success() && steps.compiler-cache-setup.outcome == 'success' && steps.compiler-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
-      with:
-        path: _Build/_CompilerCache
-        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+
+  # Preserve the original required check names over both workload groups.
+  build:
+    if: always() && github.event_name != 'schedule'
+    needs: [core, macos-build-fixtures]
+    strategy:
+      matrix:
+        include:
+          - config: Debug
+            params: { os: ubuntu-24.04 }
+          - config: Release
+            params: { os: ubuntu-26.04 }
+          - config: Debug
+            params: { os: macos-latest }
+          - config: Release
+            params: { os: macos-latest }
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Check required Posix workloads
+      env:
+        REQUIRED_RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PYCODE'
+        import json
+        import os
+        results = json.loads(os.environ['REQUIRED_RESULTS'])
+        for name, job in results.items():
+            print(f"{name}: {job['result']}")
+        if any(job['result'] != 'success' for job in results.values()):
+            raise SystemExit(1)
+        PYCODE
 
   filc-linux-experimental:
     strategy:
