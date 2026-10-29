@@ -26,28 +26,33 @@ enum class BuildCLIStatus : uint8_t
 
 struct BuildCLIResolvedStorage
 {
-    String configurationName = StringEncoding::Ascii;
+    String                      configurationName = StringEncoding::Ascii;
+    String                      importManifest    = StringEncoding::Utf8;
+    Vector<Build::ObjectImport> importedObjects;
 };
 
 struct BuildCLIParseContext
 {
-    StringSpan target           = {};
-    StringSpan targetProfile    = {};
-    StringSpan toolchain        = {};
-    StringSpan configuration    = {};
-    StringSpan generator        = {};
-    StringSpan architecture     = {};
-    StringSpan abi              = {};
-    StringSpan targetTriple     = {};
-    StringSpan sysroot          = {};
-    StringSpan windowsLongPath  = {};
-    StringSpan runner           = {};
-    StringSpan runnerPath       = {};
-    StringSpan output           = {};
-    StringSpan libraries        = {};
-    bool       quietRequested   = false;
-    bool       normalRequested  = false;
-    bool       verboseRequested = false;
+    StringSpan target          = {};
+    StringSpan targetProfile   = {};
+    StringSpan toolchain       = {};
+    StringSpan configuration   = {};
+    StringSpan generator       = {};
+    StringSpan architecture    = {};
+    StringSpan abi             = {};
+    StringSpan targetTriple    = {};
+    StringSpan sysroot         = {};
+    StringSpan windowsLongPath = {};
+    StringSpan runner          = {};
+    StringSpan runnerPath      = {};
+    StringSpan output          = {};
+    StringSpan libraries       = {};
+    StringSpan excludedSources = {};
+    StringSpan importManifest  = {};
+
+    bool quietRequested   = false;
+    bool normalRequested  = false;
+    bool verboseRequested = false;
 
     StringSpan       legacyStorage[4];
     Span<StringSpan> legacyValues = {};

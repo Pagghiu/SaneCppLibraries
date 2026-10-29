@@ -1101,6 +1101,16 @@ struct SC::Build::Action::Internal
 
 SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure)
 {
+    if (not action.excludedSources.isEmpty() and action.action != CompileObjects)
+        return Result::Error(BuildResultCategory, BuildError::ExcludedSourcesRequiresCompileObjects);
+    if (action.action == CompileObjects and
+        (action.parameters.generator != Generator::Native or action.projectName.isEmpty()))
+        return Result::Error(BuildResultCategory, BuildError::CompileObjectsRequiresStandaloneNativeProject);
+    if ((action.action == ImportObjects and
+         (action.parameters.generator != Generator::Native or action.projectName.isEmpty() or
+          action.importedObjects.sizeInElements() == 0)) or
+        (action.action != ImportObjects and action.importedObjects.sizeInElements() != 0))
+        return Result::Error(BuildResultCategory, BuildError::ObjectImportUnsupported);
     Build::Definition definition;
     SC_TRY(configure(definition, action.parameters));
     SC_TRY(definition.enforceDefaults(action.parameters));
@@ -1130,6 +1140,8 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
     {
     case Print:
     case Run:
+    case ImportObjects:
+    case CompileObjects:
     case Compile: return Internal::compileRunPrint(definition, newAction);
     case Coverage: return Internal::coverage(definition, newAction);
     case Configure: return Internal::configure(definition, newAction);

@@ -516,6 +516,23 @@ struct SupportToolsTest : public TestCase
         using namespace SC::Tools;
         using namespace SC::Tools::detail;
 
+        if (test_section("build cli parses objects-only source selection"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile-objects";
+            args[0]             = "SCTest";
+            args[1]             = "--exclude-sources";
+            args[2]             = "Libraries/*";
+            arguments.arguments = {args, 3};
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::CompileObjects, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.action == Build::Action::CompileObjects);
+            SC_TEST_EXPECT(action.projectName == "SCTest");
+            SC_TEST_EXPECT(action.excludedSources == "Libraries/*");
+        }
         if (test_section("build cli parses legacy positional arguments"))
         {
             arguments.tool      = "build";

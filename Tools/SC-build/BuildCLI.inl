@@ -76,7 +76,8 @@ static Result appendNativeBackendSupportHelp(StringFormatOutput& output)
 
 Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::Type actionType)
 {
-    if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
+    if (actionType == Build::Action::Compile or actionType == Build::Action::CompileObjects or
+        actionType == Build::Action::Run)
     {
         if (not output.append("\nTarget profiles:\n"
                               "  - host / native: build for the current host machine\n"
@@ -1078,6 +1079,42 @@ static Result scanNamedOutputMode(Span<const StringView> arguments, Build::Outpu
     return Result(true);
 }
 
+static Result readObjectImportManifest(StringSpan path, BuildCLIResolvedStorage& storage, Build::Action& action)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.read(path, storage.importManifest));
+    StringView remaining = storage.importManifest.view();
+    auto       line      = [&](StringView& value) -> bool
+    {
+        if (not remaining.splitBefore("\n", value))
+            return false;
+        remaining = remaining.sliceStart(value.sizeInBytes() + 1);
+        return not value.isEmpty() and not value.containsCodePoint('\r') and not value.containsCodePoint(0);
+    };
+    StringView header;
+    if (not line(header) or header != "SC-BUILD-OBJECTS-1")
+        return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+    while (not remaining.isEmpty())
+    {
+        StringView fields[5];
+        for (StringView& field : fields)
+            if (not line(field))
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+        Build::ObjectImport item;
+        item.sourcePath     = fields[0];
+        item.objectPath     = fields[1];
+        item.dependencyPath = fields[2];
+        item.directory      = fields[3];
+        item.command        = fields[4];
+        SC_TRY(storage.importedObjects.push_back(item));
+    }
+    if (storage.importedObjects.size() == 0)
+        return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+    action.importedObjects = storage.importedObjects.toSpanConst();
+    return Result(true);
+}
+
 Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& arguments, Build::Action& action,
                           BuildCLIResolvedStorage& resolvedStorage, BuildCLIStatus& status)
 {
@@ -1192,7 +1229,8 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     options[numOptions].value     = CommandLineValue::stringSpan(context.windowsLongPath);
     numOptions++;
 
-    if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
+    if (actionType == Build::Action::Compile or actionType == Build::Action::CompileObjects or
+        actionType == Build::Action::Run)
     {
         options[numOptions].longName  = "output";
         options[numOptions].shortName = 'o';
@@ -1234,6 +1272,25 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
         numOptions++;
     }
 
+    if (actionType == Build::Action::CompileObjects)
+    {
+        options[numOptions].longName = "exclude-sources";
+        options[numOptions].help =
+            "Skip a project-relative source wildcard; never link (native standalone target only)";
+        options[numOptions].valueName = "PATTERN";
+        options[numOptions].value     = CommandLineValue::stringSpan(context.excludedSources);
+        numOptions++;
+    }
+
+    if (actionType == Build::Action::ImportObjects)
+    {
+        options[numOptions].longName  = "manifest";
+        options[numOptions].help      = "Versioned caller-validated object inventory (no compile/link/run)";
+        options[numOptions].valueName = "PATH";
+        options[numOptions].value     = CommandLineValue::stringSpan(context.importManifest);
+        numOptions++;
+    }
+
     positionals[0].name     = "target";
     positionals[0].help     = "Optional workspace:project or project name";
     positionals[0].required = false;
@@ -1246,13 +1303,18 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     positionals[1].remainingStorage = context.legacyStorage;
     positionals[1].parsedValues     = &context.legacyValues;
 
-    spec.programName = actionType == Build::Action::Compile ? "./SC.sh build compile"_a8
-                       : actionType == Build::Action::Run   ? "./SC.sh build run"_a8
-                                                            : "./SC.sh build coverage"_a8;
-    spec.summary     = actionType == Build::Action::Compile ? "Compile one target or the default workspace."_a8
-                       : actionType == Build::Action::Run ? "Build a target if needed and run the resulting executable."_a8
-                                                          : "Build coverage output for a target."_a8;
-    spec.options     = {options, numOptions};
+    spec.programName = actionType == Build::Action::ImportObjects    ? "./SC.sh build import-objects"_a8
+                       : actionType == Build::Action::CompileObjects ? "./SC.sh build compile-objects"_a8
+                       : actionType == Build::Action::Compile        ? "./SC.sh build compile"_a8
+                       : actionType == Build::Action::Run            ? "./SC.sh build run"_a8
+                                                                     : "./SC.sh build coverage"_a8;
+    spec.summary = actionType == Build::Action::ImportObjects ? "Register caller-validated native compiler outputs."_a8
+                   : actionType == Build::Action::CompileObjects
+                       ? "Compile selected objects without linking a target."_a8
+                   : actionType == Build::Action::Compile ? "Compile one target or the default workspace."_a8
+                   : actionType == Build::Action::Run ? "Build a target if needed and run the resulting executable."_a8
+                                                      : "Build coverage output for a target."_a8;
+    spec.options = {options, numOptions};
     spec.positionals = positionals;
 
     const auto parseResult = spec.parse({argumentStorage, preArguments.sizeInElements()});
@@ -1279,6 +1341,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     action.additionalArguments = postArguments;
 
     SC_TRY(setBuildActionTarget(action, context.target));
+    action.excludedSources = context.excludedSources;
 
     if (not context.libraries.isEmpty())
     {
@@ -1300,7 +1363,8 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
             markBuildCLIValueError(applyArchitectureValue(action, context.legacyValues[2], arguments.console), status));
     }
     if (context.legacyValues.sizeInElements() >= 4 and
-        (actionType == Build::Action::Compile or actionType == Build::Action::Run))
+        (actionType == Build::Action::Compile or actionType == Build::Action::CompileObjects or
+         actionType == Build::Action::Run))
     {
         Build::OutputMode::Type legacyOutputMode = Build::OutputMode::Normal;
         SC_TRY(markBuildCLIValueError(
@@ -1352,8 +1416,15 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
         SC_TRY(action.parameters.runner.executable.assign(context.runnerPath));
     }
     SC_TRY(validateBuildActionCombination(actionType, context, action, arguments.console));
+    if (actionType == Build::Action::ImportObjects)
+    {
+        if (context.importManifest.isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+        SC_TRY(readObjectImportManifest(context.importManifest, resolvedStorage, action));
+    }
 
-    if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
+    if (actionType == Build::Action::Compile or actionType == Build::Action::CompileObjects or
+        actionType == Build::Action::Run)
     {
         Build::OutputMode::Type namedOutputMode = Build::OutputMode::Normal;
         bool                    namedOutputSet  = false;
@@ -1561,6 +1632,14 @@ Result runBuildTool(Tool::Arguments& arguments)
     else if (arguments.action == "compile")
     {
         return runBuildAction(Build::Action::Compile, arguments);
+    }
+    else if (arguments.action == "compile-objects")
+    {
+        return runBuildAction(Build::Action::CompileObjects, arguments);
+    }
+    else if (arguments.action == "import-objects")
+    {
+        return runBuildAction(Build::Action::ImportObjects, arguments);
     }
     else if (arguments.action == "run")
     {

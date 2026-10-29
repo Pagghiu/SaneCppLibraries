@@ -152,6 +152,21 @@ inline ResultErrorFormat formatBuildError(BuildError error, Span<char> output)
     case BuildError::DirectoryMustBeAbsolute:
         formatter.append("Build output, library, and project directories must be absolute paths");
         break;
+    case BuildError::CompileObjectsRequiresStandaloneNativeProject:
+        formatter.append("compile-objects requires one native project without workspace dependencies");
+        break;
+    case BuildError::ExcludedSourcesRequiresCompileObjects:
+        formatter.append("Excluded sources are only supported by compile-objects");
+        break;
+    case BuildError::ExcludedSourcesNotMatched:
+        formatter.append("Excluded source pattern did not match any compilation unit");
+        break;
+    case BuildError::ObjectImportInvalid:
+        formatter.append("Invalid object import inventory, command or dependency data");
+        break;
+    case BuildError::ObjectImportUnsupported:
+        formatter.append("Object import requires a standalone native non-MSVC project with compiler dependencies");
+        break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
     return formatter.finish();

@@ -94,6 +94,11 @@ enum class BuildError : uint32_t
     ExternalIntermediateDirectoryMissing,
     ExportLibrariesConfigurationFailed,
     DirectoryMustBeAbsolute,
+    CompileObjectsRequiresStandaloneNativeProject,
+    ExcludedSourcesRequiresCompileObjects,
+    ExcludedSourcesNotMatched,
+    ObjectImportInvalid,
+    ObjectImportUnsupported,
 };
 
 static constexpr ResultCategory BuildResultCategory = ResultCategory(21);

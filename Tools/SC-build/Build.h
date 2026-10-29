@@ -911,6 +911,17 @@ struct Definition
 // Implementations Details
 //-----------------------------------------------------------------------------------------------------------------------
 
+/// @brief Caller-validated compiler outputs for one source. The caller owns compatibility
+/// and content validation; SC-build checks the exact consumer command and dependencies.
+struct ObjectImport
+{
+    StringView sourcePath;
+    StringSpan objectPath;
+    StringSpan dependencyPath;
+    StringView directory;
+    StringView command;
+};
+
 struct Action
 {
     enum Type
@@ -919,7 +930,9 @@ struct Action
         Compile,
         Run,
         Print,
-        Coverage
+        Coverage,
+        CompileObjects,
+        ImportObjects
     };
     using ConfigureFunction = Result (*)(Build::Definition& definition, const Build::Parameters& parameters);
 
@@ -931,6 +944,12 @@ struct Action
     StringView configurationName;
     StringView projectName;
     StringView workspaceName;
+
+    /// @brief Optional project-relative wildcard excluded by CompileObjects only.
+    StringView excludedSources;
+
+    /// @brief Explicit registration only; never compiles, links or runs a target.
+    Span<const ObjectImport> importedObjects;
 
     bool allTargets = false;
 

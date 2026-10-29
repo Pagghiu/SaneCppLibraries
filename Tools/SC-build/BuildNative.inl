@@ -93,10 +93,14 @@ struct SC::Build::NativeBuild
         String responsePath;
 
         CompileFlags compileFlags;
+
+        bool selectedForCompile = true;
     };
 
     struct ResolvedProject
     {
+        bool compileObjectsOnly = false;
+
         const Parameters*    parameters    = nullptr;
         const Workspace*     workspace     = nullptr;
         const Project*       project       = nullptr;
@@ -827,6 +831,14 @@ struct SC::Build::NativeBuild
                                          const ProjectProgress& progress, NativeBuildReporter& reporter,
                                          bool& finalPhaseCompleted)
     {
+        if (resolvedProject.compileObjectsOnly)
+        {
+            SC_TRY(reporter.recordSkipped(progress.finalStep, progress.totalSteps,
+                                          getFinalStepName(*resolvedProject.project),
+                                          resolvedProject.project->targetName.view(), "objects-only action"));
+            finalPhaseCompleted = true;
+            return Result(true);
+        }
         finalPhaseCompleted             = false;
         String exportedSymbolsSignature = StringEncoding::Utf8;
         if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags) and
@@ -1158,6 +1170,83 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
+    static Result importObjects(FileSystem& fs, ResolvedProject& project, Span<const ObjectImport> imports)
+    {
+        if (project.adapter.isMSVCStyle() or not project.parameters->execution.useCompilerDependencies or
+            not project.workspaceDependencies.isEmpty())
+            return Result::Error(BuildResultCategory, BuildError::ObjectImportUnsupported);
+        Vector<const ResolvedSource*> sources;
+        // Validate the complete inventory before modifying any consumer outputs.
+        for (const ObjectImport& item : imports)
+        {
+            const ResolvedSource* source = nullptr;
+            for (const ResolvedSource& candidate : project.sources)
+                if (candidate.sourcePath.view() == item.sourcePath)
+                    source = &candidate;
+            if (source == nullptr or item.directory != project.project->rootDirectory.view() or
+                item.objectPath == source->objectPath.view() or item.dependencyPath == source->dependencyPath.view())
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            for (const ResolvedSource& candidate : project.sources)
+            {
+                if (item.objectPath == candidate.objectPath.view() or
+                    item.objectPath == candidate.dependencyPath.view() or
+                    item.objectPath == candidate.commandPath.view() or
+                    item.dependencyPath == candidate.objectPath.view() or
+                    item.dependencyPath == candidate.dependencyPath.view() or
+                    item.dependencyPath == candidate.commandPath.view())
+                    return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            }
+            FileSystem::FileStat stagedStat;
+            if (not fs.stat(item.objectPath, stagedStat) or stagedStat.fileSize == 0)
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            if (fs.existsAndIsDirectory(source->objectPath.view()) or
+                fs.existsAndIsDirectory(source->dependencyPath.view()) or
+                fs.existsAndIsDirectory(source->commandPath.view()))
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            for (const ResolvedSource* previous : sources)
+                if (previous == source)
+                    return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            CommandLine command;
+            String      rendered = StringEncoding::Utf8;
+            SC_TRY(buildCompileCommand(project, *source, command));
+            SC_TRY(formatCommandLine(command, rendered));
+            if (rendered.view() != item.command or not fs.existsAndIsFile(item.objectPath) or
+                not fs.existsAndIsFile(item.dependencyPath))
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            Vector<String> dependencies;
+            SC_TRY(parseDependencyFile(fs, item.dependencyPath, project, dependencies));
+            bool hasSource = false;
+            for (const String& dependency : dependencies)
+            {
+                FileSystem::FileStat dependencyStat;
+                if (not fs.stat(dependency.view(), dependencyStat))
+                    return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+                hasSource = hasSource or dependency.view() == source->sourcePath.view();
+            }
+            if (not hasSource)
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportInvalid);
+            SC_TRY(sources.push_back(source));
+        }
+        for (size_t index = 0; index < imports.sizeInElements(); ++index)
+        {
+            const ResolvedSource& source = *sources[index];
+            const ObjectImport&   item   = imports[index];
+            SC_TRY(makeParentDirectory(fs, source.objectPath.view()));
+            // Remove the old acceptance marker first. A failed copy cannot leave an
+            // old command marker certifying partially updated compiler outputs.
+            if (fs.existsAndIsFile(source.commandPath.view()))
+                SC_TRY(fs.removeFile(source.commandPath.view()));
+            SC_TRY(fs.copyFile(item.objectPath, source.objectPath.view(), FileSystem::CopyFlags().setOverwrite(true)));
+            SC_TRY(fs.copyFile(item.dependencyPath, source.dependencyPath.view(),
+                               FileSystem::CopyFlags().setOverwrite(true)));
+            SC_TRY(fs.writeString(source.commandPath.view(), item.command));
+            // Copy/clone preserves producer timestamps. Registration follows caller
+            // content validation, so dependency checks start at this acceptance time.
+            SC_TRY(fs.setLastModifiedTime(source.objectPath.view(), TimeMs{Time::Realtime::now().milliseconds}));
+        }
+        return Result(true);
+    }
+
     static Result execute(const Definition& definition, const Action& action, String* outputExecutable)
     {
         FilePathsResolver filePathsResolver;
@@ -1168,6 +1257,26 @@ struct SC::Build::NativeBuild
 
         Vector<ResolvedProject> resolvedProjects;
         SC_TRY(resolveProjectsInBuildOrder(action, *workspace, filePathsResolver, resolvedProjects));
+
+        if (action.action == Action::CompileObjects)
+        {
+            if (resolvedProjects.size() != 1 or not resolvedProjects[0].workspaceDependencies.isEmpty())
+                return Result::Error(BuildResultCategory, BuildError::CompileObjectsRequiresStandaloneNativeProject);
+            ResolvedProject& project   = resolvedProjects[0];
+            project.compileObjectsOnly = true;
+            bool matched               = false;
+            for (ResolvedSource& source : project.sources)
+            {
+                if (not action.excludedSources.isEmpty() and
+                    StringAlgorithms::matchWildcard(action.excludedSources, source.displayPath.view()))
+                {
+                    source.selectedForCompile = false;
+                    matched                   = true;
+                }
+            }
+            if (not action.excludedSources.isEmpty() and not matched)
+                return Result::Error(BuildResultCategory, BuildError::ExcludedSourcesNotMatched);
+        }
 
         if (action.action == Action::Print)
         {
@@ -1188,6 +1297,12 @@ struct SC::Build::NativeBuild
         for (ResolvedProject& resolvedProject : resolvedProjects)
         {
             SC_TRY(writeCompileCommands(fs, resolvedProject, workspaceCompileCommands));
+        }
+        if (action.action == Action::ImportObjects)
+        {
+            if (resolvedProjects.size() != 1)
+                return Result::Error(BuildResultCategory, BuildError::ObjectImportUnsupported);
+            return importObjects(fs, resolvedProjects[0], action.importedObjects);
         }
         SC_TRY(buildResolvedProjects(action.parameters, resolvedProjects));
 
@@ -1260,6 +1375,13 @@ struct SC::Build::NativeBuild
                 return Result(true);
             }
             compileStep++;
+            if (not source.selectedForCompile)
+            {
+                SC_TRY(reporter.recordSkipped(progress.compileStartStep + compileStep - 1, progress.totalSteps,
+                                              getCompileStepName(source.type), source.displayPath.view(),
+                                              "excluded by objects-only action"));
+                continue;
+            }
 
             CommandLine commandLine;
             String      commandString = StringEncoding::Utf8;
@@ -1323,6 +1445,13 @@ struct SC::Build::NativeBuild
                 break;
             }
             compileStep++;
+            if (not source.selectedForCompile)
+            {
+                SC_TRY(reporter.recordSkipped(progress.compileStartStep + compileStep - 1, progress.totalSteps,
+                                              getCompileStepName(source.type), source.displayPath.view(),
+                                              "excluded by objects-only action"));
+                continue;
+            }
 
             CommandLine commandLine;
             String      commandString = StringEncoding::Utf8;

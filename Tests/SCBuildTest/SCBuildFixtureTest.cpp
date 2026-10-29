@@ -878,6 +878,18 @@ static Result configureHeaderDependencyProgram(Build::Definition& definition, co
     return configureDynamicFixtureProgram(definition, parameters, HeaderFixtureProjectName);
 }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+static bool ImportedObjectExtraDefine = false;
+
+static Result configureImportedObjectProgram(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    SC_TRY(configureHeaderDependencyProgram(definition, parameters));
+    if (ImportedObjectExtraDefine)
+        SC_TRY(definition.workspaces[0].projects[0].files.compile.addDefines({"SC_IMPORT_FLAG_CHANGE=1"}));
+    return Result(true);
+}
+#endif
+
 static Result configureCompileFailureProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     return configureDynamicFixtureProgram(definition, parameters, CompileFailureProjectName);
@@ -4363,6 +4375,172 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(finalExecutableStat.modifiedTime.milliseconds ==
                            initialExecutableStat.modifiedTime.milliseconds);
         }
+
+        if (test_section("native objects-only action preserves normal final build"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+            for (size_t jobs = 1; jobs <= 2; ++jobs)
+            {
+                String             buildRoot = StringEncoding::Utf8;
+                Build::Directories directories;
+                SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+                FileSystem fs;
+                SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+                String sourceRoot = StringEncoding::Utf8;
+                SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "ObjectsOnlyFixture"}));
+                SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, sourceRoot.view(), "objects-only"));
+                String helperPath = StringEncoding::Utf8;
+                SC_TRUST_RESULT(Path::join(helperPath, {sourceRoot.view(), "helper.cpp"}));
+                SC_TRUST_RESULT(fs.writeString(helperPath.view(), "int helper() { return 42; }\n"));
+                SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+                Build::Action action = makeNativeCompileAction(directories, HeaderFixtureProjectName);
+                action.parameters.execution.maxParallelJobs = jobs;
+                action.action                               = Build::Action::CompileObjects;
+                action.excludedSources                      = "main.cpp";
+                SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram));
+                String executablePath = StringEncoding::Utf8;
+                String mainObject     = StringEncoding::Utf8;
+                String helperObject   = StringEncoding::Utf8;
+                SC_TRUST_RESULT(computeExecutablePath(action, HeaderFixtureProjectName, executablePath));
+                SC_TRUST_RESULT(computeObjectPath(action, HeaderFixtureProjectName, "main.cpp", mainObject));
+                SC_TRUST_RESULT(computeObjectPath(action, HeaderFixtureProjectName, "helper.cpp", helperObject));
+                SC_TEST_EXPECT(not fs.existsAndIsFile(executablePath.view()));
+                SC_TEST_EXPECT(not fs.existsAndIsFile(mainObject.view()));
+                SC_TEST_EXPECT(fs.existsAndIsFile(helperObject.view()));
+                Build::Action unsupported        = action;
+                unsupported.parameters.generator = Build::Generator::XCode;
+                SC_TEST_EXPECT(
+                    Build::Action::execute(unsupported, configureHeaderDependencyProgram)
+                        .isError(BuildResultCategory, BuildError::CompileObjectsRequiresStandaloneNativeProject));
+                unsupported             = action;
+                unsupported.projectName = {};
+                SC_TEST_EXPECT(
+                    Build::Action::execute(unsupported, configureHeaderDependencyProgram)
+                        .isError(BuildResultCategory, BuildError::CompileObjectsRequiresStandaloneNativeProject));
+                action.excludedSources = "does-not-exist.cpp";
+                SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram)
+                                   .isError(BuildResultCategory, BuildError::ExcludedSourcesNotMatched));
+                action.excludedSources = {};
+                SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram));
+                SC_TEST_EXPECT(fs.existsAndIsFile(mainObject.view()));
+                SC_TEST_EXPECT(not fs.existsAndIsFile(executablePath.view()));
+                FileSystem::FileStat before;
+                SC_TRUST_RESULT(fs.stat(mainObject.view(), before));
+                action.action = Build::Action::Compile;
+                SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram));
+                FileSystem::FileStat after;
+                SC_TRUST_RESULT(fs.stat(mainObject.view(), after));
+                SC_TEST_EXPECT(before.modifiedTime.milliseconds == after.modifiedTime.milliseconds);
+                String stdoutOutput = StringEncoding::Utf8;
+                SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+                SC_TEST_EXPECT(stdoutOutput == "objects-only\n");
+                action.excludedSources = "main.cpp";
+                SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram)
+                                   .isError(BuildResultCategory, BuildError::ExcludedSourcesRequiresCompileObjects));
+            }
+        }
+
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+        if (test_section("native object import preserves dependency invalidation"))
+        {
+            ImportedObjectExtraDefine    = false;
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            String root = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(root, {buildRoot.view(), "ImportFixture"}));
+            SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, root.view(), "before-import"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(root.view()));
+            Build::Action action = makeNativeCompileAction(directories, HeaderFixtureProjectName);
+            action.action        = Build::Action::CompileObjects;
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram));
+            String object           = StringEncoding::Utf8;
+            String dependency       = StringEncoding::Utf8;
+            String marker           = StringEncoding::Utf8;
+            String stagedObject     = StringEncoding::Utf8;
+            String stagedDependency = StringEncoding::Utf8;
+            String source           = StringEncoding::Utf8;
+            String command          = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeObjectPath(action, HeaderFixtureProjectName, "main.cpp", object));
+            SC_TRUST_RESULT(StringBuilder::format(dependency, "{}.d", object.view()));
+            SC_TRUST_RESULT(StringBuilder::format(marker, "{}.command", object.view()));
+            SC_TRUST_RESULT(Path::join(stagedObject, {root.view(), "import.o"}));
+            SC_TRUST_RESULT(Path::join(stagedDependency, {root.view(), "import.d"}));
+            SC_TRUST_RESULT(Path::join(source, {root.view(), "main.cpp"}));
+            SC_TRUST_RESULT(fs.read(marker.view(), command));
+            SC_TRUST_RESULT(fs.copyFile(object.view(), stagedObject.view()));
+            SC_TRUST_RESULT(fs.copyFile(dependency.view(), stagedDependency.view()));
+            SC_TRUST_RESULT(fs.removeFile(object.view()));
+            SC_TRUST_RESULT(fs.removeFile(dependency.view()));
+            SC_TRUST_RESULT(fs.removeFile(marker.view()));
+            Build::ObjectImport imported = {source.view(), stagedObject.view(), stagedDependency.view(), root.view(),
+                                            command.view()};
+            action.action                = Build::Action::ImportObjects;
+            action.importedObjects       = {&imported, 1};
+            imported.command             = "wrong compiler flags";
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram)
+                               .isError(BuildResultCategory, BuildError::ObjectImportInvalid));
+            SC_TEST_EXPECT(not fs.existsAndIsFile(object.view()));
+            imported.command                     = command.view();
+            Build::ObjectImport duplicateItems[] = {imported, imported};
+            action.importedObjects               = duplicateItems;
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram)
+                               .isError(BuildResultCategory, BuildError::ObjectImportInvalid));
+            SC_TEST_EXPECT(not fs.existsAndIsFile(object.view()));
+            action.importedObjects = {&imported, 1};
+            imported.sourcePath    = "unknown.cpp";
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram)
+                               .isError(BuildResultCategory, BuildError::ObjectImportInvalid));
+            imported.sourcePath = source.view();
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram));
+            SC_TRUST_RESULT(fs.removeFile(object.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(object.view()));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram)
+                               .isError(BuildResultCategory, BuildError::ObjectImportInvalid));
+            SC_TEST_EXPECT(fs.existsAndIsFile(marker.view()));
+            SC_TRUST_RESULT(fs.removeEmptyDirectory(object.view()));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram));
+#if SC_PLATFORM_APPLE
+            SC_TRUST_RESULT(fs.chmod(stagedObject.view(), 0));
+            SC_TEST_EXPECT(not Build::Action::execute(action, configureImportedObjectProgram));
+            SC_TEST_EXPECT(not fs.existsAndIsFile(marker.view()));
+            SC_TRUST_RESULT(fs.chmod(stagedObject.view(), 0644));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram));
+#endif
+            FileSystem::FileStat before;
+            SC_TRUST_RESULT(fs.stat(object.view(), before));
+            action.action          = Build::Action::Compile;
+            action.importedObjects = {};
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram));
+            FileSystem::FileStat after;
+            SC_TRUST_RESULT(fs.stat(object.view(), after));
+            SC_TEST_EXPECT(before.modifiedTime.milliseconds == after.modifiedTime.milliseconds);
+            String executable = StringEncoding::Utf8;
+            String output     = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, HeaderFixtureProjectName, executable));
+            SC_TEST_EXPECT(runBuiltProgram(executable.view(), output));
+            SC_TEST_EXPECT(output == "before-import\n");
+            ImportedObjectExtraDefine = true;
+
+            Result              changedFlagResult = Result(true);
+            CapturedBuildOutput changedFlagOutput;
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureImportedObjectProgram, changedFlagResult, changedFlagOutput));
+            SC_TEST_EXPECT(changedFlagResult);
+            SC_TEST_EXPECT(StringView(changedFlagOutput.stdOut.view()).containsString("[1/2] CXX main.cpp"));
+
+            SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, root.view(), "after-import"));
+            String header = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(header, {root.view(), "shared.h"}));
+            SC_TRUST_RESULT(fs.setLastModifiedTime(header.view(), TimeMs{Time::Realtime::now().milliseconds + 2000}));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureImportedObjectProgram));
+            output = "";
+            SC_TEST_EXPECT(runBuiltProgram(executable.view(), output));
+            SC_TEST_EXPECT(output == "after-import\n");
+        }
+#endif
 
         if (test_section("native backend rebuilds after header change"))
         {
