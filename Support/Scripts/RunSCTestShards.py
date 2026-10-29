@@ -29,6 +29,38 @@ def sections(text):
     return collections.Counter(re.findall(r"🟩 ([^\r\n]+::[^\r\n]+)", text))
 
 
+
+def sample_sections(paths, started):
+    """Observe existing flushed section output; timestamps have polling/stdio uncertainty."""
+    states = {p: dict(offset=0, pending=b"", previous=started, registration=None) for p in paths}
+    events = []
+
+    def collect():
+        now = time.monotonic()
+        for path, state in states.items():
+            if not path.exists():
+                continue
+            with path.open("rb") as stream:
+                stream.seek(state["offset"])
+                chunk = stream.read()
+                state["offset"] += len(chunk)
+            lines = (state["pending"] + chunk).split(b"\n")
+            state["pending"] = lines.pop()
+            for raw in lines:
+                line = raw.decode("utf-8", errors="replace").rstrip("\r")
+                registration = re.fullmatch(r"SCTest::Registration (.+)", line)
+                if registration:
+                    state["registration"] = registration[1]
+                    state["previous"] = now
+                section = re.search(r"🟩 ([^\r\n]+::[^\r\n]+)", line)
+                if section:
+                    events.append(dict(log=path.name, registration=state["registration"], section=section[1],
+                                       observed_seconds=now - started,
+                                       since_previous_ms=1000 * (now - state["previous"])))
+                    state["previous"] = now
+    return collect, events
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", choices=("SCTest", "SCTestCore"), default="SCTest")
@@ -37,6 +69,7 @@ def main():
     parser.add_argument("--toolchain", choices=("clang", "filc"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--compare-serial", action="store_true")
+    parser.add_argument("--timings", action="store_true", help="Record per-registration execution milliseconds")
     options = parser.parse_args()
     if os.name != "posix":
         parser.error("The parallel CI pilot currently supports Posix hosts")
@@ -50,6 +83,8 @@ def main():
     if options.toolchain:
         command += ["--toolchain", options.toolchain]
     command += ["--", "--all-tests"]
+    if options.timings:
+        command += ["--test-timings"]
 
     base_offset = int(os.environ.get("SC_TEST_PORT_OFFSET", "0"))
     # Keep both listening-port sets below the host's automatic client-port
@@ -88,6 +123,20 @@ def main():
         try:
             with (output / (name + ".log")).open("w") as log:
                 process = subprocess.Popen(args, cwd=root, stdout=log, stderr=log, start_new_session=True)
+                if options.timings:
+                    paths = ([output / f"shard-{i}.log" for i in range(2)] if name == "parent"
+                             else [output / (name + ".log")])
+                    collect, events = sample_sections(paths, start)
+                    while process.poll() is None:
+                        collect()
+                        try:
+                            process.wait(timeout=0.05)
+                        except subprocess.TimeoutExpired:
+                            pass
+                    collect()
+                    timeline = dict(events=events, polling_interval_ms=50,
+                                    note="Flushed-output observations, not precise per-section execution times")
+                    (output / (name + ".sections.json")).write_text(json.dumps(timeline, indent=2) + "\n")
                 code = process.wait()
         except BaseException:
             if process is not None and process.poll() is None:
@@ -157,6 +206,21 @@ def main():
                    registration_occurrences=sum(actual.values()),
                    section_occurrences=sum(section_counts.values()),
                    unique_sections=len(section_counts), serial=control)
+    if options.timings:
+        def timings(text):
+            return [dict(registration=name, milliseconds=int(ms)) for name, ms in re.findall(
+                r"^SCTest::Timing ([^ ]+) (\d+) ms$", text, re.MULTILINE)]
+        child_timings = [timings(t) for t in texts]
+        timing_inventory_matches = all(
+            collections.Counter(t["registration"] for t in measured) == registrations(text)
+            for text, measured in zip(texts, child_timings))
+        summary["timings"] = dict(shards=child_timings, inventory_matches=timing_inventory_matches)
+        if control:
+            serial_text = (output / "serial.log").read_text()
+            summary["timings"]["serial"] = timings(serial_text)
+            timing_inventory_matches = timing_inventory_matches and (
+                collections.Counter(t["registration"] for t in summary["timings"]["serial"]) == expected)
+            summary["timings"]["inventory_matches"] = timing_inventory_matches
     if control:
         reference = sections((output / "serial.log").read_text())
         summary["section_inventory_matches"] = reference == section_counts
@@ -165,6 +229,7 @@ def main():
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
     if (parent["exit"] != 0 or any(r["exit"] != 0 for r in results) or actual != expected or not offsets_match or
+            (options.timings and not timing_inventory_matches) or
             (control and not summary["section_inventory_matches"])):
         raise SystemExit(1)
 

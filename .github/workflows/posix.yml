@@ -157,7 +157,7 @@ jobs:
     - name: test SCTest
       run: |
         if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.parallel-tests }}" == "true" ]]; then
-          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --compare-serial --output _Build/_TestShards/native
+          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --compare-serial --timings --output _Build/_TestShards/native
         else
           python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --output _Build/_TestShards/native
         fi
@@ -191,7 +191,7 @@ jobs:
     - name: test SCTest xcode
       run: |
         if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.parallel-tests }}" == "true" ]]; then
-          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --generator xcode --compare-serial --output _Build/_TestShards/xcode
+          python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --generator xcode --compare-serial --timings --output _Build/_TestShards/xcode
         else
           python3 Support/Scripts/RunSCTestShards.py --configuration "${{ matrix.config }}" --generator xcode --output _Build/_TestShards/xcode
         fi

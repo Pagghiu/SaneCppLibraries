@@ -93,7 +93,7 @@ TEST_COMMAND=(./SC.sh build run "$TEST_PROJECT" "$CONFIGURATION" native --toolch
 if [[ "$SHARD_MODE" != 0 ]]; then
     TEST_COMMAND=(python3 Support/Scripts/RunSCTestShards.py --project "$TEST_PROJECT"
         --configuration "$CONFIGURATION" --toolchain filc --output "$RUN_DIR/test-shards")
-    if [[ "$SHARD_MODE" == 1 ]]; then TEST_COMMAND+=(--compare-serial); fi
+    if [[ "$SHARD_MODE" == 1 ]]; then TEST_COMMAND+=(--compare-serial --timings); fi
 fi
 
 env SC_TEST_HTTP_TLS_URL="https://localhost:$PORT/" \

@@ -53,3 +53,14 @@ filesystem/port isolation, duplicate registrations and exact section inventories
 Keep Windows launcher validation sequential. Measure startup/package/runner overhead
 and the whole critical path before expanding the pilot. Preserve all-tests, real
 TLS, coroutine and platform/compiler coverage.
+
+Optional `--test-timings` at the entrypoint (`--timings` in the comparison runner)
+records monotonic duration at the same shared registration boundary. Compare each
+timing roster with the exact registration multiset, retaining duplicate occurrences.
+Manual comparisons enable it to distinguish class imbalance from framework startup;
+normal runs keep the clock reads and timing output disabled.
+
+Timing diagnostics also sample existing flushed section output at 50 ms intervals
+to locate long waits inside a registration. These observations include polling and
+stdio delivery uncertainty; they are not precise per-section execution timings.
+They do not change the test code or its scheduling.

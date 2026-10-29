@@ -143,6 +143,7 @@ void runSupportToolsTest(TestReport& report);
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Time/Time.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <direct.h>
@@ -169,6 +170,7 @@ struct TestExecution
     SC::uint32_t    shardIndex = 0;
     SC::uint32_t    shardCount = 1;
     bool            listOnly   = false;
+    bool            timeTests  = false;
 
     SC::StringView childRoots[2] = {};
     SC::StringView childLogs     = {};
@@ -182,7 +184,9 @@ struct TestExecution
         for (int i = 1; i < argc; ++i)
         {
             const SC::StringView arg = SC::StringView::fromNullTerminated(argv[i], SC::StringEncoding::Ascii);
-            if (arg == "--list-test-functions")
+            if (arg == "--test-timings")
+                timeTests = true;
+            else if (arg == "--list-test-functions")
                 listOnly = true;
             else if (arg == "--shard-index" or arg == "--shard-count")
             {
@@ -355,13 +359,23 @@ struct TestExecution
         }
         if (hash % shardCount != shardIndex)
             return;
-        if (listOnly or shardCount > 1)
+        if (listOnly or shardCount > 1 or timeTests)
         {
             report.console.print("SCTest::Registration {}\n", registration);
             report.console.flush();
         }
         if (not listOnly)
+        {
+            const auto started = timeTests ? SC::Time::Monotonic::now().getMonotonicMilliseconds() : 0;
             function(report);
+            if (timeTests)
+            {
+                const auto elapsed = SC::Time::Monotonic::now().getMonotonicMilliseconds() - started;
+                report.console.print("SCTest::Timing {} ", registration);
+                report.console.print("{} ms\n", static_cast<SC::size_t>(elapsed));
+                report.console.flush();
+            }
+        }
     }
 };
 } // namespace

@@ -22,3 +22,13 @@ starts its own children; the runner preserves `--all-tests` and compiler setting
 Use `--project SCTestCore` for the explicit core target or `--generator xcode` for
 an already compiled Xcode target. See TOOLS-0020 in `Architecture/Tools` for the
 isolation and coverage contract.
+
+Add `--timings` to record monotonic execution milliseconds for each registration,
+including duplicates, in the retained summary. Manual CI comparisons enable this
+diagnostic; ordinary test invocations leave it disabled. It measures test execution
+separately from the framework startup included in the overall run duration.
+
+Timing diagnostics also sample existing flushed section output at 50 ms intervals
+to locate long waits inside a registration. These observations include polling and
+stdio delivery uncertainty; they are not precise per-section execution timings.
+They do not change the test code or its scheduling.
