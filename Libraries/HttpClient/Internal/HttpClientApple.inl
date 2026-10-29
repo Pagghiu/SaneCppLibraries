@@ -259,6 +259,8 @@ struct SC::HttpClientAppleCallbacks
             operation->readRequestBodyChunk({buffer, static_cast<size_t>(maxLength)}, bodyError, endReached);
         if (not bodyError)
         {
+            auto& internal               = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
+            internal.callbackError       = bodyError;
             getBodyStreamStatusRef(self) = NSStreamStatusError;
             return -1;
         }

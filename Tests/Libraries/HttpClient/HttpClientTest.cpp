@@ -2822,10 +2822,16 @@ struct SC::HttpClientTest : public SC::TestCase
 
             bool sent = false;
 
+            // Keep the malformed provider invalid even if the backend limits callback capacity.
+            bool reportOversized = false;
+
+            size_t offeredCapacity = 0;
+
             Result pullRequestBody(Span<char> dest, size_t& bytesWritten, bool& endReached) override
             {
-                bytesWritten = 0;
-                endReached   = false;
+                offeredCapacity = dest.sizeInBytes();
+                bytesWritten    = 0;
+                endReached      = false;
                 if (sent)
                 {
                     endReached = true;
@@ -2835,7 +2841,7 @@ struct SC::HttpClientTest : public SC::TestCase
                 const size_t toCopy =
                     payload.sizeInBytes() < dest.sizeInBytes() ? payload.sizeInBytes() : dest.sizeInBytes();
                 memcpy(dest.data(), payload.data(), toCopy);
-                bytesWritten = toCopy;
+                bytesWritten = reportOversized ? payload.sizeInBytes() : toCopy;
                 sent         = true;
                 endReached   = true;
                 return Result(true);
@@ -2866,13 +2872,23 @@ struct SC::HttpClientTest : public SC::TestCase
                     request.body.sizeInBytes = 5;
                     request.body.framing     = HttpClientRequestBody::SizedStream;
 
-                    SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
-                                                                   memory.memory));
+                    const Result result =
+                        HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory);
+                    SC_TEST_EXPECT(provider.sent);
+                    const bool expected =
+                        result.isError(HttpClientResultCategory, HttpClientError::RequestBodyDeclaredSizeIncomplete);
+                    if (not expected)
+                    {
+                        report.console.print("Upload validation received error {} with callback capacity {}\n",
+                                             static_cast<size_t>(result.errorValue()), provider.offeredCapacity);
+                    }
+                    SC_TEST_EXPECT(expected);
                 }
 
                 {
                     FixedBodyProvider provider;
-                    provider.payload = {"abcdef", 6};
+                    provider.payload         = {"abcdef", 6};
+                    provider.reportOversized = true;
 
                     HttpClientRequest  request;
                     HttpClientResponse response;
@@ -2885,8 +2901,18 @@ struct SC::HttpClientTest : public SC::TestCase
                     request.body.sizeInBytes = 3;
                     request.body.framing     = HttpClientRequestBody::SizedStream;
 
-                    SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
-                                                                   memory.memory));
+                    const Result result =
+                        HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory);
+                    SC_TEST_EXPECT(provider.sent);
+                    const bool expected =
+                        result.isError(HttpClientResultCategory, HttpClientError::RequestBodyDeclaredSizeExceeded) or
+                        result.isError(HttpClientResultCategory, HttpClientError::RequestBodyProviderOverflow);
+                    if (not expected)
+                    {
+                        report.console.print("Upload validation received error {} with callback capacity {}\n",
+                                             static_cast<size_t>(result.errorValue()), provider.offeredCapacity);
+                    }
+                    SC_TEST_EXPECT(expected);
                 }
 
                 SC_TEST_EXPECT(client.close());
