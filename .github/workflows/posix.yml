@@ -13,6 +13,18 @@ on:
         description: Replay selected Xcode and Fil-C core compiles with phase diagnostics after tests
         type: boolean
         default: false
+      profile-shared-objects:
+        description: Compare current Fil-C core/tools object contracts and transfer costs without importing objects
+        type: boolean
+        default: false
+      reuse-shared-objects:
+        description: Import verified same-run Fil-C library objects while Core compiles distinct sources
+        type: boolean
+        default: true
+      compare-object-reuse:
+        description: Compare four cold Fil-C Core builds on each runner after the normal tests
+        type: boolean
+        default: false
   schedule:
     - cron: '0 3 * * 0'
 
@@ -739,6 +751,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
 
+    env:
+      SC_PROFILE_SHARED_OBJECTS: ${{ (github.event_name != 'workflow_dispatch' || inputs.profile-shared-objects || inputs.reuse-shared-objects || inputs.compare-object-reuse) && '1' || '0' }}
+      SC_REUSE_SHARED_OBJECTS: ${{ (github.event_name != 'workflow_dispatch' || inputs.reuse-shared-objects || inputs.compare-object-reuse) && '1' || '0' }}
+      SC_COMPARE_SHARED_OBJECTS: ${{ github.event_name == 'workflow_dispatch' && inputs.compare-object-reuse && '1' || '0' }}
+
     steps:
     - uses: actions/checkout@v5
     - name: Restore Fil-C cache
@@ -758,7 +775,73 @@ jobs:
     - name: verify Fil-C package receipt
       run: ./SC.sh package verify filc
     - name: compile ${{ matrix.project }} Release with Fil-C
-      run: ./SC.sh build compile ${{ matrix.project }} Release native --toolchain filc --verbose
+      run: |
+        if [ "$SC_REUSE_SHARED_OBJECTS" = 1 ] && [ "${{ matrix.partition }}" = core ]; then
+          ./SC.sh build compile-objects SCTestCore Release native --toolchain filc --exclude-sources 'Libraries/*' --verbose
+        else
+          ./SC.sh build compile ${{ matrix.project }} Release native --toolchain filc --verbose
+        fi
+    - name: Profile Fil-C common object inputs
+      if: env.SC_PROFILE_SHARED_OBJECTS == '1'
+      run: >-
+        python3 Support/Scripts/ProfileFilCObjectSharing.py collect
+        --intermediate "_Build/_Intermediates/${{ matrix.project }}/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release"
+        --output "_Build/_ObjectProfiles/${{ matrix.partition }}"
+        ${{ matrix.partition == 'tools' && '--bundle' || '' }}
+    - name: Publish Fil-C common object diagnostic bundle
+      if: matrix.partition == 'tools' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      uses: actions/upload-artifact@v6
+      with:
+        name: filc-common-objects-${{ runner.arch }}-${{ github.run_attempt }}
+        path: _Build/_ObjectProfiles/tools/objects.zip
+        compression-level: 0
+        retention-days: 1
+        if-no-files-found: error
+    - name: Wait for matching Fil-C producer artifact
+      if: matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: >-
+        python3 Support/Scripts/ProfileFilCObjectSharing.py wait-artifact
+        --name "filc-common-objects-${{ runner.arch }}-${{ github.run_attempt }}"
+        --output _Build/_ObjectProfiles/core/artifact-ready.json
+    - name: Download Fil-C common object diagnostic bundle
+      if: matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      uses: actions/download-artifact@v6
+      with:
+        name: filc-common-objects-${{ runner.arch }}-${{ github.run_attempt }}
+        path: _Build/_ObjectProfiles/producer
+    - name: Compare current Fil-C object contracts
+      if: matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      run: >-
+        python3 Support/Scripts/ProfileFilCObjectSharing.py compare
+        --local _Build/_ObjectProfiles/core
+        --bundle _Build/_ObjectProfiles/producer/objects.zip
+        --output _Build/_ObjectProfiles/core/compatibility.json
+    - name: Stage and import verified Fil-C objects
+      if: matrix.partition == 'core' && env.SC_REUSE_SHARED_OBJECTS == '1'
+      run: |
+        python3 Support/Scripts/ProfileFilCObjectSharing.py stage \
+          --local _Build/_ObjectProfiles/core \
+          --bundle _Build/_ObjectProfiles/producer/objects.zip \
+          --intermediate "_Build/_Intermediates/SCTestCore/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release" \
+          --output _Build/_ObjectProfiles/core/import-stage
+        ./SC.sh build import-objects SCTestCore Release native --toolchain filc --manifest _Build/_ObjectProfiles/core/import-stage/import.txt
+    - name: Link imported Fil-C Core with normal dependency and export checks
+      if: matrix.partition == 'core' && env.SC_REUSE_SHARED_OBJECTS == '1'
+      run: |
+        ./SC.sh build compile SCTestCore Release native --toolchain filc --verbose | tee _Build/_ObjectProfiles/core/import-link.log
+        python3 Support/Scripts/ProfileFilCObjectSharing.py verify-link \
+          --intermediate "_Build/_Intermediates/SCTestCore/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release" \
+          --log _Build/_ObjectProfiles/core/import-link.log \
+          --output _Build/_ObjectProfiles/core/import-link-proof.json
+    - name: Upload Fil-C object sharing evidence
+      if: always() && matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      uses: actions/upload-artifact@v6
+      with:
+        name: filc-object-sharing-${{ runner.arch }}-${{ github.run_attempt }}
+        path: _Build/_ObjectProfiles/core
+        retention-days: 7
     - name: Restore zlib-filc source cache
       id: zlib-filc-cache
       uses: actions/cache/restore@v5
@@ -857,6 +940,23 @@ jobs:
         ./SC.sh build compile SCAwaitCoroutineShimTest Release native --toolchain filc
         ./SC.sh build run SCAwaitCoroutineShimTest Release native --toolchain filc
 
+    - name: Compare cold Fil-C object reuse on this runner
+      if: matrix.partition == 'core' && env.SC_COMPARE_SHARED_OBJECTS == '1'
+      run: >-
+        python3 Support/Scripts/BenchmarkFilCObjectSharing.py
+        --intermediate "_Build/_Intermediates/SCTestCore/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release"
+        --bundle _Build/_ObjectProfiles/producer/objects.zip
+        --output _Build/_ObjectBenchmarks
+    - name: Upload matched Fil-C object reuse measurements
+      if: always() && matrix.partition == 'core' && env.SC_COMPARE_SHARED_OBJECTS == '1'
+      uses: actions/upload-artifact@v6
+      with:
+        name: filc-object-benchmark-${{ runner.arch }}-${{ github.run_attempt }}
+        path: |
+          _Build/_ObjectBenchmarks/results.json
+          _Build/_ObjectBenchmarks/*/*.log
+          _Build/_ObjectBenchmarks/*/link-proof.json
+        retention-days: 7
     - name: Profile Fil-C core compiler phases
       if: github.event_name == 'workflow_dispatch' && inputs.profile-compiles && matrix.partition == 'core'
       run: >-
