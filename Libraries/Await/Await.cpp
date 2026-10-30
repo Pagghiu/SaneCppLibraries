@@ -33,16 +33,16 @@ static constexpr size_t AwaitFrameAlignment =
     alignof(void*);
 #endif
 
-static void* awaitAlignPointer(void* pointer, size_t alignment)
+static void* alignPointer(void* pointer, size_t alignment)
 {
     const size_t address        = reinterpret_cast<size_t>(pointer);
     const size_t alignedAddress = (address + alignment - 1) & ~(alignment - 1);
     return static_cast<char*>(pointer) + (alignedAddress - address);
 }
 
-static size_t awaitAlignSize(size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); }
+static size_t alignSize(size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); }
 
-static bool awaitIsPowerOfTwo(size_t value) { return value != 0 and (value & (value - 1)) == 0; }
+static bool isPowerOfTwo(size_t value) { return value != 0 and (value & (value - 1)) == 0; }
 
 static size_t awaitAllocatorPageSize()
 {
@@ -240,7 +240,7 @@ Result AwaitAllocator::close()
 
 void* AwaitAllocator::allocate(const void* owner, size_t numBytes, size_t alignment)
 {
-    if (not isOpen() or numBytes == 0 or not awaitIsPowerOfTwo(alignment))
+    if (not isOpen() or numBytes == 0 or not isPowerOfTwo(alignment))
     {
         recordAllocationFailure(numBytes);
         return nullptr;
@@ -268,7 +268,8 @@ void* AwaitAllocator::allocate(const void* owner, size_t numBytes, size_t alignm
         return nullptr;
     }
 
-    void* memory = awaitAlignPointer(static_cast<char*>(raw) + sizeof(AwaitAllocationHeader), alignment);
+    void* memory = alignPointer(static_cast<char*>(raw) + sizeof(AwaitAllocationHeader), alignment);
+
     AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
     header.allocator              = this;
     header.rawAllocation          = raw;
@@ -379,7 +380,7 @@ Result AwaitAllocator::initializeFixedStorage(Span<char> storage)
 {
     char* base        = storage.data();
     char* storageEnd  = base + storage.sizeInBytes();
-    char* alignedBase = static_cast<char*>(awaitAlignPointer(base, alignof(BlockHeader)));
+    char* alignedBase = static_cast<char*>(alignPointer(base, alignof(BlockHeader)));
     if (alignedBase >= storageEnd or static_cast<size_t>(storageEnd - alignedBase) < sizeof(BlockHeader))
     {
         fixedStorage = storage;
@@ -410,8 +411,7 @@ void* AwaitAllocator::allocateFromBlocks(const void*, size_t numBytes, size_t al
 
             char* blockStart = reinterpret_cast<char*>(block);
             char* blockEnd   = blockStart + block->blockBytes;
-            void* memory =
-                awaitAlignPointer(blockStart + sizeof(BlockHeader) + sizeof(AwaitAllocationHeader), alignment);
+            void* memory    = alignPointer(blockStart + sizeof(BlockHeader) + sizeof(AwaitAllocationHeader), alignment);
             char* headerPtr = static_cast<char*>(memory) - sizeof(AwaitAllocationHeader);
             if (headerPtr < blockStart + sizeof(BlockHeader))
             {
@@ -419,7 +419,7 @@ void* AwaitAllocator::allocateFromBlocks(const void*, size_t numBytes, size_t al
             }
 
             size_t usedBytes = static_cast<size_t>(static_cast<char*>(memory) + numBytes - blockStart);
-            usedBytes        = awaitAlignSize(usedBytes, alignof(BlockHeader));
+            usedBytes        = alignSize(usedBytes, alignof(BlockHeader));
             if (blockStart + usedBytes > blockEnd)
             {
                 continue;

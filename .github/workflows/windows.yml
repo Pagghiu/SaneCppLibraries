@@ -329,11 +329,11 @@ jobs:
       run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: compile SCBuildTest
       shell: cmd
-      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} --libraries unity %WINDOWS_LONG_PATH_ARGS%
+      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
     - name: test SCBuildTest
       shell: cmd
-      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} --libraries unity %WINDOWS_LONG_PATH_ARGS%
+      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
 
   # Preserve existing matrix check names as gates over all required workload groups.

@@ -91,21 +91,6 @@ SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
 Both forms add the public `Includes` directory, so target sources include library entry points such as
 `SaneCppStrings.h` rather than repository-internal paths.
 
-Override that choice for one invocation with `--libraries unity` or `--libraries separate`:
-
-```bash
-./SC.sh build compile SCTest Release --libraries unity
-./SC.sh build run SCTest Release --libraries unity -- --all-tests
-./SC.sh build configure SCTest --libraries unity
-```
-
-Omit the option (or use `--libraries default`) to retain the project's declared mode. Repository test targets
-use separate sources by default for incremental development. The override affects `addSaneCppLibraries` calls;
-test source files, compiler flags and targets that explicitly select other sources retain their declarations.
-Pass the same mode to compile and run commands and regenerate IDE projects when switching their source mode.
-Unity can reduce repeated header parsing, but a single large translation unit can also reduce parallelism;
-measure the complete compile/link workload on the intended compiler before choosing it for CI.
-
 # Cross builds are three decisions
 
 Cross compilation is easier to reason about when three concerns stay separate:

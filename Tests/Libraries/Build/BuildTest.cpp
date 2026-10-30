@@ -216,36 +216,6 @@ struct SC::BuildTest : public SC::TestCase
             SC_TEST_EXPECT(documentView.containsString("./SC.sh build run --help"));
         }
 
-        if (test_section("Build CLI selects core library compilation"))
-        {
-            const StringView modes[] = {"default", "separate", "unity"};
-            for (const StringView mode : modes)
-            {
-                StringView                    cliArguments[] = {"SCTest", "--libraries", mode};
-                Build::Action                 cliAction;
-                Tools::detail::BuildCLIStatus status = Tools::detail::BuildCLIStatus::Ready;
-                SC_TEST_EXPECT(prepareBuildCLIAction(report, cliArguments, Build::Action::Compile, cliAction, status));
-                SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
-                SC_TEST_EXPECT(cliAction.parameters.libraries.hasBeenSet() == (mode != "default"));
-
-                Build::Project project = {"LibraryModeProbe"};
-                SC_TEST_EXPECT(Build::addSaneCppLibraries(project, cliAction.parameters, Build::Libraries::Multiple));
-                SC_TEST_EXPECT(project.files.selection[0].mask.view() == (mode == "unity" ? "SC.cpp" : "**.cpp"));
-            }
-
-            Build::Action                 defaultAction;
-            Tools::detail::BuildCLIStatus status             = Tools::detail::BuildCLIStatus::Ready;
-            const StringView              defaultArguments[] = {"SCTest"};
-            SC_TEST_EXPECT(
-                prepareBuildCLIAction(report, defaultArguments, Build::Action::Compile, defaultAction, status));
-            SC_TEST_EXPECT(not defaultAction.parameters.libraries.hasBeenSet());
-
-            const StringView invalidArguments[] = {"SCTest", "--libraries", "invalid"};
-            SC_TEST_EXPECT(
-                not prepareBuildCLIAction(report, invalidArguments, Build::Action::Compile, defaultAction, status));
-            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Error);
-        }
-
         if (test_section("Build CLI reserves ABI option"))
         {
             StringView cliArguments[] = {"SCTest", "--target", "linux-glibc-x86_64", "--abi", "gnu"};

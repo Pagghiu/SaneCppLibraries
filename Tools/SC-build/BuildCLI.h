@@ -46,7 +46,6 @@ struct BuildCLIParseContext
     StringSpan runner          = {};
     StringSpan runnerPath      = {};
     StringSpan output          = {};
-    StringSpan libraries       = {};
     StringSpan excludedSources = {};
     StringSpan importManifest  = {};
 
