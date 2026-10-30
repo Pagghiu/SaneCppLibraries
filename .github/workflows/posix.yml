@@ -138,20 +138,24 @@ jobs:
       if: matrix.params.os == 'macos-latest'
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+      if: matrix.params.os != 'macos-latest'
     - name: configure SCTest
       run: ./SC.sh build configure SCTest ${{ matrix.config }}
     - name: configure SCSingleFileLibs
       run: ./SC.sh build configure "SCSingleFileLibs:" ${{ matrix.config }}
+      if: matrix.params.os != 'macos-latest'
     - name: compile SCTest
       run: ./SC.sh build compile SCTest ${{ matrix.config }}
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: compile SCAsyncExecutionTest
       run: ./SC.sh build compile SCAsyncExecutionTest ${{ matrix.config }}
+      if: matrix.params.os != 'macos-latest'
     - name: compile SCBuildTest
       run: ./SC.sh build compile SCBuildTest ${{ matrix.config }}
       if: matrix.config == 'Release' && matrix.params.os != 'macos-latest'
     - name: compile SCSingleFileLibs
       run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
+      if: matrix.params.os != 'macos-latest'
     - name: compile InteropSTL
       run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
     - name: compile SCStdCppHeaderNoLinkTest
@@ -181,6 +185,7 @@ jobs:
       env:
         CCACHE_DISABLE: 1
       run: ./SC.sh build run SCAsyncExecutionTest ${{ matrix.config }}
+      if: matrix.params.os != 'macos-latest'
     - name: test SCBuildTest
       env:
         CCACHE_DISABLE: 1
@@ -270,6 +275,61 @@ jobs:
         path: _Build/_CompilerCache
         key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
 
+
+
+  macos-auxiliary:
+    if: github.event_name != 'schedule'
+    strategy:
+      matrix:
+        config: [Debug, Release]
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      SC_ASYNC_EXECUTION_STDEXEC_INCLUDE: _Build/_AsyncExecutionStdexec/include
+      SC_ASYNC_EXECUTION_STDEXEC_REVISION: 34fa94719f97f49a553811423fa1200172f22a0e
+    steps:
+    - uses: actions/checkout@v5
+    - name: Cache stdexec headers
+      id: stdexec-cache
+      uses: actions/cache@v5
+      with:
+        path: _Build/_AsyncExecutionStdexec/include
+        key: sc-stdexec-headers-v1-${{ runner.os }}-${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+    - name: Download pinned stdexec
+      if: steps.stdexec-cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v5
+      with:
+        repository: NVIDIA/stdexec
+        ref: ${{ env.SC_ASYNC_EXECUTION_STDEXEC_REVISION }}
+        path: _Build/_AsyncExecutionStdexec
+        persist-credentials: false
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: configure SCSingleFileLibs
+      run: ./SC.sh build configure "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: compile SCAsyncExecutionTest
+      run: ./SC.sh build compile SCAsyncExecutionTest ${{ matrix.config }}
+    - name: compile SCSingleFileLibs
+      run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: test SCAsyncExecutionTest
+      env:
+        CCACHE_DISABLE: 1
+      run: ./SC.sh build run SCAsyncExecutionTest ${{ matrix.config }}
+    - name: Print macOS crash reports
+      if: failure()
+      run: bash Support/Scripts/PrintMacOSCrashReports.sh
+    - name: Save macOS auxiliary crash diagnostics
+      if: failure()
+      uses: actions/upload-artifact@v6
+      with:
+        name: macos-auxiliary-crash-${{ matrix.config }}-${{ github.run_attempt }}
+        if-no-files-found: ignore
+        retention-days: 7
+        path: |
+          ~/Library/Logs/DiagnosticReports/SC*.ips
+          ~/Library/Logs/DiagnosticReports/SC*.crash
+          _Build/_Outputs/**/SCAsyncExecutionTest
+          _Build/_Outputs/**/SCAsyncExecutionTest.dSYM/**
 
   macos-build-fixtures:
     if: github.event_name != 'schedule'
@@ -541,7 +601,7 @@ jobs:
   # Preserve the original required check names over both workload groups.
   build:
     if: always() && github.event_name != 'schedule'
-    needs: [core, macos-build-fixtures]
+    needs: [core, macos-auxiliary, macos-build-fixtures]
     strategy:
       matrix:
         include:
