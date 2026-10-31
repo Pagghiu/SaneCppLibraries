@@ -602,6 +602,6 @@ payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 1637		| 8620		| 10257	|
-| Single File | 2518		| 8856		| 11374	|
-| Standalone  | 2518		| 8856		| 11374	|
+| Library     | 1664		| 8960		| 10624	|
+| Single File | 2531		| 9210		| 11741	|
+| Standalone  | 2531		| 9210		| 11741	|

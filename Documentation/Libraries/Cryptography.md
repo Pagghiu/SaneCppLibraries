@@ -287,6 +287,6 @@ payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 1048		| 2778		| 3826	|
-| Single File | 904		| 3216		| 4120	|
-| Standalone  | 904		| 3216		| 4120	|
+| Library     | 1048		| 2888		| 3936	|
+| Single File | 904		| 3326		| 4230	|
+| Standalone  | 904		| 3326		| 4230	|

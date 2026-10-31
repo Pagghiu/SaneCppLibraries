@@ -317,7 +317,6 @@ The reference is intentionally secondary to the model and examples above.
 @copydoc SC::HttpAsyncClient
 
 # Statistics
-
 LOC counts exclude comments. Library counts files physically under `Libraries/Http`.
 Single File counts
 `SaneCppHttp.h`.
@@ -326,6 +325,6 @@ payloads.
 
 | Metric      | Header | Source | Sum   |
 |-------------|--------|--------|-------|
-| Library     | 2500		| 8403		| 10903	|
-| Single File | 3427		| 8824		| 12251	|
-| Standalone  | 13988		| 25709		| 39697	|
+| Library     | 2550		| 8499		| 11049	|
+| Single File | 3477		| 8920		| 12397	|
+| Standalone  | 14043		| 25925		| 39968	|
