@@ -164,6 +164,10 @@ shows frame-driven cancellation, timeout and shutdown; `--scope-failure` demonst
 Borrowed requests/tasks are embedded in connected storage. Typed scope storage and payload spans require no
 adapter heap allocation. OS resources and arbitrary provider/user algorithms have separate requirements.
 
+# Blog
+
+- [October 2026 Update](https://pagghiu.github.io/site/blog/2026-10-31-SaneCppLibrariesUpdate.html)
+
 # Build and run
 
 Include `Extra/Experimental/AsyncExecution/AsyncExecution.h` and compile

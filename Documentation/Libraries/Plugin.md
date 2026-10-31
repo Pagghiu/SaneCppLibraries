@@ -118,6 +118,7 @@ The current design is most credible as a development-time hot-reload facility un
 # Blog
 
 - [September 2026 Update](https://pagghiu.github.io/site/blog/2026-09-30-SaneCppLibrariesUpdate.html)
+- [October 2026 Update](https://pagghiu.github.io/site/blog/2026-10-31-SaneCppLibrariesUpdate.html)
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Plugin`.

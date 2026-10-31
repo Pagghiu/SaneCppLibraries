@@ -110,6 +110,7 @@ choosing the clock model above.
 # Further Reading
 
 - [January 2025 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
+- [October 2026 Update](https://pagghiu.github.io/site/blog/2026-10-31-SaneCppLibrariesUpdate.html)
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Time`.
