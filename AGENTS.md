@@ -67,7 +67,7 @@ Span<StringSpan>  remainingStorage = {};
 Span<StringSpan>* parsedValues     = nullptr;
 ```
 - Format with: `./SC.sh format execute`
-- Commit message: see "Commit message format" from CONTRIBUTING.md
+- Commit message: follow "Commit message format" in CONTRIBUTING.md, including a subject and descriptive body. Keep commits focused on coherent changes.
 
 ## Testing
 

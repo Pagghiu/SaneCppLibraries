@@ -255,11 +255,13 @@ Every commit should:
     - Use `CI` for changes to the Continuous Integration files.
 - Avoid use of past tense (`Use` instead of `used` etc.).
 
-Where needed add two newlines and write a further paragraph, starting with a capital letter, describing the details of the change.
+After a blank line, include a paragraph starting with a capital letter that describes what changed and why.
+
+AI co-author attribution is encouraged when supported by the agent. Let the agent use its own settings and attribution identity; a `Co-authored-by` trailer is not required by this repository.
 
 Examples:
 
-Good:
+Good subjects (each must be followed by a description):
 
 - `SerializationBinary: Use pointer to field directly instead of reinterpret_cast-ing`
 - `FileSystem: Add option to skip empty entries to Path::join`
