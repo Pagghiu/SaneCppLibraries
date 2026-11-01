@@ -609,13 +609,18 @@ static bool isEnvironmentFlagEnabled(const char* name)
 #endif
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
-static Result writeFakeMSVCWineScript(FileSystem& fs, StringView scriptPath, StringView logPath)
+static Result writeFakeMSVCWineScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                      bool logEnvironment = false)
 {
     String scriptContents = StringEncoding::Utf8;
     auto   builder        = StringBuilder::create(scriptContents);
     SC_TRY(builder.append("#!/bin/sh\n"));
     SC_TRY(builder.append("log_path='{}'\n", logPath));
     SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"$log_path\"\n"));
+    if (logEnvironment)
+    {
+        SC_TRY(builder.append("printf 'HOST_PATH=%s\\nWINEPATH=%s\\n' \"$PATH\" \"$WINEPATH\" >> \"$log_path\"\n"));
+    }
     SC_TRY(builder.append("tool=\"$1\"\n"));
     SC_TRY(builder.append("shift\n"));
     SC_TRY(builder.append("for arg in \"$@\"; do\n"));
@@ -3333,13 +3338,17 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
             SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
-            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view(), true));
 
             ScopedEnvironmentVariable importVariable;
             ScopedEnvironmentVariable wineVariable;
+            ScopedEnvironmentVariable pathVariable;
+            ScopedEnvironmentVariable winePathVariable;
             SC_TRUST_RESULT(
                 setScopedEnvironmentVariable("SC_MSVC_IMPORT_DIRECTORY", importRoot.view(), importVariable));
             SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_MSVC_WINE", winePath.view(), wineVariable));
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("PATH", "/usr/bin:/bin", pathVariable));
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("WINEPATH", "Z:\\prior", winePathVariable));
 
             Tools::Package package;
             SC_TEST_EXPECT(Tools::installMSVCToolchain(directories.packagesCacheDirectory.view(),
@@ -3364,10 +3373,26 @@ struct SCBuildFixtureTest : public SC::TestCase
                                          stdOut, {}, stdErr));
             SC_TEST_EXPECT(process.getExitStatus() == 0);
 
+            String linkerWrapper    = StringEncoding::Utf8;
+            String manifestFile     = StringEncoding::Utf8;
+            String manifestArgument = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(linkerWrapper, {package.installDirectoryLink.view(), "bin", "x64", "link"}));
+            SC_TRUST_RESULT(Path::join(manifestFile, {buildRoot.view(), "long path.manifest"}));
+            SC_TRUST_RESULT(StringBuilder::format(manifestArgument, "/MANIFESTINPUT:{}", manifestFile.view()));
+            Process linkerProcess;
+            SC_TRUST_RESULT(linkerProcess.exec({linkerWrapper.view(), manifestArgument.view()}));
+            SC_TEST_EXPECT(linkerProcess.getExitStatus() == 0);
+
             String wineInvocation = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("/DSC_LIBRARY_ROOT=../../.."));
             SC_TEST_EXPECT(not StringView(wineInvocation.view()).containsString(" Z:\\ /"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("/MANIFESTINPUT:Z:\\"));
+            SC_TEST_EXPECT(not StringView(wineInvocation.view()).containsString("/MANIFESTINPUT:/"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("HOST_PATH=/usr/bin:/bin"));
+            SC_TEST_EXPECT(
+                StringView(wineInvocation.view()).containsString("Windows Kits\\10\\bin\\10.0.26100.0\\x64"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString(";Z:\\prior"));
         }
 
         if (test_section("package tool installs portable MSVC import from explicit arguments"))

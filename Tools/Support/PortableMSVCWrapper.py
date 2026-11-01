@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 PATH_PREFIX_FLAGS = ("/Fo", "/Fd", "/Fp", "/Fi", "/Fa", "/FR", "/I")
-PATH_VALUE_FLAGS = ("/OUT:", "/LIBPATH:")
+PATH_VALUE_FLAGS = ("/OUT:", "/LIBPATH:", "/MANIFESTINPUT:")
 PATH_SUFFIXES = (".c", ".cc", ".cpp", ".cxx", ".m", ".mm", ".obj", ".lib", ".dll", ".exe", ".pch", ".pdb", ".res")
 
 
@@ -191,7 +191,10 @@ def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path,
         path_entries.append(f"{sdk_bin_root_win}\\{sdk_host_arch}\\ucrt")
     path_entries.append("C:\\windows\\system32")
 
-    environment["PATH"] = ";".join(path_entries)
+    existing_wine_path = environment.get("WINEPATH")
+    if existing_wine_path:
+        path_entries.append(existing_wine_path)
+    environment["WINEPATH"] = ";".join(path_entries)
     environment["INCLUDE"] = ";".join(
         (
             f"{msvc_root_win}\\include",
