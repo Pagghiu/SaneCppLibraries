@@ -4074,6 +4074,25 @@ struct SCBuildFixtureTest : public SC::TestCase
                 SC_TRUST_RESULT(process.exec({installedWine.view(), "--version"}, version));
                 SC_TEST_EXPECT(process.getExitStatus() == 0);
                 SC_TEST_EXPECT(StringView(version.view()).containsString("wine-11.0"));
+
+                // Recent Box64 packages install under usr/local/bin; keep reusing older usr/bin packages too.
+                String oldBox64 = StringEncoding::Utf8;
+                String newBox64 = StringEncoding::Utf8;
+                SC_TRUST_RESULT(Path::join(oldBox64, {runnerRoot.view(), "box64", "usr", "bin", "box64"}));
+                SC_TRUST_RESULT(Path::join(newBox64, {runnerRoot.view(), "box64", "usr", "local", "bin", "box64"}));
+                SC_TRUST_RESULT(fs.makeDirectoryRecursive(Path::dirname(newBox64.view(), Path::AsNative)));
+                SC_TRUST_RESULT(fs.rename(oldBox64.view(), newBox64.view()));
+                Tools::Package relocatedPackage;
+                SC_TEST_EXPECT(Tools::installLinuxWineRunner(directories.packagesCacheDirectory.view(),
+                                                             directories.packagesInstallDirectory.view(),
+                                                             relocatedPackage));
+                String installedConsole = StringEncoding::Utf8;
+                SC_TRUST_RESULT(Path::join(installedConsole, {installedRunner.view(), "bin", "wineconsole"}));
+                Process relocatedProcess;
+                String  relocatedOutput = StringEncoding::Utf8;
+                SC_TRUST_RESULT(relocatedProcess.exec({installedConsole.view(), "--version"}, relocatedOutput));
+                SC_TEST_EXPECT(relocatedProcess.getExitStatus() == 0);
+                SC_TEST_EXPECT(StringView(relocatedOutput.view()).containsString("console"));
             }
         }
 #endif

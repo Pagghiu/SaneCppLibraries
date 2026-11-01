@@ -531,6 +531,9 @@ static Result writeLinuxBox64WineScript(StringView packageRoot, StringView execu
     SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$SCRIPT_DIR\" && pwd)\n"));
     SC_TRY(builder.append("RUNNER_ROOT=$(CDPATH= cd -- \"$SCRIPT_DIR/..\" && pwd)\n"));
     SC_TRY(builder.append("BOX64_BIN=\"$RUNNER_ROOT/box64/usr/bin/box64\"\n"));
+    SC_TRY(builder.append("if [ ! -x \"$BOX64_BIN\" ]; then\n"));
+    SC_TRY(builder.append("  BOX64_BIN=\"$RUNNER_ROOT/box64/usr/local/bin/box64\"\n"));
+    SC_TRY(builder.append("fi\n"));
     SC_TRY(builder.append("WINE_BIN=\"$RUNNER_ROOT/wine/opt/wine-stable/bin/{}\"\n", wineCommand));
     SC_TRY(builder.append("LIB_PATH=\"$RUNNER_ROOT/amd64-libs/usr/lib/x86_64-linux-gnu\"\n"));
     SC_TRY(builder.append("export BOX64_NOBANNER=1\n"));
