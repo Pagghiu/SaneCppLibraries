@@ -553,6 +553,7 @@ void SC::ProcessTest::processEnvironmentNewVar()
     String output;
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
+    SC_TEST_EXPECT(process.getExitStatus() == 0);
     // We can check that the NewEnvVar has been set to SomeValue
     StringView out = output.view();
     SC_TEST_EXPECT(out.containsString("NewEnvVar=SomeValue"));
@@ -570,6 +571,7 @@ void SC::ProcessTest::processEnvironmentRedefineParentVar()
     String output;
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
+    SC_TEST_EXPECT(process.getExitStatus() == 0);
     // PATH env var has been re-defined
     StringView out = output.view();
     SC_TEST_EXPECT(out.containsString("PATH=/usr/sane_cpp_binaries"));
@@ -584,6 +586,7 @@ void SC::ProcessTest::processEnvironmentDisableInheritance()
     String output;
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
+    SC_TEST_EXPECT(process.getExitStatus() == 0);
     // PATH env var doesn't exist because of Process::inheritParentEnvironmentVariables(false)
     StringView out = output.view();
     SC_TEST_EXPECT(not out.containsString("PATH="));
