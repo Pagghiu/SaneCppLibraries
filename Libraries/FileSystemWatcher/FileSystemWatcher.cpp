@@ -42,10 +42,10 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::watch(FolderWatcher& watcher,
         return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
     if (watcher.parent != nullptr)
         return ResultFileSystemWatcher(FileSystemWatcherError::AlreadyWatching);
-    watcher.parent = this;
     if (not watcher.path.assign(path))
         return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                        FileSystemWatcherErrorDetail::AssignWatchPath);
+    watcher.parent = this;
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
 }

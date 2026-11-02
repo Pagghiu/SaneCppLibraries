@@ -90,6 +90,15 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
         FileSystemWatcher::ThreadRunner runner;
         SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+
+        char longPath[StringPath::MaxPath + 2];
+        memset(longPath, 'a', sizeof(longPath) - 1);
+        longPath[sizeof(longPath) - 1] = '\0';
+        const ResultFileSystemWatcher rejected =
+            fileEventsWatcher.watch(watcher, StringSpan::fromNullTerminated(longPath, StringEncoding::Ascii));
+        SC_TEST_EXPECT(rejected.isError(FileSystemWatcherError::PathPreparationFailed));
+        SC_TEST_EXPECT(rejected.detail == FileSystemWatcherErrorDetail::AssignWatchPath);
+
         SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, appDirectory));
         const ResultFileSystemWatcher alreadyWatching = fileEventsWatcher.watch(watcher, appDirectory);
         SC_TEST_EXPECT(alreadyWatching.isError(FileSystemWatcherError::AlreadyWatching));
