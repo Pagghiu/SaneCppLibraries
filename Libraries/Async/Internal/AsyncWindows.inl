@@ -294,33 +294,42 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         FileDescriptor::Handle  loopFd;
         SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopFd, errorResult));
 
-        TimeMs timeout;
-        if (nextTimer)
+        auto getWaitMilliseconds = [&]() -> DWORD
         {
-            if (nextTimer->milliseconds >= eventLoop.internal.loopTime.milliseconds)
-            {
-                timeout.milliseconds = nextTimer->milliseconds - eventLoop.internal.loopTime.milliseconds;
-            }
-        }
-        const DWORD ms =
-            nextTimer or syncMode == Internal::SyncMode::NoWait ? static_cast<ULONG>(timeout.milliseconds) : INFINITE;
-        ULONG      ulongEvents = static_cast<ULONG>(newEvents);
-        const BOOL res         = ::GetQueuedCompletionStatusEx(loopFd, events, totalNumEvents, &ulongEvents, ms, FALSE);
-        newEvents              = static_cast<int>(ulongEvents);
-        if (res == FALSE)
+            if (nextTimer == nullptr)
+                return syncMode == Internal::SyncMode::NoWait ? 0 : INFINITE;
+            if (nextTimer->milliseconds <= eventLoop.internal.loopTime.milliseconds)
+                return 0;
+            const int64_t remaining = nextTimer->milliseconds - eventLoop.internal.loopTime.milliseconds;
+            return remaining >= static_cast<int64_t>(INFINITE) ? INFINITE - 1 : static_cast<DWORD>(remaining);
+        };
+        DWORD milliseconds = getWaitMilliseconds();
+        for (;;)
         {
-            if (::GetLastError() == WAIT_TIMEOUT)
-            {
-                if (newEvents == 1 and events[0].lpOverlapped == nullptr)
-                {
-                    // On Windows 10 GetQueuedCompletionStatusEx reports 1 removed entry when timeout occurs
-                    newEvents = 0;
-                }
-            }
-            else
-            {
+            ULONG      ulongEvents = 0;
+            const BOOL res =
+                ::GetQueuedCompletionStatusEx(loopFd, events, totalNumEvents, &ulongEvents, milliseconds, FALSE);
+            newEvents = static_cast<int>(ulongEvents);
+            if (res != FALSE)
+                break;
+            const DWORD nativeError = ::GetLastError();
+            if (nativeError != WAIT_TIMEOUT)
                 return Result::Error(AsyncResultCategory, AsyncError::EventLoopPollFailed);
+
+            if (newEvents == 1 and events[0].lpOverlapped == nullptr)
+            {
+                // On Windows 10 GetQueuedCompletionStatusEx reports 1 removed entry when timeout occurs.
+                newEvents = 0;
             }
+            if (nextTimer == nullptr)
+                break;
+
+            // A native timeout can precede the monotonic deadline. Keep waiting for the remaining time, while still
+            // returning immediately when an I/O completion arrives.
+            eventLoop.updateTime();
+            if (eventLoop.internal.loopTime.milliseconds >= nextTimer->milliseconds)
+                break;
+            milliseconds = getWaitMilliseconds();
         }
         if (loopTimeout)
         {
