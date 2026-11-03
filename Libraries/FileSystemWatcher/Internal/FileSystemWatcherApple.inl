@@ -7,6 +7,9 @@
 #include "FileSystemWatcherThreading.h"
 
 #include <CoreServices/CoreServices.h> // FSEvents
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <AvailabilityMacros.h>
 #include <TargetConditionals.h>
@@ -35,6 +38,17 @@ struct SC::FileSystemWatcher::Internal
 
     //...
     //! [OpaqueDefinition1Snippet]
+
+    static ResultFileSystemWatcher validateWatchPath(StringSpan path)
+    {
+        const int fd = ::open(path.bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (fd == -1)
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::AppleOpenRootDirectory,
+                                           static_cast<uint32_t>(errno));
+        (void)::close(fd);
+        return ResultFileSystemWatcher(true);
+    }
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {

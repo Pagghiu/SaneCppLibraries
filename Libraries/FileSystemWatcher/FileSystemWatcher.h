@@ -242,6 +242,7 @@ struct FileSystemWatcher
     /// Its address must not change until FolderWatcher::stopWatching or FileSystemWatcher::close
     /// @param path The directory being monitored
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
+    /// @note A missing root or a root that is not a directory is rejected without consuming the FolderWatcher.
     ResultFileSystemWatcher watch(FolderWatcher& watcher, StringSpan path);
 
     void asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);

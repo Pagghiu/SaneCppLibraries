@@ -59,6 +59,8 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     AppleStartEventStream,
     WindowsOpenDirectory,
     WindowsSubmitDirectoryChanges,
+    AppleOpenRootDirectory,
+    WindowsQueryRootDirectory,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

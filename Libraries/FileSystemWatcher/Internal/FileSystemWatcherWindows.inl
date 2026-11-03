@@ -166,19 +166,15 @@ struct SC::FileSystemWatcher::Internal
         return ResultFileSystemWatcher(true);
     }
 
+    void detachUnstartedWatcher(FolderWatcher& entry)
+    {
+        self->watchers.remove(entry);
+        entry.parent = nullptr;
+    }
+
     ResultFileSystemWatcher startWatching(FolderWatcher* entry)
     {
-        if (threadingRunner)
-        {
-            threadingRunner->numEntries = 0;
-        }
         // TODO: we should probably check if we are leaking on some partial failure code path...some RAII would help
-        if (threadingRunner)
-        {
-            if (threadingRunner->numEntries >= ThreadRunnerDefinition::MaxWatchablePaths)
-                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
-        }
         HANDLE newHandle = ::CreateFileW(entry->path.view().getNullTerminatedNative(),                     //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
@@ -189,8 +185,36 @@ struct SC::FileSystemWatcher::Internal
         if (newHandle == INVALID_HANDLE_VALUE)
         {
             const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+            detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::WindowsOpenDirectory, nativeError);
+        }
+        BY_HANDLE_FILE_INFORMATION fileInfo = {};
+        if (::GetFileInformationByHandle(newHandle, &fileInfo) == FALSE)
+        {
+            const uint32_t nativeError = static_cast<uint32_t>(::GetLastError());
+            ::CloseHandle(newHandle);
+            detachUnstartedWatcher(*entry);
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::WindowsQueryRootDirectory, nativeError);
+        }
+        if ((fileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        {
+            ::CloseHandle(newHandle);
+            detachUnstartedWatcher(*entry);
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::WindowsQueryRootDirectory, ERROR_DIRECTORY);
+        }
+        if (threadingRunner)
+        {
+            threadingRunner->numEntries = 0;
+            if (threadingRunner->numEntries >= ThreadRunnerDefinition::MaxWatchablePaths)
+            {
+                ::CloseHandle(newHandle);
+                detachUnstartedWatcher(*entry);
+                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
+            }
         }
         FolderWatcherInternal& opaque = entry->internal.get();
         opaque.fileHandle             = newHandle;

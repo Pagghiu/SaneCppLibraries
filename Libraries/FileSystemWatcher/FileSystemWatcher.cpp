@@ -45,6 +45,9 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::watch(FolderWatcher& watcher,
     if (not watcher.path.assign(path))
         return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                        FileSystemWatcherErrorDetail::AssignWatchPath);
+#if SC_PLATFORM_APPLE
+    SC_TRY(internal.get().validateWatchPath(watcher.path.view()));
+#endif
     watcher.parent = this;
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);

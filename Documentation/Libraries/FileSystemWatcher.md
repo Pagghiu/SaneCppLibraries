@@ -51,6 +51,10 @@ The normal lifecycle is `init`, one or more `watch` calls, optional `stopWatchin
 may be reused after it is stopped. Calling `close` stops all remaining watchers, so explicit per-folder shutdown is not
 required when the entire owner is being torn down.
 
+The watched root must be an existing directory. A missing root or a regular file is rejected, and the same
+`FolderWatcher` can be used for a later watch. A successful root check does not guarantee that the path cannot change
+while the native watch is being set up.
+
 # A representative threaded watch
 
 This source-backed snippet is compiled with `FileSystemWatcherTest`. Notice that the callback does little work and that

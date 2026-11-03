@@ -206,12 +206,21 @@ struct SC::FileSystemWatcher::Internal
         return ResultFileSystemWatcher(true);
     }
 
+    void detachUnstartedWatcher(FolderWatcher& entry)
+    {
+        self->watchers.remove(entry);
+        entry.parent = nullptr;
+    }
+
     ResultFileSystemWatcher startWatching(FolderWatcher* entry)
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
 
         if (entry->path.view().getEncoding() == StringEncoding::Utf16)
+        {
+            detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::UnsupportedPathEncoding);
+        }
         FolderWatcherInternal& opaque = entry->internal.get();
         if (not entry->subFolderRelativePathsBuffer.empty())
         {
@@ -221,28 +230,44 @@ struct SC::FileSystemWatcher::Internal
 
         StringPath currentPath = entry->path;
 
-        int rootNotifyFd;
         if (notifyFd == -1)
         {
+            detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized,
                                            FileSystemWatcherErrorDetail::LinuxInotifyDescriptor);
         }
-        rootNotifyFd = notifyFd;
+        if (opaque.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
+        {
+            detachUnstartedWatcher(*entry);
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                           FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity);
+        }
+
+        // Open the root before registering it, so an open failure cannot leave an inotify watch behind.
+        const int rootFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (rootFd == -1)
+        {
+            const uint32_t nativeError = static_cast<uint32_t>(errno);
+            detachUnstartedWatcher(*entry);
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::LinuxOpenRootDirectory, nativeError);
+        }
+        auto closeRoot = MakeDeferred([rootFd] { ::close(rootFd); });
+
+        const int     rootNotifyFd = notifyFd;
         constexpr int mask =
             IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
         const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
         if (newHandle == -1)
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
+            detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::LinuxAddRootWatch, nativeError);
         }
         FolderWatcherInternal::Pair pair;
-        pair.notifyID   = newHandle;
-        pair.nameOffset = -1;
-        if (opaque.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
-            return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                           FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity);
+        pair.notifyID                                     = newHandle;
+        pair.nameOffset                                   = -1;
         opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
 
         // Watch all subfolders of current directory using a stack of file descriptors and names
@@ -257,15 +282,8 @@ struct SC::FileSystemWatcher::Internal
         int stackSize = 0;
 
         // fdopendir takes ownership of each descriptor popped from this stack.
-        const int rootFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-        if (rootFd == -1)
-        {
-            const uint32_t nativeError = static_cast<uint32_t>(errno);
-            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                           FileSystemWatcherErrorDetail::LinuxOpenRootDirectory, nativeError);
-        }
-
         stack[stackSize++] = {rootFd, static_cast<int>(opaque.notifyHandlesCount - 1)};
+        closeRoot.disarm();
 
         const size_t rootPathLength = entry->path.view().sizeInBytes();
         // Clean the stack of file descriptors in case any failure below is returned.

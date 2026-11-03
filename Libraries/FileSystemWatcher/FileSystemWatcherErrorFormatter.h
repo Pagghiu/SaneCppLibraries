@@ -59,6 +59,10 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
     case FileSystemWatcherErrorDetail::WindowsSubmitDirectoryChanges:
         formatter.append("Windows submit directory changes");
         break;
+    case FileSystemWatcherErrorDetail::AppleOpenRootDirectory: formatter.append("Apple open root directory"); break;
+    case FileSystemWatcherErrorDetail::WindowsQueryRootDirectory:
+        formatter.append("Windows query root directory");
+        break;
     default: return false;
     }
     return true;

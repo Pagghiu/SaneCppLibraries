@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Async/Async.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Memory/String.h"
@@ -22,6 +23,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         using namespace SC;
         const StringView appDirectory = report.applicationRootDirectory.view();
         structuredNotInitializedError();
+        eventLoopRejectedRoot(appDirectory);
         eventLoopSubdirectory(appDirectory);
         eventLoopWatchClose(appDirectory);
         eventLoopWaitTimeout();
@@ -91,6 +93,66 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(eventLoop.create());
             SC_TEST_EXPECT(not runUntil(eventLoop, [] { return false; }, TimeMs{1}));
         }
+    }
+
+    void eventLoopRejectedRoot(const StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop rejected root remains reusable"))
+            return;
+
+        FileSystem             fs;
+        const ResultFileSystem fsResult = fs.init(appDirectory);
+        SC_TEST_EXPECT(fsResult);
+        if (not fsResult)
+            return;
+        StringPath directoryName;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(directoryName, "__sc watcher async root {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(directoryName.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto       removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(directoryName.view()); });
+        StringPath directoryPath;
+        StringPath missingPath;
+        const bool pathsReady = Path::join(directoryPath, {appDirectory, directoryName.view()}) and
+                                Path::join(missingPath, {directoryPath.view(), "missing"});
+        SC_TEST_EXPECT(pathsReady);
+        if (not pathsReady)
+            return;
+
+        AsyncEventLoop eventLoop;
+        const Result   createdLoop = eventLoop.create();
+        SC_TEST_EXPECT(createdLoop);
+        if (not createdLoop)
+            return;
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(eventLoop);
+        FileSystemWatcher             fileEventsWatcher;
+        const ResultFileSystemWatcher initialized = fileEventsWatcher.init(runner);
+        SC_TEST_EXPECT(initialized);
+        if (not initialized)
+            return;
+        FileSystemWatcher::FolderWatcher watcher;
+        watcher.notifyCallback                     = [](const FileSystemWatcher::Notification&) {};
+        auto                          closeWatcher = MakeDeferred([&] { (void)fileEventsWatcher.close(); });
+        const ResultFileSystemWatcher missing      = fileEventsWatcher.watch(watcher, missingPath.view());
+        SC_TEST_EXPECT(missing.isError(FileSystemWatcherError::WatchSetupFailed));
+        SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, directoryPath.view()));
+        submitQueuedWatcher(eventLoop);
+        const ResultFileSystemWatcher closed = fileEventsWatcher.close();
+        SC_TEST_EXPECT(closed);
+        if (closed)
+            closeWatcher.disarm();
+        const ResultFileSystem removed = fs.removeDirectoryRecursive(directoryName.view());
+        SC_TEST_EXPECT(removed);
+        if (removed)
+            removeDirectory.disarm();
     }
 
     void eventLoopSubdirectory(const StringView appDirectory)

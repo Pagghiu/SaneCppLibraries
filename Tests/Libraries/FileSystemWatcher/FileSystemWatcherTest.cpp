@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include <memory.h> // memcmp
 
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcherErrorFormatter.h"
@@ -25,6 +26,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const StringView appDirectory = report.applicationRootDirectory.view();
         initClose();
         structuredErrorsAndFormatter(appDirectory);
+        failedRootCanBeReused(appDirectory);
         threadRunner(appDirectory);
     }
 
@@ -103,6 +105,72 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const ResultFileSystemWatcher alreadyWatching = fileEventsWatcher.watch(watcher, appDirectory);
         SC_TEST_EXPECT(alreadyWatching.isError(FileSystemWatcherError::AlreadyWatching));
         SC_TEST_EXPECT(fileEventsWatcher.close());
+    }
+
+    void failedRootCanBeReused(const StringView appDirectory)
+    {
+        if (not test_section("rejected root remains reusable"))
+            return;
+
+        FileSystem             fs;
+        const ResultFileSystem fsResult = fs.init(appDirectory);
+        SC_TEST_EXPECT(fsResult);
+        if (not fsResult)
+            return;
+        StringPath directoryName;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(directoryName, "__sc watcher root {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(directoryName.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(directoryName.view()); });
+
+        StringPath directoryPath;
+        StringPath missingPath;
+        StringPath filePath;
+        const bool pathsReady = Path::join(directoryPath, {appDirectory, directoryName.view()}) and
+                                Path::join(missingPath, {directoryPath.view(), "missing"}) and
+                                Path::join(filePath, {directoryPath.view(), "file"});
+        SC_TEST_EXPECT(pathsReady);
+        if (not pathsReady)
+            return;
+        const ResultFileSystem written = fs.writeString(filePath.view(), "fixture");
+        SC_TEST_EXPECT(written);
+        if (not written)
+            return;
+
+        FileSystemWatcher::ThreadRunner  runner;
+        FileSystemWatcher                fileEventsWatcher;
+        FileSystemWatcher::FolderWatcher watcher;
+        watcher.notifyCallback                    = [](const FileSystemWatcher::Notification&) {};
+        const ResultFileSystemWatcher initialized = fileEventsWatcher.init(runner);
+        SC_TEST_EXPECT(initialized);
+        if (not initialized)
+            return;
+        auto closeWatcher = MakeDeferred([&] { (void)fileEventsWatcher.close(); });
+
+        const ResultFileSystemWatcher missing = fileEventsWatcher.watch(watcher, missingPath.view());
+        SC_TEST_EXPECT(missing.isError(FileSystemWatcherError::WatchSetupFailed));
+        SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        const ResultFileSystemWatcher file = fileEventsWatcher.watch(watcher, filePath.view());
+        SC_TEST_EXPECT(file.isError(FileSystemWatcherError::WatchSetupFailed));
+        SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        SC_TEST_EXPECT(fs.removeFile(filePath.view()));
+        SC_TEST_EXPECT(fs.writeString(filePath.view(), "replacement"));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, directoryPath.view()));
+        const ResultFileSystemWatcher closed = fileEventsWatcher.close();
+        SC_TEST_EXPECT(closed);
+        if (closed)
+            closeWatcher.disarm();
+        const ResultFileSystem removed = fs.removeDirectoryRecursive(directoryName.view());
+        SC_TEST_EXPECT(removed);
+        if (removed)
+            removeDirectory.disarm();
     }
 
     void threadRunner(const StringView appDirectory)
