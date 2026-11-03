@@ -43,6 +43,18 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
 
     // Allows unblocking the ::read() when stopping the watcher [0]=read end, [1]=write end
     int shutdownPipe[2] = {-1, -1};
+
+    void closeShutdownPipe()
+    {
+        for (int& fd : shutdownPipe)
+        {
+            if (fd != -1)
+            {
+                ::close(fd);
+                fd = -1;
+            }
+        }
+    }
 };
 
 struct SC::FileSystemWatcher::Internal
@@ -61,6 +73,9 @@ struct SC::FileSystemWatcher::Internal
         if (::pipe2(threadingRunner->shutdownPipe, O_CLOEXEC) == -1)
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
+
+            self            = nullptr;
+            threadingRunner = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
                                            FileSystemWatcherErrorDetail::LinuxCreateShutdownPipe, nativeError);
         }
@@ -68,6 +83,9 @@ struct SC::FileSystemWatcher::Internal
         if (notifyFd == -1)
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
+            threadingRunner->closeShutdownPipe();
+            self            = nullptr;
+            threadingRunner = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
                                            FileSystemWatcherErrorDetail::LinuxInitializeInotify, nativeError);
         }
@@ -124,17 +142,8 @@ struct SC::FileSystemWatcher::Internal
                     }
                 }
                 SC_TRY(threadingRunner->thread.join());
-                if (threadingRunner->shutdownPipe[0] != -1)
-                {
-                    ::close(threadingRunner->shutdownPipe[0]);
-                    threadingRunner->shutdownPipe[0] = -1;
-                }
-                if (threadingRunner->shutdownPipe[1] != -1)
-                {
-                    ::close(threadingRunner->shutdownPipe[1]);
-                    threadingRunner->shutdownPipe[1] = -1;
-                }
             }
+            threadingRunner->closeShutdownPipe();
         }
         if (notifyFd != -1)
         {
