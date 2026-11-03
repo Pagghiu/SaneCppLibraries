@@ -247,17 +247,14 @@ struct SC::FileSystemWatcher::Internal
 
         int stackSize = 0;
 
-        // Push the root directory onto the stack
-        DIR* rootDir = ::opendir(currentPath.view().bytesIncludingTerminator());
-        if (!rootDir)
+        // fdopendir takes ownership of each descriptor popped from this stack.
+        const int rootFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (rootFd == -1)
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::LinuxOpenRootDirectory, nativeError);
         }
-        const int rootFd = ::dirfd(rootDir);
-
-        auto closeRootDir = MakeDeferred([rootDir] { ::closedir(rootDir); });
 
         stack[stackSize++] = {rootFd, static_cast<int>(opaque.notifyHandlesCount - 1)};
 
@@ -266,7 +263,7 @@ struct SC::FileSystemWatcher::Internal
         auto deferredCleanStack = MakeDeferred(
             [&]
             {
-                for (size_t idx = 0; idx < stackSize; ++idx)
+                for (int idx = 0; idx < stackSize; ++idx)
                 {
                     ::close(stack[idx].fd);
                 }
