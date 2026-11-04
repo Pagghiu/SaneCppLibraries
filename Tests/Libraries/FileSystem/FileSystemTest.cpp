@@ -21,6 +21,9 @@ namespace FileSystemTestWindowsDetail
 }
 } // namespace SC
 #else
+#if SC_PLATFORM_LINUX
+#include <fcntl.h>
+#endif
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
@@ -422,6 +425,44 @@ void SC::FileSystemTest::copyExistsFile()
     SC_TEST_EXPECT(fs.existsAndIsFile("destinationFile.txt"));
     SC_TEST_EXPECT(fs.read("destinationFile.txt", content));
     SC_TEST_EXPECT(content.view() == contentSource);
+
+    // Exercise copies larger than the buffered POSIX copy path's transfer buffer.
+    char largerContent[10000];
+    for (size_t idx = 0; idx < sizeof(largerContent); ++idx)
+        largerContent[idx] = static_cast<char>('a' + idx % 26);
+    SC_TEST_EXPECT(fs.write("sourceFile.txt", Span<const char>(largerContent, sizeof(largerContent))));
+    SC_TEST_EXPECT(fs.copyFile("sourceFile.txt", "destinationFile.txt",
+                               FileSystem::CopyFlags().setOverwrite(true).setUseCloneIfSupported(false)));
+    String largerResult = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read("destinationFile.txt", largerResult));
+    SC_TEST_EXPECT(largerResult.view().sizeInBytes() == sizeof(largerContent));
+    if (largerResult.view().sizeInBytes() == sizeof(largerContent))
+        SC_TEST_EXPECT(::memcmp(largerResult.view().bytesWithoutTerminator(), largerContent, sizeof(largerContent)) ==
+                       0);
+
+#if SC_PLATFORM_LINUX
+    // Virtual files can report a size of zero while still providing readable content.
+    struct stat procStat;
+    const int   procFd = ::open("/proc/self/cmdline", O_RDONLY);
+    if (procFd >= 0)
+    {
+        char          expected[4096];
+        const ssize_t expectedSize = ::read(procFd, expected, sizeof(expected));
+        const int     statResult   = ::fstat(procFd, &procStat);
+        ::close(procFd);
+        if (statResult == 0 and procStat.st_size == 0 and expectedSize > 0)
+        {
+            SC_TEST_EXPECT(fs.copyFile("/proc/self/cmdline", "virtualCopy"));
+            String copiedVirtual = StringEncoding::Ascii;
+            SC_TEST_EXPECT(fs.read("virtualCopy", copiedVirtual));
+            SC_TEST_EXPECT(copiedVirtual.view().sizeInBytes() >= static_cast<size_t>(expectedSize));
+            if (copiedVirtual.view().sizeInBytes() >= static_cast<size_t>(expectedSize))
+                SC_TEST_EXPECT(::memcmp(copiedVirtual.view().bytesWithoutTerminator(), expected,
+                                        static_cast<size_t>(expectedSize)) == 0);
+            SC_TEST_EXPECT(fs.removeFile("virtualCopy"));
+        }
+    }
+#endif
 
     // Remove all files created by the test
     SC_TEST_EXPECT(fs.removeFiles({"sourceFile.txt", "destinationFile.txt"}));

@@ -2218,27 +2218,62 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
     }
     auto closeOutput = MakeDeferred([&] { ::close(outputDescriptor); });
 
-    const int sendRes = ::sendfile(outputDescriptor, inputDescriptor, nullptr, inputStat.st_size);
-    if (sendRes < 0)
+    off_t remaining = inputStat.st_size;
+    while (remaining > 0)
     {
-        // Sendfile failed, fallback to traditional read/write
+        // Linux limits each sendfile call to this many bytes, including on 64-bit systems.
+        constexpr size_t maxSendfileBytes = 0x7ffff000;
+        const size_t     requested =
+            remaining > static_cast<off_t>(maxSendfileBytes) ? maxSendfileBytes : static_cast<size_t>(remaining);
+        ssize_t sent;
+        do
+        {
+            sent = ::sendfile(outputDescriptor, inputDescriptor, nullptr, requested);
+        } while (sent < 0 and errno == EINTR);
+        if (sent <= 0)
+            break;
+        remaining -= static_cast<off_t>(sent);
+    }
+    // A zero-sized source can still provide data, for example through a virtual filesystem.
+    const bool useBufferedCopy = remaining != 0 or inputStat.st_size == 0;
+    if (useBufferedCopy)
+    {
+        // Complete the copy with buffered reads and writes if sendfile cannot finish.
         constexpr size_t bufferSize = 4096;
 
         char buffer[bufferSize];
 
-        ssize_t bytesRead;
-        while ((bytesRead = ::read(inputDescriptor, buffer, bufferSize)) > 0)
+        for (;;)
         {
-            if (::write(outputDescriptor, buffer, static_cast<size_t>(bytesRead)) < 0)
+            ssize_t bytesRead;
+            do
             {
-                return fileSystemResultFromNative(static_cast<uint32_t>(errno),
-                                                  FileSystemErrorDetail::WriteFileContent);
+                bytesRead = ::read(inputDescriptor, buffer, bufferSize);
+            } while (bytesRead < 0 and errno == EINTR);
+            if (bytesRead < 0)
+            {
+                return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ReadFileContent);
             }
-        }
+            if (bytesRead == 0)
+                break;
 
-        if (bytesRead < 0)
-        {
-            return fileSystemResultFromNative(static_cast<uint32_t>(errno), FileSystemErrorDetail::ReadFileContent);
+            size_t bytesWritten = 0;
+            while (bytesWritten < static_cast<size_t>(bytesRead))
+            {
+                ssize_t result;
+                do
+                {
+                    result =
+                        ::write(outputDescriptor, buffer + bytesWritten, static_cast<size_t>(bytesRead) - bytesWritten);
+                } while (result < 0 and errno == EINTR);
+                if (result <= 0)
+                {
+                    const int nativeError = result == 0 ? EIO : errno;
+                    return fileSystemResultFromNative(static_cast<uint32_t>(nativeError),
+                                                      FileSystemErrorDetail::WriteFileContent);
+                }
+                bytesWritten += static_cast<size_t>(result);
+            }
         }
     }
     return Result(true);
