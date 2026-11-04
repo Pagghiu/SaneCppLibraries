@@ -33,6 +33,7 @@ inline bool appendSocketErrorDetail(ResultErrorFormatter& formatter, SocketError
     case SocketErrorDetail::WindowsSetBlocking: formatter.append("Windows set blocking mode"); break;
     case SocketErrorDetail::CreateSocket: formatter.append("create socket"); break;
     case SocketErrorDetail::SetTcpNoDelay: formatter.append("set TCP no-delay option"); break;
+    case SocketErrorDetail::GetTcpNoDelay: formatter.append("query TCP no-delay option"); break;
     case SocketErrorDetail::SetBroadcast: formatter.append("set broadcast option"); break;
     case SocketErrorDetail::JoinIPv4Multicast: formatter.append("join IPv4 multicast group"); break;
     case SocketErrorDetail::JoinIPv6Multicast: formatter.append("join IPv6 multicast group"); break;

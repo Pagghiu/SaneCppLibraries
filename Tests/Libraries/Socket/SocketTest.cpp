@@ -413,10 +413,22 @@ void SC::SocketTest::socketCreate()
     SC_TEST_EXPECT(isInheritable);
 
     // Test TCP_NODELAY
+    bool tcpNoDelay = false;
     SC_TEST_EXPECT(socket.setTcpNoDelay(true));
+    SC_TEST_EXPECT(socket.getTcpNoDelay(tcpNoDelay));
+    SC_TEST_EXPECT(tcpNoDelay);
     SC_TEST_EXPECT(socket.setTcpNoDelay(false));
+    SC_TEST_EXPECT(socket.getTcpNoDelay(tcpNoDelay));
+    SC_TEST_EXPECT(not tcpNoDelay);
 
     SC_TEST_EXPECT(socket.close());
+    tcpNoDelay = true;
+
+    const ResultSocket queryClosedSocket = socket.getTcpNoDelay(tcpNoDelay);
+    SC_TEST_EXPECT(queryClosedSocket.isError(SocketError::DescriptorQueryFailed));
+    SC_TEST_EXPECT(queryClosedSocket.detail == SocketErrorDetail::GetTcpNoDelay);
+    SC_TEST_EXPECT(queryClosedSocket.contextKind == SocketErrorContextKind::NativeError);
+    SC_TEST_EXPECT(tcpNoDelay);
     //! [socketCreateSnippet]
 }
 

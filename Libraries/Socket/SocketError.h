@@ -88,6 +88,7 @@ enum class SocketErrorDetail : uint16_t
     SendStream,
     ReceiveStream,
     WaitForRead,
+    GetTcpNoDelay,
 };
 
 /// @brief Kind of the scalar diagnostic context stored in ResultSocket.

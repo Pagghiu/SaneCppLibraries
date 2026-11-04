@@ -248,6 +248,11 @@ struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDes
     /// @return Valid Result if the TCP_NODELAY option has been set successfully
     ResultSocket setTcpNoDelay(bool tcpNoDelay);
 
+    /// @brief Queries whether Nagle's algorithm is disabled on this TCP socket
+    /// @param[out] tcpNoDelay Receives true when the TCP_NODELAY option is enabled
+    /// @return Valid Result if the option was queried successfully
+    ResultSocket getTcpNoDelay(bool& tcpNoDelay) const;
+
     /// @brief Enables or disables broadcast on this socket (for UDP)
     /// @param enableBroadcast `true` to enable broadcast (set SO_BROADCAST), `false` to disable
     /// @return Valid Result if the SO_BROADCAST option has been set successfully

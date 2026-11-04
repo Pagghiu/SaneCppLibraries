@@ -67,6 +67,20 @@ SC::ResultSocket SC::SocketDescriptor::setTcpNoDelay(bool tcpNoDelay)
     return {};
 }
 
+SC::ResultSocket SC::SocketDescriptor::getTcpNoDelay(bool& tcpNoDelay) const
+{
+    int active = 0;
+    int size   = sizeof(active);
+    if (::getsockopt(handle, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&active), &size) == SOCKET_ERROR)
+    {
+        const uint32_t nativeError = static_cast<uint32_t>(WSAGetLastError());
+        return ResultSocket::withNativeError(SocketError::DescriptorQueryFailed, SocketErrorDetail::GetTcpNoDelay,
+                                             nativeError);
+    }
+    tcpNoDelay = active != 0;
+    return {};
+}
+
 SC::ResultSocket SC::SocketDescriptor::setBroadcast(bool enableBroadcast)
 {
     int active = enableBroadcast ? 1 : 0;
