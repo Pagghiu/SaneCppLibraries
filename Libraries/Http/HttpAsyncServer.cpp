@@ -93,6 +93,7 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     SC_TRY(nativeAddress.fromAddressPort(address, port));
     eventLoop = &loop;
     SC_TRY(eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+    SC_TRY(serverSocket.setTcpNoDelay(true));
     SocketServer socketServer(serverSocket);
     SC_TRY(socketServer.bind(nativeAddress));
     SC_TRY(socketServer.listen(511));

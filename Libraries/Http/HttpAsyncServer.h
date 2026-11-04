@@ -75,6 +75,8 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @param loop The event loop to be used, where to add the listening socket
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
+    /// @note Accepted TCP sockets default to TCP_NODELAY for low-latency responses.
+    ///       A transport setup hook may change it.
     /// @return Valid Result if http listening has been started successfully
     Result start(AsyncEventLoop& loop, StringSpan address, uint16_t port);
 

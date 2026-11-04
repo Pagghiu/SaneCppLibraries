@@ -647,6 +647,12 @@ void SC::HttpAsyncServerTest::customResponseStatus()
 
     httpServer.onRequest = [this](HttpConnection& connection)
     {
+        bool tcpNoDelay = false;
+        SC_TEST_EXPECT(connection.socket.getTcpNoDelay(tcpNoDelay));
+        SC_TEST_EXPECT(tcpNoDelay);
+        SC_TEST_EXPECT(connection.socket.setTcpNoDelay(false));
+        SC_TEST_EXPECT(connection.socket.getTcpNoDelay(tcpNoDelay));
+        SC_TEST_EXPECT(not tcpNoDelay);
         SC_TEST_EXPECT(connection.response.startResponse(418, "I'm a Teapot"));
         SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "0"));
         SC_TEST_EXPECT(connection.response.sendHeaders());
