@@ -9,10 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+namespace SC
+{
 namespace
 {
-using namespace SC;
-
 bool appendControlEscape(SerializationTextOutput& output, uint32_t codePoint)
 {
     constexpr char hex[] = "0123456789abcdef";
@@ -230,6 +230,7 @@ bool appendFormatted(SerializationTextOutput& output, uint8_t floatDigits, doubl
 }
 
 } // namespace
+} // namespace SC
 
 bool SC::SerializationJson::Reader::appendJSONStringUnescaped(StringSpan escaped, SerializationTextOutput& output)
 {
