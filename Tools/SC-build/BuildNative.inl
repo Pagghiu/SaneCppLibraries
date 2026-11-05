@@ -2439,7 +2439,8 @@ struct SC::Build::NativeBuild
 
         if (targetPlatform(resolvedProject.targetContext) == Platform::Linux and
             WriterInternal::isExecutableTarget(*resolvedProject.project) and
-            not resolvedProject.project->exportLibraries.isEmpty())
+            (not resolvedProject.project->exportLibraries.isEmpty() or
+             not resolvedProject.project->exportDirectories.isEmpty()))
         {
             SC_TRY(commandLine.append("-rdynamic"));
         }
