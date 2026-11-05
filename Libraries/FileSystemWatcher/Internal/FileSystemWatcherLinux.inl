@@ -166,19 +166,24 @@ struct SC::FileSystemWatcher::Internal
                                            FileSystemWatcherErrorDetail::LinuxInotifyDescriptor);
         }
 
+        ResultFileSystemWatcher result(true);
         for (size_t idx = 0; idx < folderInternal.notifyHandlesCount; ++idx)
         {
-            const int res = ::inotify_rm_watch(notifyFd, folderInternal.notifyHandles[idx].notifyID);
-            if (res == -1)
+            int res;
+            do
             {
-                const uint32_t nativeError = static_cast<uint32_t>(errno);
-                return ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
-                                               FileSystemWatcherErrorDetail::LinuxRemoveWatch, nativeError);
+                res = ::inotify_rm_watch(notifyFd, folderInternal.notifyHandles[idx].notifyID);
+            } while (res == -1 and errno == EINTR);
+            if (res == -1 and errno != EINVAL and result)
+            {
+                result = ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
+                                                 FileSystemWatcherErrorDetail::LinuxRemoveWatch,
+                                                 static_cast<uint32_t>(errno));
             }
         }
         folderInternal.notifyHandlesCount   = 0; // Reset the count to zero
         folderInternal.relativePaths.length = 0;
-        return ResultFileSystemWatcher(true);
+        return result;
     }
 
     static ResultFileSystemWatcher getSubFolderPath(StringPath& path, const StringPath& entryPath, const char* name,
@@ -210,6 +215,12 @@ struct SC::FileSystemWatcher::Internal
     {
         self->watchers.remove(entry);
         entry.parent = nullptr;
+    }
+
+    ResultFileSystemWatcher failStartWatching(FolderWatcher& entry, ResultFileSystemWatcher failure)
+    {
+        const ResultFileSystemWatcher cleanup = stopWatching(entry);
+        return cleanup ? failure : cleanup;
     }
 
     ResultFileSystemWatcher startWatching(FolderWatcher* entry)
@@ -314,8 +325,10 @@ struct SC::FileSystemWatcher::Internal
                 {
                     continue;
                 }
-                SC_TRY(getSubFolderPath(currentPath, entry->path, subDirectory->d_name, opaque,
-                                        entryStack.notifyHandleId));
+                const ResultFileSystemWatcher pathResult =
+                    getSubFolderPath(currentPath, entry->path, subDirectory->d_name, opaque, entryStack.notifyHandleId);
+                if (not pathResult)
+                    return failStartWatching(*entry, pathResult);
 
                 struct stat st;
                 if (::stat(currentPath.view().bytesIncludingTerminator(), &st) != 0)
@@ -324,49 +337,47 @@ struct SC::FileSystemWatcher::Internal
                 }
                 if (S_ISDIR(st.st_mode))
                 {
+                    if (stackSize >= MaxStackDepth)
+                        return failStartWatching(
+                            *entry,
+                            ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                                    FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity));
+                    if (opaque.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
+                        return failStartWatching(
+                            *entry, ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                                            FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity));
+
+                    const char* relativePath = currentPath.view().bytesIncludingTerminator() + rootPathLength;
+                    if (relativePath[0] == '/')
+                        relativePath++;
+                    pair.nameOffset = opaque.relativePaths.length == 0 ? 0 : opaque.relativePaths.length + 1;
+                    const StringSpan relativePathSpan =
+                        StringSpan::fromNullTerminated(relativePath, StringEncoding::Utf8);
+                    if (not relativePathSpan.appendNullTerminatedTo(opaque.relativePaths, false))
+                        return failStartWatching(
+                            *entry, ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
+                                                            FileSystemWatcherErrorDetail::LinuxRelativePathStorage));
+
                     const int newHandle =
                         ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
                     if (newHandle == -1)
                     {
                         const uint32_t nativeError = static_cast<uint32_t>(errno);
-                        (void)stopWatching(*entry);
-                        return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                                       FileSystemWatcherErrorDetail::LinuxAddSubdirectoryWatch,
-                                                       nativeError);
+                        return failStartWatching(
+                            *entry, ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                                            FileSystemWatcherErrorDetail::LinuxAddSubdirectoryWatch,
+                                                            nativeError));
                     }
-                    if (stackSize < MaxStackDepth)
-                    {
-                        // Open the subdirectory and push onto the stack
-                        const int subFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY);
-                        if (subFd != -1)
-                        {
-                            stack[stackSize].fd             = subFd;
-                            stack[stackSize].notifyHandleId = opaque.notifyHandlesCount;
-                            stackSize++;
-                        }
-                    }
-                    else
-                    {
-                        (void)stopWatching(*entry);
-                        return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                                       FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity);
-                    }
-                    const char* relativePath = currentPath.view().bytesIncludingTerminator() + rootPathLength;
-                    if (relativePath[0] == '/')
-                    {
-                        relativePath++;
-                    }
-                    pair.notifyID   = newHandle;
-                    pair.nameOffset = opaque.relativePaths.length == 0 ? 0 : opaque.relativePaths.length + 1;
-                    StringSpan relativePathSpan = StringSpan::fromNullTerminated(relativePath, StringEncoding::Utf8);
-                    if (not relativePathSpan.appendNullTerminatedTo(opaque.relativePaths, false))
-                        return ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
-                                                       FileSystemWatcherErrorDetail::LinuxRelativePathStorage);
+                    pair.notifyID = newHandle;
 
-                    if (opaque.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
-                        return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                                       FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity);
+                    const int childHandleId = static_cast<int>(opaque.notifyHandlesCount);
+
                     opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
+
+                    // Open the subdirectory and push onto the stack
+                    const int subFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY);
+                    if (subFd != -1)
+                        stack[stackSize++] = {subFd, childHandleId};
                 }
             }
         }
@@ -379,7 +390,9 @@ struct SC::FileSystemWatcher::Internal
             threadingRunner->shouldStop.exchange(false);
             Function<void(FSWThread&)> threadFunction;
             threadFunction.bind<Internal, &Internal::threadRun>(*this);
-            SC_TRY(threadingRunner->thread.start(move(threadFunction)))
+            const ResultFileSystemWatcher started = threadingRunner->thread.start(move(threadFunction));
+            if (not started)
+                return failStartWatching(*entry, started);
         }
         return ResultFileSystemWatcher(true);
     }

@@ -143,7 +143,15 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         const ResultFileSystemWatcher missing      = fileEventsWatcher.watch(watcher, missingPath.view());
         SC_TEST_EXPECT(missing.isError(FileSystemWatcherError::WatchSetupFailed));
         SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        StringPath childPath;
+        SC_TEST_EXPECT(Path::join(childPath, {directoryPath.view(), "child"}));
+        SC_TEST_EXPECT(fs.makeDirectory(childPath.view()));
         SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, directoryPath.view()));
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(childPath.view()));
+        const ResultFileSystemWatcher stopped = watcher.stopWatching();
+        SC_TEST_EXPECT(stopped);
+        if (stopped)
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, directoryPath.view()));
         submitQueuedWatcher(eventLoop);
         const ResultFileSystemWatcher closed = fileEventsWatcher.close();
         SC_TEST_EXPECT(closed);

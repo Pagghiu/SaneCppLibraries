@@ -160,6 +160,25 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const ResultFileSystemWatcher file = fileEventsWatcher.watch(watcher, filePath.view());
         SC_TEST_EXPECT(file.isError(FileSystemWatcherError::WatchSetupFailed));
         SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+#if SC_PLATFORM_LINUX
+        StringPath childPath;
+        SC_TEST_EXPECT(Path::join(childPath, {directoryPath.view(), "child"}));
+        SC_TEST_EXPECT(fs.makeDirectory(childPath.view()));
+        StringPath grandchildPath;
+        SC_TEST_EXPECT(Path::join(grandchildPath, {childPath.view(), "grandchild"}));
+        SC_TEST_EXPECT(fs.makeDirectory(grandchildPath.view()));
+        char                             pathStorage[8];
+        FileSystemWatcher::FolderWatcher limitedWatcher(pathStorage);
+        limitedWatcher.notifyCallback                 = [](const FileSystemWatcher::Notification&) {};
+        const ResultFileSystemWatcher capacityFailure = fileEventsWatcher.watch(limitedWatcher, directoryPath.view());
+        SC_TEST_EXPECT(capacityFailure.isError(FileSystemWatcherError::BufferTooSmall));
+        SC_TEST_EXPECT(capacityFailure.detail == FileSystemWatcherErrorDetail::LinuxRelativePathStorage);
+        const ResultFileSystemWatcher afterFailure = limitedWatcher.stopWatching();
+        SC_TEST_EXPECT(afterFailure.isError(FileSystemWatcherError::NotWatching));
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(childPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(limitedWatcher, directoryPath.view()));
+        SC_TEST_EXPECT(limitedWatcher.stopWatching());
+#endif
         SC_TEST_EXPECT(fs.removeFile(filePath.view()));
         SC_TEST_EXPECT(fs.writeString(filePath.view(), "replacement"));
         SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, directoryPath.view()));
