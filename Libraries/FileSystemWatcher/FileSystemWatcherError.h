@@ -61,6 +61,10 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     WindowsSubmitDirectoryChanges,
     AppleOpenRootDirectory,
     WindowsQueryRootDirectory,
+    LinuxOpenDirectoryStream,
+    LinuxReadDirectoryEntries,
+    LinuxInspectDirectoryEntry,
+    LinuxOpenSubdirectory,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

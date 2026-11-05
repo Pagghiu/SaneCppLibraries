@@ -37,6 +37,14 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
         formatter.append("Linux add subdirectory watch");
         break;
     case FileSystemWatcherErrorDetail::LinuxOpenRootDirectory: formatter.append("Linux open root directory"); break;
+    case FileSystemWatcherErrorDetail::LinuxOpenDirectoryStream: formatter.append("Linux open directory stream"); break;
+    case FileSystemWatcherErrorDetail::LinuxReadDirectoryEntries:
+        formatter.append("Linux read directory entries");
+        break;
+    case FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry:
+        formatter.append("Linux inspect directory entry");
+        break;
+    case FileSystemWatcherErrorDetail::LinuxOpenSubdirectory: formatter.append("Linux open subdirectory"); break;
     case FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity: formatter.append("Linux watch handle capacity"); break;
     case FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity:
         formatter.append("Linux pending directory capacity");

@@ -91,6 +91,8 @@ constructor for broader or deeper trees. That buffer is ignored on Windows and A
 
 If Linux reports a recursive setup failure after registering watches, it attempts to remove all of them. The
 `FolderWatcher` can be reused when cleanup succeeds; if a removal fails, `watch` returns the cleanup error.
+Linux reports failures to open or enumerate a directory or inspect an entry during initial discovery, except when an
+entry or symbolic-link target is no longer present. It does not yet add watches for subdirectories created later.
 
 The underlying operating-system services may allocate their own resources. In particular, the Apple backend uses
 CoreServices objects while rebuilding its FSEvents stream. The allocation-free API shape therefore means caller-owned,

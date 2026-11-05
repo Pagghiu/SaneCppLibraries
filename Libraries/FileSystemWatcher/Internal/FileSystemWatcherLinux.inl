@@ -311,17 +311,34 @@ struct SC::FileSystemWatcher::Internal
             DirStackEntry entryStack = stack[--stackSize];
 
             DIR* dir = ::fdopendir(entryStack.fd);
-            if (!dir)
+            if (not dir)
             {
-                ::close(entryStack.fd); // Prevent file descriptor leak if fdopendir fails
-                continue;               // Cannot open directory, just skip it
+                const uint32_t nativeError = static_cast<uint32_t>(errno);
+                ::close(entryStack.fd); // fdopendir did not take ownership
+                return failStartWatching(*entry,
+                                         ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                                                 FileSystemWatcherErrorDetail::LinuxOpenDirectoryStream,
+                                                                 nativeError));
             }
             auto closeDir = MakeDeferred([dir] { ::closedir(dir); });
 
-            struct dirent* subDirectory;
-            while ((subDirectory = ::readdir(dir)) != nullptr)
+            for (;;)
             {
-                if (::strcmp(subDirectory->d_name, ".") == 0 || ::strcmp(subDirectory->d_name, "..") == 0)
+                errno                       = 0;
+                struct dirent* subDirectory = ::readdir(dir);
+                if (subDirectory == nullptr)
+                {
+                    const int nativeError = errno;
+                    if (nativeError == EINTR)
+                        continue;
+                    if (nativeError != 0)
+                        return failStartWatching(
+                            *entry, ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                                            FileSystemWatcherErrorDetail::LinuxReadDirectoryEntries,
+                                                            static_cast<uint32_t>(nativeError)));
+                    break;
+                }
+                if (::strcmp(subDirectory->d_name, ".") == 0 or ::strcmp(subDirectory->d_name, "..") == 0)
                 {
                     continue;
                 }
@@ -333,7 +350,14 @@ struct SC::FileSystemWatcher::Internal
                 struct stat st;
                 if (::stat(currentPath.view().bytesIncludingTerminator(), &st) != 0)
                 {
-                    continue;
+                    const int nativeError = errno;
+                    // The entry or a symlink target may have disappeared since readdir.
+                    if (nativeError == ENOENT)
+                        continue;
+                    return failStartWatching(
+                        *entry, ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                                        FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry,
+                                                        static_cast<uint32_t>(nativeError)));
                 }
                 if (S_ISDIR(st.st_mode))
                 {
@@ -376,8 +400,15 @@ struct SC::FileSystemWatcher::Internal
 
                     // Open the subdirectory and push onto the stack
                     const int subFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY);
-                    if (subFd != -1)
-                        stack[stackSize++] = {subFd, childHandleId};
+                    if (subFd == -1)
+                    {
+                        const uint32_t nativeError = static_cast<uint32_t>(errno);
+                        return failStartWatching(
+                            *entry,
+                            ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                                    FileSystemWatcherErrorDetail::LinuxOpenSubdirectory, nativeError));
+                    }
+                    stack[stackSize++] = {subFd, childHandleId};
                 }
             }
         }

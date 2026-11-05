@@ -178,6 +178,40 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(fs.removeDirectoryRecursive(childPath.view()));
         SC_TEST_EXPECT(fileEventsWatcher.watch(limitedWatcher, directoryPath.view()));
         SC_TEST_EXPECT(limitedWatcher.stopWatching());
+
+        SC_TEST_EXPECT(fs.chmod(directoryPath.view(), 0444u));
+        auto restorePermissions = MakeDeferred([&] { (void)fs.chmod(directoryPath.view(), 0755u); });
+
+        FileSystem::FileStat             inaccessibleEntry;
+        FileSystemWatcher::FolderWatcher inaccessibleWatcher;
+        inaccessibleWatcher.notifyCallback = [](const FileSystemWatcher::Notification&) {};
+        // Privileged users may still be able to inspect entries despite the permission bits.
+        if (not fs.stat(filePath.view(), inaccessibleEntry))
+        {
+            const ResultFileSystemWatcher inaccessible =
+                fileEventsWatcher.watch(inaccessibleWatcher, directoryPath.view());
+            SC_TEST_EXPECT(inaccessible.isError(FileSystemWatcherError::WatchSetupFailed));
+            SC_TEST_EXPECT(inaccessible.detail == FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry);
+            SC_TEST_EXPECT(inaccessible.nativeError != 0);
+            if (inaccessible)
+                SC_TEST_EXPECT(inaccessibleWatcher.stopWatching());
+            else
+                SC_TEST_EXPECT(inaccessibleWatcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        }
+        else
+        {
+            report.console.print("Skipping watcher permission check: directory entries remain accessible\n");
+        }
+        const ResultFileSystem restored = fs.chmod(directoryPath.view(), 0755u);
+        SC_TEST_EXPECT(restored);
+        if (restored)
+            restorePermissions.disarm();
+        StringPath danglingPath;
+        SC_TEST_EXPECT(Path::join(danglingPath, {directoryPath.view(), "dangling"}));
+        SC_TEST_EXPECT(fs.createSymbolicLink(missingPath.view(), danglingPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(inaccessibleWatcher, directoryPath.view()));
+        SC_TEST_EXPECT(inaccessibleWatcher.stopWatching());
+        SC_TEST_EXPECT(fs.removeLinkIfExists(danglingPath.view()));
 #endif
         SC_TEST_EXPECT(fs.removeFile(filePath.view()));
         SC_TEST_EXPECT(fs.writeString(filePath.view(), "replacement"));
