@@ -96,6 +96,10 @@ entry or symbolic-link target is no longer present. It does not yet add watches 
 When Linux folder watches on the same owner overlap, stopping one folder leaves shared native watches active for the
 other folders that still use them.
 
+If the shared Linux inotify queue overflows, each remaining folder receives a root-level `AddRemoveRename` notification
+with an empty relative path because individual names were lost. Rescan and restart the watch if recursive coverage must
+include directories created during the loss. Other ambiguous changes can produce the same root hint.
+
 The underlying operating-system services may allocate their own resources. In particular, the Apple backend uses
 CoreServices objects while rebuilding its FSEvents stream. The allocation-free API shape therefore means caller-owned,
 bounded SC object storage; it is not a promise that native watcher setup performs no system allocation.

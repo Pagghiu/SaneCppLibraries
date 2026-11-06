@@ -31,6 +31,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopStopPendingNotification(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
         eventLoopOverlappingWatchers(appDirectory);
+#if SC_PLATFORM_LINUX
+        eventLoopOverflow(appDirectory);
+#endif
     }
 
     void structuredNotInitializedError()
@@ -697,6 +700,175 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         if (removed)
             removeDirectory.disarm();
     }
+
+#if SC_PLATFORM_LINUX
+    void eventLoopOverflow(const StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop inotify overflow"))
+            return;
+
+        FileDescriptor limitFile;
+        if (not limitFile.open("/proc/sys/fs/inotify/max_queued_events", FileOpen{}))
+        {
+            report.console.print("Skipping inotify overflow test: queue limit is unavailable\n");
+            return;
+        }
+        char             limitBuffer[32];
+        Span<char>       limitBytes;
+        const ResultFile readLimit = limitFile.read(limitBuffer, limitBytes);
+        SC_TEST_EXPECT(readLimit);
+        SC_TEST_EXPECT(limitFile.close());
+        if (not readLimit)
+            return;
+        int32_t          queueLimit = 0;
+        const StringView limitText({limitBuffer, limitBytes.sizeInBytes()}, false, StringEncoding::Ascii);
+        const bool       parsed = limitText.trimWhiteSpaces().parseInt32(queueLimit) and queueLimit > 0;
+        SC_TEST_EXPECT(parsed);
+        if (not parsed)
+            return;
+        if (queueLimit > 100000)
+        {
+            report.console.print("Skipping inotify overflow test: queue limit is {}\n",
+                                 static_cast<size_t>(queueLimit));
+            return;
+        }
+
+        FileSystem             fs;
+        const ResultFileSystem fsReady = fs.init(appDirectory);
+        SC_TEST_EXPECT(fsReady);
+        if (not fsReady)
+            return;
+        StringPath directoryName;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(directoryName, "__sc overflow {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(directoryName.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto       removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(directoryName.view()); });
+        StringPath directoryPath;
+        StringPath firstPath;
+        StringPath secondPath;
+        StringPath victimPath;
+        StringPath eventPath;
+        StringPath afterPath;
+        const bool pathsReady = Path::join(directoryPath, {appDirectory, directoryName.view()}) and
+                                Path::join(firstPath, {directoryPath.view(), "first"}) and
+                                Path::join(secondPath, {directoryPath.view(), "second"}) and
+                                Path::join(victimPath, {directoryPath.view(), "victim"}) and
+                                Path::join(eventPath, {firstPath.view(), "event"}) and
+                                Path::join(afterPath, {secondPath.view(), "after"}) and
+                                fs.makeDirectory(firstPath.view()) and fs.makeDirectory(secondPath.view()) and
+                                fs.makeDirectory(victimPath.view());
+        SC_TEST_EXPECT(pathsReady);
+        if (not pathsReady)
+            return;
+
+        AsyncEventLoop eventLoop;
+        const Result   loopReady = eventLoop.create();
+        SC_TEST_EXPECT(loopReady);
+        if (not loopReady)
+            return;
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(eventLoop);
+        FileSystemWatcher fileEventsWatcher;
+        struct OverflowState
+        {
+            FileSystemWatcher::FolderWatcher* first  = nullptr;
+            FileSystemWatcher::FolderWatcher* victim = nullptr;
+
+            StringView expectedFirst;
+            StringView expectedSecond;
+
+            unsigned observed      = 0;
+            bool     stopped       = false;
+            bool     victimStopped = false;
+            bool     victimCalled  = false;
+            bool     firstBase     = false;
+            bool     secondBase    = false;
+            bool     after         = false;
+        } state;
+        FileSystemWatcher::FolderWatcher watchers[3];
+        state.first                = &watchers[0];
+        state.victim               = &watchers[1];
+        state.expectedFirst        = firstPath.view();
+        state.expectedSecond       = secondPath.view();
+        watchers[0].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            if (notification.relativePath.isEmpty() and
+                notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+            {
+                state.observed |= 1;
+                state.firstBase     = notification.basePath == state.expectedFirst;
+                state.victimStopped = static_cast<bool>(state.victim->stopWatching());
+                state.stopped       = static_cast<bool>(state.first->stopWatching());
+            }
+        };
+        watchers[1].notifyCallback = [&state](const FileSystemWatcher::Notification&) { state.victimCalled = true; };
+        watchers[2].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            if (notification.relativePath.isEmpty() and
+                notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
+            {
+                state.observed |= 2;
+                state.secondBase = notification.basePath == state.expectedSecond;
+            }
+            if (notification.relativePath == "after")
+                state.after = true;
+        };
+        auto closeLoop    = MakeDeferred([&] { (void)eventLoop.close(); });
+        auto closeWatcher = MakeDeferred([&] { (void)fileEventsWatcher.close(); });
+
+        const ResultFileSystemWatcher watcherReady = fileEventsWatcher.init(runner);
+        SC_TEST_EXPECT(watcherReady);
+        if (not watcherReady)
+            return;
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[0], firstPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[1], victimPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[2], secondPath.view()));
+        submitQueuedWatcher(eventLoop);
+
+        bool generated = true;
+        for (int32_t idx = 0; idx < queueLimit / 2 + 32; ++idx)
+        {
+            if (not fs.writeString(eventPath.view(), "") or not fs.removeFile(eventPath.view()))
+            {
+                generated = false;
+                break;
+            }
+        }
+        SC_TEST_EXPECT(generated);
+        if (not generated)
+            return;
+        const bool observed = runUntil(eventLoop, [&state] { return state.observed == 3; });
+        SC_TEST_EXPECT(observed);
+        if (not observed)
+            return;
+        SC_TEST_EXPECT(state.stopped and state.victimStopped and not state.victimCalled and state.firstBase and
+                       state.secondBase);
+        SC_TEST_EXPECT(fs.writeString(afterPath.view(), "after"));
+        SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.after; }));
+
+        const ResultFileSystemWatcher closed = fileEventsWatcher.close();
+        SC_TEST_EXPECT(closed);
+        if (not closed)
+            return;
+        closeWatcher.disarm();
+        const Result loopClosed = eventLoop.close();
+        SC_TEST_EXPECT(loopClosed);
+        if (not loopClosed)
+            return;
+        closeLoop.disarm();
+        const ResultFileSystem removed = fs.removeDirectoryRecursive(directoryName.view());
+        SC_TEST_EXPECT(removed);
+        if (removed)
+            removeDirectory.disarm();
+    }
+#endif
 };
 
 namespace SC

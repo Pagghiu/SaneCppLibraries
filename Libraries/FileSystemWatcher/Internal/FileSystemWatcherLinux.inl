@@ -484,7 +484,7 @@ struct SC::FileSystemWatcher::Internal
         threadingRunner->shouldStop.exchange(false);
     }
 
-    static void readAndNotify(const int notifyFd, WatcherLinkedList watchers)
+    static void readAndNotify(const int notifyFd, WatcherLinkedList& watchers)
     {
         int  numReadBytes;
         char inotifyBuffer[3 * 1024];
@@ -498,7 +498,7 @@ struct SC::FileSystemWatcher::Internal
         notifyWatchers(actuallyRead, watchers);
     }
 
-    static void notifyWatchers(Span<char> actuallyRead, WatcherLinkedList watchers)
+    static void notifyWatchers(Span<char> actuallyRead, WatcherLinkedList& watchers)
     {
         const struct inotify_event* event     = nullptr;
         const struct inotify_event* prevEvent = nullptr;
@@ -509,6 +509,39 @@ struct SC::FileSystemWatcher::Internal
              iterator += sizeof(*event) + event->len)
         {
             event = reinterpret_cast<const struct inotify_event*>(iterator);
+
+            if (event->mask & IN_Q_OVERFLOW)
+            {
+                // Rescan the live list after each callback: it may stop and release another folder.
+                // Address order visits each remaining folder at most once without auxiliary storage.
+                uintptr_t previousAddress = 0;
+                bool      havePrevious    = false;
+                for (;;)
+                {
+                    const FolderWatcher* next        = nullptr;
+                    uintptr_t            nextAddress = 0;
+                    for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
+                    {
+                        const uintptr_t address = reinterpret_cast<uintptr_t>(entry);
+                        if ((not havePrevious or address > previousAddress) and
+                            (next == nullptr or address < nextAddress))
+                        {
+                            next        = entry;
+                            nextAddress = address;
+                        }
+                    }
+                    if (next == nullptr)
+                        break;
+                    previousAddress = nextAddress;
+                    havePrevious    = true;
+                    Notification notification;
+                    notification.basePath  = next->path.view();
+                    notification.operation = Operation::AddRemoveRename;
+                    next->notifyCallback(notification);
+                }
+                prevEvent = nullptr;
+                continue;
+            }
 
             // Every folder must compare against the same preceding kernel event.
             const struct inotify_event* previousEvent = prevEvent;
