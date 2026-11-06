@@ -7,6 +7,89 @@
 #include <Windows.h>
 #include <stdio.h> // Failure-only independent deadline diagnostic
 
+void SC::AsyncTest::externalCompletionBeforeSubmission()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+    PipeDescriptor pipe;
+    PipeOptions    pipeOptions;
+    pipeOptions.blocking = false;
+    SC_TEST_EXPECT(pipe.createPipe(pipeOptions));
+
+    FileDescriptor::Handle readHandle  = FileDescriptor::Invalid;
+    FileDescriptor::Handle writeHandle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, asyncTestFailure(AsyncTestFailure::ReadPipeUnavailable)));
+    SC_TEST_EXPECT(pipe.writePipe.get(writeHandle, asyncTestFailure(AsyncTestFailure::DescriptorUnavailable)));
+
+    HANDLE writeEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    HANDLE readEvent  = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    SC_TEST_EXPECT(writeEvent != nullptr and readEvent != nullptr);
+    OVERLAPPED writeOperation = {};
+    writeOperation.hEvent     = writeEvent;
+    const char  value         = 'x';
+    const BOOL  writeStarted  = ::WriteFile(writeHandle, &value, 1, nullptr, &writeOperation);
+    const DWORD writeError    = writeStarted ? 0 : ::GetLastError();
+    SC_TEST_EXPECT(writeStarted or writeError == ERROR_IO_PENDING);
+    SC_TEST_EXPECT(::WaitForSingleObject(writeEvent, 5000) == WAIT_OBJECT_0);
+    DWORD writeBytes = 0;
+    SC_TEST_EXPECT(::GetOverlappedResult(writeHandle, &writeOperation, &writeBytes, FALSE) and writeBytes == 1);
+
+    struct CompletionState
+    {
+        bool   called = false;
+        bool   valid  = false;
+        size_t bytes  = 0;
+    } state;
+    AsyncExternalCompletion completion;
+    completion.callback = [&state](AsyncExternalCompletion::Result& result)
+    {
+        state.called = true;
+        state.valid  = static_cast<bool>(result.isValid());
+        state.bytes  = result.completionData.bytesTransferred;
+    };
+    AsyncExternalCompletion invalidCompletion;
+    const Result            invalidHandle = invalidCompletion.start(loop, FileDescriptor::Invalid);
+    SC_TEST_EXPECT(invalidHandle.isError(AsyncResultCategory, AsyncError::InvalidHandle));
+    SC_TEST_EXPECT(invalidCompletion.isFree());
+    SC_TEST_EXPECT(completion.start(loop, readHandle));
+    AsyncEventLoop          uninitializedLoop;
+    AsyncExternalCompletion uninitializedCompletion;
+    const Result            uninitialized = uninitializedCompletion.start(uninitializedLoop, readHandle);
+    SC_TEST_EXPECT(uninitialized.isError(AsyncResultCategory, AsyncError::NotInitialized));
+    SC_TEST_EXPECT(uninitializedCompletion.isFree());
+    SC_TEST_EXPECT(completion.markSubmissionPending());
+    OVERLAPPED* readOperation = static_cast<OVERLAPPED*>(completion.getWindowsOverlapped());
+    readOperation->hEvent     = readEvent;
+    char        received      = 0;
+    const BOOL  readStarted   = ::ReadFile(readHandle, &received, 1, nullptr, readOperation);
+    const DWORD readError     = readStarted ? 0 : ::GetLastError();
+    SC_TEST_EXPECT(readStarted or readError == ERROR_IO_PENDING);
+    // Ensure the native operation completed before the loop processes its queued request.
+    SC_TEST_EXPECT(::WaitForSingleObject(readEvent, 5000) == WAIT_OBJECT_0);
+
+    bool             timedOut = false;
+    AsyncLoopTimeout timeout;
+    timeout.callback = [&timedOut](AsyncLoopTimeout::Result&) { timedOut = true; };
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{5000}));
+    while (not state.called and not timedOut)
+        SC_TEST_EXPECT(loop.runOnce());
+    SC_TEST_EXPECT(state.called and state.valid and state.bytes == 1 and received == value);
+    if (not timedOut)
+    {
+        SC_TEST_EXPECT(timeout.stop(loop));
+        SC_TEST_EXPECT(loop.runNoWait());
+    }
+    if (not completion.isFree())
+    {
+        SC_TEST_EXPECT(completion.stop(loop));
+        SC_TEST_EXPECT(loop.run());
+    }
+    SC_TEST_EXPECT(pipe.close());
+    SC_TEST_EXPECT(loop.close());
+    SC_TEST_EXPECT(::CloseHandle(readEvent));
+    SC_TEST_EXPECT(::CloseHandle(writeEvent));
+}
+
 void SC::AsyncTest::fileReadCancelQuiescence(bool drainBeforeCancel)
 {
     Atomic<bool> finished = false;

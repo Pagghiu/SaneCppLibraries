@@ -1039,6 +1039,7 @@ struct SC_ASYNC_EXPORT AsyncExternalCompletion : public AsyncRequest
 
 #if SC_PLATFORM_WINDOWS
     /// Starts a Windows IOCP external completion bound to an externally-created overlapped file handle.
+    /// The handle is associated with the loop before this returns, so native I/O may be submitted immediately.
     SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
 
     /// Returns the OVERLAPPED pointer to pass to the external Windows API submission.

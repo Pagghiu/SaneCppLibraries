@@ -228,6 +228,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileReadCancelQuiescence();
         if (test_section("native completion drained before cancellation submission"))
             fileReadCancelQuiescence(true);
+        if (test_section("external completion before loop submission"))
+            externalCompletionBeforeSubmission();
 #endif
         if (test_section("file readiness"))
         {

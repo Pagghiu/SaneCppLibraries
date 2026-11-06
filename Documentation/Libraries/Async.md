@@ -105,6 +105,8 @@ loop is thread-safe; the callback is delivered by the thread dispatching the eve
 
 Use `AsyncLoopWork` for work submitted to a caller-provided `ThreadPool`, and `AsyncExternalCompletion` when an external
 API already has its own asynchronous completion mechanism that needs to re-enter the loop.
+On Windows, starting a native `AsyncExternalCompletion` associates its file handle with the loop before returning, so
+the external operation can be submitted immediately.
 
 # Socket I/O
 

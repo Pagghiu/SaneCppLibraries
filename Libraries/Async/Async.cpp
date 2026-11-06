@@ -650,6 +650,14 @@ SC::Result SC::AsyncExternalCompletion::start(AsyncEventLoop& eventLoop, FileDes
     SC_TRY(checkState());
     handle     = fileDescriptor;
     manualMode = false;
+    SC_TRY(validate(eventLoop));
+    // The internal wakeup uses a null handle and posts its own completion packets.
+    if (handle != nullptr)
+    {
+        if (not eventLoop.isInitialized())
+            return SC::Result::Error(AsyncResultCategory, AsyncError::NotInitialized);
+        SC_TRY(eventLoop.associateExternallyCreatedFileDescriptorHandle(handle));
+    }
     return eventLoop.start(*this);
 }
 #endif

@@ -1275,14 +1275,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // External COMPLETION
     //-------------------------------------------------------------------------------------------------------
-    static Result setupAsync(AsyncEventLoop& eventLoop, AsyncExternalCompletion& async)
-    {
-        if (not async.manualMode and async.handle != 0)
-        {
-            SC_TRY(eventLoop.internal.kernelQueue.get().associateExternallyCreatedFileDescriptorHandle(async.handle));
-        }
-        return Result(true);
-    }
+    // start() associates native handles before the caller can submit I/O.
+    static Result setupAsync(AsyncEventLoop&, AsyncExternalCompletion&) { return Result(true); }
 
     static Result activateAsync(AsyncEventLoop&, AsyncExternalCompletion& async)
     {

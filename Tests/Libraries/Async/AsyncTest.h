@@ -86,6 +86,7 @@ struct SC::AsyncTest : public SC::TestCase
     void fileWorkerAssociatedCompletion();
     void fileReadCancelQuiescence(bool drainBeforeCancel = false);
     void externalCompletionManual();
+    void externalCompletionBeforeSubmission();
     void fileClose();
     void serialReadWrite();
     void serialStop();

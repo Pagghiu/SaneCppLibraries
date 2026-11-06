@@ -89,3 +89,4 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - [ASYNC-0009 - Use portable structured Result errors](async-0009-use-portable-structured-result-errors.md)
 - [ASYNC-0010 - Validate file-system requests before backend routing](async-0010-validate-file-system-requests-before-backend-routing.md)
 - [ASYNC-0020 - Recheck Windows timer deadlines after poll](async-0020-recheck-windows-timer-deadlines-after-poll.md)
+- [ASYNC-0021 - Associate external completions before native submission](async-0021-associate-external-completions-before-native-submission.md)
