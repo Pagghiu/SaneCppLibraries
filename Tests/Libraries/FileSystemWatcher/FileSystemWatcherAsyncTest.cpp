@@ -30,6 +30,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopWatchStop(appDirectory);
         eventLoopStopPendingNotification(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
+        eventLoopOverlappingWatchers(appDirectory);
     }
 
     void structuredNotInitializedError()
@@ -557,6 +558,144 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path1.view()));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path2.view()));
         }
+    }
+
+    void eventLoopOverlappingWatchers(const StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop overlapping watchers"))
+            return;
+
+        FileSystem             fs;
+        const ResultFileSystem fsReady = fs.init(appDirectory);
+        SC_TEST_EXPECT(fsReady);
+        if (not fsReady)
+            return;
+        StringPath directoryName;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(directoryName, "__sc overlap {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(directoryName.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto       removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(directoryName.view()); });
+        StringPath directoryPath;
+        StringPath childPath;
+        StringPath grandchildPath;
+        const bool pathsReady = Path::join(directoryPath, {appDirectory, directoryName.view()}) and
+                                Path::join(childPath, {directoryPath.view(), "child"}) and
+                                Path::join(grandchildPath, {childPath.view(), "grandchild"}) and
+                                fs.makeDirectory(childPath.view()) and fs.makeDirectory(grandchildPath.view());
+        SC_TEST_EXPECT(pathsReady);
+        if (not pathsReady)
+            return;
+
+        AsyncEventLoop eventLoop;
+        const Result   loopReady = eventLoop.create();
+        SC_TEST_EXPECT(loopReady);
+        if (not loopReady)
+            return;
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(eventLoop);
+        FileSystemWatcher fileEventsWatcher;
+
+        struct OverlapState
+        {
+            StringView expected;
+            unsigned   observed = 0;
+            unsigned   required = 0;
+        } state;
+        FileSystemWatcher::FolderWatcher watcher1, watcher2;
+        watcher1.notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            const StringView path = notification.relativePath;
+            if (path.endsWith(state.expected))
+                state.observed |= 1;
+        };
+        watcher2.notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            const StringView path = notification.relativePath;
+            if (path.endsWith(state.expected))
+                state.observed |= 2;
+        };
+
+        auto closeLoop    = MakeDeferred([&] { (void)eventLoop.close(); });
+        auto closeWatcher = MakeDeferred([&] { (void)fileEventsWatcher.close(); });
+
+        const ResultFileSystemWatcher watcherReady = fileEventsWatcher.init(runner);
+        SC_TEST_EXPECT(watcherReady);
+        if (not watcherReady)
+            return;
+
+        auto writeFile = [&](StringView parent, StringView name)
+        {
+            StringPath path;
+            return Path::join(path, {parent, name}) and fs.writeString(path.view(), "content");
+        };
+        auto writeAndObserve = [&](StringView parent, StringView name, unsigned required)
+        {
+            state.expected = name;
+            state.observed = 0;
+            state.required = required;
+            return writeFile(parent, name) and
+                   runUntil(eventLoop, [&state] { return (state.observed & state.required) == state.required; });
+        };
+        constexpr unsigned firstWatcher  = 1;
+        constexpr unsigned secondWatcher = 2;
+        constexpr unsigned bothWatchers  = firstWatcher | secondWatcher;
+
+        SC_TEST_EXPECT(writeFile(directoryPath.view(), "modify-only.txt"));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, directoryPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, directoryPath.view()));
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(writeAndObserve(directoryPath.view(), "modify-only.txt", bothWatchers));
+#if SC_PLATFORM_LINUX
+        char                             limitedPaths[8];
+        FileSystemWatcher::FolderWatcher limitedWatcher(limitedPaths);
+        limitedWatcher.notifyCallback                = [](const FileSystemWatcher::Notification&){};
+        const ResultFileSystemWatcher limitedFailure = fileEventsWatcher.watch(limitedWatcher, directoryPath.view());
+        SC_TEST_EXPECT(limitedFailure.isError(FileSystemWatcherError::BufferTooSmall));
+        SC_TEST_EXPECT(limitedFailure.detail == FileSystemWatcherErrorDetail::LinuxRelativePathStorage);
+        SC_TEST_EXPECT(limitedWatcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        SC_TEST_EXPECT(writeAndObserve(directoryPath.view(), "rollback-root.txt", bothWatchers));
+        SC_TEST_EXPECT(writeAndObserve(childPath.view(), "rollback-child.txt", bothWatchers));
+#endif
+        SC_TEST_EXPECT(writeAndObserve(directoryPath.view(), "same-first.txt", bothWatchers));
+        SC_TEST_EXPECT(watcher1.stopWatching());
+        SC_TEST_EXPECT(writeAndObserve(directoryPath.view(), "same-second.txt", secondWatcher));
+
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, directoryPath.view()));
+        SC_TEST_EXPECT(watcher2.stopWatching());
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(writeAndObserve(directoryPath.view(), "same-third.txt", firstWatcher));
+
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, childPath.view()));
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(writeAndObserve(childPath.view(), "child-first.txt", bothWatchers));
+        SC_TEST_EXPECT(watcher1.stopWatching());
+        SC_TEST_EXPECT(writeAndObserve(childPath.view(), "child-second.txt", secondWatcher));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, directoryPath.view()));
+        SC_TEST_EXPECT(watcher2.stopWatching());
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(writeAndObserve(childPath.view(), "child-third.txt", firstWatcher));
+
+        const ResultFileSystemWatcher closed = fileEventsWatcher.close();
+        SC_TEST_EXPECT(closed);
+        if (not closed)
+            return;
+        closeWatcher.disarm();
+        const Result loopClosed = eventLoop.close();
+        SC_TEST_EXPECT(loopClosed);
+        if (not loopClosed)
+            return;
+        closeLoop.disarm();
+        const ResultFileSystem removed = fs.removeDirectoryRecursive(directoryName.view());
+        SC_TEST_EXPECT(removed);
+        if (removed)
+            removeDirectory.disarm();
     }
 };
 

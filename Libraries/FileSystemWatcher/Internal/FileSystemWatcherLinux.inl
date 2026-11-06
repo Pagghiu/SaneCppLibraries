@@ -153,6 +153,21 @@ struct SC::FileSystemWatcher::Internal
         return ResultFileSystemWatcher(true);
     }
 
+    // One inotify descriptor can be shared by multiple folder watchers on this owner.
+    bool isWatchUsedByAnotherFolder(int watchId) const
+    {
+        for (const FolderWatcher* other = self->watchers.front; other != nullptr; other = other->next)
+        {
+            const FolderWatcherInternal& otherInternal = other->internal.get();
+            for (size_t idx = 0; idx < otherInternal.notifyHandlesCount; ++idx)
+            {
+                if (otherInternal.notifyHandles[idx].notifyID == watchId)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     ResultFileSystemWatcher stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
@@ -169,10 +184,14 @@ struct SC::FileSystemWatcher::Internal
         ResultFileSystemWatcher result(true);
         for (size_t idx = 0; idx < folderInternal.notifyHandlesCount; ++idx)
         {
+            const int watchId = folderInternal.notifyHandles[idx].notifyID;
+            if (isWatchUsedByAnotherFolder(watchId))
+                continue;
+
             int res;
             do
             {
-                res = ::inotify_rm_watch(notifyFd, folderInternal.notifyHandles[idx].notifyID);
+                res = ::inotify_rm_watch(notifyFd, watchId);
             } while (res == -1 and errno == EINTR);
             if (res == -1 and errno != EINVAL and result)
             {
@@ -490,6 +509,9 @@ struct SC::FileSystemWatcher::Internal
              iterator += sizeof(*event) + event->len)
         {
             event = reinterpret_cast<const struct inotify_event*>(iterator);
+
+            // Every folder must compare against the same preceding kernel event.
+            const struct inotify_event* previousEvent = prevEvent;
             for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
             {
                 // Check if current FolderWatcher has a watcher matching the one from current event
@@ -498,7 +520,7 @@ struct SC::FileSystemWatcher::Internal
                 {
                     if (entry->internal.get().notifyHandles[idx] == pair)
                     {
-                        (void)notifySingleEvent(event, prevEvent, entry, idx);
+                        (void)notifySingleEvent(event, previousEvent, entry, idx);
                         prevEvent = event;
                         break;
                     }
