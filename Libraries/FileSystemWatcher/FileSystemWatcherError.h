@@ -23,6 +23,7 @@ enum class FileSystemWatcherError : uint32_t
     WatchSetupFailed,
     StopWatchingFailed,
     CloseFailed,
+    MonitoringFailed,
 };
 
 /// @brief Stable backend stages retained as context for a FileSystemWatcher failure.
@@ -65,6 +66,8 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     LinuxReadDirectoryEntries,
     LinuxInspectDirectoryEntry,
     LinuxOpenSubdirectory,
+    LinuxReadEvents,
+    LinuxWaitForEvents,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

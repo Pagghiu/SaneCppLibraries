@@ -11,6 +11,11 @@
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 
+#if SC_PLATFORM_LINUX
+#include <errno.h>
+#include <unistd.h>
+#endif
+
 namespace SC
 {
 struct FileSystemWatcherAsyncTest;
@@ -33,6 +38,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopOverlappingWatchers(appDirectory);
 #if SC_PLATFORM_LINUX
         eventLoopOverflow(appDirectory);
+        eventLoopReadFailure(appDirectory);
 #endif
     }
 
@@ -790,6 +796,8 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             bool     victimCalled  = false;
             bool     firstBase     = false;
             bool     secondBase    = false;
+            bool     firstStatus   = false;
+            bool     secondStatus  = false;
             bool     after         = false;
         } state;
         FileSystemWatcher::FolderWatcher watchers[3];
@@ -803,7 +811,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
             {
                 state.observed |= 1;
-                state.firstBase     = notification.basePath == state.expectedFirst;
+                state.firstBase   = notification.basePath == state.expectedFirst;
+                state.firstStatus = notification.kind == FileSystemWatcher::NotificationKind::RescanRequired and
+                                    static_cast<bool>(notification.failure);
                 state.victimStopped = static_cast<bool>(state.victim->stopWatching());
                 state.stopped       = static_cast<bool>(state.first->stopWatching());
             }
@@ -815,7 +825,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
             {
                 state.observed |= 2;
-                state.secondBase = notification.basePath == state.expectedSecond;
+                state.secondBase   = notification.basePath == state.expectedSecond;
+                state.secondStatus = notification.kind == FileSystemWatcher::NotificationKind::RescanRequired and
+                                     static_cast<bool>(notification.failure);
             }
             if (notification.relativePath == "after")
                 state.after = true;
@@ -849,7 +861,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         if (not observed)
             return;
         SC_TEST_EXPECT(state.stopped and state.victimStopped and not state.victimCalled and state.firstBase and
-                       state.secondBase);
+                       state.secondBase and state.firstStatus and state.secondStatus);
         SC_TEST_EXPECT(fs.writeString(afterPath.view(), "after"));
         SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.after; }));
 
@@ -867,6 +879,222 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(removed);
         if (removed)
             removeDirectory.disarm();
+    }
+
+    void eventLoopReadFailure(const StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop inotify read failure"))
+            return;
+        FileSystem             fs;
+        const ResultFileSystem fsReady = fs.init(appDirectory);
+        SC_TEST_EXPECT(fsReady);
+        if (not fsReady)
+            return;
+        StringPath directoryName;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(directoryName, "__sc read failure {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(directoryName.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto       removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(directoryName.view()); });
+        StringPath directoryPath;
+        StringPath normalPath;
+        StringPath failurePath;
+        const bool pathsReady = Path::join(directoryPath, {appDirectory, directoryName.view()}) and
+                                Path::join(normalPath, {directoryPath.view(), "normal"}) and
+                                Path::join(failurePath, {directoryPath.view(), "failure"});
+        SC_TEST_EXPECT(pathsReady);
+        if (not pathsReady)
+            return;
+
+        struct Runner : FileSystemWatcherAsyncT<AsyncEventLoop>
+        {
+            int descriptor() const { return notifyFd; }
+
+            void injectReadinessFailure(Result failure)
+            {
+                AsyncFileReadiness::Result result(*eventLoop, asyncPoll, failure);
+                onEventLoopNotification(result);
+            }
+        } runner;
+        AsyncEventLoop          eventLoop;
+        AsyncEventLoop::Options options;
+        options.apiType        = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+        const Result loopReady = eventLoop.create(options);
+        SC_TEST_EXPECT(loopReady);
+        if (not loopReady)
+            return;
+        runner.init(eventLoop);
+        FileSystemWatcher             fileEventsWatcher;
+        const ResultFileSystemWatcher watcherReady = fileEventsWatcher.init(runner);
+        SC_TEST_EXPECT(watcherReady);
+        if (not watcherReady)
+        {
+            (void)eventLoop.close();
+            return;
+        }
+        FileSystemWatcher::FolderWatcher watchers[3];
+        struct FailureState
+        {
+            FileSystemWatcher* owner = nullptr;
+
+            FileSystemWatcher::FolderWatcher* first  = nullptr;
+            FileSystemWatcher::FolderWatcher* victim = nullptr;
+
+            StringView path;
+
+            int fd       = -1;
+            int backupFd = -1;
+
+            unsigned normal   = 0;
+            unsigned failures = 0;
+
+            bool normalStatus   = true;
+            bool restored       = false;
+            bool stopped        = false;
+            bool victimStopped  = false;
+            bool victimCalled   = false;
+            bool rejected       = false;
+            bool closed         = false;
+            bool failureDetails = true;
+        } state;
+        state.owner  = &fileEventsWatcher;
+        state.first  = &watchers[0];
+        state.victim = &watchers[1];
+        state.path   = directoryPath.view();
+        state.fd     = runner.descriptor();
+
+        watchers[0].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            if (notification.kind == FileSystemWatcher::NotificationKind::Change)
+            {
+                ++state.normal;
+                state.normalStatus = state.normalStatus and static_cast<bool>(notification.failure);
+                return;
+            }
+            if (notification.kind != FileSystemWatcher::NotificationKind::WatchStopped)
+                return;
+            ++state.failures;
+            state.failureDetails = notification.basePath == state.path and notification.relativePath.isEmpty() and
+                                   notification.operation == FileSystemWatcher::Operation::AddRemoveRename and
+                                   notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                                   notification.failure.detail == FileSystemWatcherErrorDetail::LinuxReadEvents and
+                                   notification.failure.nativeError == EBADF;
+            if (::dup2(state.backupFd, state.fd) == state.fd)
+            {
+                state.restored = ::close(state.backupFd) == 0;
+                state.backupFd = -1;
+            }
+            FileSystemWatcher::FolderWatcher retry;
+            retry.notifyCallback = [](const FileSystemWatcher::Notification&){};
+            state.rejected = state.owner->watch(retry, state.path).isError(FileSystemWatcherError::MonitoringFailed);
+            state.victimStopped = static_cast<bool>(state.victim->stopWatching());
+            state.stopped       = static_cast<bool>(state.first->stopWatching());
+        };
+        watchers[1].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            if (notification.kind == FileSystemWatcher::NotificationKind::WatchStopped)
+                state.victimCalled = true;
+        };
+        watchers[2].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        {
+            if (notification.kind == FileSystemWatcher::NotificationKind::WatchStopped)
+            {
+                ++state.failures;
+                state.failureDetails = state.failureDetails and notification.basePath == state.path and
+                                       notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                                       notification.failure.detail == FileSystemWatcherErrorDetail::LinuxReadEvents and
+                                       notification.failure.nativeError == EBADF;
+                state.closed = static_cast<bool>(state.owner->close());
+            }
+        };
+        auto closeLoop    = MakeDeferred([&] { (void)eventLoop.close(); });
+        auto closeWatcher = MakeDeferred([&] { (void)fileEventsWatcher.close(); });
+        auto restoreFd    = MakeDeferred(
+            [&]
+            {
+                if (state.backupFd != -1)
+                {
+                    (void)::dup2(state.backupFd, state.fd);
+                    (void)::close(state.backupFd);
+                }
+            });
+        bool allWatching = true;
+        for (auto& watcher : watchers)
+        {
+            const ResultFileSystemWatcher watched = fileEventsWatcher.watch(watcher, directoryPath.view());
+            SC_TEST_EXPECT(watched);
+            allWatching = allWatching and static_cast<bool>(watched);
+        }
+        if (not allWatching)
+            return;
+        submitQueuedWatcher(eventLoop);
+        SC_TEST_EXPECT(fileEventsWatcher.asyncNotify(nullptr)); // A nonblocking read with no events is not a failure.
+        SC_TEST_EXPECT(state.normal == 0 and state.failures == 0);
+        SC_TEST_EXPECT(fs.writeString(normalPath.view(), "normal"));
+        SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.normal != 0; }));
+        SC_TEST_EXPECT(state.normalStatus);
+        SC_TEST_EXPECT(fs.writeString(failurePath.view(), "failure"));
+        state.backupFd = ::dup(state.fd);
+        SC_TEST_EXPECT(state.backupFd != -1);
+        if (state.backupFd == -1)
+            return;
+        const bool invalidated = ::close(state.fd) == 0;
+        SC_TEST_EXPECT(invalidated);
+        if (not invalidated)
+            return;
+        SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.failures == 2; }));
+        SC_TEST_EXPECT(state.restored and state.stopped and state.victimStopped and not state.victimCalled and
+                       state.rejected and state.closed and state.failureDetails);
+        if (not state.closed)
+            return;
+        closeWatcher.disarm();
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+
+        struct AsyncFailureState
+        {
+            FileSystemWatcher* owner = nullptr;
+
+            bool delivered = false;
+            bool closed    = false;
+        } asyncFailure;
+        asyncFailure.owner = &fileEventsWatcher;
+
+        watchers[2].notifyCallback = [&asyncFailure](const FileSystemWatcher::Notification& notification)
+        {
+            asyncFailure.delivered =
+                notification.kind == FileSystemWatcher::NotificationKind::WatchStopped and
+                notification.failure.result.isError(AsyncResultCategory, AsyncError::WatcherRegistrationFailed) and
+                notification.failure.detail == FileSystemWatcherErrorDetail::None and
+                notification.failure.nativeError == 0;
+            asyncFailure.closed = static_cast<bool>(asyncFailure.owner->close());
+        };
+        const ResultFileSystemWatcher reinitialized = fileEventsWatcher.init(runner);
+        SC_TEST_EXPECT(reinitialized);
+        if (not reinitialized)
+            return;
+        auto closeReinitializedWatcher = MakeDeferred([&] { (void)fileEventsWatcher.close(); });
+
+        const ResultFileSystemWatcher rewatched = fileEventsWatcher.watch(watchers[2], directoryPath.view());
+        SC_TEST_EXPECT(rewatched);
+        if (not rewatched)
+            return;
+        runner.injectReadinessFailure(Result::Error(AsyncResultCategory, AsyncError::WatcherRegistrationFailed));
+        SC_TEST_EXPECT(asyncFailure.delivered and asyncFailure.closed);
+        if (not asyncFailure.closed)
+            return;
+        closeReinitializedWatcher.disarm();
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+        const Result loopClosed = eventLoop.close();
+        SC_TEST_EXPECT(loopClosed);
+        if (not loopClosed)
+            return;
+        closeLoop.disarm();
     }
 #endif
 };

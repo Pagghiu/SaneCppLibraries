@@ -90,6 +90,22 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const ResultErrorFormat foreignFormat = formatFileSystemWatcherError(foreignResult, {});
         SC_TEST_EXPECT(foreignFormat.status == ResultErrorFormatStatus::ForeignCategory);
 
+        FileSystemWatcher::Notification notification;
+        SC_TEST_EXPECT(notification.kind == FileSystemWatcher::NotificationKind::Change);
+        SC_TEST_EXPECT(notification.failure);
+        const ResultFileSystemWatcher monitoringFailure(FileSystemWatcherError::MonitoringFailed,
+                                                        FileSystemWatcherErrorDetail::LinuxReadEvents, 5);
+        const ResultErrorFormat monitoringFormat = formatFileSystemWatcherError(monitoringFailure, formattedMessage);
+        SC_TEST_EXPECT(monitoringFormat);
+        SC_TEST_EXPECT(StringView::fromNullTerminated(formattedMessage, StringEncoding::Ascii)
+                           .containsString("Linux read events"));
+        const ResultFileSystemWatcher waitFailure(FileSystemWatcherError::MonitoringFailed,
+                                                  FileSystemWatcherErrorDetail::LinuxWaitForEvents, 5);
+        const ResultErrorFormat       waitFormat = formatFileSystemWatcherError(waitFailure, formattedMessage);
+        SC_TEST_EXPECT(waitFormat);
+        SC_TEST_EXPECT(StringView::fromNullTerminated(formattedMessage, StringEncoding::Ascii)
+                           .containsString("Linux wait for events"));
+
         FileSystemWatcher::ThreadRunner runner;
         SC_TEST_EXPECT(fileEventsWatcher.init(runner));
 

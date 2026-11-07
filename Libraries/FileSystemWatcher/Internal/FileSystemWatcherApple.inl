@@ -443,11 +443,12 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 {
 };
 
-void SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
+bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
 {
     Internal& impl = internal.get();
     if (not impl.refreshing.load() and not impl.closing.load() and impl.watcher->parent == this)
     {
         impl.watcher->notifyCallback(impl.notification);
     }
+    return true;
 }

@@ -45,6 +45,8 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
         formatter.append("Linux inspect directory entry");
         break;
     case FileSystemWatcherErrorDetail::LinuxOpenSubdirectory: formatter.append("Linux open subdirectory"); break;
+    case FileSystemWatcherErrorDetail::LinuxReadEvents: formatter.append("Linux read events"); break;
+    case FileSystemWatcherErrorDetail::LinuxWaitForEvents: formatter.append("Linux wait for events"); break;
     case FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity: formatter.append("Linux watch handle capacity"); break;
     case FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity:
         formatter.append("Linux pending directory capacity");
@@ -94,6 +96,7 @@ inline ResultErrorFormat formatFileSystemWatcherErrorWithDetails(FileSystemWatch
     case FileSystemWatcherError::WatchSetupFailed: formatter.append("Failed to configure watching"); break;
     case FileSystemWatcherError::StopWatchingFailed: formatter.append("Failed to stop watching"); break;
     case FileSystemWatcherError::CloseFailed: formatter.append("Failed to close watcher"); break;
+    case FileSystemWatcherError::MonitoringFailed: formatter.append("Filesystem monitoring stopped"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 

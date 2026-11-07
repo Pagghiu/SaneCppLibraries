@@ -341,9 +341,10 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(Str
     return ResultFileSystemWatcher(true);
 }
 
-void SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher, size_t bytesTransferred)
+bool SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher, size_t bytesTransferred)
 {
     SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher != nullptr);
     SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher->internal.get().fileHandle != INVALID_HANDLE_VALUE);
     FileSystemWatcher::Internal::notifyEntry(*watcher->internal.get().parentEntry, bytesTransferred);
+    return true;
 }

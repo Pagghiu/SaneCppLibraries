@@ -66,8 +66,8 @@ struct FileSystemWatcher
     struct InternalDefinition
     {
         static constexpr int Windows = 3 * sizeof(void*);
-        // Two extra pointers are temporary while Result and ResultFileSystemWatcher carry migration context.
-        static constexpr int Apple   = 44 * sizeof(void*);
+        // The Apple backend keeps a Notification and structured result inline during event-loop handoff.
+        static constexpr int Apple   = 47 * sizeof(void*);
         static constexpr int Linux   = sizeof(void*) * 4;
         static constexpr int Default = Linux;
 
@@ -125,12 +125,24 @@ struct FileSystemWatcher
         AddRemoveRename, ///< A file or directory has been added, removed or renamed
     };
 
+    /// @brief Describes whether a notification represents a change or a loss of monitoring information.
+    enum class NotificationKind
+    {
+        Change,         ///< A file or directory may have changed
+        RescanRequired, ///< Changes were lost; rescan the watched tree and restore coverage if necessary
+        WatchStopped,   ///< Monitoring has stopped; inspect Notification::failure and reinitialize the owner
+    };
+
     /// @brief Notification holding type and path
     struct Notification
     {
-        StringSpan basePath;                        ///< Reference to the watched directory
-        StringSpan relativePath;                    ///< Relative path of the file being notified from `basePath`
-        Operation  operation = Operation::Modified; ///< Notification type
+        StringSpan basePath;     ///< Reference to the watched directory
+        StringSpan relativePath; ///< Relative path of the file being notified from `basePath`
+
+        Operation        operation = Operation::Modified;      ///< Coarse change class
+        NotificationKind kind      = NotificationKind::Change; ///< Change or monitoring status
+
+        ResultFileSystemWatcher failure; ///< Failure when kind is WatchStopped; successful otherwise
 
         /// @brief Get the full path of the file being watched.
         /// @param path StringPath that will hold full (absolute) path
@@ -201,6 +213,7 @@ struct FileSystemWatcher
         virtual Result appleWakeUpAndWait()     = 0;
 
 #elif SC_PLATFORM_LINUX
+        // On failure, no readiness request may remain active or retain notifyFd.
         virtual Result linuxStartSharedFileReadiness() = 0;
         virtual Result linuxStopSharedFileReadiness()  = 0;
 
@@ -234,6 +247,7 @@ struct FileSystemWatcher
     ResultFileSystemWatcher init(EventLoopRunner& runner);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
+    /// @note On Linux, closing from the ThreadRunner callback fails; close from another thread after the callback.
     /// @return Valid Result if resources have been freed successfully
     ResultFileSystemWatcher close();
 
@@ -245,7 +259,10 @@ struct FileSystemWatcher
     /// @note A missing root or a root that is not a directory is rejected without consuming the FolderWatcher.
     ResultFileSystemWatcher watch(FolderWatcher& watcher, StringSpan path);
 
-    void asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
+    bool asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
+#if SC_PLATFORM_LINUX
+    void asyncNotifyFailure(Result failure);
+#endif
 
   private:
     friend decltype(internal);
@@ -347,13 +364,47 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         return asyncPoll.start(*eventLoop, notifyFd);
     }
 
-    virtual Result linuxStopSharedFileReadiness() override { return asyncPoll.stop(*eventLoop); }
+    virtual Result linuxStopSharedFileReadiness() override
+    {
+        if (linuxDeliveryAlive != nullptr)
+        {
+            *linuxDeliveryAlive = false;
+            linuxDeliveryAlive  = nullptr;
+        }
+        if (not asyncPoll.isFree())
+        {
+            SC_TRY(asyncPoll.stop(*eventLoop));
+            while (not asyncPoll.isFree())
+            {
+                SC_TRY(eventLoop->runNoWait());
+            }
+        }
+        return Result(true);
+    }
 
     void onEventLoopNotification(typename T_AsyncFileReadiness::Result& result)
     {
-        fileSystemWatcher->asyncNotify(nullptr);
-        result.reactivateRequest(true);
+        bool deliveryAlive = true;
+        linuxDeliveryAlive = &deliveryAlive;
+
+        bool rearm = false;
+        if (result.isValid())
+        {
+            rearm = fileSystemWatcher->asyncNotify(nullptr);
+        }
+        else
+        {
+            fileSystemWatcher->asyncNotifyFailure(result.isValid());
+        }
+        if (deliveryAlive)
+        {
+            linuxDeliveryAlive = nullptr;
+            if (rearm)
+                result.reactivateRequest(true);
+        }
     }
+
+    bool* linuxDeliveryAlive = nullptr;
 
     T_AsyncFileReadiness asyncPoll = {};
 #else

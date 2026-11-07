@@ -51,6 +51,14 @@ The normal lifecycle is `init`, one or more `watch` calls, optional `stopWatchin
 may be reused after it is stopped. Calling `close` stops all remaining watchers, so explicit per-folder shutdown is not
 required when the entire owner is being torn down.
 
+`Notification::kind` distinguishes an ordinary `Change`, a `RescanRequired` hint when changes were lost, and
+`WatchStopped` when monitoring has failed. The latter carries a failure in `Notification::failure`. A folder remains
+attached until it is stopped or the owner is closed; close and reinitialize the owner before starting new watches.
+Both status notifications use an empty relative path and the coarse
+`AddRemoveRename` operation. An ordinary `Change` is not a guarantee that coverage is complete. Status reporting is
+currently implemented for Linux queue overflow and fatal inotify or readiness errors; other native coverage-loss cases
+are not yet classified consistently.
+
 The watched root must be an existing directory. A missing root or a regular file is rejected, and the same
 `FolderWatcher` can be used for a later watch. A successful root check does not guarantee that the path cannot change
 while the native watch is being set up.
@@ -96,9 +104,12 @@ entry or symbolic-link target is no longer present. It does not yet add watches 
 When Linux folder watches on the same owner overlap, stopping one folder leaves shared native watches active for the
 other folders that still use them.
 
-If the shared Linux inotify queue overflows, each remaining folder receives a root-level `AddRemoveRename` notification
-with an empty relative path because individual names were lost. Rescan and restart the watch if recursive coverage must
-include directories created during the loss. Other ambiguous changes can produce the same root hint.
+If the shared Linux inotify queue overflows, each remaining folder receives a `RescanRequired` notification because
+individual names were lost. Rescan and restart the watch if recursive coverage must include directories created during
+the loss. A fatal inotify read, worker wait or Async readiness failure sends `WatchStopped` to each remaining folder;
+the owner rejects new watches until it is closed and reinitialized. Other cases that can lose coverage are not yet
+reported reliably. On Linux, do not call `FileSystemWatcher::close` from its own ThreadRunner callback: it returns a
+close error, and another thread can close the owner after that callback returns.
 
 The underlying operating-system services may allocate their own resources. In particular, the Apple backend uses
 CoreServices objects while rebuilding its FSEvents stream. The allocation-free API shape therefore means caller-owned,

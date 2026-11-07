@@ -63,12 +63,14 @@ struct SC::FileSystemWatcher::Internal
     EventLoopRunner*      eventLoopRunner = nullptr;
     ThreadRunnerInternal* threadingRunner = nullptr;
 
-    int notifyFd = -1; // inotify file descriptor
+    int  notifyFd         = -1; // inotify file descriptor
+    bool monitoringFailed = false;
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
-        self            = &parent;
-        threadingRunner = &runner.get();
+        self             = &parent;
+        threadingRunner  = &runner.get();
+        monitoringFailed = false;
 
         if (::pipe2(threadingRunner->shutdownPipe, O_CLOEXEC) == -1)
         {
@@ -94,19 +96,35 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
-        self            = &parent;
-        eventLoopRunner = &runner;
+        self             = &parent;
+        eventLoopRunner  = &runner;
+        monitoringFailed = false;
 
         notifyFd = ::inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
         if (notifyFd == -1)
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
+
+            self            = nullptr;
+            eventLoopRunner = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
                                            FileSystemWatcherErrorDetail::LinuxInitializeInotify, nativeError);
         }
 
         eventLoopRunner->internalInit(parent, notifyFd);
-        return eventLoopRunner->linuxStartSharedFileReadiness();
+        const Result started = eventLoopRunner->linuxStartSharedFileReadiness();
+        if (not started)
+        {
+            ::close(notifyFd);
+            notifyFd = -1;
+
+            eventLoopRunner->notifyFd          = -1;
+            eventLoopRunner->fileSystemWatcher = nullptr;
+
+            eventLoopRunner = nullptr;
+            self            = nullptr;
+        }
+        return started;
     }
 
     ResultFileSystemWatcher close()
@@ -118,15 +136,13 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY(eventLoopRunner->linuxStopSharedFileReadiness());
         }
 
-        while (FolderWatcher* entry = self->watchers.front)
-        {
-            SC_TRY(stopWatching(*entry));
-        }
-
         if (threadingRunner)
         {
             if (threadingRunner->thread.wasStarted())
             {
+                if (::pthread_equal(::pthread_self(), threadingRunner->thread.thread))
+                    return ResultFileSystemWatcher(FileSystemWatcherError::CloseFailed,
+                                                   FileSystemWatcherErrorDetail::PosixPthreadJoin, EDEADLK);
                 threadingRunner->shouldStop.exchange(true);
 
                 // Write to shutdownPipe to unblock the ::select() in the dedicated thread
@@ -143,6 +159,15 @@ struct SC::FileSystemWatcher::Internal
                 }
                 SC_TRY(threadingRunner->thread.join());
             }
+        }
+        // The thread must no longer be dispatching before the owner unlinks its folder watchers.
+        while (FolderWatcher* entry = self->watchers.front)
+        {
+            SC_TRY(stopWatching(*entry));
+        }
+
+        if (threadingRunner)
+        {
             threadingRunner->closeShutdownPipe();
         }
         if (notifyFd != -1)
@@ -150,6 +175,14 @@ struct SC::FileSystemWatcher::Internal
             ::close(notifyFd);
             notifyFd = -1;
         }
+        self = nullptr;
+        if (eventLoopRunner)
+        {
+            eventLoopRunner->notifyFd          = -1;
+            eventLoopRunner->fileSystemWatcher = nullptr;
+            eventLoopRunner                    = nullptr;
+        }
+        threadingRunner = nullptr;
         return ResultFileSystemWatcher(true);
     }
 
@@ -246,6 +279,11 @@ struct SC::FileSystemWatcher::Internal
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
 
+        if (monitoringFailed)
+        {
+            detachUnstartedWatcher(*entry);
+            return ResultFileSystemWatcher(FileSystemWatcherError::MonitoringFailed);
+        }
         if (entry->path.view().getEncoding() == StringEncoding::Utf16)
         {
             detachUnstartedWatcher(*entry);
@@ -461,31 +499,42 @@ struct SC::FileSystemWatcher::Internal
             }
 
             // Setup a select fd_set to listen on both notifyFd and shutdownPipe simultaneously
-            fd_set fds;
-            FD_ZERO(&fds);
-            FD_SET(currentNotifyFd, &fds);
-            FD_SET(shutdownFd, &fds);
+            fd_set    fds;
             const int maxFd = currentNotifyFd > shutdownFd ? currentNotifyFd : shutdownFd;
 
             int selectRes;
             do
             {
+                // select may alter the sets on interruption, so rebuild them for each retry.
+                FD_ZERO(&fds);
+                FD_SET(currentNotifyFd, &fds);
+                FD_SET(shutdownFd, &fds);
                 // Block until some events are received on the notifyFd or when shutdownPipe is written to
                 selectRes = ::select(maxFd + 1, &fds, nullptr, nullptr, nullptr);
             } while (selectRes == -1 and errno == EINTR);
 
+            if (selectRes == -1)
+            {
+                failMonitoring(ResultFileSystemWatcher(FileSystemWatcherError::MonitoringFailed,
+                                                       FileSystemWatcherErrorDetail::LinuxWaitForEvents,
+                                                       static_cast<uint32_t>(errno)));
+                return;
+            }
             if (FD_ISSET(shutdownFd, &fds))
             {
                 return; // Interrupted by write to shutdown pipe (from close())
             }
             // Here select has received data on notifyHandle
-            readAndNotify(currentNotifyFd, self->watchers);
+            if (not readAndNotify(currentNotifyFd, self->watchers))
+                return;
         }
         threadingRunner->shouldStop.exchange(false);
     }
 
-    static void readAndNotify(const int notifyFd, WatcherLinkedList& watchers)
+    bool readAndNotify(const int notifyFd, WatcherLinkedList& watchers)
     {
+        if (monitoringFailed)
+            return false;
         int  numReadBytes;
         char inotifyBuffer[3 * 1024];
         // TODO: Handle the case where kernel is sending more than 3kb of events.
@@ -494,8 +543,58 @@ struct SC::FileSystemWatcher::Internal
             numReadBytes = ::read(notifyFd, inotifyBuffer, sizeof(inotifyBuffer));
         } while (numReadBytes == -1 and errno == EINTR);
 
+        if (numReadBytes == -1 and (errno == EAGAIN or errno == EWOULDBLOCK))
+            return true;
+        if (numReadBytes <= 0)
+        {
+            const uint32_t nativeError = numReadBytes == -1 ? static_cast<uint32_t>(errno) : 0;
+            failMonitoring(ResultFileSystemWatcher(FileSystemWatcherError::MonitoringFailed,
+                                                   FileSystemWatcherErrorDetail::LinuxReadEvents, nativeError));
+            return false;
+        }
         Span<char> actuallyRead = {inotifyBuffer, static_cast<size_t>(numReadBytes)};
         notifyWatchers(actuallyRead, watchers);
+        return true;
+    }
+
+    void failMonitoring(ResultFileSystemWatcher failure)
+    {
+        if (monitoringFailed)
+            return;
+        monitoringFailed = true;
+        notifyRoots(self->watchers, NotificationKind::WatchStopped, failure);
+    }
+
+    static void notifyRoots(WatcherLinkedList& watchers, NotificationKind kind, ResultFileSystemWatcher failure)
+    {
+        // Rescan the live list after each callback: it may stop and release another folder.
+        // Address order visits each remaining folder at most once without auxiliary storage.
+        uintptr_t previousAddress = 0;
+        bool      havePrevious    = false;
+        for (;;)
+        {
+            const FolderWatcher* next        = nullptr;
+            uintptr_t            nextAddress = 0;
+            for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
+            {
+                const uintptr_t address = reinterpret_cast<uintptr_t>(entry);
+                if ((not havePrevious or address > previousAddress) and (next == nullptr or address < nextAddress))
+                {
+                    next        = entry;
+                    nextAddress = address;
+                }
+            }
+            if (next == nullptr)
+                break;
+            previousAddress = nextAddress;
+            havePrevious    = true;
+            Notification notification;
+            notification.basePath  = next->path.view();
+            notification.operation = Operation::AddRemoveRename;
+            notification.kind      = kind;
+            notification.failure   = failure;
+            next->notifyCallback(notification);
+        }
     }
 
     static void notifyWatchers(Span<char> actuallyRead, WatcherLinkedList& watchers)
@@ -512,33 +611,7 @@ struct SC::FileSystemWatcher::Internal
 
             if (event->mask & IN_Q_OVERFLOW)
             {
-                // Rescan the live list after each callback: it may stop and release another folder.
-                // Address order visits each remaining folder at most once without auxiliary storage.
-                uintptr_t previousAddress = 0;
-                bool      havePrevious    = false;
-                for (;;)
-                {
-                    const FolderWatcher* next        = nullptr;
-                    uintptr_t            nextAddress = 0;
-                    for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
-                    {
-                        const uintptr_t address = reinterpret_cast<uintptr_t>(entry);
-                        if ((not havePrevious or address > previousAddress) and
-                            (next == nullptr or address < nextAddress))
-                        {
-                            next        = entry;
-                            nextAddress = address;
-                        }
-                    }
-                    if (next == nullptr)
-                        break;
-                    previousAddress = nextAddress;
-                    havePrevious    = true;
-                    Notification notification;
-                    notification.basePath  = next->path.view();
-                    notification.operation = Operation::AddRemoveRename;
-                    next->notifyCallback(notification);
-                }
+                notifyRoots(watchers, NotificationKind::RescanRequired, ResultFileSystemWatcher(true));
                 prevEvent = nullptr;
                 continue;
             }
@@ -628,7 +701,12 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(Str
     return ResultFileSystemWatcher(true);
 }
 
-void SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
+bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
 {
-    internal.get().readAndNotify(internal.get().notifyFd, internal.get().self->watchers);
+    return internal.get().readAndNotify(internal.get().notifyFd, internal.get().self->watchers);
+}
+
+void SC::FileSystemWatcher::asyncNotifyFailure(Result failure)
+{
+    internal.get().failMonitoring(ResultFileSystemWatcher(failure));
 }
