@@ -46,6 +46,7 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
         break;
     case FileSystemWatcherErrorDetail::LinuxOpenSubdirectory: formatter.append("Linux open subdirectory"); break;
     case FileSystemWatcherErrorDetail::LinuxReadEvents: formatter.append("Linux read events"); break;
+    case FileSystemWatcherErrorDetail::LinuxWatchInvalidated: formatter.append("Linux watch invalidated"); break;
     case FileSystemWatcherErrorDetail::LinuxWaitForEvents: formatter.append("Linux wait for events"); break;
     case FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity: formatter.append("Linux watch handle capacity"); break;
     case FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity:

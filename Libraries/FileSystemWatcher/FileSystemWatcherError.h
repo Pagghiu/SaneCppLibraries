@@ -68,6 +68,7 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     LinuxOpenSubdirectory,
     LinuxReadEvents,
     LinuxWaitForEvents,
+    LinuxWatchInvalidated,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

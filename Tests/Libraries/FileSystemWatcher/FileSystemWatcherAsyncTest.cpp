@@ -37,6 +37,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopCloseMultipleWatchers(appDirectory);
         eventLoopOverlappingWatchers(appDirectory);
 #if SC_PLATFORM_LINUX
+        eventLoopWatchInvalidation(appDirectory);
         eventLoopOverflow(appDirectory);
         eventLoopReadFailure(appDirectory);
 #endif
@@ -708,6 +709,119 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     }
 
 #if SC_PLATFORM_LINUX
+    void eventLoopWatchInvalidation(const StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop inotify watch invalidation"))
+            return;
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        StringPath fixture;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(fixture, "__sc inotify invalidation {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(fixture.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto cleanup = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(fixture.view()); });
+
+        StringPath tree, child, grandchild, sibling, moved, movedChild;
+        SC_TEST_EXPECT(Path::join(tree, {appDirectory, fixture.view(), "tree"}));
+        SC_TEST_EXPECT(Path::join(child, {tree.view(), "child"}));
+        SC_TEST_EXPECT(Path::join(grandchild, {child.view(), "grandchild"}));
+        SC_TEST_EXPECT(Path::join(sibling, {tree.view(), "child-other"}));
+        SC_TEST_EXPECT(Path::join(moved, {appDirectory, fixture.view(), "moved"}));
+        SC_TEST_EXPECT(Path::join(movedChild, {moved.view(), "grandchild"}));
+        SC_TEST_EXPECT(fs.makeDirectoryRecursive(grandchild.view()));
+        SC_TEST_EXPECT(fs.makeDirectory(sibling.view()));
+
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(loop);
+        FileSystemWatcher                owner;
+        FileSystemWatcher::FolderWatcher outer, inner;
+        auto                             closeOwner = MakeDeferred([&] { (void)owner.close(); });
+        SC_TEST_EXPECT(owner.init(runner));
+
+        using Kind = FileSystemWatcher::NotificationKind;
+        struct State
+        {
+            unsigned rescans      = 0;
+            unsigned outerStopped = 0;
+            unsigned innerStopped = 0;
+            bool     validStatus  = true;
+            bool     stalePath    = false;
+            bool     siblingSeen  = false;
+            bool     movedSeen    = false;
+        } state;
+        outer.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == Kind::RescanRequired)
+            {
+                ++state.rescans;
+                state.validStatus = state.validStatus and event.failure and event.relativePath.isEmpty();
+            }
+            if (event.kind == Kind::WatchStopped)
+            {
+                ++state.outerStopped;
+                state.validStatus = state.validStatus and event.relativePath.isEmpty() and
+                                    event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                                    event.failure.detail == FileSystemWatcherErrorDetail::LinuxWatchInvalidated;
+            }
+            const StringView path = event.relativePath;
+            state.stalePath |= path.endsWith("stale.txt");
+            state.siblingSeen |= path == "child-other/marker.txt";
+        };
+        inner.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == Kind::WatchStopped)
+            {
+                ++state.innerStopped;
+                state.validStatus = state.validStatus and event.relativePath.isEmpty() and
+                                    event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                                    event.failure.detail == FileSystemWatcherErrorDetail::LinuxWatchInvalidated;
+            }
+            const StringView path = event.relativePath;
+            state.stalePath |= path.endsWith("stale.txt");
+            state.movedSeen |= path.endsWith("restarted.txt");
+        };
+        const auto write = [&](StringView directory, StringView name)
+        {
+            StringPath path;
+            return Path::join(path, {directory, name}) and fs.writeString(path.view(), "event");
+        };
+
+        SC_TEST_EXPECT(owner.watch(outer, tree.view()));
+        SC_TEST_EXPECT(owner.watch(inner, child.view()));
+        submitQueuedWatcher(loop);
+        SC_TEST_EXPECT(fs.rename(child.view(), moved.view()));
+        SC_TEST_EXPECT(write(movedChild.view(), "stale.txt"));
+        SC_TEST_EXPECT(write(sibling.view(), "marker.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.siblingSeen; }));
+        SC_TEST_EXPECT(state.rescans == 1);
+        SC_TEST_EXPECT(state.innerStopped == 1);
+        SC_TEST_EXPECT(not state.stalePath);
+
+        SC_TEST_EXPECT(inner.stopWatching());
+        SC_TEST_EXPECT(owner.watch(inner, moved.view()));
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(tree.view()));
+        SC_TEST_EXPECT(write(movedChild.view(), "restarted.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.movedSeen; }));
+        SC_TEST_EXPECT(state.outerStopped == 1);
+        SC_TEST_EXPECT(state.innerStopped == 1);
+        SC_TEST_EXPECT(state.validStatus);
+        SC_TEST_EXPECT(outer.stopWatching());
+        SC_TEST_EXPECT(inner.stopWatching());
+        SC_TEST_EXPECT(owner.close());
+        closeOwner.disarm();
+        SC_TEST_EXPECT(loop.close());
+    }
+
     void eventLoopOverflow(const StringView appDirectory)
     {
         if (not test_section("AsyncEventLoop inotify overflow"))

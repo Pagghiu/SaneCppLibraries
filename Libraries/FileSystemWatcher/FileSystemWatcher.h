@@ -130,7 +130,7 @@ struct FileSystemWatcher
     {
         Change,         ///< A file or directory may have changed
         RescanRequired, ///< Changes were lost; rescan the watched tree and restore coverage if necessary
-        WatchStopped,   ///< Monitoring has stopped; inspect Notification::failure and reinitialize the owner
+        WatchStopped,   ///< Monitoring has stopped for this root; inspect Notification::failure before restarting
     };
 
     /// @brief Notification holding type and path

@@ -21,7 +21,9 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
         int32_t notifyID   = 0;
         int32_t nameOffset = 0;
 
-        bool operator==(Pair other) const { return notifyID == other.notifyID; }
+        // Negative IDs retain cleanup ownership after their paths become invalid.
+        int32_t nativeID() const { return notifyID < 0 ? -notifyID : notifyID; }
+        void    suppress() { notifyID = -nativeID(); }
     };
 
     Pair   notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
@@ -194,7 +196,7 @@ struct SC::FileSystemWatcher::Internal
             const FolderWatcherInternal& otherInternal = other->internal.get();
             for (size_t idx = 0; idx < otherInternal.notifyHandlesCount; ++idx)
             {
-                if (otherInternal.notifyHandles[idx].notifyID == watchId)
+                if (otherInternal.notifyHandles[idx].nativeID() == watchId)
                     return true;
             }
         }
@@ -217,8 +219,8 @@ struct SC::FileSystemWatcher::Internal
         ResultFileSystemWatcher result(true);
         for (size_t idx = 0; idx < folderInternal.notifyHandlesCount; ++idx)
         {
-            const int watchId = folderInternal.notifyHandles[idx].notifyID;
-            if (isWatchUsedByAnotherFolder(watchId))
+            const int watchId = folderInternal.notifyHandles[idx].nativeID();
+            if (watchId == 0 or isWatchUsedByAnotherFolder(watchId))
                 continue;
 
             int res;
@@ -535,8 +537,8 @@ struct SC::FileSystemWatcher::Internal
     {
         if (monitoringFailed)
             return false;
-        int  numReadBytes;
-        char inotifyBuffer[3 * 1024];
+        int                                numReadBytes;
+        alignas(struct inotify_event) char inotifyBuffer[3 * 1024];
         // TODO: Handle the case where kernel is sending more than 3kb of events.
         do
         {
@@ -565,7 +567,8 @@ struct SC::FileSystemWatcher::Internal
         notifyRoots(self->watchers, NotificationKind::WatchStopped, failure);
     }
 
-    static void notifyRoots(WatcherLinkedList& watchers, NotificationKind kind, ResultFileSystemWatcher failure)
+    template <typename Visit>
+    static void forEachLiveFolder(WatcherLinkedList& watchers, Visit visit)
     {
         // Rescan the live list after each callback: it may stop and release another folder.
         // Address order visits each remaining folder at most once without auxiliary storage.
@@ -573,9 +576,9 @@ struct SC::FileSystemWatcher::Internal
         bool      havePrevious    = false;
         for (;;)
         {
-            const FolderWatcher* next        = nullptr;
-            uintptr_t            nextAddress = 0;
-            for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
+            FolderWatcher* next        = nullptr;
+            uintptr_t      nextAddress = 0;
+            for (FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
             {
                 const uintptr_t address = reinterpret_cast<uintptr_t>(entry);
                 if ((not havePrevious or address > previousAddress) and (next == nullptr or address < nextAddress))
@@ -588,13 +591,74 @@ struct SC::FileSystemWatcher::Internal
                 break;
             previousAddress = nextAddress;
             havePrevious    = true;
-            Notification notification;
-            notification.basePath  = next->path.view();
-            notification.operation = Operation::AddRemoveRename;
-            notification.kind      = kind;
-            notification.failure   = failure;
-            next->notifyCallback(notification);
+            visit(*next);
         }
+    }
+
+    static void notifyRoot(const FolderWatcher& entry, NotificationKind kind,
+                           ResultFileSystemWatcher failure = ResultFileSystemWatcher(true))
+    {
+        Notification notification;
+        notification.basePath  = entry.path.view();
+        notification.operation = Operation::AddRemoveRename;
+        notification.kind      = kind;
+        notification.failure   = failure;
+        entry.notifyCallback(notification);
+    }
+
+    static void notifyRoots(WatcherLinkedList& watchers, NotificationKind kind, ResultFileSystemWatcher failure)
+    {
+        forEachLiveFolder(watchers,
+                          [&](const FolderWatcher& entry)
+                          {
+                              if (entry.internal.get().notifyHandles[0].notifyID > 0)
+                                  notifyRoot(entry, kind, failure);
+                          });
+    }
+
+    static void invalidateWatch(FolderWatcher& entry, const struct inotify_event& event)
+    {
+        auto&      folder     = entry.internal.get();
+        auto&      root       = folder.notifyHandles[0];
+        const bool rootActive = root.notifyID > 0;
+        const bool rootLost   = rootActive and root.notifyID == event.wd;
+        if (rootLost)
+            root.suppress();
+
+        bool subtreeLost = false;
+        for (size_t index = 1; rootActive and not rootLost and index < folder.notifyHandlesCount; ++index)
+        {
+            auto& lost = folder.notifyHandles[index];
+            if (lost.notifyID != event.wd)
+                continue;
+
+            subtreeLost = true;
+            lost.suppress();
+            const char*  directory = folder.relativePaths.writableSpan.data() + lost.nameOffset;
+            const size_t length    = ::strlen(directory);
+            for (size_t child = 1; child < folder.notifyHandlesCount; ++child)
+            {
+                auto&       candidate = folder.notifyHandles[child];
+                const char* path      = folder.relativePaths.writableSpan.data() + candidate.nameOffset;
+                if (::strncmp(path, directory, length) == 0 and path[length] == '/')
+                    candidate.suppress();
+            }
+        }
+
+        if (event.mask & IN_IGNORED)
+        {
+            for (size_t index = 0; index < folder.notifyHandlesCount; ++index)
+            {
+                if (folder.notifyHandles[index].nativeID() == event.wd)
+                    folder.notifyHandles[index].notifyID = 0;
+            }
+        }
+
+        if (rootLost)
+            notifyRoot(entry, NotificationKind::WatchStopped,
+                       {FileSystemWatcherError::MonitoringFailed, FileSystemWatcherErrorDetail::LinuxWatchInvalidated});
+        else if (subtreeLost)
+            notifyRoot(entry, NotificationKind::RescanRequired);
     }
 
     static void notifyWatchers(Span<char> actuallyRead, WatcherLinkedList& watchers)
@@ -615,16 +679,23 @@ struct SC::FileSystemWatcher::Internal
                 prevEvent = nullptr;
                 continue;
             }
+            if (event->mask & (IN_DELETE_SELF | IN_MOVE_SELF | IN_UNMOUNT | IN_IGNORED))
+            {
+                forEachLiveFolder(watchers, [&](FolderWatcher& entry) { invalidateWatch(entry, *event); });
+                prevEvent = nullptr;
+                continue;
+            }
 
             // Every folder must compare against the same preceding kernel event.
             const struct inotify_event* previousEvent = prevEvent;
             for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
             {
-                // Check if current FolderWatcher has a watcher matching the one from current event
-                FolderWatcherInternal::Pair pair{event->wd, 0};
-                for (size_t idx = 0; idx < entry->internal.get().notifyHandlesCount; ++idx)
+                const auto& folder = entry->internal.get();
+                if (folder.notifyHandles[0].notifyID <= 0)
+                    continue;
+                for (size_t idx = 0; idx < folder.notifyHandlesCount; ++idx)
                 {
-                    if (entry->internal.get().notifyHandles[idx] == pair)
+                    if (folder.notifyHandles[idx].notifyID == event->wd)
                     {
                         (void)notifySingleEvent(event, previousEvent, entry, idx);
                         prevEvent = event;
@@ -643,12 +714,13 @@ struct SC::FileSystemWatcher::Internal
         Notification notification;
 
         notification.basePath = entry->path.view();
+        const char* eventName = event->len == 0 ? "" : event->name;
 
         // 1. Compute relative Path
         if (foundIndex == 0)
         {
             // Something changed in the original root folder being watched
-            notification.relativePath = StringSpan({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
+            notification.relativePath = StringSpan::fromNullTerminated(eventName, StringEncoding::Utf8);
         }
         else
         {
@@ -661,7 +733,7 @@ struct SC::FileSystemWatcher::Internal
                     : "";
 
             const StringSpan relativeDirectory = StringSpan::fromNullTerminated(dirStart, StringEncoding::Utf8);
-            const StringSpan relativeName      = StringSpan::fromNullTerminated(event->name, StringEncoding::Utf8);
+            const StringSpan relativeName      = StringSpan::fromNullTerminated(eventName, StringEncoding::Utf8);
 
             if (not eventPath.assign(relativeDirectory) or not eventPath.append("/") or
                 not eventPath.append(relativeName))
