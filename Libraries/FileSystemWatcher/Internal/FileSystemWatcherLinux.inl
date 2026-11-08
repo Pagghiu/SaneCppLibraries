@@ -685,6 +685,27 @@ struct SC::FileSystemWatcher::Internal
                 prevEvent = nullptr;
                 continue;
             }
+            if ((event->mask & IN_ISDIR) and (event->mask & (IN_CREATE | IN_MOVED_TO)))
+            {
+                // The parent event provides no coverage for changes inside the arriving directory.
+                forEachLiveFolder(watchers,
+                                  [&](const FolderWatcher& entry)
+                                  {
+                                      const auto& folder = entry.internal.get();
+                                      if (folder.notifyHandles[0].notifyID <= 0)
+                                          return;
+                                      for (size_t idx = 0; idx < folder.notifyHandlesCount; ++idx)
+                                      {
+                                          if (folder.notifyHandles[idx].notifyID == event->wd)
+                                          {
+                                              notifyRoot(entry, NotificationKind::RescanRequired);
+                                              break;
+                                          }
+                                      }
+                                  });
+                prevEvent = nullptr;
+                continue;
+            }
 
             // Every folder must compare against the same preceding kernel event.
             const struct inotify_event* previousEvent = prevEvent;

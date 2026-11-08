@@ -752,6 +752,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         struct State
         {
             unsigned rescans      = 0;
+            unsigned innerRescans = 0;
             unsigned outerStopped = 0;
             unsigned innerStopped = 0;
             bool     validStatus  = true;
@@ -779,6 +780,11 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         };
         inner.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
         {
+            if (event.kind == Kind::RescanRequired)
+            {
+                ++state.innerRescans;
+                state.validStatus = state.validStatus and event.failure and event.relativePath.isEmpty();
+            }
             if (event.kind == Kind::WatchStopped)
             {
                 ++state.innerStopped;
@@ -814,8 +820,28 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(runUntil(loop, [&state] { return state.movedSeen; }));
         SC_TEST_EXPECT(state.outerStopped == 1);
         SC_TEST_EXPECT(state.innerStopped == 1);
-        SC_TEST_EXPECT(state.validStatus);
         SC_TEST_EXPECT(outer.stopWatching());
+
+        StringPath createdDirectory, incomingDirectory, importedDirectory;
+        SC_TEST_EXPECT(Path::join(createdDirectory, {moved.view(), "created"}));
+        SC_TEST_EXPECT(Path::join(incomingDirectory, {appDirectory, fixture.view(), "incoming"}));
+        SC_TEST_EXPECT(Path::join(importedDirectory, {movedChild.view(), "imported"}));
+        SC_TEST_EXPECT(fs.makeDirectory(createdDirectory.view()));
+        SC_TEST_EXPECT(fs.makeDirectory(incomingDirectory.view()));
+        SC_TEST_EXPECT(write(incomingDirectory.view(), "already-present.txt"));
+        SC_TEST_EXPECT(fs.rename(incomingDirectory.view(), importedDirectory.view()));
+        state.movedSeen = false;
+        SC_TEST_EXPECT(write(moved.view(), "restarted.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.movedSeen; }));
+        SC_TEST_EXPECT(state.innerRescans == 2);
+        SC_TEST_EXPECT(state.validStatus);
+
+        SC_TEST_EXPECT(inner.stopWatching());
+        SC_TEST_EXPECT(owner.watch(inner, moved.view()));
+        state.movedSeen = false;
+        SC_TEST_EXPECT(write(importedDirectory.view(), "restarted.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.movedSeen; }));
+        SC_TEST_EXPECT(state.innerRescans == 2);
         SC_TEST_EXPECT(inner.stopWatching());
         SC_TEST_EXPECT(owner.close());
         closeOwner.disarm();
