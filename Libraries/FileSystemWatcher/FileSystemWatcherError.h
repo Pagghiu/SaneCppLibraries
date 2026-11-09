@@ -69,6 +69,8 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     LinuxReadEvents,
     LinuxWaitForEvents,
     LinuxWatchInvalidated,
+    AppleResolveWatchRoot,
+    AppleWatchInvalidated,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

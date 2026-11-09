@@ -46,10 +46,14 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::watch(FolderWatcher& watcher,
         return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                        FileSystemWatcherErrorDetail::AssignWatchPath);
 #if SC_PLATFORM_APPLE
-    SC_TRY(internal.get().validateWatchPath(watcher.path.view()));
+    SC_TRY(internal.get().prepareWatchPath(watcher));
+    internal.get().mutex.lock();
 #endif
     watcher.parent = this;
     watchers.queueBack(watcher);
+#if SC_PLATFORM_APPLE
+    internal.get().mutex.unlock();
+#endif
     return internal.get().startWatching(&watcher);
 }
 

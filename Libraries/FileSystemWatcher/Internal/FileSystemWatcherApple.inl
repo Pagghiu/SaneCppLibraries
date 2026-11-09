@@ -9,6 +9,7 @@
 #include <CoreServices/CoreServices.h> // FSEvents
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <unistd.h>
 
 #include <AvailabilityMacros.h>
@@ -17,6 +18,12 @@
 // TODO: Figure out another API for ios as this is a private API and it will not be accepted on app store.
 #include "FSEventsIOS.h"
 #endif
+
+struct SC::FileSystemWatcher::FolderWatcherInternal
+{
+    StringPath canonicalPath;
+    bool       stopped = false;
+};
 
 struct SC::FileSystemWatcher::Internal
 {
@@ -32,21 +39,31 @@ struct SC::FileSystemWatcher::Internal
 
     // Used to pass data from thread to async callback
     Notification   notification;
-    FolderWatcher* watcher;
+    FolderWatcher* watcher = nullptr;
     FSWAtomicBool  closing;
     FSWAtomicBool  refreshing;
 
     //...
     //! [OpaqueDefinition1Snippet]
 
-    static ResultFileSystemWatcher validateWatchPath(StringSpan path)
+    static ResultFileSystemWatcher prepareWatchPath(FolderWatcher& entry)
     {
-        const int fd = ::open(path.bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        const int fd = ::open(entry.path.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
         if (fd == -1)
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleOpenRootDirectory,
                                            static_cast<uint32_t>(errno));
-        (void)::close(fd);
+        auto closeDirectory = MakeDeferred([fd] { (void)::close(fd); });
+        char canonicalPath[PATH_MAX];
+        if (::fcntl(fd, F_GETPATH, canonicalPath) == -1)
+            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
+                                           FileSystemWatcherErrorDetail::AppleResolveWatchRoot,
+                                           static_cast<uint32_t>(errno));
+        auto& folder = entry.internal.get();
+        if (not folder.canonicalPath.assign(StringSpan::fromNullTerminated(canonicalPath, StringEncoding::Utf8)))
+            return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
+                                           FileSystemWatcherErrorDetail::AppleResolveWatchRoot);
+        folder.stopped = false;
         return ResultFileSystemWatcher(true);
     }
 
@@ -168,36 +185,40 @@ struct SC::FileSystemWatcher::Internal
                     CFRelease(watchedPaths[idx]);
                 }
             });
+        mutex.lock();
+        auto unlock = MakeDeferred([&] { mutex.unlock(); });
         for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
         {
+            const auto& folder = it->internal.get();
+            if (folder.stopped)
+                continue;
+            if (numAllocatedPaths == ThreadRunnerDefinition::MaxWatchablePaths)
+                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
+                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
             watchedPaths[numAllocatedPaths] =
                 CFStringCreateWithFileSystemRepresentation(nullptr, it->path.view().bytesIncludingTerminator());
             if (not watchedPaths[numAllocatedPaths])
                 return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                                FileSystemWatcherErrorDetail::AppleCreateWatchPathString);
             numAllocatedPaths++;
-            if (numAllocatedPaths > ThreadRunnerDefinition::MaxWatchablePaths)
-                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
         }
         if (numAllocatedPaths == 0)
         {
             return ResultFileSystemWatcher(true);
         }
         pathsArray = CFArrayCreate(nullptr, reinterpret_cast<const void**>(watchedPaths),
-                                   static_cast<CFIndex>(numAllocatedPaths), nullptr);
+                                   static_cast<CFIndex>(numAllocatedPaths), &kCFTypeArrayCallBacks);
         if (not pathsArray)
         {
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleCreateWatchPathsArray);
         }
-        deferDeletePaths.disarm();
-        deferFreeMalloc.disarm();
+        auto releasePaths = MakeDeferred([pathsArray] { CFRelease(pathsArray); });
 
         // Create Stream
         constexpr CFAbsoluteTime           watchLatency = 0.2;
         constexpr FSEventStreamCreateFlags watchFlags =
-            kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer;
+            kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagWatchRoot;
         FSEventStreamContext fsEventContext;
         ::memset(&fsEventContext, 0, sizeof(fsEventContext));
         fsEventContext.info = this;
@@ -226,6 +247,7 @@ struct SC::FileSystemWatcher::Internal
         {
             FSEventStreamInvalidate(fsEventStream);
             FSEventStreamRelease(fsEventStream);
+            fsEventStream = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleStartEventStream);
         }
@@ -281,131 +303,124 @@ struct SC::FileSystemWatcher::Internal
                                          kFSEventStreamEventFlagItemRemoved | //
                                          kFSEventStreamEventFlagItemRenamed;
 
-    static constexpr int EVENT_SYSTEM = kFSEventStreamEventFlagUserDropped |     //
-                                        kFSEventStreamEventFlagKernelDropped |   //
-                                        kFSEventStreamEventFlagEventIdsWrapped | //
-                                        kFSEventStreamEventFlagHistoryDone |     //
-                                        kFSEventStreamEventFlagMount |           //
-                                        kFSEventStreamEventFlagUnmount |         //
-                                        kFSEventStreamEventFlagRootChanged;
+    static constexpr int EVENT_GLOBAL_LOSS = kFSEventStreamEventFlagUserDropped | kFSEventStreamEventFlagKernelDropped |
+                                             kFSEventStreamEventFlagEventIdsWrapped;
+    static constexpr int EVENT_SUBTREE_LOSS =
+        kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagMount | kFSEventStreamEventFlagUnmount;
+    static constexpr int EVENT_COVERAGE = EVENT_GLOBAL_LOSS | EVENT_SUBTREE_LOSS | kFSEventStreamEventFlagRootChanged;
 
-    static void threadOnNewFSEvent(ConstFSEventStreamRef          streamRef,  //
-                                   void*                          info,       //
-                                   size_t                         numEvents,  //
-                                   void*                          eventPaths, //
-                                   const FSEventStreamEventFlags* eventFlags, //
-                                   const FSEventStreamEventId*    eventIds)
+    static void threadOnNewFSEvent(ConstFSEventStreamRef streamRef, void* info, size_t numEvents, void* eventPaths,
+                                   const FSEventStreamEventFlags* eventFlags, const FSEventStreamEventId* eventIds)
     {
-        (void)(streamRef);
-        (void)(eventIds);
-        Internal&    internal = *reinterpret_cast<Internal*>(info);
-        const char** paths    = reinterpret_cast<const char**>(eventPaths);
-        for (size_t idx = 0; idx < numEvents; ++idx)
+        (void)streamRef;
+        (void)eventIds;
+        Internal&    internal = *static_cast<Internal*>(info);
+        const char** paths    = static_cast<const char**>(eventPaths);
+        for (size_t idx = 0; idx < numEvents and not internal.closing.load() and not internal.refreshing.load(); ++idx)
         {
-            const FSEventStreamEventFlags flags = eventFlags[idx];
-            if (flags & EVENT_SYSTEM)
+            const auto flags = eventFlags[idx];
+            if ((flags & kFSEventStreamEventFlagHistoryDone) and not(flags & EVENT_COVERAGE))
                 continue;
 
-            const StringSpan path = StringSpan::fromNullTerminated(paths[idx], StringEncoding::Utf8);
-
-            bool sendNotification = true;
-            for (size_t prevIdx = 0; prevIdx < idx; ++prevIdx)
+            const StringSpan path      = StringSpan::fromNullTerminated(paths[idx], StringEncoding::Utf8);
+            bool             duplicate = false;
+            if (not(flags & EVENT_COVERAGE))
             {
-                const StringSpan otherPath = StringSpan::fromNullTerminated(paths[prevIdx], StringEncoding::Utf8);
-                if (path == otherPath)
+                for (size_t prev = 0; prev < idx; ++prev)
                 {
-                    // Filter out multiple events for the same file in this batch
-                    sendNotification = false;
-                    break;
+                    if ((eventFlags[prev] & (EVENT_COVERAGE | kFSEventStreamEventFlagHistoryDone)) == 0 and
+                        path == StringSpan::fromNullTerminated(paths[prev], StringEncoding::Utf8))
+                    {
+                        duplicate = true;
+                        break;
+                    }
                 }
             }
-            if (sendNotification)
-            {
-                notify(path, internal, flags);
-            }
-            if (internal.closing.load())
-            {
-                break;
-            }
+            if (not duplicate)
+                internal.notify(path, flags);
         }
     }
 
-    static void notify(const StringSpan path, Internal& internal, const FSEventStreamEventFlags flags)
+    static bool containsPath(StringSpan root, StringSpan path)
     {
-        if (internal.refreshing.load() or internal.closing.load())
-        {
-            return;
-        }
-        internal.notification.fullPath = path;
+        const auto       bytes = path.toCharSpan();
+        const size_t     size  = root.sizeInBytes();
+        Span<const char> prefix;
+        return size > 0 and bytes.sliceStartLength(0, size, prefix) and
+               root == StringSpan(prefix, false, path.getEncoding()) and
+               (size == bytes.sizeInBytes() or prefix[size - 1] == '/' or bytes[size] == '/');
+    }
 
-        const bool isDirectory = flags & kFSEventStreamEventFlagItemIsDir;
-        const bool isRenamed   = flags & EVENT_RENAMED;
-        const bool isModified  = flags & EVENT_MODIFIED;
+    void notify(StringSpan path, FSEventStreamEventFlags flags)
+    {
+        const bool rootChanged = flags & kFSEventStreamEventFlagRootChanged;
+        const bool globalLoss  = flags & EVENT_GLOBAL_LOSS;
+        const bool subtreeLoss = flags & EVENT_SUBTREE_LOSS;
+        const bool renamed     = flags & EVENT_RENAMED;
+        const bool modified    = flags & EVENT_MODIFIED;
+        const bool directory   = flags & kFSEventStreamEventFlagItemIsDir;
 
-        // FSEvent coalesces events in ways that makes it impossible to figure out exactly what happened
-        // see https://github.com/atom/watcher/blob/master/docs/macos.md
-        if (isRenamed)
+        uintptr_t previous = 0;
+        while (not refreshing.load() and not closing.load())
         {
-            internal.notification.operation = Operation::AddRemoveRename;
-        }
-        else
-        {
-            if (isModified or not isDirectory)
+            mutex.lock();
+            FolderWatcher*   selected = nullptr;
+            uintptr_t        address  = 0;
+            NotificationKind kind     = NotificationKind::Change;
+            for (auto* entry = self->watchers.front; entry != nullptr; entry = entry->next)
             {
-                internal.notification.operation = Operation::Modified;
-            }
-            else
-            {
-                internal.notification.operation = Operation::AddRemoveRename;
-            }
-        }
-
-        internal.mutex.lock();
-        FolderWatcher* watcher = internal.self->watchers.front;
-        internal.mutex.unlock();
-        while (watcher != nullptr)
-        {
-            Span<const char> rootSpan;
-
-            const bool sliceStart = path.toCharSpan().sliceStartLength(0, watcher->path.view().sizeInBytes(), rootSpan);
-            internal.notification.basePath = {rootSpan, false, StringEncoding::Utf8};
-            if (sliceStart and watcher->path.view() == internal.notification.basePath)
-            {
-                Span<const char> relativeSpan;
-                (void)path.toCharSpan().sliceStartLength(
-                    watcher->path.view().sizeInBytes(),
-                    path.toCharSpan().sizeInBytes() - watcher->path.view().sizeInBytes(), relativeSpan);
-                if (relativeSpan.data()[0] == '/')
-                {
-                    (void)relativeSpan.sliceStart(1, relativeSpan);
-                }
-                internal.notification.relativePath = {relativeSpan, true, path.getEncoding()};
-                internal.notification.basePath     = watcher->path.view();
-
-                if (internal.eventLoopRunner)
-                {
-                    EventLoopRunner& eventLoopRunner = *internal.eventLoopRunner;
-
-                    internal.watcher = watcher;
-                    const Result res = eventLoopRunner.appleWakeUpAndWait();
-                    if (internal.closing.load() or internal.refreshing.load())
-                    {
-                        break;
-                    }
-                    if (not res)
-                    {
-                        // TODO: print error for wakeup
-                    }
-                }
+                const auto  current = reinterpret_cast<uintptr_t>(entry);
+                const auto& folder  = entry->internal.get();
+                if (current <= previous or (selected != nullptr and current >= address) or folder.stopped)
+                    continue;
+                const StringSpan root = folder.canonicalPath.view();
+                if (rootChanged and root == path)
+                    kind = NotificationKind::WatchStopped;
+                else if (globalLoss or (subtreeLoss and (containsPath(root, path) or containsPath(path, root))))
+                    kind = NotificationKind::RescanRequired;
+                else if (not rootChanged and not subtreeLoss and containsPath(root, path))
+                    kind = NotificationKind::Change;
                 else
-                {
-                    watcher->notifyCallback(internal.notification);
-                }
+                    continue;
+                selected = entry;
+                address  = current;
             }
-            // TODO: If someone removes this watcher in the callback we will skip notifying remaining ones.
-            internal.mutex.lock();
-            watcher = watcher->next;
-            internal.mutex.unlock();
+            if (selected == nullptr)
+            {
+                mutex.unlock();
+                return;
+            }
+            previous     = address;
+            auto& folder = selected->internal.get();
+
+            notification           = {};
+            notification.basePath  = selected->path.view();
+            notification.fullPath  = notification.basePath;
+            notification.operation = Operation::AddRemoveRename;
+            notification.kind      = kind;
+            if (kind == NotificationKind::WatchStopped)
+            {
+                notification.failure = {FileSystemWatcherError::MonitoringFailed,
+                                        FileSystemWatcherErrorDetail::AppleWatchInvalidated};
+                folder.stopped       = true;
+            }
+            else if (kind == NotificationKind::Change)
+            {
+                auto relative = path.toCharSpan();
+                (void)relative.sliceStart(folder.canonicalPath.view().sizeInBytes(), relative);
+                if (relative.sizeInBytes() != 0 and relative[0] == '/')
+                    (void)relative.sliceStart(1, relative);
+                notification.relativePath = {relative, true, path.getEncoding()};
+                notification.fullPath     = path;
+                if (not renamed and (modified or not directory))
+                    notification.operation = Operation::Modified;
+            }
+            watcher = selected;
+            mutex.unlock();
+            if (eventLoopRunner)
+                (void)eventLoopRunner->appleWakeUpAndWait();
+            else
+                selected->notifyCallback(notification);
         }
     }
 
@@ -439,14 +454,12 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(Str
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
 };
-struct SC::FileSystemWatcher::FolderWatcherInternal
-{
-};
 
 bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
 {
     Internal& impl = internal.get();
-    if (not impl.refreshing.load() and not impl.closing.load() and impl.watcher->parent == this)
+    if (not impl.refreshing.load() and not impl.closing.load() and impl.watcher != nullptr and
+        impl.watcher->parent == this)
     {
         impl.watcher->notifyCallback(impl.notification);
     }

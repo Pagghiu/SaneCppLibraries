@@ -107,7 +107,7 @@ struct FileSystemWatcher
         static constexpr int MaxChangesBufferSize = 16 * 1024;
 
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
-        static constexpr int Apple   = sizeof(void*);
+        static constexpr int Apple   = sizeof(StringPath) + sizeof(void*);
         static constexpr int Linux   = 1056 + 4096 + 8;
         static constexpr int Default = Linux;
 

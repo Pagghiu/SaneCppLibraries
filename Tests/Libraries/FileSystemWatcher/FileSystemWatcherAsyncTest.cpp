@@ -36,6 +36,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopStopPendingNotification(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
         eventLoopOverlappingWatchers(appDirectory);
+#if SC_PLATFORM_APPLE
+        appleRootChanged(appDirectory);
+#endif
 #if SC_PLATFORM_LINUX
         eventLoopWatchInvalidation(appDirectory);
         eventLoopOverflow(appDirectory);
@@ -707,6 +710,109 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         if (removed)
             removeDirectory.disarm();
     }
+
+#if SC_PLATFORM_APPLE
+    void appleRootChanged(StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop FSEvents root change"))
+            return;
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        StringPath fixture;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(fixture, "__sc fsevents root {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(fixture.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto cleanup = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(fixture.view()); });
+
+        StringPath root, sibling, moved, alias;
+        SC_TEST_EXPECT(Path::join(root, {appDirectory, fixture.view(), "tree"}));
+        SC_TEST_EXPECT(Path::join(sibling, {appDirectory, fixture.view(), "tree-other"}));
+        SC_TEST_EXPECT(Path::join(moved, {appDirectory, fixture.view(), "moved"}));
+        SC_TEST_EXPECT(Path::join(alias, {appDirectory, fixture.view(), "alias"}));
+        SC_TEST_EXPECT(fs.makeDirectory(root.view()));
+        SC_TEST_EXPECT(fs.makeDirectory(sibling.view()));
+        SC_TEST_EXPECT(fs.createSymbolicLink(root.view(), alias.view()));
+        SC_TEST_EXPECT(alias.append("/"));
+
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(loop);
+        FileSystemWatcher                owner;
+        FileSystemWatcher::FolderWatcher lost, remaining;
+        auto                             closeOwner = MakeDeferred([&] { (void)owner.close(); });
+        SC_TEST_EXPECT(owner.init(runner));
+
+        using Kind = FileSystemWatcher::NotificationKind;
+        struct State
+        {
+            StringSpan alias;
+            bool       ready         = false;
+            bool       remainingSeen = false;
+            bool       restarted     = false;
+            bool       validStop     = false;
+            unsigned   stops         = 0;
+            unsigned   siblingStops  = 0;
+        } state{alias.view()};
+        lost.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == Kind::WatchStopped)
+            {
+                ++state.stops;
+                StringPath full;
+                state.validStop = event.basePath == state.alias and event.relativePath.isEmpty() and
+                                  event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                                  event.failure.detail == FileSystemWatcherErrorDetail::AppleWatchInvalidated and
+                                  event.getFullPath(full) and full.view() == state.alias;
+            }
+            if (event.kind == Kind::Change)
+            {
+                state.ready |= event.relativePath == "ready.txt";
+                state.restarted |= event.relativePath == "restart.txt";
+            }
+        };
+        remaining.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == Kind::WatchStopped)
+                ++state.siblingStops;
+            state.remainingSeen |= event.kind == Kind::Change and event.relativePath == "marker.txt";
+        };
+        auto write = [&](StringView directory, StringView name)
+        {
+            StringPath file;
+            return Path::join(file, {directory, name}) and fs.writeString(file.view(), "marker");
+        };
+
+        SC_TEST_EXPECT(owner.watch(lost, alias.view()));
+        SC_TEST_EXPECT(owner.watch(remaining, sibling.view()));
+        SC_TEST_EXPECT(write(root.view(), "ready.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.ready; }));
+        SC_TEST_EXPECT(fs.rename(root.view(), moved.view()));
+        SC_TEST_EXPECT(write(sibling.view(), "marker.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.stops != 0 and state.remainingSeen; }));
+        SC_TEST_EXPECT(state.validStop);
+        SC_TEST_EXPECT(state.stops == 1);
+        SC_TEST_EXPECT(state.siblingStops == 0);
+        SC_TEST_EXPECT(lost.stopWatching());
+        SC_TEST_EXPECT(owner.watch(lost, moved.view()));
+        SC_TEST_EXPECT(write(moved.view(), "restart.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.restarted; }));
+        SC_TEST_EXPECT(state.stops == 1);
+        SC_TEST_EXPECT(lost.stopWatching());
+        SC_TEST_EXPECT(remaining.stopWatching());
+        SC_TEST_EXPECT(owner.close());
+        closeOwner.disarm();
+        SC_TEST_EXPECT(loop.close());
+    }
+#endif
 
 #if SC_PLATFORM_LINUX
     void eventLoopWatchInvalidation(const StringView appDirectory)
