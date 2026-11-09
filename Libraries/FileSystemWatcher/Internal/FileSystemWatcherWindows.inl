@@ -10,9 +10,9 @@
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
-    uint8_t        changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
-    FolderWatcher* parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
-    HANDLE         fileHandle;
+    uint8_t changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
+    HANDLE  fileHandle;
+    bool*   deliveryAlive = nullptr;
 };
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
@@ -148,6 +148,12 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher stopWatching(FolderWatcher& folderWatcher)
     {
+        auto& folder = folderWatcher.internal.get();
+        if (folder.deliveryAlive != nullptr)
+        {
+            *folder.deliveryAlive = false;
+            folder.deliveryAlive  = nullptr;
+        }
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
         if (threadingRunner)
@@ -219,8 +225,6 @@ struct SC::FileSystemWatcher::Internal
         FolderWatcherInternal& opaque = entry->internal.get();
         opaque.fileHandle             = newHandle;
 
-        opaque.parentEntry = entry;
-
         OVERLAPPED* overlapped = getOverlapped(*entry);
         if (threadingRunner)
         {
@@ -260,22 +264,65 @@ struct SC::FileSystemWatcher::Internal
             const DWORD result = ::WaitForMultipleObjects(runner.numEntries, runner.hEvents, TRUE, INFINITE);
             if (result != WAIT_FAILED and not runner.shouldStop.load())
             {
-                const DWORD            index  = result - WAIT_OBJECT_0;
-                FolderWatcher&         entry  = *runner.entries[index];
-                FolderWatcherInternal& opaque = entry.internal.get();
-
-                DWORD transferredBytes = 0;
-                SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
-                OVERLAPPED* overlapped = getOverlapped(entry);
-                const BOOL  overlappedResult =
-                    ::GetOverlappedResult(opaque.fileHandle, overlapped, &transferredBytes, FALSE);
-                notifyEntry(entry, overlappedResult ? static_cast<size_t>(transferredBytes) : 0);
+                const DWORD    index = result - WAIT_OBJECT_0;
+                FolderWatcher& entry = *runner.entries[index];
+                (void)completeRead(entry);
             }
         }
         threadingRunner->shouldStop.exchange(false);
     }
 
-    static void notifyEntry(FolderWatcher& entry, size_t transferredBytes)
+    static void notifyStatus(const FolderWatcher& entry, NotificationKind kind, ResultFileSystemWatcher failure)
+    {
+        Notification notification;
+        notification.basePath  = entry.path.view();
+        notification.operation = Operation::AddRemoveRename;
+        notification.kind      = kind;
+        notification.failure   = failure;
+        auto callback          = entry.notifyCallback;
+        callback(notification);
+    }
+
+    bool completeRead(FolderWatcher& entry)
+    {
+        auto& folder           = entry.internal.get();
+        DWORD transferredBytes = 0;
+        if (not ::GetOverlappedResult(folder.fileHandle, getOverlapped(entry), &transferredBytes, FALSE))
+        {
+            const DWORD error = ::GetLastError();
+            if (error != ERROR_NOTIFY_ENUM_DIR)
+            {
+                notifyStatus(entry, NotificationKind::WatchStopped,
+                             {FileSystemWatcherError::MonitoringFailed,
+                              FileSystemWatcherErrorDetail::WindowsCompleteDirectoryChanges, error});
+                return false;
+            }
+            transferredBytes = 0;
+        }
+
+        bool alive = true;
+        if (eventLoopRunner)
+            folder.deliveryAlive = &alive;
+        if (transferredBytes == 0)
+            notifyStatus(entry, NotificationKind::RescanRequired, ResultFileSystemWatcher(true));
+        else
+            notifyEntry(entry, transferredBytes, alive);
+        if (not alive or entry.parent == nullptr)
+            return false;
+
+        folder.deliveryAlive = nullptr;
+        const auto submitted = submitRead(entry);
+        if (submitted)
+            return true;
+        if (submitted.isError(FileSystemWatcherError::WatchSetupFailed))
+            notifyStatus(entry, NotificationKind::WatchStopped,
+                         {FileSystemWatcherError::MonitoringFailed, submitted.detail, submitted.nativeError});
+        else
+            notifyStatus(entry, NotificationKind::WatchStopped, submitted);
+        return false;
+    }
+
+    static void notifyEntry(FolderWatcher& entry, size_t transferredBytes, const bool& alive)
     {
         FolderWatcherInternal& opaque = entry.internal.get();
         uint8_t                changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
@@ -292,20 +339,6 @@ struct SC::FileSystemWatcher::Internal
         Notification notification;
         notification.basePath = entry.path.view();
 
-        if (transferredBytes == 0)
-        {
-            // Windows reports a zero-byte completion when the change buffer overflowed.
-            // The specific file names are lost, so report a conservative root-level change
-            // instead of parsing stale buffer contents.
-            notification.operation = Operation::AddRemoveRename;
-            entry.notifyCallback(notification);
-            if (entry.parent != nullptr)
-            {
-                SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(entry.parent->internal.get().submitRead(entry));
-            }
-            return;
-        }
-
         FILE_NOTIFY_INFORMATION* event = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(changesBuffer);
         do
         {
@@ -319,17 +352,13 @@ struct SC::FileSystemWatcher::Internal
             case FILE_ACTION_MODIFIED: notification.operation = Operation::Modified; break;
             default: notification.operation = Operation::AddRemoveRename; break;
             }
-            entry.notifyCallback(notification);
-            if (not event->NextEntryOffset)
+            auto callback = entry.notifyCallback;
+            callback(notification);
+            if (not alive or not event->NextEntryOffset)
                 break;
 
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
         } while (true);
-
-        if (entry.parent != nullptr)
-        {
-            SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(entry.parent->internal.get().submitRead(entry));
-        }
     }
 };
 
@@ -343,8 +372,13 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(Str
 
 bool SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher, size_t bytesTransferred)
 {
+    (void)bytesTransferred;
     SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher != nullptr);
     SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher->internal.get().fileHandle != INVALID_HANDLE_VALUE);
-    FileSystemWatcher::Internal::notifyEntry(*watcher->internal.get().parentEntry, bytesTransferred);
-    return true;
+    return internal.get().completeRead(*watcher);
+}
+
+void SC::FileSystemWatcher::asyncNotifyFailure(FolderWatcher& watcher, Result failure)
+{
+    Internal::notifyStatus(watcher, NotificationKind::WatchStopped, ResultFileSystemWatcher(failure));
 }

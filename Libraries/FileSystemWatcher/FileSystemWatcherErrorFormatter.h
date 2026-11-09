@@ -70,6 +70,9 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
     case FileSystemWatcherErrorDetail::WindowsSubmitDirectoryChanges:
         formatter.append("Windows submit directory changes");
         break;
+    case FileSystemWatcherErrorDetail::WindowsCompleteDirectoryChanges:
+        formatter.append("Windows complete directory changes");
+        break;
     case FileSystemWatcherErrorDetail::AppleOpenRootDirectory: formatter.append("Apple open root directory"); break;
     case FileSystemWatcherErrorDetail::AppleResolveWatchRoot: formatter.append("Apple resolve watch root"); break;
     case FileSystemWatcherErrorDetail::AppleWatchInvalidated: formatter.append("Apple watch invalidated"); break;

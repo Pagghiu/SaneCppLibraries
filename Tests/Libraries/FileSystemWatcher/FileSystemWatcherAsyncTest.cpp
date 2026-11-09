@@ -14,6 +14,9 @@
 #if SC_PLATFORM_LINUX
 #include <errno.h>
 #include <unistd.h>
+#elif SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #endif
 
 namespace SC
@@ -36,6 +39,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopStopPendingNotification(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
         eventLoopOverlappingWatchers(appDirectory);
+#if SC_PLATFORM_WINDOWS
+        windowsCompletionCoverage(appDirectory);
+#endif
 #if SC_PLATFORM_APPLE
         appleRootChanged(appDirectory);
 #endif
@@ -710,6 +716,131 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         if (removed)
             removeDirectory.disarm();
     }
+
+#if SC_PLATFORM_WINDOWS
+    void windowsCompletionCoverage(StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop Windows completion coverage"))
+            return;
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        StringPath fixture;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(fixture, "__sc windows coverage {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(fixture.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto       cleanup = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(fixture.view()); });
+        StringPath root;
+        SC_TEST_EXPECT(Path::join(root, {appDirectory, fixture.view()}));
+
+        struct Runner : FileSystemWatcherAsyncT<AsyncEventLoop>
+        {
+            HANDLE                  directory        = INVALID_HANDLE_VALUE;
+            bool                    rejectSubmission = false;
+            static constexpr Result rejected() { return Result::Error(AsyncResultCategory, AsyncError::RequestInUse); }
+
+            Result windowsStartFolderExternalCompletion(FileSystemWatcher::FolderWatcher& watcher,
+                                                        void*                             handle) override
+            {
+                directory = handle;
+                return FileSystemWatcherAsyncT::windowsStartFolderExternalCompletion(watcher, handle);
+            }
+
+            Result windowsMarkFolderExternalCompletionPending(FileSystemWatcher::FolderWatcher& watcher) override
+            {
+                if (rejectSubmission)
+                    return rejected();
+                return FileSystemWatcherAsyncT::windowsMarkFolderExternalCompletionPending(watcher);
+            }
+        } runner;
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        runner.init(loop);
+        FileSystemWatcher                owner;
+        FileSystemWatcher::FolderWatcher watch;
+        auto                             closeOwner = MakeDeferred([&] { (void)owner.close(); });
+        SC_TEST_EXPECT(owner.init(runner));
+        struct State
+        {
+            size_t rescans         = 0;
+            size_t changes         = 0;
+            size_t stopped         = 0;
+            bool   overflowContext = true;
+            bool   cancelled       = false;
+            bool   failedRearm     = false;
+            bool   marker          = false;
+        } state;
+        using Kind           = FileSystemWatcher::NotificationKind;
+        watch.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == Kind::RescanRequired)
+            {
+                ++state.rescans;
+                state.overflowContext = state.overflowContext and event.failure and event.relativePath.isEmpty();
+            }
+            else if (event.kind == Kind::WatchStopped)
+            {
+                ++state.stopped;
+                state.cancelled |=
+                    event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                    event.failure.detail == FileSystemWatcherErrorDetail::WindowsCompleteDirectoryChanges and
+                    event.failure.nativeError == ERROR_OPERATION_ABORTED and event.relativePath.isEmpty();
+                state.failedRearm |= event.failure.result.isError(AsyncResultCategory, AsyncError::RequestInUse);
+            }
+            else
+            {
+                ++state.changes;
+                state.marker |= StringView(event.relativePath) == "coverage-marker.txt";
+            }
+        };
+        SC_TEST_EXPECT(owner.watch(watch, root.view()));
+        submitQueuedWatcher(loop);
+
+        // The first completion occupies the outstanding read while the remaining events fill the kernel buffer.
+        StringPath path;
+        bool       filled = true;
+        for (size_t index = 0; index < 1024 and filled; ++index)
+        {
+            filled = StringBuilder::format(path, "{}/watcher-overflow-entry-{}.txt", root.view(), index) and
+                     fs.writeString(path.view(), "entry");
+        }
+        SC_TEST_EXPECT(filled);
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.rescans > 0; }));
+        SC_TEST_EXPECT(state.overflowContext);
+        SC_TEST_EXPECT(state.stopped == 0);
+        SC_TEST_EXPECT(Path::join(path, {root.view(), "coverage-marker.txt"}));
+        SC_TEST_EXPECT(fs.writeString(path.view(), "after overflow"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.marker; }));
+
+        SC_TEST_EXPECT(::CancelIoEx(runner.directory, nullptr) != FALSE);
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.stopped > 0; }));
+        SC_TEST_EXPECT(state.stopped == 1);
+        SC_TEST_EXPECT(state.cancelled);
+        SC_TEST_EXPECT(watch.stopWatching());
+
+        SC_TEST_EXPECT(owner.watch(watch, root.view()));
+        runner.rejectSubmission = true;
+        SC_TEST_EXPECT(fs.writeString(path.view(), "rearm failure"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.stopped == 2; }));
+        SC_TEST_EXPECT(state.failedRearm);
+        SC_TEST_EXPECT(watch.stopWatching());
+
+        runner.rejectSubmission = false;
+        SC_TEST_EXPECT(owner.watch(watch, root.view()));
+        SC_TEST_EXPECT(watch.stopWatching());
+        SC_TEST_EXPECT(state.stopped == 2);
+        SC_TEST_EXPECT(owner.close());
+        closeOwner.disarm();
+        SC_TEST_EXPECT(loop.close());
+    }
+#endif
 
 #if SC_PLATFORM_APPLE
     void appleRootChanged(StringView appDirectory)

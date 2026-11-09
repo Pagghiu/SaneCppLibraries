@@ -71,6 +71,7 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     LinuxWatchInvalidated,
     AppleResolveWatchRoot,
     AppleWatchInvalidated,
+    WindowsCompleteDirectoryChanges,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

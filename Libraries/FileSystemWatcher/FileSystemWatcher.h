@@ -262,6 +262,8 @@ struct FileSystemWatcher
     bool asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
 #if SC_PLATFORM_LINUX
     void asyncNotifyFailure(Result failure);
+#elif SC_PLATFORM_WINDOWS
+    void asyncNotifyFailure(FolderWatcher& watcher, Result failure);
 #endif
 
   private:
@@ -426,6 +428,12 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         T_AsyncExternalCompletion& completion =
             watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
 
+        if (completion.isFree() and not completion.hasSubmissionPending())
+        {
+            completion.~T_AsyncExternalCompletion();
+            windowsFolderCompletionStopped = true;
+            return Result(true);
+        }
         windowsFolderCompletionStopped = false;
         onAsyncCompletionClose         = [this, &watcher](T_AsyncResult&)
         {
@@ -472,11 +480,13 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         SC_COMPILER_WARNING_PUSH_OFFSETOF;
         auto&          storage = reinterpret_cast<decltype(FolderWatcher::asyncStorage)&>(result.getAsync());
         FolderWatcher& watcher = SC_COMPILER_FIELD_OFFSET(FolderWatcher, asyncStorage, storage);
-        fileSystemWatcher->asyncNotify(&watcher, result.completionData.bytesTransferred);
-        if (watcher.parent != nullptr and result.getAsync().hasSubmissionPending())
+        if (result.isValid())
         {
-            result.reactivateRequest(true);
+            if (fileSystemWatcher->asyncNotify(&watcher, result.completionData.bytesTransferred))
+                result.reactivateRequest(true);
         }
+        else
+            fileSystemWatcher->asyncNotifyFailure(watcher, result.isValid());
         SC_COMPILER_WARNING_POP_OFFSETOF;
     }
 
