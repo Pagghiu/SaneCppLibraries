@@ -164,8 +164,8 @@ struct SC::FileSystemWatcher::Internal
         else
         {
             SC_TRY(eventLoopRunner->windowsRequestStopFolderExternalCompletion(folderWatcher));
-            closeFileHandle(folderWatcher);
             SC_TRY(eventLoopRunner->windowsWaitFolderExternalCompletionStopped(folderWatcher));
+            closeFileHandle(folderWatcher);
             return ResultFileSystemWatcher(true);
         }
         closeFileHandle(folderWatcher);

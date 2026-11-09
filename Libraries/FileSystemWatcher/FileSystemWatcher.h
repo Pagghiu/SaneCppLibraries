@@ -429,28 +429,19 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
             watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
 
         if (completion.isFree() and not completion.hasSubmissionPending())
-        {
-            completion.~T_AsyncExternalCompletion();
-            windowsFolderCompletionStopped = true;
             return Result(true);
-        }
-        windowsFolderCompletionStopped = false;
-        onAsyncCompletionClose         = [this, &watcher](T_AsyncResult&)
-        {
-            T_AsyncExternalCompletion& completion =
-                watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
-            completion.~T_AsyncExternalCompletion();
-            windowsFolderCompletionStopped = true;
-        };
-        return completion.stop(*eventLoop, &onAsyncCompletionClose);
+        return completion.stop(*eventLoop);
     }
 
-    virtual Result windowsWaitFolderExternalCompletionStopped(FolderWatcher&) override
+    virtual Result windowsWaitFolderExternalCompletionStopped(FolderWatcher& watcher) override
     {
-        while (not windowsFolderCompletionStopped)
+        T_AsyncExternalCompletion& completion =
+            watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
+        while (not completion.isFree())
         {
             SC_TRY(eventLoop->runOnce());
         }
+        completion.~T_AsyncExternalCompletion();
         return Result(true);
     }
 
@@ -490,8 +481,6 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         SC_COMPILER_WARNING_POP_OFFSETOF;
     }
 
-    Function<void(T_AsyncResult&)> onAsyncCompletionClose;
-    bool                           windowsFolderCompletionStopped = false;
 #endif
 };
 

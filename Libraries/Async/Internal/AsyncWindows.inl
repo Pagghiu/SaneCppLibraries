@@ -112,8 +112,33 @@ SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
 
 struct SC::AsyncEventLoop::Internal::KernelQueue
 {
+    struct DispatchBatch
+    {
+        OVERLAPPED_ENTRY* events;
+        uint32_t          count;
+        uint32_t          next;
+        DispatchBatch*    previous;
+    };
+
     FileDescriptor          loopFd;
     AsyncExternalCompletion asyncWakeUp;
+    DispatchBatch*          dispatchBatch = nullptr;
+
+    bool discardCollectedCompletion(OVERLAPPED* overlapped)
+    {
+        for (auto* batch = dispatchBatch; batch != nullptr; batch = batch->previous)
+        {
+            for (uint32_t index = batch->next; index < batch->count; ++index)
+            {
+                if (batch->events[index].lpOverlapped == overlapped)
+                {
+                    batch->events[index].lpOverlapped = nullptr;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     KernelQueue() {}
 
@@ -1326,21 +1351,23 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             return Result(true);
         }
 
-        const BOOL result = ::CancelIoEx(async.handle, &async.overlapped.get().overlapped);
-        if (result != FALSE)
-        {
-            async.flags |= Internal::Flag_WaitingKernelCancel;
-            eventLoop.internal.hasPendingKernelCancellations = true;
-            return Result(true);
-        }
-        const DWORD error = ::GetLastError();
-        if (error == ERROR_NOT_FOUND or error == ERROR_INVALID_HANDLE)
+        OVERLAPPED* overlapped = &async.overlapped.get().overlapped;
+        if (async.handle == nullptr or eventLoop.internal.kernelQueue.get().discardCollectedCompletion(overlapped))
         {
             async.submissionPending = false;
             async.completionPosted  = false;
             return Result(true);
         }
-        return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
+        if (::CancelIoEx(async.handle, overlapped) == FALSE)
+        {
+            const DWORD error = ::GetLastError();
+            if (error != ERROR_NOT_FOUND and error != ERROR_INVALID_HANDLE)
+                return Result::Error(AsyncResultCategory, AsyncError::CancellationFailed);
+        }
+        // A completed or closed operation may already have queued its packet.
+        async.flags |= Internal::Flag_WaitingKernelCancel;
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        return Result(true);
     }
 
     [[nodiscard]] static bool teardownAsync(AsyncExternalCompletion*, AsyncTeardown&) { return true; }

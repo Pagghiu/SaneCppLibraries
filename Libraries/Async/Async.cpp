@@ -1845,6 +1845,13 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& eve
                                                              AsyncKernelEvents& asyncKernelEvents)
 {
     KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
+#if SC_PLATFORM_WINDOWS
+    // A nested stop can consume a completion already collected by an enclosing dispatch.
+    auto&                      queue = kernelQueue.get();
+    KernelQueue::DispatchBatch batch{kernelEvents.events, kernelEvents.getNumEvents(), 0, queue.dispatchBatch};
+    queue.dispatchBatch = &batch;
+    auto restoreBatch   = MakeDeferred([&] { queue.dispatchBatch = batch.previous; });
+#endif
     switch (syncMode)
     {
     case SyncMode::NoWait: {
@@ -1970,6 +1977,9 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eve
 {
     for (uint32_t idx = 0; idx < kernelEvents.getNumEvents(); ++idx)
     {
+#if SC_PLATFORM_WINDOWS
+        kernelQueue.get().dispatchBatch->next = idx + 1;
+#endif
         SC_LOG_MESSAGE(" Iteration = {}\n", idx);
         SC_LOG_MESSAGE(" Active Requests = {}\n", getTotalNumberOfActiveHandle());
         bool continueProcessing = true;
@@ -2402,8 +2412,19 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
     }
     break;
     case AsyncRequest::State::Setup: {
-        // Request was not even setup, so it can go straight to cancellation queue
         async.state = AsyncRequest::State::Cancelling;
+#if SC_PLATFORM_WINDOWS
+        if (async.type == AsyncRequest::Type::ExternalCompletion)
+        {
+            const auto& completion = static_cast<const AsyncExternalCompletion&>(async);
+            // A caller can submit native I/O before the first loop submission.
+            if (not completion.manualMode and completion.handle != nullptr and completion.submissionPending)
+            {
+                async.flags &= ~(Flag_NeedsTeardown | Flag_ManualCompletion);
+                break;
+            }
+        }
+#endif
         numberOfSubmissions -= 1;
         submissions.remove(async);
         pushToCancellationQueue(async);

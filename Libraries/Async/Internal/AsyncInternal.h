@@ -54,7 +54,7 @@ struct SC::AsyncEventLoop::Internal
 
     struct KernelQueueDefinition
     {
-        static constexpr int Windows = 136;
+        static constexpr int Windows = 144;
         static constexpr int Apple   = 80;
         static constexpr int Linux   = 360;
         static constexpr int Default = Linux;

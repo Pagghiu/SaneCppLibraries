@@ -84,6 +84,83 @@ void SC::AsyncTest::externalCompletionBeforeSubmission()
         SC_TEST_EXPECT(completion.stop(loop));
         SC_TEST_EXPECT(loop.run());
     }
+
+    for (int scenario = 0; scenario < 3; ++scenario)
+    {
+        state.called = false;
+        SC_TEST_EXPECT(::ResetEvent(readEvent));
+        SC_TEST_EXPECT(completion.start(loop, readHandle));
+        SC_TEST_EXPECT(completion.markSubmissionPending());
+        readOperation->hEvent = readEvent;
+        const BOOL  started   = ::ReadFile(readHandle, &received, 1, nullptr, readOperation);
+        const DWORD error     = started ? 0 : ::GetLastError();
+        SC_TEST_EXPECT(not started and error == ERROR_IO_PENDING);
+
+        if (scenario != 0)
+        {
+            SC_TEST_EXPECT(loop.runNoWait());
+            SC_TEST_EXPECT(::ResetEvent(writeEvent));
+            writeOperation        = {};
+            writeOperation.hEvent = writeEvent;
+            const BOOL  written   = ::WriteFile(writeHandle, &value, 1, nullptr, &writeOperation);
+            const DWORD writeCode = written ? 0 : ::GetLastError();
+            SC_TEST_EXPECT(written or writeCode == ERROR_IO_PENDING);
+            SC_TEST_EXPECT(::WaitForSingleObject(writeEvent, 5000) == WAIT_OBJECT_0);
+            SC_TEST_EXPECT(::WaitForSingleObject(readEvent, 5000) == WAIT_OBJECT_0);
+        }
+
+        int                          stops     = 0;
+        Function<void(AsyncResult&)> afterStop = [&stops](AsyncResult&) { ++stops; };
+        alignas(uint64_t) uint8_t    storage[8192];
+        AsyncKernelEvents            events;
+        events.eventsMemory = storage;
+        if (scenario == 2)
+        {
+            struct StopFromTimer
+            {
+                AsyncExternalCompletion&      completion;
+                Function<void(AsyncResult&)>& afterStop;
+                Result                        stopped = Result(false);
+            } stopFromTimer{completion, afterStop};
+            AsyncLoopTimeout timer;
+            timer.callback = [&stopFromTimer](AsyncLoopTimeout::Result& result)
+            {
+                auto& eventLoop       = result.eventLoop;
+                stopFromTimer.stopped = stopFromTimer.completion.stop(eventLoop, &stopFromTimer.afterStop);
+                if (stopFromTimer.stopped)
+                    stopFromTimer.stopped = eventLoop.runNoWait();
+            };
+            SC_TEST_EXPECT(timer.start(loop, TimeMs{0}));
+            SC_TEST_EXPECT(loop.submitRequests(events));
+            auto*      packet   = reinterpret_cast<OVERLAPPED_ENTRY*>(storage);
+            const auto deadline = Time::Monotonic::now();
+            do
+            {
+                SC_TEST_EXPECT(loop.blockingPoll(events));
+            } while (packet->lpOverlapped == nullptr and
+                     Time::Monotonic::now().getMonotonicMilliseconds() - deadline.getMonotonicMilliseconds() < 5000);
+            SC_TEST_EXPECT(packet->lpOverlapped == readOperation);
+            SC_TEST_EXPECT(loop.dispatchCompletions(events));
+            SC_TEST_EXPECT(stopFromTimer.stopped and stops == 1 and completion.isFree() and not state.called);
+            SC_TEST_EXPECT(packet->lpOverlapped == nullptr);
+            continue;
+        }
+        SC_TEST_EXPECT(completion.stop(loop, &afterStop));
+        SC_TEST_EXPECT(loop.submitRequests(events));
+        // Dispatch without polling so the completion packet stays in IOCP.
+        SC_TEST_EXPECT(loop.dispatchCompletions(events));
+        SC_TEST_EXPECT(stops == 0 and not completion.isFree());
+        timedOut = false;
+        SC_TEST_EXPECT(timeout.start(loop, TimeMs{5000}));
+        while (stops == 0 and not timedOut)
+            SC_TEST_EXPECT(loop.runOnce());
+        SC_TEST_EXPECT(not timedOut);
+        SC_TEST_EXPECT(timeout.stop(loop));
+        SC_TEST_EXPECT(loop.runNoWait());
+        SC_TEST_EXPECT(stops == 1 and completion.isFree() and not completion.hasSubmissionPending());
+        SC_TEST_EXPECT(not state.called);
+    }
+
     SC_TEST_EXPECT(pipe.close());
     SC_TEST_EXPECT(loop.close());
     SC_TEST_EXPECT(::CloseHandle(readEvent));

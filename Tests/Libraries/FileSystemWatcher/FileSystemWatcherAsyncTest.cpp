@@ -834,6 +834,12 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
         runner.rejectSubmission = false;
         SC_TEST_EXPECT(owner.watch(watch, root.view()));
+        SC_TEST_EXPECT(fs.writeString(path.view(), "old request"));
+        SC_TEST_EXPECT(watch.stopWatching());
+        SC_TEST_EXPECT(owner.watch(watch, root.view()));
+        state.marker = false;
+        SC_TEST_EXPECT(fs.writeString(path.view(), "new request"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.marker; }));
         SC_TEST_EXPECT(watch.stopWatching());
         SC_TEST_EXPECT(state.stopped == 2);
         SC_TEST_EXPECT(owner.close());
