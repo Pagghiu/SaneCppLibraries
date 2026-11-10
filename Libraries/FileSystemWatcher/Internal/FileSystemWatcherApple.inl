@@ -22,7 +22,9 @@
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
     StringPath canonicalPath;
-    bool       stopped = false;
+    bool       stopped       = false;
+    bool       inStream      = false;
+    bool       rescanPending = false;
 };
 
 struct SC::FileSystemWatcher::Internal
@@ -34,6 +36,7 @@ struct SC::FileSystemWatcher::Internal
     FSWThread               pollingThread;
     ResultFileSystemWatcher signalReturnCode = ResultFileSystemWatcher(true);
     FSWEventObject          refreshSignalFinished;
+    FSWEventObject          refreshResume;
     FSWMutex                mutex;
     EventLoopRunner*        eventLoopRunner = nullptr;
 
@@ -42,6 +45,7 @@ struct SC::FileSystemWatcher::Internal
     FolderWatcher* watcher = nullptr;
     FSWAtomicBool  closing;
     FSWAtomicBool  refreshing;
+    bool           deliveringRefreshHint = false;
 
     //...
     //! [OpaqueDefinition1Snippet]
@@ -63,7 +67,9 @@ struct SC::FileSystemWatcher::Internal
         if (not folder.canonicalPath.assign(StringSpan::fromNullTerminated(canonicalPath, StringEncoding::Utf8)))
             return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
                                            FileSystemWatcherErrorDetail::AppleResolveWatchRoot);
-        folder.stopped = false;
+        folder.stopped       = false;
+        folder.inStream      = false;
+        folder.rescanPending = false;
         return ResultFileSystemWatcher(true);
     }
 
@@ -71,15 +77,23 @@ struct SC::FileSystemWatcher::Internal
     {
         (void)(runner);
         self = &parent;
+        closing.store(false);
         return ResultFileSystemWatcher(true);
     }
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
+        runner.internalInit(parent, 0);
+        const Result result = runner.appleStartWakeUp();
+        if (not result)
+        {
+            runner.fileSystemWatcher = nullptr;
+            return result;
+        }
         self            = &parent;
         eventLoopRunner = &runner;
-        eventLoopRunner->internalInit(parent, 0);
-        return eventLoopRunner->appleStartWakeUp();
+        closing.store(false);
+        return ResultFileSystemWatcher(true);
     }
 
     ResultFileSystemWatcher initThread()
@@ -105,7 +119,12 @@ struct SC::FileSystemWatcher::Internal
             eventObject.signal();
             threadRun();
         };
-        SC_TRY(pollingThread.start(pollingFunction));
+        const auto started = pollingThread.start(pollingFunction);
+        if (not started)
+        {
+            releaseResources();
+            return started;
+        }
         eventObject.wait();
         return ResultFileSystemWatcher(true);
     }
@@ -114,9 +133,11 @@ struct SC::FileSystemWatcher::Internal
     {
         if (self == nullptr)
             return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
+        if (onWorkerThread() or refreshing.load() or closing.load())
+            return {FileSystemWatcherError::CloseFailed, FileSystemWatcherErrorDetail::PosixPthreadJoin, EDEADLK};
+        closing.store(true);
         if (pollingThread.wasStarted())
         {
-            closing.exchange(true);
             if (eventLoopRunner)
             {
                 eventLoopRunner->appleSignalEventObject();
@@ -132,8 +153,22 @@ struct SC::FileSystemWatcher::Internal
         if (eventLoopRunner)
         {
             SC_TRY(eventLoopRunner->appleStopWakeUp());
+            eventLoopRunner->fileSystemWatcher = nullptr;
+            eventLoopRunner                    = nullptr;
         }
+        while (FolderWatcher* entry = self->watchers.front)
+        {
+            self->watchers.remove(*entry);
+            entry->parent = nullptr;
+        }
+        watcher = nullptr;
+        self    = nullptr;
         return ResultFileSystemWatcher(true);
+    }
+
+    bool onWorkerThread() const
+    {
+        return pollingThread.wasStarted() and ::pthread_equal(::pthread_self(), pollingThread.thread);
     }
 
     void wakeUpFSEventThread()
@@ -163,21 +198,14 @@ struct SC::FileSystemWatcher::Internal
         CFRunLoopRemoveSource(copyRunLoop, refreshSignal, kCFRunLoopDefaultMode);
     }
 
-    ResultFileSystemWatcher threadCreateFSEvent()
+    ResultFileSystemWatcher threadCreateFSEvent(FSEventStreamRef& replacement)
     {
         if (runLoop == nullptr)
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleRunLoop);
-        CFArrayRef   pathsArray = nullptr;
-        CFStringRef* watchedPaths =
-            (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerDefinition::MaxWatchablePaths);
-        if (watchedPaths == nullptr)
-            return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                           FileSystemWatcherErrorDetail::AppleAllocateWatchPaths);
-        // TODO: Loop to convert paths
-        auto   deferFreeMalloc   = MakeDeferred([&] { free(watchedPaths); });
-        size_t numAllocatedPaths = 0;
-        auto   deferDeletePaths  = MakeDeferred(
+        const void* watchedPaths[ThreadRunnerDefinition::MaxWatchablePaths];
+        size_t      numAllocatedPaths = 0;
+        auto        deferDeletePaths  = MakeDeferred(
             [&]
             {
                 for (size_t idx = 0; idx < numAllocatedPaths; ++idx)
@@ -206,8 +234,8 @@ struct SC::FileSystemWatcher::Internal
         {
             return ResultFileSystemWatcher(true);
         }
-        pathsArray = CFArrayCreate(nullptr, reinterpret_cast<const void**>(watchedPaths),
-                                   static_cast<CFIndex>(numAllocatedPaths), &kCFTypeArrayCallBacks);
+        const CFArrayRef pathsArray =
+            CFArrayCreate(nullptr, watchedPaths, static_cast<CFIndex>(numAllocatedPaths), &kCFTypeArrayCallBacks);
         if (not pathsArray)
         {
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
@@ -222,14 +250,14 @@ struct SC::FileSystemWatcher::Internal
         FSEventStreamContext fsEventContext;
         ::memset(&fsEventContext, 0, sizeof(fsEventContext));
         fsEventContext.info = this;
-        fsEventStream       = FSEventStreamCreate(nullptr,                       //
+        replacement         = FSEventStreamCreate(nullptr,                       //
                                                   &Internal::threadOnNewFSEvent, //
                                                   &fsEventContext,               //
                                                   pathsArray,                    //
                                                   kFSEventStreamEventIdSinceNow, //
                                                   watchLatency,                  //
                                                   watchFlags);
-        if (fsEventStream == nullptr)
+        if (replacement == nullptr)
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleCreateEventStream);
 
@@ -238,16 +266,16 @@ struct SC::FileSystemWatcher::Internal
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
         // Add it to runLoop
-        FSEventStreamScheduleWithRunLoop(fsEventStream, runLoop, kCFRunLoopDefaultMode);
+        FSEventStreamScheduleWithRunLoop(replacement, runLoop, kCFRunLoopDefaultMode);
 #if SC_COMPILER_CLANG
 #pragma clang diagnostic pop
 #endif
 
-        if (not FSEventStreamStart(fsEventStream))
+        if (not FSEventStreamStart(replacement))
         {
-            FSEventStreamInvalidate(fsEventStream);
-            FSEventStreamRelease(fsEventStream);
-            fsEventStream = nullptr;
+            FSEventStreamInvalidate(replacement);
+            FSEventStreamRelease(replacement);
+            replacement = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::AppleStartEventStream);
         }
@@ -264,34 +292,56 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher stopWatching(FolderWatcher& folderWatcher)
     {
-        mutex.lock();
-        folderWatcher.parent->watchers.remove(folderWatcher);
-        folderWatcher.parent = nullptr;
-        mutex.unlock();
-        return startWatching(nullptr);
+        if (onWorkerThread() or refreshing.load() or closing.load())
+            return {FileSystemWatcherError::StopWatchingFailed, FileSystemWatcherErrorDetail::PosixPthreadJoin,
+                    EDEADLK};
+        refreshing.store(true);
+        detach(folderWatcher);
+        return refreshStream(nullptr);
     }
 
-    ResultFileSystemWatcher startWatching(FolderWatcher*)
+    void detach(FolderWatcher& folderWatcher)
     {
+        mutex.lock();
+        self->watchers.remove(folderWatcher);
+        folderWatcher.parent = nullptr;
+        mutex.unlock();
+    }
+
+    ResultFileSystemWatcher startWatching(FolderWatcher* entry)
+    {
+        if (onWorkerThread() or refreshing.load() or closing.load())
+            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::PosixPthreadJoin, EDEADLK};
+        SC_TRY(prepareWatchPath(*entry));
         if (not pollingThread.wasStarted())
         {
             SC_TRY(initThread());
         }
+        refreshing.store(true);
+        mutex.lock();
+        entry->parent = self;
+        self->watchers.queueBack(*entry);
+        mutex.unlock();
+        return refreshStream(entry);
+    }
+
+    ResultFileSystemWatcher refreshStream(FolderWatcher* added)
+    {
         // A pending notification may be waiting for the caller's event loop. Release that
         // handoff before synchronously waiting for the FSEvents thread to refresh its stream.
-        refreshing.exchange(true);
         if (eventLoopRunner)
         {
             eventLoopRunner->appleSignalEventObject();
         }
         wakeUpFSEventThread();
+        const auto result = signalReturnCode;
+        if (not result and added)
+            detach(*added);
         if (eventLoopRunner)
-        {
-            SC_TRY(eventLoopRunner->appleStopWakeUp());
-            SC_TRY(eventLoopRunner->appleStartWakeUp());
-        }
-        refreshing.exchange(false);
-        return signalReturnCode;
+            eventLoopRunner->appleResetHandoff();
+        refreshing.store(false);
+        refreshResume.signal();
+        return result;
     }
     static constexpr int EVENT_MODIFIED = kFSEventStreamEventFlagItemChangeOwner |   //
                                           kFSEventStreamEventFlagItemFinderInfoMod | //
@@ -312,10 +362,11 @@ struct SC::FileSystemWatcher::Internal
     static void threadOnNewFSEvent(ConstFSEventStreamRef streamRef, void* info, size_t numEvents, void* eventPaths,
                                    const FSEventStreamEventFlags* eventFlags, const FSEventStreamEventId* eventIds)
     {
-        (void)streamRef;
         (void)eventIds;
-        Internal&    internal = *static_cast<Internal*>(info);
-        const char** paths    = static_cast<const char**>(eventPaths);
+        Internal& internal = *static_cast<Internal*>(info);
+        if (streamRef != internal.fsEventStream)
+            return;
+        const char** paths = static_cast<const char**>(eventPaths);
         for (size_t idx = 0; idx < numEvents and not internal.closing.load() and not internal.refreshing.load(); ++idx)
         {
             const auto flags = eventFlags[idx];
@@ -351,7 +402,7 @@ struct SC::FileSystemWatcher::Internal
                (size == bytes.sizeInBytes() or prefix[size - 1] == '/' or bytes[size] == '/');
     }
 
-    void notify(StringSpan path, FSEventStreamEventFlags flags)
+    void notify(StringSpan path, FSEventStreamEventFlags flags, bool refreshHint = false)
     {
         const bool rootChanged = flags & kFSEventStreamEventFlagRootChanged;
         const bool globalLoss  = flags & EVENT_GLOBAL_LOSS;
@@ -374,7 +425,13 @@ struct SC::FileSystemWatcher::Internal
                 if (current <= previous or (selected != nullptr and current >= address) or folder.stopped)
                     continue;
                 const StringSpan root = folder.canonicalPath.view();
-                if (rootChanged and root == path)
+                if (refreshHint)
+                {
+                    if (not folder.rescanPending)
+                        continue;
+                    kind = NotificationKind::RescanRequired;
+                }
+                else if (rootChanged and root == path)
                     kind = NotificationKind::WatchStopped;
                 else if (globalLoss or (subtreeLoss and (containsPath(root, path) or containsPath(path, root))))
                     kind = NotificationKind::RescanRequired;
@@ -392,6 +449,8 @@ struct SC::FileSystemWatcher::Internal
             }
             previous     = address;
             auto& folder = selected->internal.get();
+            if (refreshHint and not eventLoopRunner)
+                folder.rescanPending = false;
 
             notification           = {};
             notification.basePath  = selected->path.view();
@@ -402,7 +461,8 @@ struct SC::FileSystemWatcher::Internal
             {
                 notification.failure = {FileSystemWatcherError::MonitoringFailed,
                                         FileSystemWatcherErrorDetail::AppleWatchInvalidated};
-                folder.stopped       = true;
+                if (not eventLoopRunner)
+                    folder.stopped = true;
             }
             else if (kind == NotificationKind::Change)
             {
@@ -415,7 +475,8 @@ struct SC::FileSystemWatcher::Internal
                 if (not renamed and (modified or not directory))
                     notification.operation = Operation::Modified;
             }
-            watcher = selected;
+            watcher               = selected;
+            deliveringRefreshHint = refreshHint;
             mutex.unlock();
             if (eventLoopRunner)
                 (void)eventLoopRunner->appleWakeUpAndWait();
@@ -424,23 +485,83 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
+    bool deliverOnEventLoop()
+    {
+        if (not refreshing.load() and not closing.load() and watcher != nullptr and watcher->parent == self)
+        {
+            auto         callback  = watcher->notifyCallback;
+            Notification delivered = notification;
+            // Refresh or close may release the native event batch and let the worker reuse the
+            // handoff slot before this callback returns.
+            StringPath basePath, fullPath;
+            if (not basePath.assign(delivered.basePath) or not fullPath.assign(delivered.fullPath))
+            {
+                delivered = {};
+                if (not basePath.isEmpty())
+                    delivered.basePath = basePath.view();
+                delivered.fullPath  = delivered.basePath;
+                delivered.kind      = NotificationKind::RescanRequired;
+                delivered.operation = Operation::AddRemoveRename;
+            }
+            else
+            {
+                if (delivered.kind == NotificationKind::Change)
+                {
+                    auto relative = fullPath.view().toCharSpan();
+                    (void)relative.sliceStart(relative.sizeInBytes() - delivered.relativePath.sizeInBytes(), relative);
+                    delivered.relativePath = {relative, true, fullPath.view().getEncoding()};
+                }
+                delivered.basePath = basePath.view();
+                delivered.fullPath = fullPath.view();
+            }
+            if (deliveringRefreshHint)
+                watcher->internal.get().rescanPending = false;
+            if (delivered.kind == NotificationKind::WatchStopped)
+                watcher->internal.get().stopped = true;
+            watcher = nullptr;
+            callback(delivered);
+            return true;
+        }
+        return false;
+    }
+
     static void threadExecuteRefresh(void* arg)
     {
         Internal& self = *static_cast<Internal*>(arg);
-        if (self.fsEventStream)
-        {
-            self.threadDestroyFSEvent();
-        }
         if (self.closing.load())
         {
+            if (self.fsEventStream)
+                self.threadDestroyFSEvent();
             CFRunLoopStop(self.runLoop);
             self.runLoop = nullptr;
+            self.refreshSignalFinished.signal();
+            return;
         }
-        else
+
+        FSEventStreamRef replacement = nullptr;
+        self.signalReturnCode        = self.threadCreateFSEvent(replacement);
+        if (self.signalReturnCode)
         {
-            self.signalReturnCode = self.threadCreateFSEvent();
+            if (self.fsEventStream)
+                self.threadDestroyFSEvent();
+            self.fsEventStream = replacement;
         }
+
+        // SinceNow cannot replay a discarded batch. Every surviving root may need a rescan
+        // even if the old stream was retained after a failed replacement.
+        self.mutex.lock();
+        for (auto* entry = self.self->watchers.front; entry != nullptr; entry = entry->next)
+        {
+            auto& folder         = entry->internal.get();
+            folder.rescanPending = folder.inStream and not folder.stopped;
+            if (self.signalReturnCode)
+                folder.inStream = not folder.stopped;
+        }
+        self.mutex.unlock();
+        self.watcher = nullptr;
         self.refreshSignalFinished.signal();
+        self.refreshResume.wait();
+        self.notify({}, 0, true);
     }
 };
 
@@ -455,13 +576,4 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
 };
 
-bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
-{
-    Internal& impl = internal.get();
-    if (not impl.refreshing.load() and not impl.closing.load() and impl.watcher != nullptr and
-        impl.watcher->parent == this)
-    {
-        impl.watcher->notifyCallback(impl.notification);
-    }
-    return true;
-}
+bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t) { return internal.get().deliverOnEventLoop(); }

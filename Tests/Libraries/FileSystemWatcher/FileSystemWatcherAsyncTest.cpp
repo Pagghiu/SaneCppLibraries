@@ -44,6 +44,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
 #if SC_PLATFORM_APPLE
         appleRootChanged(appDirectory);
+        appleRefreshOverlappingWatchers(appDirectory);
 #endif
 #if SC_PLATFORM_LINUX
         eventLoopWatchInvalidation(appDirectory);
@@ -849,6 +850,83 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
 
 #if SC_PLATFORM_APPLE
+    void appleRefreshOverlappingWatchers(StringView appDirectory)
+    {
+        if (not test_section("AsyncEventLoop FSEvents refresh overlapping watchers"))
+            return;
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        StringPath root, child, trigger, afterRefresh;
+        SC_TEST_EXPECT(Path::join(root, {appDirectory, "__sc fsevents refresh"}));
+        const ResultFileSystem created = fs.makeDirectory(root.view());
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto cleanup = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(root.view()); });
+        SC_TEST_EXPECT(Path::join(child, {root.view(), "child"}));
+        SC_TEST_EXPECT(Path::join(trigger, {child.view(), "trigger.txt"}));
+        SC_TEST_EXPECT(Path::join(afterRefresh, {child.view(), "after-refresh.txt"}));
+        SC_TEST_EXPECT(fs.makeDirectory(child.view()));
+
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        auto                                    closeLoop = MakeDeferred([&] { (void)loop.close(); });
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(loop);
+        FileSystemWatcher                owner;
+        FileSystemWatcher::FolderWatcher refreshing, remaining;
+        auto                             closeOwner = MakeDeferred([&] { (void)owner.close(); });
+        SC_TEST_EXPECT(owner.init(runner));
+
+        using Kind = FileSystemWatcher::NotificationKind;
+        struct State
+        {
+            FileSystemWatcher&                owner;
+            FileSystemWatcher::FolderWatcher& refreshing;
+            StringSpan                        root;
+            StringSpan                        child;
+            bool                              refreshed       = false;
+            bool                              rescan          = false;
+            bool                              remainingChange = false;
+            bool                              restartedChange = false;
+        } state{owner, refreshing, root.view(), child.view()};
+        refreshing.notifyCallback = [this, &state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind != Kind::Change)
+                return;
+            if (not state.refreshed and event.relativePath == "child/trigger.txt")
+            {
+                SC_TEST_EXPECT(state.refreshing.stopWatching());
+                SC_TEST_EXPECT(state.owner.watch(state.refreshing, state.root));
+                state.refreshed = true;
+                StringPath full;
+                SC_TEST_EXPECT(event.basePath == state.root);
+                SC_TEST_EXPECT(event.relativePath == "child/trigger.txt");
+                SC_TEST_EXPECT(event.getFullPath(full));
+                SC_TEST_EXPECT(StringView(full.view()).endsWith("/child/trigger.txt"));
+            }
+            state.restartedChange |= event.relativePath == "child/after-refresh.txt";
+        };
+        remaining.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (state.refreshed and event.kind == Kind::RescanRequired)
+                state.rescan |= event.basePath == state.child and event.relativePath.isEmpty() and event.failure;
+            state.remainingChange |= event.kind == Kind::Change and event.relativePath == "after-refresh.txt";
+        };
+
+        SC_TEST_EXPECT(owner.watch(refreshing, root.view()));
+        SC_TEST_EXPECT(owner.watch(remaining, child.view()));
+        submitQueuedWatcher(loop);
+        SC_TEST_EXPECT(fs.writeString(trigger.view(), "marker"));
+        const bool recovered = runUntil(loop, [&] { return state.refreshed and state.rescan; });
+        SC_TEST_EXPECT(state.refreshed);
+        SC_TEST_EXPECT(state.rescan);
+        SC_TEST_EXPECT(recovered);
+        SC_TEST_EXPECT(fs.writeString(afterRefresh.view(), "marker"));
+        SC_TEST_EXPECT(runUntil(loop, [&] { return state.remainingChange and state.restartedChange; }));
+    }
+
     void appleRootChanged(StringView appDirectory)
     {
         if (not test_section("AsyncEventLoop FSEvents root change"))

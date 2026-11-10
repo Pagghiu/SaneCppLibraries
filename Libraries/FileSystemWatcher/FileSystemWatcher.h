@@ -67,7 +67,7 @@ struct FileSystemWatcher
     {
         static constexpr int Windows = 3 * sizeof(void*);
         // The Apple backend keeps a Notification and structured result inline during event-loop handoff.
-        static constexpr int Apple   = 47 * sizeof(void*);
+        static constexpr int Apple   = 61 * sizeof(void*);
         static constexpr int Linux   = sizeof(void*) * 4;
         static constexpr int Default = Linux;
 
@@ -210,6 +210,7 @@ struct FileSystemWatcher
         virtual Result appleStartWakeUp()       = 0;
         virtual Result appleStopWakeUp()        = 0;
         virtual void   appleSignalEventObject() = 0;
+        virtual void   appleResetHandoff()      = 0;
         virtual Result appleWakeUpAndWait()     = 0;
 
 #elif SC_PLATFORM_LINUX
@@ -247,7 +248,7 @@ struct FileSystemWatcher
     ResultFileSystemWatcher init(EventLoopRunner& runner);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
-    /// @note On Windows and Linux, closing from the ThreadRunner callback fails; close from another thread after
+    /// @note Closing from the ThreadRunner callback fails; close from another thread after
     /// the callback.
     /// @return Valid Result if resources have been freed successfully
     ResultFileSystemWatcher close();
@@ -318,9 +319,16 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 
     virtual void appleSignalEventObject() override { eventObject.signal(); }
 
-    virtual Result appleStopWakeUp() override
+    virtual void appleResetHandoff() override
     {
         notificationGeneration++;
+        // The producer is quiescent. Consume any unused release signal.
+        eventObject.signal();
+        eventObject.wait();
+    }
+
+    virtual Result appleStopWakeUp() override
+    {
         if (not asyncWakeUp.isFree())
         {
             SC_TRY(asyncWakeUp.stop(*eventLoop));
@@ -329,9 +337,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
                 SC_TRY(eventLoop->runNoWait());
             }
         }
-        // The producer is quiescent now; consume any unused refresh/close handoff signal.
-        eventObject.signal();
-        eventObject.wait();
+        appleResetHandoff();
         return Result(true);
     }
 
@@ -346,8 +352,8 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
     {
         const size_t generation = notificationGeneration;
         result.reactivateRequest(true);
-        fileSystemWatcher->asyncNotify(nullptr);
-        if (generation == notificationGeneration)
+        const bool delivered = fileSystemWatcher->asyncNotify(nullptr);
+        if (delivered and generation == notificationGeneration)
         {
             eventObject.signal();
         }

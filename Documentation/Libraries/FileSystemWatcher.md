@@ -111,6 +111,9 @@ the owner rejects new watches until it is closed and reinitialized. Other cases 
 reported reliably. On Linux, do not call `FileSystemWatcher::close` from its own ThreadRunner callback: it returns a
 close error, and another thread can close the owner after that callback returns.
 
+On Apple, refreshing the shared FSEvents stream after a watch is added or removed can discard queued changes.
+Surviving watches receive a root-level `RescanRequired` so the caller can reconcile those changes.
+
 The underlying operating-system services may allocate their own resources. In particular, the Apple backend uses
 CoreServices objects while rebuilding its FSEvents stream. The allocation-free API shape therefore means caller-owned,
 bounded SC object storage; it is not a promise that native watcher setup performs no system allocation.
