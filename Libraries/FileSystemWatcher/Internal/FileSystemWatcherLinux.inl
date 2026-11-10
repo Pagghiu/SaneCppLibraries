@@ -8,6 +8,7 @@
 #include <dirent.h>      // opendir, readdir, closedir
 #include <errno.h>       // errno
 #include <fcntl.h>       // open, O_RDONLY, O_DIRECTORY
+#include <stdio.h>       // snprintf
 #include <string.h>      // strlen
 #include <sys/inotify.h> // inotify
 #include <sys/select.h>  // fd_set / FD_ZERO
@@ -265,6 +266,34 @@ struct SC::FileSystemWatcher::Internal
         return ResultFileSystemWatcher(true);
     }
 
+    int registerDirectory(int directoryFd)
+    {
+        // inotify takes a path. Resolve the open descriptor through procfs so registration
+        // and enumeration use the same object even if its directory entry is replaced.
+        char descriptorPath[sizeof("/proc/self/fd/") + 3 * sizeof(int)];
+        ::snprintf(descriptorPath, sizeof(descriptorPath), "/proc/self/fd/%d", directoryFd);
+        constexpr int mask = IN_ONLYDIR | IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF |
+                             IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
+        return ::inotify_add_watch(notifyFd, descriptorPath, mask);
+    }
+
+    static bool sameDirectory(const struct stat& first, const struct stat& second)
+    {
+        return S_ISDIR(second.st_mode) and first.st_dev == second.st_dev and first.st_ino == second.st_ino;
+    }
+
+    static ResultFileSystemWatcher verifyDirectory(int directoryFd, int parentFd, const char* name, int flags)
+    {
+        struct stat opened, named;
+        if (::fstat(directoryFd, &opened) == -1 or ::fstatat(parentFd, name, &named, flags) == -1)
+            return {FileSystemWatcherError::WatchSetupFailed,
+                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
+        if (not sameDirectory(opened, named))
+            return {FileSystemWatcherError::WatchSetupFailed,
+                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, ESTALE};
+        return ResultFileSystemWatcher(true);
+    }
+
     void detachUnstartedWatcher(FolderWatcher& entry)
     {
         self->watchers.remove(entry);
@@ -324,10 +353,7 @@ struct SC::FileSystemWatcher::Internal
         }
         auto closeRoot = MakeDeferred([rootFd] { ::close(rootFd); });
 
-        const int     rootNotifyFd = notifyFd;
-        constexpr int mask =
-            IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
-        const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
+        const int newHandle = registerDirectory(rootFd);
         if (newHandle == -1)
         {
             const uint32_t nativeError = static_cast<uint32_t>(errno);
@@ -339,6 +365,10 @@ struct SC::FileSystemWatcher::Internal
         pair.notifyID                                     = newHandle;
         pair.nameOffset                                   = -1;
         opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
+
+        const auto verifiedRoot = verifyDirectory(rootFd, AT_FDCWD, currentPath.view().bytesIncludingTerminator(), 0);
+        if (not verifiedRoot)
+            return failStartWatching(*entry, verifiedRoot);
 
         // Watch all subfolders of current directory using a stack of file descriptors and names
         constexpr int MaxStackDepth = FolderWatcherSizes::MaxNumberOfSubdirs;
@@ -401,16 +431,15 @@ struct SC::FileSystemWatcher::Internal
                 {
                     continue;
                 }
-                const ResultFileSystemWatcher pathResult =
-                    getSubFolderPath(currentPath, entry->path, subDirectory->d_name, opaque, entryStack.notifyHandleId);
-                if (not pathResult)
-                    return failStartWatching(*entry, pathResult);
-
+                const int   parentFd = entryStack.fd;
                 struct stat st;
-                if (::stat(currentPath.view().bytesIncludingTerminator(), &st) != 0)
+                int         inspected;
+                do
+                    inspected = ::fstatat(parentFd, subDirectory->d_name, &st, AT_SYMLINK_NOFOLLOW);
+                while (inspected == -1 and errno == EINTR);
+                if (inspected == -1)
                 {
                     const int nativeError = errno;
-                    // The entry or a symlink target may have disappeared since readdir.
                     if (nativeError == ENOENT)
                         continue;
                     return failStartWatching(
@@ -420,6 +449,37 @@ struct SC::FileSystemWatcher::Internal
                 }
                 if (S_ISDIR(st.st_mode))
                 {
+                    int subFd;
+                    do
+                        subFd =
+                            ::openat(parentFd, subDirectory->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+                    while (subFd == -1 and errno == EINTR);
+                    if (subFd == -1)
+                    {
+                        const int nativeError = errno;
+                        if (nativeError == ENOENT)
+                            continue;
+                        return failStartWatching(*entry, {FileSystemWatcherError::WatchSetupFailed,
+                                                          FileSystemWatcherErrorDetail::LinuxOpenSubdirectory,
+                                                          static_cast<uint32_t>(nativeError)});
+                    }
+                    auto closeChild = MakeDeferred([subFd] { ::close(subFd); });
+
+                    struct stat opened;
+                    if (::fstat(subFd, &opened) == -1)
+                        return failStartWatching(*entry, {FileSystemWatcherError::WatchSetupFailed,
+                                                          FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity,
+                                                          static_cast<uint32_t>(errno)});
+                    if (not sameDirectory(st, opened))
+                        return failStartWatching(*entry,
+                                                 {FileSystemWatcherError::WatchSetupFailed,
+                                                  FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, ESTALE});
+
+                    const auto pathResult = getSubFolderPath(currentPath, entry->path, subDirectory->d_name, opaque,
+                                                             entryStack.notifyHandleId);
+                    if (not pathResult)
+                        return failStartWatching(*entry, pathResult);
+
                     if (stackSize >= MaxStackDepth)
                         return failStartWatching(
                             *entry,
@@ -441,8 +501,7 @@ struct SC::FileSystemWatcher::Internal
                             *entry, ResultFileSystemWatcher(FileSystemWatcherError::BufferTooSmall,
                                                             FileSystemWatcherErrorDetail::LinuxRelativePathStorage));
 
-                    const int newHandle =
-                        ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
+                    const int newHandle = registerDirectory(subFd);
                     if (newHandle == -1)
                     {
                         const uint32_t nativeError = static_cast<uint32_t>(errno);
@@ -457,17 +516,12 @@ struct SC::FileSystemWatcher::Internal
 
                     opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
 
-                    // Open the subdirectory and push onto the stack
-                    const int subFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY);
-                    if (subFd == -1)
-                    {
-                        const uint32_t nativeError = static_cast<uint32_t>(errno);
-                        return failStartWatching(
-                            *entry,
-                            ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                                    FileSystemWatcherErrorDetail::LinuxOpenSubdirectory, nativeError));
-                    }
+                    const auto verifiedChild =
+                        verifyDirectory(subFd, parentFd, subDirectory->d_name, AT_SYMLINK_NOFOLLOW);
+                    if (not verifiedChild)
+                        return failStartWatching(*entry, verifiedChild);
                     stack[stackSize++] = {subFd, childHandleId};
+                    closeChild.disarm();
                 }
             }
         }

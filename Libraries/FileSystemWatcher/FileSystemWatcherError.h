@@ -76,6 +76,7 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     WindowsSignalWatchEvent,
     WindowsWaitForWatchEvents,
     WindowsCancelDirectoryChanges,
+    LinuxVerifyDirectoryIdentity,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

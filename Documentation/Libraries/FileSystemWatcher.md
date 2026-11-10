@@ -99,8 +99,10 @@ constructor for broader or deeper trees. That buffer is ignored on Windows and A
 
 If Linux reports a recursive setup failure after registering watches, it attempts to remove all of them. The
 `FolderWatcher` can be reused when cleanup succeeds; if a removal fails, `watch` returns the cleanup error.
-Linux reports failures to open or enumerate a directory or inspect an entry during initial discovery, except when an
-entry or symbolic-link target is no longer present. It does not yet add watches for subdirectories created later.
+Linux opens descendants relative to their parent directory and skips directory symlinks during discovery. Registering
+the opened directories with inotify requires `/proc/self/fd`. Disappearing entries can be skipped during discovery.
+A replacement detected during registration fails setup and rolls back. Directories created later require a rescan
+to restore recursive coverage.
 When Linux folder watches on the same owner overlap, stopping one folder leaves shared native watches active for the
 other folders that still use them.
 
