@@ -19,12 +19,13 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
     FSWThread thread;
 
-    static constexpr int N = ThreadRunnerDefinition::MaxWatchablePaths;
-
-    HANDLE         hEvents[N] = {0};
-    FolderWatcher* entries[N] = {nullptr};
-    DWORD          numEntries = 0;
-    FSWAtomicBool  shouldStop;
+    // Slot zero wakes the worker before the owner changes the wait set.
+    HANDLE         hEvents[MAXIMUM_WAIT_OBJECTS]     = {};
+    FolderWatcher* entries[MAXIMUM_WAIT_OBJECTS - 1] = {};
+    HANDLE         paused                            = nullptr;
+    HANDLE         resume                            = nullptr;
+    bool           exiting                           = false;
+    DWORD          count                             = 0;
 };
 
 struct SC::FileSystemWatcher::Internal
@@ -47,8 +48,27 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
-        self            = &parent;
-        threadingRunner = &runner.get();
+        auto&  state     = runner.get();
+        HANDLE events[3] = {};
+        for (HANDLE& event : events)
+        {
+            event = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
+            if (event == nullptr)
+            {
+                const auto error = static_cast<uint32_t>(::GetLastError());
+                for (HANDLE created : events)
+                    if (created != nullptr)
+                        ::CloseHandle(created);
+                return {FileSystemWatcherError::InitializationFailed,
+                        FileSystemWatcherErrorDetail::WindowsCreateWatchEvent, error};
+            }
+        }
+        state.hEvents[0] = events[0];
+        state.paused     = events[1];
+        state.resume     = events[2];
+        state.exiting    = false;
+        self             = &parent;
+        threadingRunner  = &runner.get();
         return ResultFileSystemWatcher(true);
     }
 
@@ -66,37 +86,98 @@ struct SC::FileSystemWatcher::Internal
             return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
         if (threadingRunner)
         {
-            if (threadingRunner->thread.wasStarted())
+            SC_TRY(pauseWorker(FileSystemWatcherError::CloseFailed));
+            auto& runner   = *threadingRunner;
+            runner.exiting = true;
+            if (runner.thread.wasStarted())
             {
-                threadingRunner->shouldStop.exchange(true);
-                do
-                {
-                    for (DWORD idx = 0; idx < threadingRunner->numEntries; ++idx)
-                    {
-                        ::SetEvent(threadingRunner->hEvents[idx]);
-                    }
-                } while (threadingRunner->shouldStop.load());
-                SC_TRY(threadingRunner->thread.join());
+                ::SetEvent(runner.resume);
+                SC_TRY(runner.thread.join());
             }
+            while (FolderWatcher* entry = self->watchers.front)
+                SC_TRY(removeThreadWatch(*entry));
+            ::CloseHandle(runner.paused);
+            ::CloseHandle(runner.resume);
+            ::CloseHandle(threadingRunner->hEvents[0]);
+            threadingRunner->hEvents[0] = nullptr;
+            threadingRunner             = nullptr;
         }
-        while (FolderWatcher* entry = self->watchers.front)
+        else
         {
-            SC_TRY(stopWatching(*entry));
+            while (FolderWatcher* entry = self->watchers.front)
+                SC_TRY(stopWatching(*entry));
+            eventLoopRunner->fileSystemWatcher = nullptr;
+            eventLoopRunner                    = nullptr;
         }
+        self = nullptr;
         return ResultFileSystemWatcher(true);
     }
 
-    void signalWatcherEvent(FolderWatcher& watcher)
+    ResultFileSystemWatcher pauseWorker(FileSystemWatcherError error)
     {
-        OVERLAPPED* overlapped = getOverlapped(watcher);
-        ::SetEvent(overlapped->hEvent);
+        auto& runner = *threadingRunner;
+        if (not runner.thread.wasStarted())
+            return ResultFileSystemWatcher(true);
+        if (::GetThreadId(runner.thread.thread) == ::GetCurrentThreadId())
+            return {error, FileSystemWatcherErrorDetail::WindowsWaitForSingleObject, ERROR_POSSIBLE_DEADLOCK};
+        if (not ::SetEvent(runner.hEvents[0]))
+            return {error, FileSystemWatcherErrorDetail::WindowsSignalWatchEvent,
+                    static_cast<uint32_t>(::GetLastError())};
+        HANDLE      wait[] = {runner.paused, runner.thread.thread};
+        const DWORD result = ::WaitForMultipleObjects(2, wait, FALSE, INFINITE);
+        if (result == WAIT_OBJECT_0)
+            return ResultFileSystemWatcher(true);
+        if (result == WAIT_OBJECT_0 + 1)
+        {
+            SC_TRY(runner.thread.join());
+            ::ResetEvent(runner.hEvents[0]);
+            return ResultFileSystemWatcher(true);
+        }
+        return {error, FileSystemWatcherErrorDetail::WindowsWaitForWatchEvents,
+                static_cast<uint32_t>(::GetLastError())};
     }
 
-    void closeWatcherEvent(FolderWatcher& watcher)
+    ResultFileSystemWatcher resumeWorker()
     {
-        OVERLAPPED* overlapped = getOverlapped(watcher);
+        auto& runner = *threadingRunner;
+        if (runner.thread.wasStarted())
+        {
+            if (not ::SetEvent(runner.resume))
+                return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::WindowsSignalWatchEvent,
+                        static_cast<uint32_t>(::GetLastError())};
+            return ResultFileSystemWatcher(true);
+        }
+        return runner.count == 0 ? ResultFileSystemWatcher(true) : runner.thread.start(&threadDispatch, this);
+    }
+
+    ResultFileSystemWatcher removeThreadWatch(FolderWatcher& entry)
+    {
+        auto& runner     = *threadingRunner;
+        auto& folder     = entry.internal.get();
+        auto* overlapped = getOverlapped(entry);
+        if (not ::CancelIoEx(folder.fileHandle, overlapped))
+        {
+            const auto error = static_cast<uint32_t>(::GetLastError());
+            if (error != ERROR_NOT_FOUND)
+                return {FileSystemWatcherError::StopWatchingFailed,
+                        FileSystemWatcherErrorDetail::WindowsCancelDirectoryChanges, error};
+        }
+        // A manual-reset event lets us wait even when the worker observed the completion.
+        DWORD bytes = 0;
+        (void)::GetOverlappedResult(folder.fileHandle, overlapped, &bytes, TRUE);
+        for (DWORD index = 0; index < runner.count; ++index)
+        {
+            if (runner.entries[index] != &entry)
+                continue;
+            --runner.count;
+            runner.entries[index]     = runner.entries[runner.count];
+            runner.hEvents[index + 1] = runner.hEvents[runner.count + 1];
+            break;
+        }
         ::CloseHandle(overlapped->hEvent);
-        overlapped->hEvent = INVALID_HANDLE_VALUE;
+        closeFileHandle(entry);
+        detachUnstartedWatcher(entry);
+        return ResultFileSystemWatcher(true);
     }
 
     void closeFileHandle(FolderWatcher& watcher)
@@ -148,6 +229,13 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher stopWatching(FolderWatcher& folderWatcher)
     {
+        if (threadingRunner)
+        {
+            SC_TRY(pauseWorker(FileSystemWatcherError::StopWatchingFailed));
+            const auto removed = removeThreadWatch(folderWatcher);
+            const auto resumed = resumeWorker();
+            return removed ? resumed : removed;
+        }
         auto& folder = folderWatcher.internal.get();
         if (folder.deliveryAlive != nullptr)
         {
@@ -156,18 +244,8 @@ struct SC::FileSystemWatcher::Internal
         }
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
-        if (threadingRunner)
-        {
-            signalWatcherEvent(folderWatcher);
-            closeWatcherEvent(folderWatcher);
-        }
-        else
-        {
-            SC_TRY(eventLoopRunner->windowsRequestStopFolderExternalCompletion(folderWatcher));
-            SC_TRY(eventLoopRunner->windowsWaitFolderExternalCompletionStopped(folderWatcher));
-            closeFileHandle(folderWatcher);
-            return ResultFileSystemWatcher(true);
-        }
+        SC_TRY(eventLoopRunner->windowsRequestStopFolderExternalCompletion(folderWatcher));
+        SC_TRY(eventLoopRunner->windowsWaitFolderExternalCompletionStopped(folderWatcher));
         closeFileHandle(folderWatcher);
         return ResultFileSystemWatcher(true);
     }
@@ -180,7 +258,6 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher startWatching(FolderWatcher* entry)
     {
-        // TODO: we should probably check if we are leaking on some partial failure code path...some RAII would help
         HANDLE newHandle = ::CreateFileW(entry->path.view().getNullTerminatedNative(),                     //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
@@ -211,43 +288,62 @@ struct SC::FileSystemWatcher::Internal
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
                                            FileSystemWatcherErrorDetail::WindowsQueryRootDirectory, ERROR_DIRECTORY);
         }
+        auto& folder      = entry->internal.get();
+        folder.fileHandle = newHandle;
         if (threadingRunner)
-        {
-            threadingRunner->numEntries = 0;
-            if (threadingRunner->numEntries >= ThreadRunnerDefinition::MaxWatchablePaths)
-            {
-                ::CloseHandle(newHandle);
-                detachUnstartedWatcher(*entry);
-                return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                               FileSystemWatcherErrorDetail::WatchPathCapacity);
-            }
-        }
-        FolderWatcherInternal& opaque = entry->internal.get();
-        opaque.fileHandle             = newHandle;
+            return startThreadWatch(*entry);
 
-        OVERLAPPED* overlapped = getOverlapped(*entry);
-        if (threadingRunner)
+        const auto started = eventLoopRunner->windowsStartFolderExternalCompletion(*entry, newHandle);
+        if (not started)
         {
-            overlapped->hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
-
-            threadingRunner->hEvents[threadingRunner->numEntries] = overlapped->hEvent;
-            threadingRunner->entries[threadingRunner->numEntries] = entry;
-            threadingRunner->numEntries++;
+            closeFileHandle(*entry);
+            detachUnstartedWatcher(*entry);
+            return started;
         }
-        else
-        {
-            SC_TRY(eventLoopRunner->windowsStartFolderExternalCompletion(*entry, newHandle));
-        }
-
-        SC_TRY(submitRead(*entry));
-
-        if (threadingRunner and not threadingRunner->thread.wasStarted())
-        {
-            threadingRunner->shouldStop.exchange(false);
-            SC_TRY(threadingRunner->thread.start(&threadDispatch, this));
-        }
-        return ResultFileSystemWatcher(true);
+        const auto submitted = submitRead(*entry);
+        if (submitted)
+            return submitted;
+        const auto stopped = stopWatching(*entry);
+        return stopped ? submitted : stopped;
     }
+
+    ResultFileSystemWatcher startThreadWatch(FolderWatcher& entry)
+    {
+        auto rollback = MakeDeferred(
+            [&]
+            {
+                closeFileHandle(entry);
+                detachUnstartedWatcher(entry);
+            });
+        auto& runner = *threadingRunner;
+        if (runner.count == MAXIMUM_WAIT_OBJECTS - 1)
+            return {FileSystemWatcherError::WatchLimitExceeded, FileSystemWatcherErrorDetail::WatchPathCapacity};
+        auto* overlapped   = getOverlapped(entry);
+        *overlapped        = {};
+        overlapped->hEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (overlapped->hEvent == nullptr)
+            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::WindowsCreateWatchEvent,
+                    static_cast<uint32_t>(::GetLastError())};
+        auto closeEvent = MakeDeferred([&] { ::CloseHandle(overlapped->hEvent); });
+        SC_TRY(pauseWorker(FileSystemWatcherError::WatchSetupFailed));
+        const auto submitted = submitRead(entry);
+        if (not submitted)
+        {
+            const auto resumed = resumeWorker();
+            return resumed ? submitted : resumed;
+        }
+        runner.entries[runner.count] = &entry;
+        ++runner.count;
+        runner.hEvents[runner.count] = overlapped->hEvent;
+        closeEvent.disarm();
+        rollback.disarm();
+        const auto resumed = resumeWorker();
+        if (resumed)
+            return resumed;
+        const auto removed = removeThreadWatch(entry);
+        return removed ? resumed : removed;
+    }
+
     static DWORD WINAPI threadDispatch(LPVOID arg)
     {
         Internal& self = *static_cast<Internal*>(arg);
@@ -259,17 +355,29 @@ struct SC::FileSystemWatcher::Internal
     {
         thread.setThreadName(SC_NATIVE_STR("FileSystemWatcher::init"));
         ThreadRunnerInternal& runner = *threadingRunner;
-        while (not runner.shouldStop.load())
+        for (;;)
         {
-            const DWORD result = ::WaitForMultipleObjects(runner.numEntries, runner.hEvents, TRUE, INFINITE);
-            if (result != WAIT_FAILED and not runner.shouldStop.load())
+            const DWORD result = ::WaitForMultipleObjects(runner.count + 1, runner.hEvents, FALSE, INFINITE);
+            if (result == WAIT_OBJECT_0)
             {
-                const DWORD    index = result - WAIT_OBJECT_0;
-                FolderWatcher& entry = *runner.entries[index];
-                (void)completeRead(entry);
+                ::SetEvent(runner.paused);
+                if (::WaitForSingleObject(runner.resume, INFINITE) != WAIT_OBJECT_0 or runner.exiting)
+                    return;
+                continue;
             }
+            if (result == WAIT_FAILED)
+            {
+                const auto error = static_cast<uint32_t>(::GetLastError());
+                for (DWORD index = 0; index < runner.count; ++index)
+                    notifyStatus(*runner.entries[index], NotificationKind::WatchStopped,
+                                 {FileSystemWatcherError::MonitoringFailed,
+                                  FileSystemWatcherErrorDetail::WindowsWaitForWatchEvents, error});
+                return;
+            }
+            const DWORD index = result - WAIT_OBJECT_0;
+            ::ResetEvent(runner.hEvents[index]);
+            (void)completeRead(*runner.entries[index - 1]);
         }
-        threadingRunner->shouldStop.exchange(false);
     }
 
     static void notifyStatus(const FolderWatcher& entry, NotificationKind kind, ResultFileSystemWatcher failure)

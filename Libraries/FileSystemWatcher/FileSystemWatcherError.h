@@ -72,6 +72,10 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     AppleResolveWatchRoot,
     AppleWatchInvalidated,
     WindowsCompleteDirectoryChanges,
+    WindowsCreateWatchEvent,
+    WindowsSignalWatchEvent,
+    WindowsWaitForWatchEvents,
+    WindowsCancelDirectoryChanges,
 };
 
 /// @brief Stable category assigned to errors owned by FileSystemWatcher.

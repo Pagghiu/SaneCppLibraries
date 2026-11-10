@@ -13,6 +13,11 @@
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif
+
 namespace SC
 {
 struct FileSystemWatcherTest;
@@ -28,6 +33,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         structuredErrorsAndFormatter(appDirectory);
         failedRootCanBeReused(appDirectory);
         threadRunner(appDirectory);
+#if SC_PLATFORM_WINDOWS
+        windowsThreadRunnerMultipleRoots(appDirectory);
+#endif
     }
 
     void initClose()
@@ -322,6 +330,89 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fs.removeEmptyDirectory(watchDirectoryName));
         }
     }
+
+#if SC_PLATFORM_WINDOWS
+    void windowsThreadRunnerMultipleRoots(StringView appDirectory)
+    {
+        if (not test_section("Windows ThreadRunner multiple roots"))
+            return;
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        StringPath fixture;
+        bool       created = false;
+        for (size_t attempt = 0; attempt < 128 and not created; ++attempt)
+        {
+            if (not StringBuilder::format(fixture, "__sc thread watcher {}", attempt))
+                break;
+            created = static_cast<bool>(fs.makeDirectory(fixture.view()));
+        }
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+        auto cleanup = MakeDeferred([&] { (void)fs.removeDirectoryRecursive(fixture.view()); });
+
+        struct Root
+        {
+            StringPath                       path;
+            FileSystemWatcher::FolderWatcher watch;
+            HANDLE                           notification = nullptr;
+        } roots[2];
+        auto closeEvents = MakeDeferred(
+            [&]
+            {
+                for (auto& root : roots)
+                    if (root.notification != nullptr)
+                        ::CloseHandle(root.notification);
+            });
+        for (size_t index = 0; index < 2; ++index)
+        {
+            auto& root = roots[index];
+            SC_TEST_EXPECT(StringBuilder::format(root.path, "{}/{}/root{}", appDirectory, fixture.view(), index));
+            SC_TEST_EXPECT(fs.makeDirectory(root.path.view()));
+            root.notification = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
+            SC_TEST_EXPECT(root.notification != nullptr);
+            root.watch.notifyCallback = [&root](const FileSystemWatcher::Notification& event)
+            {
+                if (event.kind == FileSystemWatcher::NotificationKind::Change and
+                    event.operation == FileSystemWatcher::Operation::AddRemoveRename and
+                    StringView(event.relativePath).startsWith("marker"))
+                    ::SetEvent(root.notification);
+            };
+        }
+
+        FileSystemWatcher::ThreadRunner runner;
+        FileSystemWatcher               owner;
+        SC_TEST_EXPECT(owner.init(runner));
+        auto closeOwner = MakeDeferred([&] { (void)owner.close(); });
+        auto write      = [&](Root& root, StringView name)
+        {
+            StringPath path;
+            return Path::join(path, {root.path.view(), name}) and fs.writeString(path.view(), "marker");
+        };
+
+        SC_TEST_EXPECT(owner.watch(roots[0].watch, roots[0].path.view()));
+        SC_TEST_EXPECT(owner.watch(roots[1].watch, roots[1].path.view()));
+        SC_TEST_EXPECT(write(roots[1], "marker-second.txt"));
+        SC_TEST_EXPECT(::WaitForSingleObject(roots[1].notification, 5000) == WAIT_OBJECT_0);
+        SC_TEST_EXPECT(write(roots[0], "marker-first.txt"));
+        SC_TEST_EXPECT(::WaitForSingleObject(roots[0].notification, 5000) == WAIT_OBJECT_0);
+
+        SC_TEST_EXPECT(roots[0].watch.stopWatching());
+        SC_TEST_EXPECT(write(roots[1], "marker-remaining.txt"));
+        SC_TEST_EXPECT(::WaitForSingleObject(roots[1].notification, 5000) == WAIT_OBJECT_0);
+        SC_TEST_EXPECT(owner.watch(roots[0].watch, roots[0].path.view()));
+        SC_TEST_EXPECT(write(roots[0], "marker-reused.txt"));
+        SC_TEST_EXPECT(::WaitForSingleObject(roots[0].notification, 5000) == WAIT_OBJECT_0);
+        SC_TEST_EXPECT(owner.close());
+        SC_TEST_EXPECT(owner.init(runner));
+        SC_TEST_EXPECT(owner.watch(roots[1].watch, roots[1].path.view()));
+        SC_TEST_EXPECT(write(roots[1], "marker-reopened.txt"));
+        SC_TEST_EXPECT(::WaitForSingleObject(roots[1].notification, 5000) == WAIT_OBJECT_0);
+        SC_TEST_EXPECT(owner.close());
+        closeOwner.disarm();
+    }
+#endif
 };
 
 namespace SC

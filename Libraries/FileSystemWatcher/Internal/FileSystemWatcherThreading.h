@@ -9,14 +9,6 @@
 #include <Windows.h>
 namespace SC
 {
-struct FSWAtomicBool
-{
-    volatile bool value = false;
-
-    bool load() { return InterlockedOr(reinterpret_cast<LONG volatile*>(&value), 0) != 0; }
-    bool exchange(bool desired) { return InterlockedExchange(reinterpret_cast<LONG volatile*>(&value), desired) != 0; }
-};
-
 struct FSWThread
 {
     HANDLE thread = nullptr;
@@ -33,16 +25,15 @@ struct FSWThread
 
     ResultFileSystemWatcher join()
     {
-        if (!thread)
+        if (not thread)
             return ResultFileSystemWatcher(true);
-        const DWORD    res         = ::WaitForSingleObject(thread, INFINITE);
-        const uint32_t nativeError = res == WAIT_FAILED ? static_cast<uint32_t>(::GetLastError()) : 0;
+        const DWORD res = ::WaitForSingleObject(thread, INFINITE);
+        if (res != WAIT_OBJECT_0)
+            return {FileSystemWatcherError::CloseFailed, FileSystemWatcherErrorDetail::WindowsWaitForSingleObject,
+                    res == WAIT_FAILED ? static_cast<uint32_t>(::GetLastError()) : 0};
         ::CloseHandle(thread);
         thread = nullptr;
-        return res == WAIT_OBJECT_0
-                   ? ResultFileSystemWatcher(true)
-                   : ResultFileSystemWatcher(FileSystemWatcherError::CloseFailed,
-                                             FileSystemWatcherErrorDetail::WindowsWaitForSingleObject, nativeError);
+        return ResultFileSystemWatcher(true);
     }
 
     bool wasStarted() const { return thread != nullptr; }

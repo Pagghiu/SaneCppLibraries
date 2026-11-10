@@ -27,6 +27,14 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
     case FileSystemWatcherErrorDetail::PosixPthreadJoin: formatter.append("POSIX join thread"); break;
     case FileSystemWatcherErrorDetail::WindowsCreateThread: formatter.append("Windows create thread"); break;
     case FileSystemWatcherErrorDetail::WindowsWaitForSingleObject: formatter.append("Windows wait for thread"); break;
+    case FileSystemWatcherErrorDetail::WindowsCreateWatchEvent: formatter.append("Windows create watch event"); break;
+    case FileSystemWatcherErrorDetail::WindowsSignalWatchEvent: formatter.append("Windows signal watch event"); break;
+    case FileSystemWatcherErrorDetail::WindowsWaitForWatchEvents:
+        formatter.append("Windows wait for watch events");
+        break;
+    case FileSystemWatcherErrorDetail::WindowsCancelDirectoryChanges:
+        formatter.append("Windows cancel directory changes");
+        break;
     case FileSystemWatcherErrorDetail::LinuxCreateShutdownPipe: formatter.append("Linux create shutdown pipe"); break;
     case FileSystemWatcherErrorDetail::LinuxInitializeInotify: formatter.append("Linux initialize inotify"); break;
     case FileSystemWatcherErrorDetail::LinuxWriteShutdownPipe: formatter.append("Linux write shutdown pipe"); break;

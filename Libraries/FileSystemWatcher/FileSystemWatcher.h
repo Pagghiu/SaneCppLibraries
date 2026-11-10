@@ -247,7 +247,8 @@ struct FileSystemWatcher
     ResultFileSystemWatcher init(EventLoopRunner& runner);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
-    /// @note On Linux, closing from the ThreadRunner callback fails; close from another thread after the callback.
+    /// @note On Windows and Linux, closing from the ThreadRunner callback fails; close from another thread after
+    /// the callback.
     /// @return Valid Result if resources have been freed successfully
     ResultFileSystemWatcher close();
 
@@ -420,7 +421,10 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         placementNew(completion);
         completion.setDebugName("FileSystemWatcherAsync Completion");
         completion.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
-        return completion.start(*eventLoop, handle);
+        const Result started = completion.start(*eventLoop, handle);
+        if (not started)
+            completion.~T_AsyncExternalCompletion();
+        return started;
     }
 
     virtual Result windowsRequestStopFolderExternalCompletion(FolderWatcher& watcher) override
