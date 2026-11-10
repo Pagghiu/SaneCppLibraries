@@ -768,6 +768,20 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         FileSystemWatcher::FolderWatcher watch;
         auto                             closeOwner = MakeDeferred([&] { (void)owner.close(); });
         SC_TEST_EXPECT(owner.init(runner));
+        AsyncEventLoop uninitializedLoop;
+        runner.init(uninitializedLoop);
+        const auto registration = owner.watch(watch, root.view());
+        SC_TEST_EXPECT(registration.result.isError(AsyncResultCategory, AsyncError::NotInitialized));
+        SC_TEST_EXPECT(watch.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        runner.init(loop);
+
+        runner.rejectSubmission = true;
+        const auto submission   = owner.watch(watch, root.view());
+        SC_TEST_EXPECT(submission.result.isError(AsyncResultCategory, AsyncError::RequestInUse));
+        SC_TEST_EXPECT(watch.stopWatching().isError(FileSystemWatcherError::NotWatching));
+        SC_TEST_EXPECT(loop.getNumberOfSubmittedRequests() == 0);
+        runner.rejectSubmission = false;
+
         struct State
         {
             size_t rescans         = 0;
