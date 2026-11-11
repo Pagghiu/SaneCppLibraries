@@ -104,7 +104,8 @@ the opened directories with inotify requires `/proc/self/fd`. Disappearing entri
 A replacement detected during registration fails setup and rolls back. Directories created later require a rescan
 to restore recursive coverage.
 When Linux folder watches on the same owner overlap, stopping one folder leaves shared native watches active for the
-other folders that still use them.
+other folders that still use them. If a nested event path exceeds the notification buffer, the watch emits
+a root-level `RescanRequired` and stays active.
 
 If the shared Linux inotify queue overflows, each remaining folder receives a `RescanRequired` notification because
 individual names were lost. Rescan and restart the watch if recursive coverage must include directories created during

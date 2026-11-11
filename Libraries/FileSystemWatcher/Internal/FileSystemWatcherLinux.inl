@@ -772,7 +772,7 @@ struct SC::FileSystemWatcher::Internal
                 {
                     if (folder.notifyHandles[idx].notifyID == event->wd)
                     {
-                        (void)notifySingleEvent(event, previousEvent, entry, idx);
+                        notifySingleEvent(event, previousEvent, entry, idx);
                         prevEvent = event;
                         break;
                     }
@@ -781,9 +781,8 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    [[nodiscard]] static ResultFileSystemWatcher notifySingleEvent(const struct inotify_event* event,
-                                                                   const struct inotify_event* prevEvent,
-                                                                   const FolderWatcher* entry, size_t foundIndex)
+    static void notifySingleEvent(const struct inotify_event* event, const struct inotify_event* prevEvent,
+                                  const FolderWatcher* entry, size_t foundIndex)
     {
         StringPath   eventPath;
         Notification notification;
@@ -812,8 +811,10 @@ struct SC::FileSystemWatcher::Internal
 
             if (not eventPath.assign(relativeDirectory) or not eventPath.append("/") or
                 not eventPath.append(relativeName))
-                return ResultFileSystemWatcher(FileSystemWatcherError::PathPreparationFailed,
-                                               FileSystemWatcherErrorDetail::BuildNotificationPath);
+            {
+                notifyRoot(*entry, NotificationKind::RescanRequired);
+                return;
+            }
 
             notification.relativePath = eventPath.view();
         }
@@ -825,7 +826,7 @@ struct SC::FileSystemWatcher::Internal
             // I'm not really sure that Modified is consistently pushed after AddRemoveRename from Linux Kernel.
             if (prevEvent != nullptr and (prevEvent->wd == event->wd))
             {
-                return ResultFileSystemWatcher(true);
+                return;
             }
             notification.operation = Operation::Modified;
         }
@@ -836,7 +837,6 @@ struct SC::FileSystemWatcher::Internal
 
         // 3. Finally invoke user callback with the notification
         entry->notifyCallback(notification);
-        return ResultFileSystemWatcher(true);
     }
 };
 

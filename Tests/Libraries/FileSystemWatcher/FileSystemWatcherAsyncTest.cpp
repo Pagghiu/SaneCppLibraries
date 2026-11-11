@@ -13,6 +13,9 @@
 
 #if SC_PLATFORM_LINUX
 #include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #elif SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -49,6 +52,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #if SC_PLATFORM_LINUX
         eventLoopWatchInvalidation(appDirectory);
         eventLoopOverflow(appDirectory);
+        eventLoopLongNotificationPath();
         eventLoopReadFailure(appDirectory);
 #endif
     }
@@ -1044,6 +1048,111 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
 
 #if SC_PLATFORM_LINUX
+    void eventLoopLongNotificationPath()
+    {
+        if (not test_section("AsyncEventLoop inotify long notification path"))
+            return;
+
+        char       root[]  = "/tmp/sc-watcher-path.XXXXXXXX";
+        const bool created = ::mkdtemp(root) != nullptr;
+        SC_TEST_EXPECT(created);
+        if (not created)
+            return;
+
+        char component[251];
+        for (size_t index = 0; index + 1 < sizeof(component); ++index)
+            component[index] = 'd';
+        component[sizeof(component) - 1] = '\0';
+        char fileName[151];
+        for (size_t index = 0; index + 1 < sizeof(fileName); ++index)
+            fileName[index] = 'f';
+        fileName[sizeof(fileName) - 1] = '\0';
+
+        constexpr size_t depth = 16;
+        int              descriptors[depth + 1];
+        size_t           opened  = 0;
+        auto             cleanup = MakeDeferred(
+            [&]
+            {
+                if (opened == depth + 1)
+                {
+                    (void)::unlinkat(descriptors[depth], fileName, 0);
+                    (void)::unlinkat(descriptors[depth], "marker", 0);
+                }
+                while (opened > 0)
+                {
+                    (void)::close(descriptors[--opened]);
+                    if (opened != 0)
+                        (void)::unlinkat(descriptors[opened - 1], component, AT_REMOVEDIR);
+                }
+                (void)::rmdir(root);
+            });
+        descriptors[0] = ::open(root, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        SC_TEST_EXPECT(descriptors[0] != -1);
+        if (descriptors[0] == -1)
+            return;
+        opened = 1;
+        while (opened <= depth)
+        {
+            const int  parent = descriptors[opened - 1];
+            const bool made   = ::mkdirat(parent, component, 0700) == 0;
+            SC_TEST_EXPECT(made);
+            if (not made)
+                return;
+            const int child = ::openat(parent, component, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            SC_TEST_EXPECT(child != -1);
+            if (child == -1)
+            {
+                (void)::unlinkat(parent, component, AT_REMOVEDIR);
+                return;
+            }
+            descriptors[opened++] = child;
+        }
+
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+        auto                                    closeLoop = MakeDeferred([&] { (void)loop.close(); });
+        FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+        runner.init(loop);
+        FileSystemWatcher                owner;
+        char                             paths[40 * 1024];
+        FileSystemWatcher::FolderWatcher watcher(paths);
+        auto                             closeOwner = MakeDeferred([&] { (void)owner.close(); });
+        SC_TEST_EXPECT(owner.init(runner));
+
+        struct State
+        {
+            StringSpan root;
+            bool       rescan = false;
+            bool       marker = false;
+        } state{StringSpan::fromNullTerminated(root, StringEncoding::Utf8)};
+        using Kind             = FileSystemWatcher::NotificationKind;
+        watcher.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == Kind::RescanRequired)
+                state.rescan |= event.basePath == state.root and event.relativePath.isEmpty() and event.failure and
+                                event.operation == FileSystemWatcher::Operation::AddRemoveRename;
+            if (event.kind == Kind::Change)
+                state.marker |= StringView(event.relativePath).endsWith("/marker");
+        };
+        SC_TEST_EXPECT(owner.watch(watcher, state.root));
+        submitQueuedWatcher(loop);
+        auto createFile = [&](const char* name)
+        {
+            const int fd = ::openat(descriptors[depth], name, O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0600);
+            return fd != -1 and ::close(fd) == 0;
+        };
+        SC_TEST_EXPECT(createFile(fileName));
+        const bool delivered = runUntil(loop, [&state] { return state.rescan; });
+        SC_TEST_EXPECT(delivered);
+        SC_TEST_EXPECT(createFile("marker"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.marker; }));
+        SC_TEST_EXPECT(owner.close());
+        closeOwner.disarm();
+        SC_TEST_EXPECT(loop.close());
+        closeLoop.disarm();
+    }
+
     void eventLoopWatchInvalidation(const StringView appDirectory)
     {
         if (not test_section("AsyncEventLoop inotify watch invalidation"))
