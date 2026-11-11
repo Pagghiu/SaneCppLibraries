@@ -142,6 +142,14 @@ Capability fields describe what this build can request from its backend, not wha
 will negotiate. Applications with a hard deployment requirement can pass required backend/features
 to `HttpClient::init()` and fail before accepting work.
 
+On Linux, libcurl is loaded at runtime. The dynamic loader must be able to find
+`libcurl.so.4` or `libcurl.so` with all required symbols. The loader tries each name in that order.
+The reported backend identifies the compiled transport. Initialization returns `RequiredBackendUnavailable`
+when neither candidate can be loaded with the required symbols.
+HTTP/2 and TLS policy capabilities come from the loaded libcurl build and are cached on the first
+capability query. If that probe cannot load libcurl, those runtime-dependent features are reported as
+unsupported for the lifetime of the process.
+
 # Where to look next
 
 - `Examples/HttpClientPollSession` is the complete poll-driven example used above, including the

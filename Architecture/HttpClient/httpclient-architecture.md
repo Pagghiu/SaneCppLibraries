@@ -76,3 +76,4 @@ Do not model `HttpClient` after `Http` internals, browser networking stacks, hea
 - [HTTPCLIENT-0005 - Keep session and scheduler as optional caller-owned layers](httpclient-0005-keep-session-and-scheduler-as-optional-caller-owned-layers.md)
 - [HTTPCLIENT-0006 - Keep content coding out of the core transport operation](httpclient-0006-keep-content-coding-out-of-the-core-transport-operation.md)
 - [HTTPCLIENT-0007 - Use portable structured Result errors](httpclient-0007-use-portable-structured-result-errors.md)
+- [HTTPCLIENT-0009 - Validate each libcurl candidate](httpclient-0009-validate-each-libcurl-candidate.md)

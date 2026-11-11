@@ -133,10 +133,13 @@ struct HttpClientLinuxLibCurlLoader
         if (libcurlHandle)
             return true;
 
-        // Try common libcurl shared library names
-        libcurlHandle = ::dlopen("libcurl.so.4", RTLD_NOW);
-        if (libcurlHandle == nullptr)
-            libcurlHandle = ::dlopen("libcurl.so", RTLD_NOW);
+        return load("libcurl.so.4") or load("libcurl.so");
+    }
+
+  private:
+    bool load(const char* name)
+    {
+        libcurlHandle = ::dlopen(name, RTLD_NOW);
         if (libcurlHandle == nullptr)
             return false;
 
@@ -157,14 +160,14 @@ struct HttpClientLinuxLibCurlLoader
             curl_easy_perform == nullptr or curl_easy_setopt == nullptr or curl_easy_getinfo == nullptr or
             curl_version_info == nullptr or curl_slist_append == nullptr or curl_slist_free_all == nullptr)
         {
-            ::dlclose(libcurlHandle);
-            libcurlHandle = nullptr;
+            close();
             return false;
         }
 
         return true;
     }
 
+  public:
     bool supportsFeature(int feature) const
     {
         if (curl_version_info == nullptr)
@@ -176,9 +179,7 @@ struct HttpClientLinuxLibCurlLoader
     void close()
     {
         if (libcurlHandle)
-        {
             ::dlclose(libcurlHandle);
-            libcurlHandle = nullptr;
-        }
+        *this = {};
     }
 };

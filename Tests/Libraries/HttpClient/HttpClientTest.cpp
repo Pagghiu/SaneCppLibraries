@@ -41,6 +41,14 @@ struct SC::HttpClientTest : public SC::TestCase
 {
     HttpClientTest(SC::TestReport& report) : TestCase(report, "HttpClientTest")
     {
+#if SC_PLATFORM_LINUX
+        if (const char* fixture = ::getenv("SC_TEST_HTTP_LIBCURL_FIXTURE"))
+        {
+            if (test_section("libcurl runtime fixture"))
+                libcurlRuntimeFixture(StringSpan::fromNullTerminated(fixture, StringEncoding::Ascii));
+            return;
+        }
+#endif
         if (test_section("request policy names"))
         {
             requestPolicyNames();
@@ -459,6 +467,37 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(rejectedClient.close());
         }
     }
+
+#if SC_PLATFORM_LINUX
+    void libcurlRuntimeFixture(StringView fixture)
+    {
+        const bool available = fixture == "basic" or fixture == "tls" or fixture == "http2";
+        const bool tls       = fixture == "tls";
+        const bool http2     = fixture == "http2";
+        SC_TEST_EXPECT(available or fixture == "missing" or fixture == "incomplete");
+        HttpClientLinuxLibCurlLoader loader;
+        SC_TEST_EXPECT(loader.init() == available);
+        SC_TEST_EXPECT(loader.supportsFeature(CURL_VERSION_SSL) == tls);
+        SC_TEST_EXPECT(loader.supportsFeature(CURL_VERSION_HTTP2) == http2);
+        loader.close();
+        SC_TEST_EXPECT(not loader.isValid());
+        SC_TEST_EXPECT(not loader.supportsFeature(CURL_VERSION_SSL));
+        SC_TEST_EXPECT(not loader.supportsFeature(CURL_VERSION_HTTP2));
+
+        const auto capabilities = HttpClient::getCapabilities();
+        SC_TEST_EXPECT(capabilities.backend == HttpClientCapabilities::LibCurl);
+        SC_TEST_EXPECT(capabilities.tlsCustomCaPath == tls);
+        SC_TEST_EXPECT(capabilities.protocolHttp2Required == http2);
+        HttpClient client;
+        const auto initialized = client.init(HttpClientCapabilities::LibCurl);
+        if (available)
+            SC_TEST_EXPECT(initialized);
+        else
+            SC_TEST_EXPECT(initialized.isError(HttpClientResultCategory, HttpClientError::RequiredBackendUnavailable));
+        SC_TEST_EXPECT(client.isInitialized() == available);
+        SC_TEST_EXPECT(client.close());
+    }
+#endif
 
     void capabilities()
     {
