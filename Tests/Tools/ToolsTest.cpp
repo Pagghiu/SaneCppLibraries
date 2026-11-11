@@ -1647,6 +1647,55 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(checkFileHash(sourcePath.view(), Hashing::TypeSHA256, "invalid")
                                .isError(PackageResultCategory, PackageError::SourceHashMismatch));
         }
+        if (test_section("pinned Git package validates the full revision"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            String source = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(source, {outputDirectory.view(), "pinned-git-source"}));
+            SC_TEST_EXPECT(fs.makeDirectory(source.view()));
+            auto git = [&](Span<const StringSpan> command, String& output) -> Result
+            {
+                Process process;
+                SC_TRY(configurePackageGitProcess(process));
+                SC_TRY(process.setWorkingDirectory(source.view()));
+                SC_TRY(process.exec(command, output).toResult());
+                return Result(process.getExitStatus() == 0);
+            };
+            String           revision = StringEncoding::Utf8;
+            const StringSpan init[]   = {"git", "init"};
+            SC_TEST_EXPECT(git(init, revision));
+            const StringSpan commit[] = {"git",
+                                         "-c",
+                                         "user.name=Package Test",
+                                         "-c",
+                                         "user.email=package-test@example.com",
+                                         "-c",
+                                         "commit.gpgsign=false",
+                                         "commit",
+                                         "--allow-empty",
+                                         "-m",
+                                         "Fixture"};
+            SC_TEST_EXPECT(git(commit, revision));
+            revision                = "";
+            const StringSpan head[] = {"git", "rev-parse", "HEAD"};
+            SC_TEST_EXPECT(git(head, revision));
+            const auto hash = StringView(revision.view()).trimWhiteSpaces();
+            SC_TEST_EXPECT(hash.sizeInBytes() > 7);
+            if (hash.sizeInBytes() <= 7)
+                return;
+            const StringView prefix = hash.sliceStartLength(0, 7);
+            Download         download;
+            download.packageVersion = prefix;
+            download.shallowClone   = hash;
+            SC_TEST_EXPECT(verifyGitCommitForDirectory(download, source.view()));
+
+            // The fake pin shares the display prefix with the installed revision.
+            download.shallowClone =
+                format("{}{}", hash.sliceStartLength(0, hash.sizeInBytes() - 1), hash.endsWith("0") ? "1" : "0");
+            SC_TEST_EXPECT(verifyGitCommitForDirectory(download, source.view())
+                               .isError(PackageResultCategory, PackageError::SourceRevisionMismatch));
+        }
 #if SC_PLATFORM_APPLE
         if (test_section("package source revision mismatch has identity"))
         {

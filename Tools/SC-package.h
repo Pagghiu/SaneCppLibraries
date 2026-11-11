@@ -19,6 +19,18 @@ namespace SC
 {
 namespace Tools
 {
+// Package Git commands use the native Git executable. Fil-C runtime libraries
+// belong to this process and can shadow Git's native dependencies.
+[[nodiscard]] inline Result configurePackageGitProcess(Process& process)
+{
+#if SC_COMPILER_FILC
+    return process.setEnvironment("LD_LIBRARY_PATH", "").toResult();
+#else
+    (void)process;
+    return Result(true);
+#endif
+}
+
 [[nodiscard]] inline Result createLink(StringView sourceFileOrDirectory, StringView linkFile)
 {
     FileSystem fs;
@@ -300,7 +312,11 @@ namespace Tools
 
         if (download.isGitClone)
         {
-            Process    process[4];
+            Process process[4];
+            for (Process& gitProcess : process)
+            {
+                SC_TRY(configurePackageGitProcess(gitProcess));
+            }
             StringView params[10];
             size_t     numParams;
 
@@ -410,11 +426,14 @@ inline Result verifyGitCommitForDirectory(const Download& download, StringView s
 {
     String  result;
     Process process;
+    SC_TRY(configurePackageGitProcess(process));
     SC_TRY(process.setWorkingDirectory(sourceDirectory));
     SC_TRY(process.exec({"git", "rev-parse", "HEAD"}, result).toResult());
     if (process.getExitStatus() != 0)
         return Result::Error(PackageResultCategory, PackageError::SourceRevisionProbeFailed);
-    if (not StringView(result.view()).startsWith(download.packageVersion.view()))
+    const StringView revision = StringView(result.view()).trimWhiteSpaces();
+    if (download.shallowClone.isEmpty() ? not revision.startsWith(download.packageVersion.view())
+                                        : revision != download.shallowClone.view())
         return Result::Error(PackageResultCategory, PackageError::SourceRevisionMismatch);
     return Result(true);
 }
