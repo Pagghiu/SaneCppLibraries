@@ -375,11 +375,63 @@ struct SC::PluginTest : public SC::TestCase
             String sourceMod2;
             SC_TEST_EXPECT(
                 StringBuilder::create(sourceMod2).appendReplaceAll(sourceMod1.view(), "original", "MODIFIED"));
+
+            AsyncEventLoop loop;
+            SC_TEST_EXPECT(loop.create());
+            auto                   closeLoop = MakeDeferred([&] { (void)loop.close(); });
+            FileSystemWatcherAsync watcherRunner;
+            watcherRunner.init(loop);
+            FileSystemWatcher                watcher;
+            FileSystemWatcher::FolderWatcher folder;
+            auto                             closeWatcher = MakeDeferred([&] { (void)watcher.close(); });
+            SC_TEST_EXPECT(watcher.init(watcherRunner));
+            struct ReloadState
+            {
+                PluginRegistry& registry;
+                StringSpan      child;
+                bool            matched = false;
+            } reload{registry, identifierChild};
+            folder.notifyCallback = [&reload](const FileSystemWatcher::Notification& event)
+            {
+                if (event.kind != FileSystemWatcher::NotificationKind::Change or event.relativePath.isEmpty())
+                    return;
+                reload.registry.getPluginsToReloadBecauseOf(event.relativePath, Time::Milliseconds(-1),
+                                                            [&reload](const PluginIdentifier& plugin)
+                                                            { reload.matched |= plugin.view() == reload.child; });
+            };
+            SC_TEST_EXPECT(watcher.watch(folder, testPluginsPath.view()));
             SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceMod2.view()));
 
-            // Reload child plugin
-            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile.view(),
-                                               PluginRegistry::LoadMode::Reload));
+            AsyncLoopTimeout timeout;
+            bool             timedOut = false;
+            timeout.callback          = [&timedOut](AsyncLoopTimeout::Result&) { timedOut = true; };
+            const auto started        = timeout.start(loop, Time::Milliseconds(5000));
+            SC_TEST_EXPECT(started);
+            if (started)
+            {
+                while (not reload.matched and not timedOut)
+                {
+                    const auto ran = loop.runOnce();
+                    SC_TEST_EXPECT(ran);
+                    if (not ran)
+                        break;
+                }
+                if (not timeout.isFree())
+                {
+                    SC_TEST_EXPECT(timeout.stop(loop));
+                    SC_TEST_EXPECT(loop.runNoWait());
+                    SC_TEST_EXPECT(timeout.isFree());
+                }
+            }
+            SC_TEST_EXPECT(reload.matched);
+            SC_TEST_EXPECT(watcher.close());
+            closeWatcher.disarm();
+            SC_TEST_EXPECT(loop.close());
+            closeLoop.disarm();
+
+            if (reload.matched)
+                SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile.view(),
+                                                   PluginRegistry::LoadMode::Reload));
 
             // Check child return value of the exported function for the modified plugin
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
