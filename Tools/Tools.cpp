@@ -153,8 +153,8 @@ int main(int argc, const char* argv[])
     builder.finalize();
     console.print(gFormatString.view());
 
-    const Result   result  = Tool::runTool(arguments);
-    const uint64_t elapsed = SC::Time::Realtime::now().subtractExact(started).ms;
+    const Result       result  = Tool::runTool(arguments);
+    const SC::uint64_t elapsed = SC::Time::Realtime::now().subtractExact(started).ms;
 
     SC_TRY(StringBuilder::format(gFormatString, "{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action,
                                  elapsed));
