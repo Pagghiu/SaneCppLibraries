@@ -189,7 +189,7 @@ void SC::FileSystemIteratorTest::nativeEnumerationFailure()
         SC_TEST_EXPECT(::FindClose(entries[0].fileDescriptor));
         entries[0].fileDescriptor = INVALID_HANDLE_VALUE;
 #else
-        const int enumerationDescriptor = ::dirfd(static_cast<DIR*>(entries[0].dirEnumerator));
+        const int enumerationDescriptor = dirfd(static_cast<DIR*>(entries[0].dirEnumerator));
         SC_TEST_EXPECT(::close(enumerationDescriptor) == 0);
         if (entries[0].fileDescriptor == enumerationDescriptor)
             entries[0].fileDescriptor = -1;

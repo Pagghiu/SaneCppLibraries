@@ -53,7 +53,8 @@ struct SC::FileSystemIterator::Internal
     {
         if (entry.dirEnumerator != nullptr)
         {
-            const int enumeratorDescriptor = ::dirfd(static_cast<DIR*>(entry.dirEnumerator));
+            // dirfd may be a macro, including on NetBSD.
+            const int enumeratorDescriptor = dirfd(static_cast<DIR*>(entry.dirEnumerator));
             ::closedir(static_cast<DIR*>(entry.dirEnumerator));
             entry.dirEnumerator = nullptr;
             // closedir owns its descriptor. A second close could hit a descriptor reused by another thread.
