@@ -14,5 +14,13 @@ struct ITestInterface2
 {
     static constexpr auto InterfaceHash = SC::PluginHash("ITestInterface2");
 
-    SC::Function<float(float)> divideFloat;
+    struct Coordinates
+    {
+        double x;
+        double y;
+        double z;
+    };
+
+    SC::Function<float(float)>             divideFloat;
+    SC::Function<Coordinates(Coordinates)> translate;
 };

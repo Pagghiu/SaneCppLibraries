@@ -233,26 +233,17 @@ struct SC::PluginTest : public SC::TestCase
                 SC_TEST_EXPECT(scanResult.detail == PluginErrorDetail::ScannerDefinitionStorage);
                 SC_TEST_EXPECT(scanResult.contextKind == PluginErrorContextKind::RequiredElements);
             }
-            PluginDefinition       definitions[3];
+            PluginDefinition       definitions[4];
             Span<PluginDefinition> definitionsSpan;
             Buffer                 fileStorage;
             SC_TEST_EXPECT(
                 PluginScanner::scanDirectory(testPluginsPath.view(), definitions, fileStorage, definitionsSpan));
-            SC_TEST_EXPECT(definitionsSpan.sizeInElements() == 2);
+            SC_TEST_EXPECT(definitionsSpan.sizeInElements() == 4);
 
-            // Save parent and child plugin identifiers and paths
-            const size_t parentIndex            = definitions[0].dependencies.isEmpty() ? 0 : 1;
-            const size_t childIndex             = parentIndex == 0 ? 1 : 0;
-            const auto   childItem              = definitions[childIndex];
-            const auto   parentItem             = definitions[parentIndex];
-            const auto   identifierChildString  = childItem.identity.identifier;
-            const auto   identifierParentString = parentItem.identity.identifier;
-#if not SC_COMPILER_FILC || not defined(__GLIBC__)
-            const auto pluginScriptPath = childItem.getMainPluginFile().absolutePath;
-#endif
-
-            const StringView identifierChild  = identifierChildString.view();
-            const StringView identifierParent = identifierParentString.view();
+            constexpr StringSpan identifierChild  = "TestPluginChild";
+            constexpr StringSpan identifierParent = "TestPluginParent";
+            constexpr StringSpan identifierLeft   = "TestPluginLeft";
+            constexpr StringSpan identifierRight  = "TestPluginRight";
 
 #if SC_PLATFORM_WINDOWS
             StringPath debuggerHandlePath;
@@ -273,10 +264,11 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory));
 
             // Setup registry
-            PluginDynamicLibrary libraries[2]; // Provide storage space for Plugins
+            PluginDynamicLibrary libraries[4];
 
             PluginRegistry registry;
             registry.init(libraries);
+            auto closeRegistry = MakeDeferred([&] { (void)registry.close(); });
             SC_TEST_EXPECT(registry.replaceDefinitions(move(definitionsSpan)));
             const ResultPlugin invalidIdentifier =
                 registry.loadPlugin("PluginThatDoesNotExist", compiler, sysroot, report.executableFile.view());
@@ -287,8 +279,17 @@ struct SC::PluginTest : public SC::TestCase
             // Check that plugins have been compiled and are valid
             const PluginDynamicLibrary* pluginChild  = registry.findPlugin(identifierChild);
             const PluginDynamicLibrary* pluginParent = registry.findPlugin(identifierParent);
+            const PluginDynamicLibrary* pluginLeft   = registry.findPlugin(identifierLeft);
+            const PluginDynamicLibrary* pluginRight  = registry.findPlugin(identifierRight);
+            const bool                  foundAll     = pluginChild and pluginParent and pluginLeft and pluginRight;
+            SC_TEST_EXPECT(foundAll);
+            if (not foundAll)
+                return;
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(pluginParent->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(pluginLeft->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(pluginRight->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(pluginParent->numReloads == 1);
 
 #if SC_PLATFORM_WINDOWS
             bool       childReloadMatched = false;
@@ -323,7 +324,7 @@ struct SC::PluginTest : public SC::TestCase
             int reloadAllMatches = 0;
             registry.getPluginsToReloadBecauseOf(StringSpan(), Time::Milliseconds(-1),
                                                  [&](const PluginIdentifier&) { reloadAllMatches++; });
-            SC_TEST_EXPECT(reloadAllMatches == 2);
+            SC_TEST_EXPECT(reloadAllMatches == 4);
 
             // Query two interfaces from the child plugins and check their expected behaviour
             ITestInterface1* interface1 = nullptr;
@@ -335,6 +336,8 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(pluginChild->queryInterface(interface2));
             SC_TEST_EXPECT(interface2 != nullptr);
             SC_TEST_EXPECT(interface2->divideFloat(4.0) == 2.0);
+            const auto translated = interface2->translate({1.5, -2.0, 4.25});
+            SC_TEST_EXPECT(translated.x == 2.5 and translated.y == 0.0 and translated.z == 7.25);
 
             // Manually grab an exported function and check its return value
             using FunctionIsPluginOriginal = bool (*)();
@@ -365,7 +368,8 @@ struct SC::PluginTest : public SC::TestCase
                     "PluginTest - Skipping same-path reload: Fil-C glibc retains the original module");
 #else
             // Modify child plugin to change return value of the exported function
-            String sourceContent = StringEncoding::Ascii;
+            const auto& pluginScriptPath = pluginChild->definition.getMainPluginFile().absolutePath;
+            String      sourceContent    = StringEncoding::Ascii;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent));
             String sourceMod1;
             SC_TEST_EXPECT(StringBuilder::create(sourceMod1)
@@ -442,13 +446,19 @@ struct SC::PluginTest : public SC::TestCase
             // Unload parent plugin
             SC_TEST_EXPECT(registry.unloadPlugin(identifierParent));
 
-            // Check that both parent and child plugin have been unloaded
+            // Both dependency paths must be unloaded, even though they share the same child.
             SC_TEST_EXPECT(not pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(not pluginParent->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(not pluginLeft->dynamicLibrary.isValid());
+            SC_TEST_EXPECT(not pluginRight->dynamicLibrary.isValid());
 
             // Cleanup
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierChild));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
+            SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierLeft));
+            SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierRight));
+            SC_TEST_EXPECT(registry.close());
+            closeRegistry.disarm();
         }
         if (test_section("PluginCompiler can include C++ headers without linking the C++ runtime"))
         {

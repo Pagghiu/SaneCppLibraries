@@ -16,6 +16,7 @@ struct TestPluginChild : public ITestInterface1, public ITestInterface2
         // Setup Interfaces table
         ITestInterface1::multiplyInt.bind<TestPluginChild, &TestPluginChild::multiply>(*this);
         ITestInterface2::divideFloat.bind<TestPluginChild, &TestPluginChild::divide>(*this);
+        ITestInterface2::translate.bind<TestPluginChild, &TestPluginChild::translateCoordinates>(*this);
 
         console.printLine("TestPluginChild original Start");
     }
@@ -25,6 +26,8 @@ struct TestPluginChild : public ITestInterface1, public ITestInterface2
     int multiply(int value) { return value * 2; }
 
     float divide(float value) { return value / 2; }
+
+    Coordinates translateCoordinates(Coordinates point) { return {point.x + 1, point.y + 2, point.z + 3}; }
 
     [[nodiscard]] bool init()
     {
@@ -47,7 +50,7 @@ extern "C" SC_PLUGIN_EXPORT bool isPluginOriginal() { return true; }
 // Version:       1
 // Description:   A Simple text plugin
 // Category:      Generic
-// Dependencies:  TestPluginParent
+// Dependencies:  TestPluginLeft,TestPluginRight
 //
 // SC_END_PLUGIN
 SC_PLUGIN_DEFINE(TestPluginChild)
