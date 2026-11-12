@@ -382,8 +382,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         if (completion.res < 0)
         {
             if (completion.res == -EINTR and
-                (async.type == AsyncRequest::Type::FileRead or async.type == AsyncRequest::Type::FileWrite))
-                return Result(true); // Preserve the existing transparent file-I/O retry.
+                (async.type == AsyncRequest::Type::FileRead or async.type == AsyncRequest::Type::FileWrite or
+                 async.type == AsyncRequest::Type::SocketSend))
+                return Result(true);
             continueProcessing = false;
             if (completion.res != -ECANCELED)
                 return AsyncCompletionDetail::operationFailure(async.type);
@@ -459,7 +460,24 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         SC_TRY(getNewSubmission(eventLoop, submission));
         if (async.singleBuffer)
         {
-            AsyncLinuxIOUring::prepWrite(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
+            AsyncLinuxIOUring::prepWrite(submission, async.handle, async.buffer.data() + async.totalBytesWritten,
+                                         async.buffer.sizeInBytes() - async.totalBytesWritten, 0);
+        }
+        else if (async.totalBytesWritten != 0)
+        {
+            // A short writev may end inside a caller-owned span. Submit one span at a time
+            // from that point so the kernel can read the original vector without modification.
+            size_t offset = async.totalBytesWritten;
+            for (const auto& buffer : async.buffers)
+            {
+                if (offset < buffer.sizeInBytes())
+                {
+                    AsyncLinuxIOUring::prepWrite(submission, async.handle, buffer.data() + offset,
+                                                 buffer.sizeInBytes() - offset, 0);
+                    break;
+                }
+                offset -= buffer.sizeInBytes();
+            }
         }
         else
         {
@@ -475,22 +493,23 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result completeAsync(AsyncSocketSend::Result& result)
     {
-        result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
-
-        size_t totalBytes = 0;
-        if (result.getAsync().singleBuffer)
+        AsyncSocketSend& async = result.getAsync();
+        const int32_t    sent  = events[result.eventIndex].res;
+        if (sent > 0)
         {
-            totalBytes = result.getAsync().buffer.sizeInBytes();
+            async.totalBytesWritten += static_cast<size_t>(sent);
         }
-        else
-        {
-            for (const auto& buf : result.getAsync().buffers)
-            {
-                totalBytes += buf.sizeInBytes();
-            }
-        }
-        if (result.completionData.numBytes != totalBytes)
+        result.completionData.numBytes = async.totalBytesWritten;
+        const size_t totalBytes        = Internal::getSummedSizeOfBuffers(async);
+        if (sent == 0 and async.totalBytesWritten != totalBytes)
             return Result::Error(AsyncResultCategory, AsyncError::SocketSendIncomplete);
+        if (sent == -EINTR or async.totalBytesWritten < totalBytes)
+        {
+            result.shouldCallCallback = false;
+            result.reactivateRequest(true);
+            return Result(true);
+        }
+        async.totalBytesWritten = 0;
         return Result(true);
     }
 
