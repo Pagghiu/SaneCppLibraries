@@ -278,7 +278,8 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
 
     HttpStringIterator hostIt = originalHost;
 
-    char       separator;
+    char separator = 0;
+
     const bool hasQueryOrFragment = hostIt.advanceUntilMatchesAny({'?', '#'}, separator);
 
     // If there is no path but the host contains query/fragment (e.g. http://example.com?x=1)
