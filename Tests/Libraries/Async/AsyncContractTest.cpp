@@ -14,6 +14,13 @@
 #include <unistd.h>
 #endif
 
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+#include "Libraries/Async/Internal/AsyncWindowsTimerPoll.inl"
+#endif
+
 namespace SC
 {
 struct AsyncContractTest;
@@ -31,6 +38,12 @@ struct SC::AsyncContractTest : public SC::TestCase
             options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
             numRuns         = 2;
         }
+#if SC_PLATFORM_WINDOWS
+        if (test_section("early completion-port timeout preserves timer progress"))
+        {
+            windowsTimerPoll();
+        }
+#endif
 #if SC_PLATFORM_LINUX
         if (numRuns == 2 and test_section("io_uring initialization preserves stdin"))
         {
@@ -361,6 +374,55 @@ struct SC::AsyncContractTest : public SC::TestCase
         }
         return predicate();
     }
+
+#if SC_PLATFORM_WINDOWS
+    void windowsTimerPoll()
+    {
+        const TimeMs start{100};
+        auto         expectTimer = [&](TimeMs deadline, DWORD firstWait, bool completion)
+        {
+            unsigned polls   = 0;
+            unsigned samples = 0;
+            detail::pollWindowsAsyncTimer(
+                &deadline, false, start,
+                [&](DWORD wait)
+                {
+                    if (++polls == 1)
+                    {
+                        SC_TEST_EXPECT(wait == firstWait);
+                        return true;
+                    }
+                    SC_TEST_EXPECT(wait == 1);
+                    return not completion;
+                },
+                [&]
+                {
+                    ++samples;
+                    return samples == 1 ? TimeMs{deadline.milliseconds - 1} : deadline;
+                });
+            SC_TEST_EXPECT(polls == 2);
+            SC_TEST_EXPECT(samples == (completion ? 1u : 2u));
+        };
+        expectTimer(TimeMs{101}, 1, false);
+        expectTimer(TimeMs{100 + 4294967296LL}, INFINITE - 1, false);
+        expectTimer(TimeMs{101}, 1, true);
+        unsigned nonblockingPolls = 0;
+        detail::pollWindowsAsyncTimer(
+            nullptr, true, start,
+            [&](DWORD wait)
+            {
+                ++nonblockingPolls;
+                SC_TEST_EXPECT(wait == 0);
+                return true;
+            },
+            [&]
+            {
+                SC_TEST_EXPECT(false);
+                return start;
+            });
+        SC_TEST_EXPECT(nonblockingPolls == 1);
+    }
+#endif
 
     bool runOnceUntil(AsyncEventLoop& eventLoop, Function<bool()> predicate, int maxAttempts = 8)
     {

@@ -24,11 +24,9 @@ any particular intermittent test failure to clock resolution, and does not chang
 
 ## Confirmation
 
-Use a Windows standalone Async test with an injected native poll and monotonic clock. Force one timeout before the
-deadline, advance the clock on the next timed poll, and verify `runOnce` dispatches the timer. Check that `runNoWait`
-remains nonblocking, a queued completion is dispatched without waiting for the timer, and a duration larger than the
-native wait range is capped to a finite value. Run Debug and Release along with the existing Async contract and full
-platform regressions.
+In AsyncContractTest, drive the Windows polling policy with a simulated early timeout followed by a timeout at the
+deadline or an I/O completion. Check the remaining wait, the finite cap for long timers, and the single zero-timeout
+poll in nonblocking mode. The shared callback and wake-up tests exercise dispatch through the real event loop.
 
 ## Related
 
