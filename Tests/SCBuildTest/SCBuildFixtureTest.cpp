@@ -849,6 +849,29 @@ static Result configureTinyConsoleProgram(Build::Definition& definition, const B
     return Result(true);
 }
 
+#if SC_PLATFORM_LINUX
+static Result configureNativeExportsProgram(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    Build::Workspace workspace = {FixtureWorkspaceName};
+    Build::Project   project   = {"NativeExportsProgram", Build::TargetType::ConsoleExecutable};
+
+    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
+    SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    project.link.linkStdCpp              = false;
+    project.link.preserveExportedSymbols = true;
+    SC_TRY(project.addExportDirectories({"Tests/SCBuildTest/Fixture/NativeExports/Exported"}));
+    SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/NativeExports/Host.c"));
+    SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/NativeExports/Hidden.c"));
+    SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/NativeExports/Exported/Exports.c"));
+    SC_TRY(project.addLinkLibraries({"dl"}));
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    SC_TRY(definition.workspaces.push_back(move(workspace)));
+    return Result(true);
+}
+#endif
+
 static Result configureSmallSCProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {FixtureWorkspaceName};
@@ -4379,6 +4402,43 @@ struct SCBuildFixtureTest : public SC::TestCase
 #endif
             SC_TEST_EXPECT(verifyNoSCExportsFromExecutable(executablePath.view(), importLibraryPath.view()));
         }
+
+#if SC_PLATFORM_LINUX
+        if (test_section("native backend exports symbols from a source directory"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(buildRoot.view()));
+
+            String pluginSource = StringEncoding::Utf8;
+            String pluginPath   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(pluginSource, {report.libraryRootDirectory.view(),
+                                                      "Tests/SCBuildTest/Fixture/NativeExports/Plugin.c"}));
+            SC_TRUST_RESULT(Path::join(pluginPath, {buildRoot.view(), "plugin.so"}));
+
+            Process      compiler;
+            const Result launched =
+                compiler.exec({"cc", "-fPIC", "-shared", pluginSource.view(), "-o", pluginPath.view()});
+            const bool compiled = launched and compiler.getExitStatus() == 0;
+            SC_TEST_EXPECT(compiled);
+            if (compiled)
+            {
+                const StringView args[]           = {pluginPath.view()};
+                const StringView configurations[] = {"Debug", "Release"};
+                for (const StringView configuration : configurations)
+                {
+                    Build::Action action = makeNativeCompileAction(directories, "NativeExportsProgram", configuration);
+                    action.action        = Build::Action::Run;
+                    action.additionalArguments = args;
+                    SC_TEST_EXPECT(Build::Action::execute(action, configureNativeExportsProgram));
+                }
+            }
+        }
+#endif
 
         if (test_section("native backend skips up-to-date work in verbose mode"))
         {
