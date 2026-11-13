@@ -105,10 +105,17 @@ struct SC::FileSystemTest : public SC::TestCase
         }
         if (test_section("executableFile / applicationRootDirectory"))
         {
-            StringPath stringPath;
-            report.console.print("executableFile=\"{}\"\n", FileSystem::Operations::getExecutablePath(stringPath));
-            report.console.print("applicationRootDirectory=\"{}\"\n",
-                                 FileSystem::Operations::getApplicationRootDirectory(stringPath));
+            StringPath       stringPath;
+            const StringSpan executable = FileSystem::Operations::getExecutablePath(stringPath);
+            report.console.print("executableFile=\"{}\"\n", executable);
+#if !SC_PLATFORM_EMSCRIPTEN
+            SC_TEST_EXPECT(not executable.isEmpty());
+#endif
+            const StringSpan applicationRoot = FileSystem::Operations::getApplicationRootDirectory(stringPath);
+            report.console.print("applicationRootDirectory=\"{}\"\n", applicationRoot);
+#if !SC_PLATFORM_EMSCRIPTEN
+            SC_TEST_EXPECT(not applicationRoot.isEmpty());
+#endif
         }
         if (test_section("getCurrentWorkingDirectory"))
         {

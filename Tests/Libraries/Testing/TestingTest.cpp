@@ -45,6 +45,13 @@ struct SC::TestingTest : public SC::TestCase
 
     TestingTest(TestReport& report) : TestCase(report, "TestingTest")
     {
+#if !SC_PLATFORM_EMSCRIPTEN
+        if (test_section("native executable and application root"))
+        {
+            SC_TEST_EXPECT(not report.executableFile.view().isEmpty());
+            SC_TEST_EXPECT(not report.applicationRootDirectory.view().isEmpty());
+        }
+#endif
         if (test_section("expectation dispatch and single evaluation"))
         {
             const bool debugBreakOnFailure = report.debugBreakOnFailedTest;
