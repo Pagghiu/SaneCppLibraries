@@ -8,6 +8,7 @@
 #include <errno.h>       // errno
 #include <fcntl.h>       // fcntl
 #include <netdb.h>       // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#include <netinet/in.h>  // Internet address and protocol definitions
 #include <netinet/tcp.h> // TCP_NODELAY
 #include <sys/socket.h>  // sendto / recvmsg
 #include <sys/uio.h>     // iovec
