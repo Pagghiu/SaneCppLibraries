@@ -184,6 +184,14 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         const ResultFileSystemWatcher file = fileEventsWatcher.watch(watcher, filePath.view());
         SC_TEST_EXPECT(file.isError(FileSystemWatcherError::WatchSetupFailed));
         SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
+#if SC_PLATFORM_WINDOWS
+        // A leaked directory handle also prevents an exclusive read of the rejected file.
+        const HANDLE exclusiveHandle = ::CreateFileW(filePath.view().getNullTerminatedNative(), GENERIC_READ, 0,
+                                                     nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        SC_TEST_EXPECT(exclusiveHandle != INVALID_HANDLE_VALUE);
+        if (exclusiveHandle != INVALID_HANDLE_VALUE)
+            SC_TEST_EXPECT(::CloseHandle(exclusiveHandle) != FALSE);
+#endif
 #if SC_PLATFORM_LINUX
         StringPath childPath;
         SC_TEST_EXPECT(Path::join(childPath, {directoryPath.view(), "child"}));

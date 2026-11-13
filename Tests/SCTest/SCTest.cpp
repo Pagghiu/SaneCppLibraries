@@ -51,6 +51,7 @@ void runFileSystemWatcherTest(TestReport& report);
 
 // FileSystemWatcherAsync
 void runFileSystemWatcherAsyncTest(TestReport& report);
+void runFileSystemWatcherLinuxTest(TestReport& report);
 
 // Hashing
 void runHashingTest(TestReport& report);
@@ -458,6 +459,9 @@ int main(int argc, const char* argv[])
     // FileSystemWatcher tests
     SC_RUN_TEST(runFileSystemWatcherTest);
     SC_RUN_TEST(runFileSystemWatcherAsyncTest);
+#if SC_PLATFORM_LINUX
+    SC_RUN_TEST(runFileSystemWatcherLinuxTest);
+#endif
 
     // Hashing tests
     SC_RUN_TEST(runHashingTest);
