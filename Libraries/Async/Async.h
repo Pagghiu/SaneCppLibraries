@@ -645,6 +645,8 @@ struct SC_ASYNC_EXPORT AsyncSocketConnect : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     void (*pConnectEx)() = nullptr;
     detail::WinOverlappedOpaque overlapped;
+#else
+    SC::Result immediateConnectResult{true};
 #endif
 };
 

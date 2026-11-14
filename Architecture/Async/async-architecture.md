@@ -92,3 +92,4 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - [ASYNC-0021 - Associate external completions before native submission](async-0021-associate-external-completions-before-native-submission.md)
 - [ASYNC-0022 - Drain Windows external cancellations](async-0022-drain-windows-external-cancellations.md)
 - [ASYNC-0023 - Resume short io_uring socket writes](async-0023-resume-short-io-uring-socket-writes.md)
+- [ASYNC-0024 - Dispatch immediate POSIX connect results](async-0024-dispatch-immediate-posix-connect-results.md)
