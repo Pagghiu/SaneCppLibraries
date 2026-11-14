@@ -51,13 +51,17 @@ The normal lifecycle is `init`, one or more `watch` calls, optional `stopWatchin
 may be reused after it is stopped. Calling `close` stops all remaining watchers, so explicit per-folder shutdown is not
 required when the entire owner is being torn down.
 
-`Notification::kind` distinguishes an ordinary `Change`, a `RescanRequired` hint when changes were lost, and
-`WatchStopped` when monitoring has failed. The latter carries a failure in `Notification::failure`. A folder remains
-attached until it is stopped or the owner is closed; close and reinitialize the owner before starting new watches.
-Both status notifications use an empty relative path and the coarse
-`AddRemoveRename` operation. An ordinary `Change` is not a guarantee that coverage is complete. Status reporting is
-currently implemented for Linux queue overflow and fatal inotify or readiness errors; other native coverage-loss cases
-are not yet classified consistently.
+The notification kind guides recovery.
+
+- `Change` identifies a possible filesystem change. An empty relative path can represent changes anywhere under the root.
+- `RescanRequired` means the caller should reconcile the tree. Re-register the watch if native coverage was lost, such
+  as when a Linux directory arrives after setup.
+- `WatchStopped` means monitoring for the reported root has ended. Inspect `Notification::failure`. The folder
+  remains attached until explicitly stopped or the owner is closed. When a shared monitor fails, close and
+  reinitialize the owner before starting new watches.
+
+Both status notifications use an empty relative path and the coarse `AddRemoveRename` operation.
+An ordinary `Change` does not guarantee complete coverage.
 
 The watched root must be an existing directory. A missing root or a regular file is rejected, and the same
 `FolderWatcher` can be used for a later watch. A successful root check does not guarantee that the path cannot change
@@ -90,32 +94,34 @@ their platform storage inline. Their addresses and lifetimes are part of the con
   also be safe to access from another thread.
 - Check every `Result`. Setup, path copying, backend registration, buffer exhaustion, stopping, and closing can fail.
 
-There are fixed implementation limits rather than unbounded library-side growth. The Windows and Apple runners support at
-most 1024 watched paths. On Windows each folder has a 16 KiB native change buffer; overflow is reported conservatively as a
-root-level `AddRemoveRename` notification with an empty relative path. On Linux recursive watching installs an `inotify`
-watch per directory found during `watch`, tracks at most 128 directories per `FolderWatcher`, and stores their relative
-paths in caller-provided memory. The default Linux path store is 4 KiB; pass a larger `Span<char>` to the `FolderWatcher`
+Apple supports up to 1024 watched paths. Windows `ThreadRunner` supports up to 63 watched roots per owner because
+one slot in its native wait set is reserved for control. Each Windows folder has a 16 KiB native change buffer.
+Linux installs one `inotify` watch per directory found during setup and tracks up to 128 directories per
+`FolderWatcher`. Relative paths are stored in caller-provided memory. The default Linux path store is 4 KiB; pass a larger `Span<char>` to the `FolderWatcher`
 constructor for broader or deeper trees. That buffer is ignored on Windows and Apple platforms.
 
 If Linux reports a recursive setup failure after registering watches, it attempts to remove all of them. The
 `FolderWatcher` can be reused when cleanup succeeds; if a removal fails, `watch` returns the cleanup error.
 Linux opens descendants relative to their parent directory and skips directory symlinks during discovery. Registering
 the opened directories with inotify requires `/proc/self/fd`. Disappearing entries can be skipped during discovery.
-A replacement detected during registration fails setup and rolls back. Directories created later require a rescan
-to restore recursive coverage.
+A replacement detected during registration fails setup and rolls back. Restart the watch to restore coverage of
+directories created after setup.
 When Linux folder watches on the same owner overlap, stopping one folder leaves shared native watches active for the
-other folders that still use them. If a nested event path exceeds the notification buffer, the watch emits
-a root-level `RescanRequired` and stays active.
+other folders that still use them.
 
 If the shared Linux inotify queue overflows, each remaining folder receives a `RescanRequired` notification because
 individual names were lost. Rescan and restart the watch if recursive coverage must include directories created during
 the loss. A fatal inotify read, worker wait or Async readiness failure sends `WatchStopped` to each remaining folder;
-the owner rejects new watches until it is closed and reinitialized. Other cases that can lose coverage are not yet
-reported reliably. On Linux, do not call `FileSystemWatcher::close` from its own ThreadRunner callback: it returns a
-close error, and another thread can close the owner after that callback returns.
+the owner rejects new watches until it is closed and reinitialized. Close a Linux ThreadRunner from another thread
+after its callback returns.
 
-On Apple, refreshing the shared FSEvents stream after a watch is added or removed can discard queued changes.
-Surviving watches receive a root-level `RescanRequired` so the caller can reconcile those changes.
+| Backend | `RescanRequired` | `WatchStopped` |
+|:--------|:-----------------|:---------------|
+| Windows | Native buffer overflow | Failed directory completion or rearm ends that folder. A worker wait failure ends all roots on the thread runner. |
+| Apple | Native drops, event ID wrap, coalesced subtree or mount events, and shared stream refresh | A native root-change event ends the affected folder. |
+| Linux | Shared queue overflow, an unrepresentable event path, subtree invalidation, or a new directory | Root invalidation ends that folder. A fatal read, wait, or readiness failure ends the shared monitor. |
+
+The backend reports the loss it can observe. Filesystem and native API behavior can limit which events arrive.
 
 The underlying operating-system services may allocate their own resources. In particular, the Apple backend uses
 CoreServices objects while rebuilding its FSEvents stream. The allocation-free API shape therefore means caller-owned,
@@ -153,9 +159,8 @@ keeps backend callbacks short and absorbs duplicate bursts.
 
 # Status and further material
 
-🟩 **Usable.** The core threaded and event-loop paths are exercised on the supported desktop platforms. The main
-limitations are the intentionally coarse event vocabulary, bounded recursive bookkeeping, and the absence of a portable
-polling fallback.
+🟩 **Usable.** The threaded and event loop modes pass the shared suite. The watcher reports coarse events
+and uses bounded storage for recursive watches. There is no portable polling fallback.
 
 - [SCExample](@ref page_examples) contains the production-shaped hot-reload consumer.
 - [Linux inotify implementation video](https://www.youtube.com/watch?v=92saVDCRnCI) discusses one backend.

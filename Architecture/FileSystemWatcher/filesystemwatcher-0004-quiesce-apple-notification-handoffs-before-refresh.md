@@ -3,6 +3,8 @@
 Status: Accepted
 Date: 2026-10-10
 
+[FILESYSTEMWATCHER-0007](filesystemwatcher-0007-report-watcher-coverage-loss.md) updates the wake-up lifetime during refresh.
+
 ## Context
 
 The Apple backend delivers FSEvents through a worker thread that waits for an Async wake-up callback. Changing the watched paths synchronously refreshes the worker's stream. Waiting for that refresh while the worker waits for the caller to dispatch a notification creates a circular wait. A timeout in the caller's event loop cannot resolve it.

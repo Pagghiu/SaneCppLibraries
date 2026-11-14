@@ -8,7 +8,7 @@
 
 The library wraps native OS watch APIs behind `FileSystemWatcher`, `FolderWatcher`, and two delivery modes. `ThreadRunner` delivers notifications from library-owned background machinery. `EventLoopRunner` lets an external event loop drive notification delivery, and `FileSystemWatcherAsyncT<T_AsyncEventLoop>` is the template bridge for Async integration without an Async dependency.
 
-Notifications deliberately expose a coarse model: `Operation::Modified` or `Operation::AddRemoveRename`, plus `basePath`, `relativePath`, and a helper to build the full path. Backend implementations normalize native events into that model and keep OS-specific details internal.
+Change notifications report `Operation::Modified` or `Operation::AddRemoveRename` with a base and relative path. Root-level status notifications report when callers need to reconcile the tree or restart monitoring.
 
 ## Boundaries
 
@@ -32,7 +32,7 @@ Inference: this library should not expose every native watcher event or flag as 
 
 ## Architectural Choices
 
-Keep native backend code internal. Keep public notifications coarse and portable. Preserve both `ThreadRunner` and `EventLoopRunner` initialization paths. Keep Async support in `FileSystemWatcherAsyncT` rather than a direct dependency or separate bridge library. Keep recursive Linux watch storage bounded and explicit where needed. Document limitations instead of promising exact native event fidelity.
+Keep native backend code internal. Keep public notifications coarse and portable. Preserve both `ThreadRunner` and `EventLoopRunner` initialization paths. Keep Async support in `FileSystemWatcherAsyncT` rather than a direct dependency or separate bridge library. Keep recursive watch storage bounded and explicit. Document limitations instead of promising exact native event fidelity.
 
 ## Explicitly Excluded Targets
 
@@ -60,3 +60,8 @@ Do not add mandatory polling fallback, caller-owned thread injection, exact nati
 - [FILESYSTEMWATCHER-0001 - Keep async integration as a template bridge](filesystemwatcher-0001-keep-async-integration-as-a-template-bridge.md)
 - [FILESYSTEMWATCHER-0002 - Expose coarse portable event classes over native watch APIs](filesystemwatcher-0002-expose-coarse-portable-event-classes-over-native-watch-apis.md)
 - [FILESYSTEMWATCHER-0003 - Use structured watcher errors with backend context](filesystemwatcher-0003-structured-result-errors.md)
+- [FILESYSTEMWATCHER-0004 - Quiesce Apple notification handoffs before refresh](filesystemwatcher-0004-quiesce-apple-notification-handoffs-before-refresh.md)
+- [FILESYSTEMWATCHER-0005 - Reject invalid watch roots without consuming the watcher](filesystemwatcher-0005-reject-invalid-watch-roots-without-consuming-the-watcher.md)
+- [FILESYSTEMWATCHER-0006 - Own Linux watches by directory identity](filesystemwatcher-0006-share-linux-watches-between-folders.md)
+- [FILESYSTEMWATCHER-0007 - Report watcher coverage loss](filesystemwatcher-0007-report-watcher-coverage-loss.md)
+- [FILESYSTEMWATCHER-0008 - Keep Windows thread wait handles stable](filesystemwatcher-0008-keep-windows-thread-wait-handles-stable.md)
