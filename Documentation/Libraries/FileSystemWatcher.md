@@ -5,7 +5,7 @@
 [TOC]
 
 [SaneCppFileSystemWatcher.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcher.h)
-wraps the native directory-watching facilities on Windows, macOS, and Linux. It is aimed at systems such as hot reloaders,
+wraps the native directory-watching facilities on Windows, macOS, Linux, NetBSD, and FreeBSD. It is aimed at systems such as hot reloaders,
 asset pipelines, and development tools that need to know *that a watched tree changed* and then decide what work to redo.
 
 # Dependencies
@@ -56,11 +56,12 @@ The notification kind guides recovery.
 - `Change` identifies a possible filesystem change. An empty relative path can represent changes anywhere under the root.
 - `RescanRequired` means the caller should reconcile the tree. Re-register the watch if native coverage was lost, such
   as when a Linux directory arrives after setup.
+- `CoverageLimited` means monitoring continues with the limitation described by `Notification::failure`.
 - `WatchStopped` means monitoring for the reported root has ended. Inspect `Notification::failure`. The folder
   remains attached until explicitly stopped or the owner is closed. When a shared monitor fails, close and
   reinitialize the owner before starting new watches.
 
-Both status notifications use an empty relative path and the coarse `AddRemoveRename` operation.
+The three status notifications use an empty relative path and the coarse `AddRemoveRename` operation.
 An ordinary `Change` does not guarantee complete coverage.
 
 The watched root must be an existing directory. A missing root or a regular file is rejected, and the same
@@ -100,6 +101,25 @@ Linux installs one `inotify` watch per directory found during setup and tracks u
 `FolderWatcher`. Relative paths are stored in caller-provided memory. The default Linux path store is 4 KiB; pass a larger `Span<char>` to the `FolderWatcher`
 constructor for broader or deeper trees. That buffer is ignored on Windows and Apple platforms.
 
+On NetBSD and FreeBSD, each folder initially holds 128 inventory entries, including the root, and 4 KiB of path-component
+storage. Regular files and directories each use a native descriptor. To watch larger trees, pass a path-component buffer
+and an entry buffer to the two-argument `FolderWatcher` constructor; use
+`FolderWatcher::entryStorageSize(numberOfEntries)` to size the latter. The buffers must not overlap and must remain
+unchanged until the watch stops. The entry buffer is ignored by other platforms. A setup that exceeds entry capacity or
+available descriptors fails and rolls back; exhaustion while monitoring sends `WatchStopped` and requires the owner to
+be closed and reinitialized. Native descriptor limits can be reached before the caller's buffer is full.
+
+BSD records symbolic links and other non-regular, non-directory entries without a direct vnode registration. The
+watcher does not follow directory symlinks or monitor those entries' contents or metadata directly. It emits a
+`CoverageLimited` notification when a watch begins with passive entries or discovers a new passive path; their directory
+entry changes can still produce structural hints. Inspect the tree and use another mechanism if direct coverage is
+required. A root rename or removal, vnode revocation, failed reconciliation, or fatal queue/readiness error stops the
+shared monitor and reports `WatchStopped`. Descendants that disappear during discovery are skipped or retired.
+A descendant identity mismatch during reconciliation triggers one retry. A successful retry reports
+`RescanRequired` for the root, and a failed retry stops monitoring. A structural change may yield a specific path or
+an empty root hint when changes are ambiguous. BSD thread callbacks can stop watches, but closing the owner from its own worker callback fails;
+close it from another thread after that callback returns.
+
 If Linux reports a recursive setup failure after registering watches, it attempts to remove all of them. The
 `FolderWatcher` can be reused when cleanup succeeds; if a removal fails, `watch` returns the cleanup error.
 Linux opens descendants relative to their parent directory and skips directory symlinks during discovery. Registering
@@ -120,6 +140,7 @@ after its callback returns.
 | Windows | Native buffer overflow | Failed directory completion or rearm ends that folder. A worker wait failure ends all roots on the thread runner. |
 | Apple | Native drops, event ID wrap, coalesced subtree or mount events, and shared stream refresh | A native root-change event ends the affected folder. |
 | Linux | Shared queue overflow, an unrepresentable event path, or a directory tree change | Root invalidation or failed directory registration ends that folder. A fatal read, wait, or readiness failure ends the shared monitor. |
+| NetBSD and FreeBSD | Recovered identity mismatch or an unrepresentable event path | Root loss, vnode revocation, failed reconciliation, or a fatal queue/readiness error ends the shared monitor. |
 
 The backend reports the loss it can observe. Filesystem and native API behavior can limit which events arrive.
 
@@ -134,6 +155,7 @@ bounded SC object storage; it is not a promise that native watcher setup perform
 | Windows | `ReadDirectoryChangesW` with subtree watching | Relative paths are UTF-16; buffer overflow loses individual names and produces a conservative root notification |
 | macOS | FSEvents with per-file events | Events can be coalesced; stream setup has roughly 200 ms latency and structural distinctions remain intentionally coarse |
 | Linux | `inotify`, one watch per directory discovered during setup | Paths must be ASCII or UTF-8; recursive capacity and stored relative paths are bounded as described above |
+| NetBSD, FreeBSD | `kqueue`, with a bounded inventory of directory and regular-file vnodes | Directory changes are reconciled recursively; descriptor limits and passive-entry notifications apply |
 
 Changes that bypass the watched directory entry may not produce a notification. Examples include modifying a file through
 a symbolic or hard link outside the watched tree, and some memory-mapped writes. On Linux, the watcher registers new or
@@ -159,7 +181,8 @@ keeps backend callbacks short and absorbs duplicate bursts.
 
 # Status and further material
 
-🟩 **Usable.** The threaded and event loop modes pass the shared suite. The watcher reports coarse events
+🟩 **Usable on the supported desktop platforms.** NetBSD and FreeBSD ARM64 support is experimental.
+The threaded and event loop modes pass the shared suite on both tested guests. The watcher reports coarse events
 and uses bounded storage for recursive watches. There is no portable polling fallback.
 
 - [SCExample](@ref page_examples) contains the production-shaped hot-reload consumer.

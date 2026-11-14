@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-// Linux backend for HttpClient using libcurl via dlopen.
-#include "HttpClientLinuxAPI.h"
+// HttpClient backend using libcurl via dlopen on POSIX systems.
+#include "HttpClientLibCurlAPI.h"
 
 #include "../../Common/PlacementNew.h"
 
@@ -9,7 +9,7 @@
 
 struct SC::HttpClient::Internal
 {
-    HttpClientLinuxLibCurlLoader curl;
+    HttpClientLibCurlLoader curl;
 };
 
 struct SC::HttpClientOperation::Internal
@@ -52,8 +52,8 @@ static const char* getCustomMethod(SC::HttpClientRequest::Method method)
     return "GET";
 }
 
-static SC::Result httpClientLinuxAppendHeader(HttpClientLinuxLibCurlLoader& curl, struct curl_slist*& headers,
-                                              const char* headerLine)
+static SC::Result httpClientLibCurlAppendHeader(HttpClientLibCurlLoader& curl, struct curl_slist*& headers,
+                                                const char* headerLine)
 {
     struct curl_slist* newHeaders = curl.curl_slist_append(headers, headerLine);
     if (newHeaders == nullptr)
@@ -62,9 +62,8 @@ static SC::Result httpClientLinuxAppendHeader(HttpClientLinuxLibCurlLoader& curl
     return SC::Result(true);
 }
 
-static SC::Result httpClientLinuxAppendProxyAuthorization(HttpClientLinuxLibCurlLoader& curl,
-                                                          struct curl_slist*& headers, SC::StringSpan authorization,
-                                                          SC::Span<char> scratch)
+static SC::Result httpClientLibCurlAppendProxyAuthorization(HttpClientLibCurlLoader& curl, struct curl_slist*& headers,
+                                                            SC::StringSpan authorization, SC::Span<char> scratch)
 {
     static const char   ProxyAuthorizationPrefix[]    = "Proxy-Authorization: ";
     static const size_t ProxyAuthorizationPrefixBytes = sizeof(ProxyAuthorizationPrefix) - 1;
@@ -75,7 +74,7 @@ static SC::Result httpClientLinuxAppendProxyAuthorization(HttpClientLinuxLibCurl
     memcpy(scratch.data(), ProxyAuthorizationPrefix, ProxyAuthorizationPrefixBytes);
     memcpy(scratch.data() + ProxyAuthorizationPrefixBytes, authorizationBytes.data(), authorizationBytes.sizeInBytes());
     scratch[ProxyAuthorizationPrefixBytes + authorizationBytes.sizeInBytes()] = '\0';
-    return httpClientLinuxAppendHeader(curl, headers, scratch.data());
+    return httpClientLibCurlAppendHeader(curl, headers, scratch.data());
 }
 
 static long getCurlHttpVersionOption(SC::HttpClientRequestProtocolOptions::Preference preference)
@@ -107,18 +106,18 @@ static SC::Result getCurlStringPointer(SC::StringSpan source, SC::Span<char> sto
     return SC::Result(true);
 }
 
-struct HttpClientLinuxRuntimeFeatures
+struct HttpClientLibCurlRuntimeFeatures
 {
     bool tls   = false;
     bool http2 = false;
 };
 
-static const HttpClientLinuxRuntimeFeatures& getHttpClientLinuxRuntimeFeatures()
+static const HttpClientLibCurlRuntimeFeatures& getHttpClientLibCurlRuntimeFeatures()
 {
-    static const HttpClientLinuxRuntimeFeatures features = []()
+    static const HttpClientLibCurlRuntimeFeatures features = []()
     {
-        HttpClientLinuxRuntimeFeatures result;
-        HttpClientLinuxLibCurlLoader   curl;
+        HttpClientLibCurlRuntimeFeatures result;
+        HttpClientLibCurlLoader          curl;
         if (not curl.init())
             return result;
 
@@ -133,7 +132,7 @@ static const HttpClientLinuxRuntimeFeatures& getHttpClientLinuxRuntimeFeatures()
 
 namespace SC
 {
-struct HttpClientLinuxCallbacks
+struct HttpClientLibCurlCallbacks
 {
     static HttpClientResponse::Protocol mapCurlHttpVersion(long version)
     {
@@ -296,8 +295,8 @@ struct HttpClientLinuxCallbacks
 
 SC::HttpClient::HttpClient()
 {
-    static_assert(sizeof(Internal) <= sizeof(storage), "Linux HttpClient storage too small");
-    static_assert(alignof(Internal) <= alignof(uint64_t), "Linux HttpClient alignment mismatch");
+    static_assert(sizeof(Internal) <= sizeof(storage), "libcurl HttpClient storage too small");
+    static_assert(alignof(Internal) <= alignof(uint64_t), "libcurl HttpClient alignment mismatch");
     SC::placementNew(*reinterpret_cast<Internal*>(storage));
 }
 
@@ -326,8 +325,8 @@ SC::Result SC::HttpClient::platformClose()
 
 SC::HttpClientOperation::HttpClientOperation()
 {
-    static_assert(sizeof(Internal) <= sizeof(storage), "Linux HttpClientOperation storage too small");
-    static_assert(alignof(Internal) <= alignof(uint64_t), "Linux HttpClientOperation alignment mismatch");
+    static_assert(sizeof(Internal) <= sizeof(storage), "libcurl HttpClientOperation storage too small");
+    static_assert(alignof(Internal) <= alignof(uint64_t), "libcurl HttpClientOperation alignment mismatch");
     SC::placementNew(*reinterpret_cast<Internal*>(storage));
 }
 
@@ -342,7 +341,7 @@ SC::HttpClientOperation::~HttpClientOperation()
 
 SC::Result SC::HttpClientOperation::platformInit()
 {
-    (void)getHttpClientLinuxRuntimeFeatures();
+    (void)getHttpClientLibCurlRuntimeFeatures();
     auto& session       = *reinterpret_cast<HttpClient::Internal*>(client->storage);
     auto& internal      = *reinterpret_cast<Internal*>(storage);
     internal.curlHandle = session.curl.curl_easy_init();
@@ -505,13 +504,13 @@ SC::Result SC::HttpClientOperation::platformStart()
 
     session.curl.curl_easy_setopt(curlHandle, CURLOPT_NOPROGRESS, 0L);
     session.curl.curl_easy_setopt(curlHandle, CURLOPT_XFERINFOFUNCTION,
-                                  &HttpClientLinuxCallbacks::curlProgressCallback);
+                                  &HttpClientLibCurlCallbacks::curlProgressCallback);
     session.curl.curl_easy_setopt(curlHandle, CURLOPT_XFERINFODATA, this);
 
-    session.curl.curl_easy_setopt(curlHandle, CURLOPT_HEADERFUNCTION, &HttpClientLinuxCallbacks::curlHeaderCallback);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_HEADERFUNCTION, &HttpClientLibCurlCallbacks::curlHeaderCallback);
     session.curl.curl_easy_setopt(curlHandle, CURLOPT_HEADERDATA, this);
 
-    session.curl.curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, &HttpClientLinuxCallbacks::curlWriteCallback);
+    session.curl.curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, &HttpClientLibCurlCallbacks::curlWriteCallback);
     session.curl.curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, this);
 
     if (internal.requestHeaders != nullptr)
@@ -521,8 +520,8 @@ SC::Result SC::HttpClientOperation::platformStart()
     }
     if (currentRequest.options.proxy.authorization.sizeInBytes() > 0)
     {
-        SC_TRY(httpClientLinuxAppendProxyAuthorization(session.curl, internal.requestHeaders,
-                                                       currentRequest.options.proxy.authorization, backendScratch));
+        SC_TRY(httpClientLibCurlAppendProxyAuthorization(session.curl, internal.requestHeaders,
+                                                         currentRequest.options.proxy.authorization, backendScratch));
     }
     for (size_t idx = 0; idx < currentRequest.headers.sizeInElements(); ++idx)
     {
@@ -535,7 +534,7 @@ SC::Result SC::HttpClientOperation::platformStart()
             memcpy(backendScratch.data(), currentRequest.headers[idx].name.toCharSpan().data(), nameLen);
             backendScratch[nameLen]     = ';';
             backendScratch[nameLen + 1] = '\0';
-            SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
+            SC_TRY(httpClientLibCurlAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
             continue;
         }
         if (nameLen + valLen + 3 >= backendScratch.sizeInBytes())
@@ -545,11 +544,11 @@ SC::Result SC::HttpClientOperation::platformStart()
         backendScratch[nameLen + 1] = ' ';
         memcpy(backendScratch.data() + nameLen + 2, currentRequest.headers[idx].value.toCharSpan().data(), valLen);
         backendScratch[nameLen + 2 + valLen] = '\0';
-        SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
+        SC_TRY(httpClientLibCurlAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
     }
     if (currentRequest.body.isChunkedStream())
     {
-        SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, "Transfer-Encoding: chunked"));
+        SC_TRY(httpClientLibCurlAppendHeader(session.curl, internal.requestHeaders, "Transfer-Encoding: chunked"));
     }
     if (internal.requestHeaders != nullptr)
     {
@@ -558,7 +557,7 @@ SC::Result SC::HttpClientOperation::platformStart()
 
     if (currentRequest.body.isStreamed())
     {
-        session.curl.curl_easy_setopt(curlHandle, CURLOPT_READFUNCTION, &HttpClientLinuxCallbacks::curlReadCallback);
+        session.curl.curl_easy_setopt(curlHandle, CURLOPT_READFUNCTION, &HttpClientLibCurlCallbacks::curlReadCallback);
         session.curl.curl_easy_setopt(curlHandle, CURLOPT_READDATA, this);
         if (currentRequest.method == HttpClientRequest::HttpPOST)
         {
@@ -611,7 +610,7 @@ SC::Result SC::HttpClientOperation::platformStart()
                 long httpCode = 0;
                 sessionRef.curl.curl_easy_getinfo(internalRef.curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
                 operation->currentResponse->statusCode = static_cast<int>(httpCode);
-                HttpClientLinuxCallbacks::updateNegotiatedProtocol(*operation);
+                HttpClientLibCurlCallbacks::updateNegotiatedProtocol(*operation);
                 long redirectCount = 0;
                 (void)sessionRef.curl.curl_easy_getinfo(internalRef.curlHandle, CURLINFO_REDIRECT_COUNT,
                                                         &redirectCount);
@@ -631,7 +630,7 @@ SC::Result SC::HttpClientOperation::platformStart()
                         return nullptr;
                     }
                 }
-                if (HttpClientLinuxCallbacks::isHttp2Required(*operation) and
+                if (HttpClientLibCurlCallbacks::isHttp2Required(*operation) and
                     operation->currentResponse->negotiatedProtocol != HttpClientResponse::Protocol::Http2)
                 {
                     operation->enqueueError(

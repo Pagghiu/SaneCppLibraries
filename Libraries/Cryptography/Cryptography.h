@@ -25,8 +25,9 @@ namespace SC
 /// @brief Platform-backed symmetric cryptography primitives.
 /// @n
 /// The native backend uses operating system cryptographic primitives and keeps the core interface synchronous,
-/// allocation-free and span-based. Linux can explicitly select a runtime-loaded OpenSSL 3 backend, whose internal
-/// allocations are outside the library's control. Apple GCM is narrowly composed over CommonCrypto AES.
+/// allocation-free and span-based. Callers can explicitly select a runtime-loaded OpenSSL 3 backend, whose internal
+/// allocations are outside the library's control. On NetBSD and FreeBSD, select OpenSSL for symmetric operations.
+/// Apple GCM is narrowly composed over CommonCrypto AES.
 /// @warning This is a Draft, unaudited low-level primitive API. Prefer AEAD, keep keys and nonces under an explicit
 /// protocol policy, and use AES-CBC only for compatibility with an existing authenticated construction.
 struct SC_CRYPTOGRAPHY_EXPORT Cryptography

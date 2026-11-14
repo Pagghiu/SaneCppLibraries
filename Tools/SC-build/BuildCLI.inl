@@ -38,6 +38,8 @@ static constexpr StringView helpHostPlatformName(Build::Platform::Type platform)
     case Build::Platform::Windows: return "Windows";
     case Build::Platform::Apple: return "macOS";
     case Build::Platform::Linux: return "Linux";
+    case Build::Platform::NetBSD: return "NetBSD";
+    case Build::Platform::FreeBSD: return "FreeBSD";
     case Build::Platform::Wasm: return "Wasm";
     case Build::Platform::Unknown: return "unknown";
     }
@@ -88,7 +90,8 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
                               "  - linux-musl-arm64: Linux musl arm64 target profile\n"
                               "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
                               "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
-                              "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"))
+                              "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"
+                              "  - freebsd-arm64 / netbsd-arm64: BSD cross-build with Clang, LLD and --sysroot\n"))
             return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
         if (not output.append("\nToolchain values:\n"
                               "  - default / host-default: host-default compiler family\n"
@@ -227,6 +230,8 @@ static void applyHostDefaultBuildParameters(Build::Action& action)
     case Platform::Windows: action.parameters.hostMachine.platform = Build::Platform::Windows; break;
     case Platform::Apple: action.parameters.hostMachine.platform = Build::Platform::Apple; break;
     case Platform::Linux: action.parameters.hostMachine.platform = Build::Platform::Linux; break;
+    case Platform::NetBSD: action.parameters.hostMachine.platform = Build::Platform::NetBSD; break;
+    case Platform::FreeBSD: action.parameters.hostMachine.platform = Build::Platform::FreeBSD; break;
     default: break;
     }
     switch (HostInstructionSet)
@@ -251,6 +256,14 @@ static void applyHostDefaultBuildParameters(Build::Action& action)
         action.parameters.generator = Build::Generator::Native;
         action.parameters.platform  = Build::Platform::Linux;
         break;
+    case Platform::NetBSD:
+        action.parameters.generator = Build::Generator::Native;
+        action.parameters.platform  = Build::Platform::NetBSD;
+        break;
+    case Platform::FreeBSD:
+        action.parameters.generator = Build::Generator::Native;
+        action.parameters.platform  = Build::Platform::FreeBSD;
+        break;
     default: break;
     }
     action.parameters.targetMachine.platform     = action.parameters.platform;
@@ -262,6 +275,21 @@ static Result applyTargetProfileValue(Build::Action& action, StringView targetPr
 {
     if (targetProfile.isEmpty())
     {
+        return Result(true);
+    }
+
+    const bool freeBSDArm64 = targetProfile.equalsIgnoreCaseASCII("freebsd-arm64");
+    if (freeBSDArm64 or targetProfile.equalsIgnoreCaseASCII("netbsd-arm64"))
+    {
+        action.parameters.platform               = freeBSDArm64 ? Build::Platform::FreeBSD : Build::Platform::NetBSD;
+        action.parameters.targetMachine.platform = action.parameters.platform;
+        action.parameters.architecture           = Build::Architecture::Arm64;
+        action.parameters.targetMachine.architecture = action.parameters.architecture;
+        action.parameters.targetMachine.environment  = Build::TargetEnvironment::Native;
+        action.parameters.generator                  = Build::Generator::Native;
+        action.parameters.toolchain.family           = Build::Toolchain::Clang;
+        SC_TRY(action.parameters.toolchain.targetTriple.assign(freeBSDArm64 ? "aarch64-unknown-freebsd15.1"_a8
+                                                                            : "aarch64-unknown-netbsd11.0"_a8));
         return Result(true);
     }
 
@@ -765,6 +793,12 @@ static bool tripleConflictsWithTargetArchitecture(StringView triple, Build::Arch
 static Result validateBuildActionCombination(Build::Action::Type actionType, const BuildCLIParseContext& context,
                                              const Build::Action& action, Console& console)
 {
+    if ((action.parameters.platform == Build::Platform::NetBSD or
+         action.parameters.platform == Build::Platform::FreeBSD) and
+        action.parameters.generator != Build::Generator::Native)
+    {
+        return printBuildActionCombinationError(console, "BSD targets currently require the native generator");
+    }
     const bool windowsGNUTarget  = isWindowsGNUTargetMachine(action.parameters.targetMachine);
     const bool windowsMSVCTarget = isWindowsMSVCTargetMachine(action.parameters.targetMachine);
     const bool linuxGlibcTarget  = isLinuxGlibcTargetMachine(action.parameters.targetMachine);
@@ -1128,7 +1162,9 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     {
     case Platform::Windows:
     case Platform::Apple:
-    case Platform::Linux: applyHostDefaultBuildParameters(action); break;
+    case Platform::Linux:
+    case Platform::NetBSD:
+    case Platform::FreeBSD: applyHostDefaultBuildParameters(action); break;
     default: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     }
 
@@ -1161,7 +1197,8 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     options[numOptions].shortName = 't';
     options[numOptions].help =
         "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, windows-msvc-x86_64, "
-        "windows-msvc-arm64, linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, linux-musl-arm64)";
+        "windows-msvc-arm64, linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, linux-musl-arm64, "
+        "freebsd-arm64, netbsd-arm64)";
     options[numOptions].valueName = "PROFILE";
     options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
     numOptions++;
@@ -1529,6 +1566,15 @@ static Result runBuildConfigure(Tool::Arguments& arguments)
     action.parameters.platform  = Build::Platform::Apple;
     arguments.console.print("Executing \"{}\" for Native on Apple platform\n", arguments.action);
     SC_TRY(Build::executeAction(action));
+    switch (HostPlatform)
+    {
+    case Platform::NetBSD: action.parameters.platform = Build::Platform::NetBSD; break;
+    case Platform::FreeBSD: action.parameters.platform = Build::Platform::FreeBSD; break;
+    default: return Result(true);
+    }
+    arguments.console.print("Executing \"{}\" for Native on {} platform\n", arguments.action,
+                            Build::Platform::toString(action.parameters.platform));
+    SC_TRY(Build::executeAction(action));
     return Result(true);
 }
 
@@ -1576,7 +1622,9 @@ static Result runBuildDocumentation(StringView doxygenExecutable, Tool::Argument
     case Platform::Apple: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "macos")); break;
     case Platform::Linux: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "linux")); break;
     case Platform::Windows: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "windows")); break;
-    case Platform::Emscripten: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
+    case Platform::Emscripten:
+    case Platform::NetBSD:
+    case Platform::FreeBSD: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     }
     SC_TRY(process.exec({doxygenExecutable}));
     if (process.getExitStatus() != 0)

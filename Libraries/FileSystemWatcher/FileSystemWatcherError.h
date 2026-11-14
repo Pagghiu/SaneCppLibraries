@@ -24,6 +24,7 @@ enum class FileSystemWatcherError : uint32_t
     StopWatchingFailed,
     CloseFailed,
     MonitoringFailed,
+    CoverageLimited,
 };
 
 /// @brief Stable backend stages retained as context for a FileSystemWatcher failure.
@@ -68,6 +69,18 @@ enum class FileSystemWatcherErrorDetail : uint32_t
     LinuxOpenSubdirectory,
     LinuxReadEvents,
     LinuxWaitForEvents,
+    BSDCreateQueue,
+    BSDRegisterControlEvent,
+    BSDTriggerControlEvent,
+    BSDOpenRootDirectory,
+    BSDInventory,
+    BSDReconcile,
+    BSDWaitForEvents,
+    BSDReadEvents,
+    BSDPassiveEntries,
+    BSDEntryStorage,
+    BSDCleanup,
+    BSDVnodeRevoked,
     LinuxWatchInvalidated,
     AppleResolveWatchRoot,
     AppleWatchInvalidated,

@@ -384,6 +384,9 @@ that task with an error before entering its stack.
 Close every incremental growth runtime before attaching a debugger to the process. Attaching after incremental
 execution starts is outside the supported tooling contract.
 
+On BSD, incremental commitment is available on ARM64 NetBSD and FreeBSD. NetBSD reserves inaccessible pages with
+future read/write protection so stack commits work under PaX MPROTECT.
+
 `FiberWorkerPool` can register and close all of its worker threads through `FiberWorkerPoolOptions`. Set
 `stackGrowthRuntime` to the open process owner. On POSIX, also provide one flat
 `stackGrowthSignalStackStorage` span containing at least `workerCount * FiberStackGrowthSignalStackSize` bytes; the

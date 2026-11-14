@@ -3,7 +3,8 @@
 set -eu
 cd "$(dirname "$0")/../../.."
 case "$(uname -s)" in
-    Linux) dl_lib=-ldl ;;
+    Linux|FreeBSD) dl_lib=-ldl ;;
+    NetBSD) dl_lib= ;;
     *) echo "This fixture requires a libcurl HttpClient host" >&2; exit 1 ;;
 esac
 work=$(mktemp -d "${TMPDIR:-/tmp}/sc-libcurl-fixture.XXXXXXXX")

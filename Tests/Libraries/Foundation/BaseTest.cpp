@@ -6,6 +6,7 @@
 #include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Limits.h"
 #include "Libraries/Testing/Testing.h"
+#include "Tests/Libraries/Foundation/PlatformSmoke.h"
 
 namespace SC
 {
@@ -124,6 +125,11 @@ struct SC::BaseTest : public SC::TestCase
 
     BaseTest(SC::TestReport& report) : TestCase(report, "BaseTest")
     {
+        if (test_section("platform core smoke"))
+        {
+            SC_TEST_EXPECT(runPlatformSmoke());
+        }
+
         if (test_section("Result diagnostic writer"))
         {
             char                 translated[64];

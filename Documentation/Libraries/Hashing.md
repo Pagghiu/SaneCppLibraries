@@ -61,17 +61,20 @@ allocate a buffer proportional to the stream, so the total input size is not lim
 span, and hexadecimal or Base64 text requires a separate encoding step and caller-chosen storage. [Strings](@ref
 library_strings) provides `StringBuilder::appendHex`; Hashing intentionally does not depend on it.
 
-There is no dynamic allocation in the Hashing library itself. On Apple platforms the algorithm context lives inline in
-the object. Windows and Linux implementations acquire native cryptographic handles or sockets, so construction and
-`setType()` can still consume fallible OS resources; destruction releases them. A `Hashing` instance and its active
+There is no dynamic allocation in the Hashing library itself. On Apple, NetBSD and FreeBSD the algorithm context lives
+inline in the object. Windows and Linux implementations acquire native cryptographic handles or sockets, so construction
+and `setType()` can still consume fallible OS resources; destruction releases them. A `Hashing` instance and its active
 session should stay on one thread unless the caller supplies its own synchronization.
 
 # Platform and integration boundaries
 
-The same public workflow maps to CommonCrypto on Apple platforms, CryptoAPI on Windows, and the kernel `AF_ALG` hashing
-interface on Linux. Other targets currently compile a stub whose operations return `false`; support should therefore be
-verified for the deployment target rather than inferred from the header being available. Backend selection is an
-implementation detail, but it explains why the API is fallible even though the object and digest storage are fixed-size.
+The same public workflow maps to CommonCrypto on Apple platforms, CryptoAPI on Windows, the kernel `AF_ALG` hashing
+interface on Linux, and base-system digest routines on NetBSD and FreeBSD. FreeBSD builds link the system `libmd`
+(`-lmd`); NetBSD uses libc. BSD platform support is experimental. The shared suite covers NetBSD 11 and FreeBSD 15.1 on
+x86_64 and ARM64.
+Other targets currently compile a stub whose operations return `false`; support should therefore be verified for the
+deployment target rather than inferred from the header being available. Backend selection is an implementation detail,
+but it explains why the API is fallible even though the object and digest storage are fixed-size.
 
 Hashing sits below the libraries that own I/O and presentation policy:
 

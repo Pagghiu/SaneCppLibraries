@@ -213,6 +213,11 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileSend(false); // do not use thread-pool
             fileSend(true);  // use thread-pool
         }
+        if (test_section("file send larger than one buffer"))
+        {
+            fileSend(false, false, false, true);
+            fileSend(true, false, false, true);
+        }
         if (test_section("file send EOF worker"))
             fileSend(true, true);
         if (test_section("file send EOF native"))
@@ -239,6 +244,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             fileReadinessCancel();
         }
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+        if (test_section("nested kqueue readiness"))
+            bsdNestedKqueueReadiness();
+#endif
         if (test_section("external completion manual"))
         {
             externalCompletionManual();

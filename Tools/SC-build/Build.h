@@ -50,7 +50,9 @@ struct Platform
         Windows,
         Apple,
         Linux,
-        Wasm
+        Wasm,
+        NetBSD,
+        FreeBSD
     };
 
     /// @brief Get StringView from Platform::Type
@@ -63,6 +65,8 @@ struct Platform
         case Apple: return "apple";
         case Linux: return "linux";
         case Wasm: return "wasm";
+        case NetBSD: return "netbsd";
+        case FreeBSD: return "freebsd";
         }
         Assert::unreachable();
     }
@@ -659,7 +663,7 @@ struct Configuration
     /// @brief A pre-made preset with pre-configured set of options
     enum class Preset
     {
-        Debug,         ///< Compile for debug, enabling ASAN (if not set on project and never on VStudio)
+        Debug,         ///< Compile for debug, enabling ASAN where supported by the default toolchain
         DebugCoverage, ///< Compile for debug, enabling coverage (sets ClangCL for VStudio)
         Release,       ///< Compile for release
     };

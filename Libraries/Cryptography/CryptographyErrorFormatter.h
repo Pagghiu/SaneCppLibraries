@@ -165,6 +165,7 @@ inline bool appendCryptographyErrorDetail(ResultErrorFormatter& formatter, Crypt
     case CryptographyErrorDetail::WindowsBCryptHmacUpdate: formatter.append("Windows BCrypt update HMAC"); break;
     case CryptographyErrorDetail::WindowsBCryptHmacFinalize: formatter.append("Windows BCrypt finalize HMAC"); break;
     case CryptographyErrorDetail::LinuxGetRandom: formatter.append("Linux getrandom"); break;
+    case CryptographyErrorDetail::BSDGetEntropy: formatter.append("BSD getentropy"); break;
     case CryptographyErrorDetail::LinuxAFAlgCreateAlgorithmSocket:
         formatter.append("Linux AF_ALG create algorithm socket");
         break;

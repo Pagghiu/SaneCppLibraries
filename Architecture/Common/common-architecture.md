@@ -88,3 +88,4 @@ output, translation, sizing, and wording behavior.
 - [COMMON-0008 - Keep StringSpan and StringPath in Common](common-0008-keep-stringspan-and-stringpath-in-common.md)
 - [COMMON-0009 - Use library-owned structured Result errors](common-0009-use-library-owned-structured-result-errors.md)
 - [COMMON-0010 - Assign errors to foundational StringSpan](common-0010-assign-errors-to-foundational-stringspan.md)
+- [COMMON-0011 - Share protected POSIX reservations](common-0011-share-protected-posix-reservations.md)

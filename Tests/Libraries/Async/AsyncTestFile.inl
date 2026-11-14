@@ -1,10 +1,18 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
+
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#include <stdlib.h>
+#include <sys/event.h>
+#include <time.h>
+#include <unistd.h>
+#endif
 
 void SC::AsyncTest::fileReadWrite(bool useThreadPool)
 {
@@ -426,6 +434,120 @@ void SC::AsyncTest::fileReadinessCancel()
     SC_TEST_EXPECT(pipe.close());
     SC_TEST_EXPECT(eventLoop.close());
 }
+
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+void SC::AsyncTest::bsdNestedKqueueReadiness()
+{
+    char      fixture[] = "/tmp/sc-bsd-async-nested.XXXXXXXX";
+    const int file      = ::mkstemp(fixture);
+    SC_TEST_EXPECT(file != -1);
+    if (file == -1)
+        return;
+    const int queue = ::kqueue();
+    SC_TEST_EXPECT(queue != -1);
+    auto closeNative = MakeDeferred(
+        [&]
+        {
+            if (queue != -1)
+                (void)::close(queue);
+            (void)::close(file);
+            (void)::unlink(fixture);
+        });
+    if (queue == -1)
+        return;
+    struct kevent change;
+    EV_SET(&change, file, EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE, 0, nullptr);
+    const bool registered = ::kevent(queue, &change, 1, nullptr, 0, nullptr) == 0;
+    SC_TEST_EXPECT(registered);
+    if (not registered)
+        return;
+
+    AsyncEventLoop eventLoop;
+    const Result   loopReady = eventLoop.create(options);
+    SC_TEST_EXPECT(loopReady);
+    if (not loopReady)
+        return;
+    struct State
+    {
+        AsyncEventLoop* loop = nullptr;
+
+        int queue     = -1;
+        int file      = -1;
+        int callbacks = 0;
+
+        bool valid    = true;
+        bool stopped  = false;
+        bool timedOut = false;
+    } state;
+    state.loop  = &eventLoop;
+    state.queue = queue;
+    state.file  = file;
+    AsyncFileReadiness readiness;
+    readiness.callback = [&state](AsyncFileReadiness::Result& result)
+    {
+        struct kevent         event;
+        const struct timespec noWait = {0, 0};
+        const int             count  = ::kevent(state.queue, nullptr, 0, &event, 1, &noWait);
+
+        state.valid = state.valid and static_cast<bool>(result.isValid()) and count == 1 and
+                      event.ident == static_cast<uintptr_t>(state.file) and (event.fflags & NOTE_WRITE) != 0;
+        ++state.callbacks;
+        result.reactivateRequest(true);
+        if (state.callbacks == 2)
+            state.stopped = static_cast<bool>(result.getAsync().stop(*state.loop));
+    };
+    AsyncLoopTimeout timeout;
+    timeout.callback = [&state](AsyncLoopTimeout::Result&) { state.timedOut = true; };
+    auto closeLoop   = MakeDeferred([&] { (void)eventLoop.close(); });
+
+    const bool ready = eventLoop.associateExternallyCreatedFileDescriptorHandle(queue) and
+                       readiness.start(eventLoop, queue) and timeout.start(eventLoop, TimeMs{5000}) and
+                       eventLoop.runNoWait();
+    SC_TEST_EXPECT(ready);
+    if (not ready)
+        return;
+    const bool firstWrite = ::write(file, "a", 1) == 1;
+    SC_TEST_EXPECT(firstWrite);
+    if (not firstWrite)
+        return;
+    while (state.callbacks < 1 and not state.timedOut)
+    {
+        const Result step = eventLoop.runOnce();
+        SC_TEST_EXPECT(step);
+        if (not step)
+            return;
+    }
+    if (state.timedOut)
+    {
+        SC_TEST_EXPECT(not state.timedOut);
+        return;
+    }
+    const bool secondWrite = ::write(file, "b", 1) == 1;
+    SC_TEST_EXPECT(secondWrite);
+    if (not secondWrite)
+        return;
+    while (state.callbacks < 2 and not state.timedOut)
+    {
+        const Result step = eventLoop.runOnce();
+        SC_TEST_EXPECT(step);
+        if (not step)
+            return;
+    }
+    SC_TEST_EXPECT(not state.timedOut and state.callbacks == 2 and state.valid and state.stopped);
+    if (state.timedOut)
+        return;
+    SC_TEST_EXPECT(timeout.stop(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(readiness.isFree() and timeout.isFree());
+    SC_TEST_EXPECT(::write(file, "c", 1) == 1);
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(state.callbacks == 2);
+    const Result closed = eventLoop.close();
+    SC_TEST_EXPECT(closed);
+    if (closed)
+        closeLoop.disarm();
+}
+#endif
 
 void SC::AsyncTest::externalCompletionManual()
 {

@@ -59,6 +59,18 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
         break;
     case FileSystemWatcherErrorDetail::LinuxWatchInvalidated: formatter.append("Linux watch invalidated"); break;
     case FileSystemWatcherErrorDetail::LinuxWaitForEvents: formatter.append("Linux wait for events"); break;
+    case FileSystemWatcherErrorDetail::BSDCreateQueue: formatter.append("BSD create queue"); break;
+    case FileSystemWatcherErrorDetail::BSDRegisterControlEvent: formatter.append("BSD register control event"); break;
+    case FileSystemWatcherErrorDetail::BSDTriggerControlEvent: formatter.append("BSD trigger control event"); break;
+    case FileSystemWatcherErrorDetail::BSDOpenRootDirectory: formatter.append("BSD open root directory"); break;
+    case FileSystemWatcherErrorDetail::BSDInventory: formatter.append("BSD build inventory"); break;
+    case FileSystemWatcherErrorDetail::BSDReconcile: formatter.append("BSD reconcile inventory"); break;
+    case FileSystemWatcherErrorDetail::BSDWaitForEvents: formatter.append("BSD wait for events"); break;
+    case FileSystemWatcherErrorDetail::BSDReadEvents: formatter.append("BSD read events"); break;
+    case FileSystemWatcherErrorDetail::BSDPassiveEntries: formatter.append("BSD passive entries"); break;
+    case FileSystemWatcherErrorDetail::BSDEntryStorage: formatter.append("BSD entry storage"); break;
+    case FileSystemWatcherErrorDetail::BSDCleanup: formatter.append("BSD cleanup"); break;
+    case FileSystemWatcherErrorDetail::BSDVnodeRevoked: formatter.append("BSD vnode revoked"); break;
     case FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity: formatter.append("Linux watch handle capacity"); break;
     case FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity:
         formatter.append("Linux pending directory capacity");
@@ -114,6 +126,7 @@ inline ResultErrorFormat formatFileSystemWatcherErrorWithDetails(FileSystemWatch
     case FileSystemWatcherError::StopWatchingFailed: formatter.append("Failed to stop watching"); break;
     case FileSystemWatcherError::CloseFailed: formatter.append("Failed to close watcher"); break;
     case FileSystemWatcherError::MonitoringFailed: formatter.append("Filesystem monitoring stopped"); break;
+    case FileSystemWatcherError::CoverageLimited: formatter.append("Filesystem monitoring coverage is limited"); break;
     default: return ResultErrorFormatter::failure(ResultErrorFormatStatus::UnknownError, output);
     }
 

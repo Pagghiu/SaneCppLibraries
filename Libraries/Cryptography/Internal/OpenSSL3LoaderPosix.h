@@ -10,20 +10,30 @@ namespace SC
 {
 namespace detail
 {
-struct OpenSSL3RuntimeLinux
+struct OpenSSL3RuntimePosix
 {
     void*       library = nullptr;
     OpenSSL3API api;
 
-    OpenSSL3RuntimeLinux()
+    OpenSSL3RuntimePosix()
     {
-        library = ::dlopen("libcrypto.so.3", RTLD_NOW | RTLD_LOCAL);
-        if (not api.resolve(library, resolveSymbol))
-        {
-            if (library != nullptr)
-                ::dlclose(library);
-            library = nullptr;
-        }
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+        // The base system library can use a different SONAME from the upstream OpenSSL 3 build.
+        if (load("/usr/lib/libcrypto.so"))
+            return;
+#endif
+        load("libcrypto.so.3");
+    }
+
+    bool load(const char* path)
+    {
+        library = ::dlopen(path, RTLD_NOW | RTLD_LOCAL);
+        if (api.resolve(library, resolveSymbol))
+            return true;
+        if (library != nullptr)
+            ::dlclose(library);
+        library = nullptr;
+        return false;
     }
 
     static void* resolveSymbol(void* library, const char* name) { return ::dlsym(library, name); }
@@ -33,7 +43,7 @@ inline OpenSSL3API& openSSL3API()
 {
     // A valid handle intentionally remains loaded for the process lifetime. This avoids invalidating provider objects
     // owned by sessions and keeps dynamic-library ownership separate from the platform-neutral EVP adapter.
-    static OpenSSL3RuntimeLinux runtime;
+    static OpenSSL3RuntimePosix runtime;
     return runtime.api;
 }
 } // namespace detail

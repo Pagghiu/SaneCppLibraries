@@ -64,6 +64,8 @@ Keep digest bytes as bytes. Formatting belongs to callers or string utilities.
 
 ## Decision Log
 
+- [HASHING-0004 - Use BSD base-system digest contexts](hashing-0004-use-bsd-base-system-digest-contexts.md)
+
 - [HASHING-0001 - Wrap native OS hash APIs instead of bundling hash implementations](hashing-0001-wrap-native-os-hash-apis-instead-of-bundling-hash-implementations.md)
 - [HASHING-0002 - Keep Hashing state inline and non-movable](hashing-0002-keep-hashing-state-inline-and-non-movable.md)
 - [HASHING-0003 - Keep C bindings co-located with Hashing](hashing-0003-keep-c-bindings-co-located-with-hashing.md)

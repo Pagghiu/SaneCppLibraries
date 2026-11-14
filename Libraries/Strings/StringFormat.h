@@ -229,7 +229,8 @@ template <> struct SC_STRINGS_EXPORT StringFormatterFor<double>       {static bo
 template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::ssize_t);};
 #endif
 #else
-#if !SC_PLATFORM_LINUX && !(SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT)
+#if !SC_PLATFORM_LINUX && !(SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT) && \
+    !((SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && SC_PLATFORM_64_BIT)
 template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringSpan, const SC::size_t);};
 template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::ssize_t);};
 #endif

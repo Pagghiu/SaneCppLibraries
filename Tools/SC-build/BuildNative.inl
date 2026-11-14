@@ -600,7 +600,9 @@ struct SC::Build::NativeBuild
         switch (targetPlatform(resolvedProject.targetContext))
         {
         case Platform::Apple:
-        case Platform::Linux: return true;
+        case Platform::Linux:
+        case Platform::NetBSD:
+        case Platform::FreeBSD: return true;
         case Platform::Unknown:
         case Platform::Windows:
         case Platform::Wasm: return false;
@@ -617,24 +619,34 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append("-x"));
             break;
         case Platform::Linux:
-            if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags))
+        case Platform::NetBSD:
+        case Platform::FreeBSD: {
+            const bool preserve =
+                WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags);
+            const StringView executable = preserve ? "objcopy"_a8 : "strip"_a8;
+            String           stripTool  = StringEncoding::Utf8;
+            if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
             {
-                String objcopyTool = StringEncoding::Utf8;
-                SC_TRY(resolveLinuxBinutilsTool(resolvedProject.targetContext, "objcopy"_a8, objcopyTool));
-                SC_TRY(commandLine.append(objcopyTool.view()));
-                SC_TRY(commandLine.append("--strip-unneeded"));
+                SC_TRY(resolveLinuxBinutilsTool(resolvedProject.targetContext, executable, stripTool));
+            }
+            else if (isBSDCrossTarget(resolvedProject.targetContext))
+            {
+                SC_TRY(stripTool.assign(preserve ? "llvm-objcopy"_a8 : "llvm-strip"_a8));
+            }
+            else
+            {
+                SC_TRY(stripTool.assign(executable));
+            }
+            SC_TRY(commandLine.append(stripTool.view()));
+            SC_TRY(commandLine.append("--strip-unneeded"));
+            if (preserve)
+            {
                 String option = StringEncoding::Utf8;
                 SC_TRY(StringBuilder::format(option, "--keep-symbols={}", resolvedProject.exportedSymbolsPath.view()));
                 SC_TRY(commandLine.append(option.view()));
             }
-            else
-            {
-                String stripTool = StringEncoding::Utf8;
-                SC_TRY(resolveLinuxBinutilsTool(resolvedProject.targetContext, "strip"_a8, stripTool));
-                SC_TRY(commandLine.append(stripTool.view()));
-                SC_TRY(commandLine.append("--strip-unneeded"));
-            }
             break;
+        }
         case Platform::Unknown:
         case Platform::Windows:
         case Platform::Wasm: return Result::Error(BuildResultCategory, BuildError::StripUnsupported);
@@ -674,11 +686,13 @@ struct SC::Build::NativeBuild
             }
 
             CommandLine nmCommand;
-            SC_TRY(nmCommand.append("nm"));
+            SC_TRY(nmCommand.append(isBSDCrossTarget(resolvedProject.targetContext) ? "llvm-nm"_a8 : "nm"_a8));
             switch (targetPlatform(resolvedProject.targetContext))
             {
             case Platform::Apple: SC_TRY(nmCommand.append("-gjU")); break;
             case Platform::Linux:
+            case Platform::NetBSD:
+            case Platform::FreeBSD:
                 SC_TRY(nmCommand.append("-g"));
                 SC_TRY(nmCommand.append("--defined-only"));
                 SC_TRY(nmCommand.append("-j"));
@@ -725,7 +739,9 @@ struct SC::Build::NativeBuild
         SC_TRY(fs.writeString(resolvedProject.exportedSymbolsPath.view(), exportedSymbols.view()));
 
         String linkerSymbols = StringEncoding::Utf8;
-        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
+        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux or
+            targetPlatform(resolvedProject.targetContext) == Platform::NetBSD or
+            targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD)
         {
             auto builder = StringBuilder::create(linkerSymbols);
             SC_TRY(builder.append("{\n"));
@@ -746,7 +762,9 @@ struct SC::Build::NativeBuild
         }
 
         SC_TRY(signature.assign(exportedSymbols.view()));
-        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
+        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux or
+            targetPlatform(resolvedProject.targetContext) == Platform::NetBSD or
+            targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD)
         {
             auto builder = StringBuilder::createForAppendingTo(signature);
             SC_TRY(builder.append("\n# dynamic-list\n"));
@@ -843,7 +861,9 @@ struct SC::Build::NativeBuild
         String exportedSymbolsSignature = StringEncoding::Utf8;
         if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags) and
             (targetPlatform(resolvedProject.targetContext) == Platform::Apple or
-             targetPlatform(resolvedProject.targetContext) == Platform::Linux))
+             targetPlatform(resolvedProject.targetContext) == Platform::Linux or
+             targetPlatform(resolvedProject.targetContext) == Platform::NetBSD or
+             targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD))
         {
             SC_TRY(writeExportedSymbolsFiles(fs, resolvedProject, exportedSymbolsSignature));
         }
@@ -2039,11 +2059,21 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        const bool useCDriverToAvoidGccStdCppRuntime =
-            resolvedProject.adapter.family == Toolchain::GCC and not resolvedProject.linkFlags.linkStdCpp and
+        const bool supportsSanitizers =
+            resolvedProject.adapter.family != Toolchain::FilC and
+            not(isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
+                resolvedProject.targetContext.hostMachine.platform != Platform::Linux);
+        const bool enableSanitizers =
+            (resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers;
+        // FreeBSD Clang's C++ driver pulls in asan_cxx, which needs a C++ ABI runtime.
+        const bool useCDriverToAvoidCppRuntime =
+            not resolvedProject.linkFlags.linkStdCpp and
+            (resolvedProject.adapter.family == Toolchain::GCC or
+             (resolvedProject.adapter.family == Toolchain::Clang and enableSanitizers and
+              targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD)) and
             resolvedProject.adapter.executableLink == resolvedProject.adapter.executableCpp;
-        SC_TRY(commandLine.append(useCDriverToAvoidGccStdCppRuntime ? resolvedProject.adapter.executableC.view()
-                                                                    : resolvedProject.adapter.executableLink.view()));
+        SC_TRY(commandLine.append(useCDriverToAvoidCppRuntime ? resolvedProject.adapter.executableC.view()
+                                                              : resolvedProject.adapter.executableLink.view()));
         if (not resolvedProject.adapter.subcommandLink.isEmpty())
         {
             SC_TRY(commandLine.append(resolvedProject.adapter.subcommandLink));
@@ -2054,16 +2084,13 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append("-fprofile-instr-generate"));
             SC_TRY(commandLine.append("-fcoverage-mapping"));
         }
-        const bool supportsSanitizers =
-            resolvedProject.adapter.family != Toolchain::FilC and
-            not(isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
-                resolvedProject.targetContext.hostMachine.platform != Platform::Linux);
-        if ((resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers)
+        if (enableSanitizers)
         {
             SC_TRY(commandLine.append("-fsanitize=address,undefined"));
         }
-        if (isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
-            resolvedProject.targetContext.hostMachine.platform != Platform::Linux)
+        if (isBSDCrossTarget(resolvedProject.targetContext) or
+            (isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
+             resolvedProject.targetContext.hostMachine.platform != Platform::Linux))
         {
             SC_TRY(commandLine.append("-fuse-ld=lld"));
         }
@@ -2073,8 +2100,7 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(resolvedProject.adapter.linkerToolDirectory.view()));
         }
         const bool sanitizerNeedsCppRuntime =
-            (resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers and
-            targetPlatform(resolvedProject.targetContext) == Platform::Linux;
+            enableSanitizers and targetPlatform(resolvedProject.targetContext) == Platform::Linux;
         if (not resolvedProject.linkFlags.linkStdCpp and not sanitizerNeedsCppRuntime and
             resolvedProject.adapter.supportsNoStdCppLinkFlag())
         {
@@ -2105,7 +2131,9 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(commandLine.append("-lc++abi"));
         }
-        if (useCDriverToAvoidGccStdCppRuntime and targetPlatform(resolvedProject.targetContext) == Platform::Linux)
+        if (useCDriverToAvoidCppRuntime and (targetPlatform(resolvedProject.targetContext) == Platform::Linux or
+                                             targetPlatform(resolvedProject.targetContext) == Platform::NetBSD or
+                                             targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD))
         {
             SC_TRY(commandLine.append("-lm"));
         }
@@ -2437,7 +2465,9 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux and
+        if ((targetPlatform(resolvedProject.targetContext) == Platform::Linux or
+             targetPlatform(resolvedProject.targetContext) == Platform::NetBSD or
+             targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD) and
             WriterInternal::isExecutableTarget(*resolvedProject.project) and
             (not resolvedProject.project->exportLibraries.isEmpty() or
              not resolvedProject.project->exportDirectories.isEmpty()))
@@ -2452,7 +2482,9 @@ struct SC::Build::NativeBuild
             {
                 SC_TRY(commandLine.append("-dead_strip"));
             }
-            else if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
+            else if (targetPlatform(resolvedProject.targetContext) == Platform::Linux or
+                     targetPlatform(resolvedProject.targetContext) == Platform::NetBSD or
+                     targetPlatform(resolvedProject.targetContext) == Platform::FreeBSD)
             {
                 SC_TRY(commandLine.append("-Wl,--gc-sections"));
             }
@@ -2468,8 +2500,13 @@ struct SC::Build::NativeBuild
                 SC_TRY(commandLine.append("-Xlinker"));
                 SC_TRY(commandLine.append(resolvedProject.exportedSymbolsPath.view()));
                 break;
-            case Platform::Linux: {
-                SC_TRY(commandLine.append("-Wl,--gc-keep-exported"));
+            case Platform::Linux:
+            case Platform::NetBSD:
+            case Platform::FreeBSD: {
+                // LLD retains dynamic-list exports with -rdynamic and does not support this GNU option.
+                if (targetPlatform(resolvedProject.targetContext) != Platform::FreeBSD and
+                    not isBSDCrossTarget(resolvedProject.targetContext))
+                    SC_TRY(commandLine.append("-Wl,--gc-keep-exported"));
                 String option = StringEncoding::Utf8;
                 SC_TRY(StringBuilder::format(option, "-Wl,--dynamic-list={}",
                                              resolvedProject.exportedSymbolsLinkerPath.view()));
@@ -2735,6 +2772,8 @@ struct SC::Build::NativeBuild
         case SC::Platform::Linux: buildMachine.platform = Build::Platform::Linux; break;
         case SC::Platform::Windows: buildMachine.platform = Build::Platform::Windows; break;
         case SC::Platform::Emscripten: buildMachine.platform = Build::Platform::Wasm; break;
+        case SC::Platform::NetBSD: buildMachine.platform = Build::Platform::NetBSD; break;
+        case SC::Platform::FreeBSD: buildMachine.platform = Build::Platform::FreeBSD; break;
         }
         switch (HostInstructionSet)
         {
@@ -2786,7 +2825,54 @@ struct SC::Build::NativeBuild
         {
             context.targetMachine.environment = TargetEnvironment::WindowsGNU;
         }
+        const bool bsdTarget =
+            context.targetMachine.platform == Platform::NetBSD or context.targetMachine.platform == Platform::FreeBSD;
+        const bool bsdBuildMachine =
+            context.buildMachine.platform == Platform::NetBSD or context.buildMachine.platform == Platform::FreeBSD;
+        if (bsdBuildMachine and context.targetMachine.platform != context.buildMachine.platform)
+            return Result::Error(BuildResultCategory, BuildError::ToolchainHostUnsupported);
+        if ((bsdTarget or parameters.platform == Platform::NetBSD or parameters.platform == Platform::FreeBSD) and
+            parameters.platform != Platform::Unknown and parameters.platform != context.targetMachine.platform)
+            return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
+        if (bsdTarget)
+        {
+            if (isBSDCrossTarget(context))
+            {
+                if ((context.buildMachine.platform != Platform::Linux and
+                     context.buildMachine.platform != Platform::Apple) or
+                    context.targetMachine.architecture != Architecture::Arm64 or
+                    context.targetMachine.environment != TargetEnvironment::Native or
+                    parameters.toolchain.family != Toolchain::Clang or
+                    parameters.platform != context.targetMachine.platform)
+                    return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
+                const StringView triple = parameters.toolchain.targetTriple.view();
+                const StringView platform =
+                    context.targetMachine.platform == Platform::FreeBSD ? "-freebsd"_a8 : "-netbsd"_a8;
+                if (not triple.startsWith("aarch64-") or not triple.containsString(platform))
+                    return Result::Error(BuildResultCategory, BuildError::TargetTripleUnsupportedForToolchain);
+                if (parameters.toolchain.sysroot.view().isEmpty())
+                    return Result::Error(BuildResultCategory, BuildError::SysrootTargetUnsupported);
+            }
+            else
+            {
+                if (context.hostMachine.platform != context.buildMachine.platform or
+                    context.targetMachine.architecture != context.buildMachine.architecture or
+                    context.targetMachine.environment != TargetEnvironment::Native)
+                    return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
+                if (not parameters.toolchain.targetTriple.view().isEmpty())
+                    return Result::Error(BuildResultCategory, BuildError::TargetTripleUnsupportedForToolchain);
+                if (not parameters.toolchain.sysroot.view().isEmpty())
+                    return Result::Error(BuildResultCategory, BuildError::SysrootTargetUnsupported);
+            }
+        }
         return Result(true);
+    }
+
+    static constexpr bool isBSDCrossTarget(const ResolvedTargetContext& context)
+    {
+        return (context.targetMachine.platform == Platform::NetBSD or
+                context.targetMachine.platform == Platform::FreeBSD) and
+               context.targetMachine.platform != context.buildMachine.platform;
     }
 
     static constexpr bool isWindowsGNUTarget(const ResolvedTargetContext& context)
@@ -3213,7 +3299,9 @@ struct SC::Build::NativeBuild
         {
         case SC::Platform::Windows: SC_TRY(process.exec({"where", executable}, commandPath)); break;
         case SC::Platform::Apple:
-        case SC::Platform::Linux: SC_TRY(process.exec({"which", executable}, commandPath)); break;
+        case SC::Platform::Linux:
+        case SC::Platform::NetBSD:
+        case SC::Platform::FreeBSD: SC_TRY(process.exec({"which", executable}, commandPath)); break;
         case SC::Platform::Emscripten: return Result::Error(BuildResultCategory, BuildError::HostCommandUnavailable);
         }
         if (process.getExitStatus() != 0)
@@ -4717,6 +4805,8 @@ struct SC::Build::NativeBuild
         {
         case Platform::Apple: return "macOS";
         case Platform::Linux: return "linux";
+        case Platform::NetBSD: return "netbsd";
+        case Platform::FreeBSD: return "freebsd";
         case Platform::Windows: return "windows";
         case Platform::Wasm: return "wasm";
         case Platform::Unknown: return "unknown";

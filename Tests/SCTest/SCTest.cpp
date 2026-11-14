@@ -52,6 +52,7 @@ void runFileSystemWatcherTest(TestReport& report);
 // FileSystemWatcherAsync
 void runFileSystemWatcherAsyncTest(TestReport& report);
 void runFileSystemWatcherLinuxTest(TestReport& report);
+void runFileSystemWatcherBSDTest(TestReport& report);
 
 // Hashing
 void runHashingTest(TestReport& report);
@@ -79,9 +80,12 @@ void runHttpStressTest(TestReport& report);
 
 // HttpClient
 void runHttpClientTest(TestReport& report);
+void runHttpClientThreadingTest(TestReport& report);
 
 // Plugin
 void runPluginTest(TestReport& report);
+void runPluginDynamicLibraryTest(TestReport& report);
+void runPluginCompilerSmokeTest(TestReport& report);
 
 // Process
 void runProcessTest(TestReport& report);
@@ -461,6 +465,8 @@ int main(int argc, const char* argv[])
     SC_RUN_TEST(runFileSystemWatcherAsyncTest);
 #if SC_PLATFORM_LINUX
     SC_RUN_TEST(runFileSystemWatcherLinuxTest);
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    SC_RUN_TEST(runFileSystemWatcherBSDTest);
 #endif
 
     // Hashing tests
@@ -489,8 +495,11 @@ int main(int argc, const char* argv[])
 
     // HttpClient tests
     SC_RUN_TEST(runHttpClientTest);
+    SC_RUN_TEST(runHttpClientThreadingTest);
 
     // Plugin tests
+    SC_RUN_TEST(runPluginDynamicLibraryTest);
+    SC_RUN_TEST(runPluginCompilerSmokeTest);
 #if SC_XCTEST
 #else
     SC_RUN_TEST(runPluginTest);

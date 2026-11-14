@@ -21,3 +21,4 @@ Project-wide ADRs use the `SC-NNNN` identifier scope. These decisions apply to a
 - [SC-0015 - Prefer maturing existing libraries over expanding scope](sc-0015-prefer-maturing-existing-libraries-over-expanding-scope.md)
 - [SC-0016 - Support layered adoption modes](sc-0016-support-layered-adoption-modes.md)
 - [SC-0017 - Publish Draft and MVP libraries deliberately](sc-0017-publish-draft-and-mvp-libraries-deliberately.md)
+- [SC-0018 - Port BSD systems by platform and capability](sc-0018-port-bsd-by-platform-and-capability.md)

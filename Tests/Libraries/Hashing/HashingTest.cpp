@@ -115,6 +115,28 @@ struct SC::HashingTest : public SC::TestCase
                 StringBuilder::create(test).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
             SC_TEST_EXPECT(test == "37268335DD6931045BDCDF92623FF819A64244B53D0E746D438797349D4DA578"_a8);
         }
+        if (test_section("empty input and reuse"))
+        {
+            Hashing         hash;
+            Hashing::Result result;
+            SC_TEST_EXPECT(not hash.add({}));
+            SC_TEST_EXPECT(not hash.getHash(result));
+            SC_TEST_EXPECT(hash.setType(Hashing::TypeSHA256));
+            SC_TEST_EXPECT(hash.add({}));
+            SC_TEST_EXPECT(hash.add("abc"_a8.toBytesSpan()));
+            SC_TEST_EXPECT(hash.getHash(result));
+
+            String digest;
+            SC_TEST_EXPECT(
+                StringBuilder::create(digest).appendHex(result.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
+            SC_TEST_EXPECT(digest == "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"_a8);
+            SC_TEST_EXPECT(hash.setType(Hashing::TypeMD5));
+            SC_TEST_EXPECT(hash.add({}));
+            SC_TEST_EXPECT(hash.getHash(result));
+            SC_TEST_EXPECT(
+                StringBuilder::create(digest).appendHex(result.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
+            SC_TEST_EXPECT(digest == "D41D8CD98F00B204E9800998ECF8427E"_a8);
+        }
         if (test_section("C Bindings"))
         {
             const char* res = sc_hashing_test();

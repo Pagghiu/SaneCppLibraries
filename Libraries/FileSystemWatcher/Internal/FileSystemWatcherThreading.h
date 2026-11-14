@@ -161,6 +161,8 @@ struct FSWThread
     {
 #if SC_PLATFORM_APPLE
         pthread_setname_np(name);
+#elif SC_PLATFORM_NETBSD
+        pthread_setname_np(pthread_self(), "%s", const_cast<char*>(name));
 #else
         pthread_setname_np(pthread_self(), name);
 #endif

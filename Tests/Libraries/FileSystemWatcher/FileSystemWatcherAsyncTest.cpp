@@ -49,6 +49,17 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         appleRootChanged(appDirectory);
         appleRefreshOverlappingWatchers(appDirectory);
 #endif
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+        bsdCapacityAndFailure(appDirectory);
+        bsdFailedRunnerInitialization(appDirectory);
+        bsdDescriptorExhaustion(appDirectory);
+        bsdExtendedStorage(appDirectory);
+        bsdPassiveEntries(appDirectory);
+        bsdCallbackLifecycle(appDirectory);
+        bsdDynamicTreeAndRootLoss(appDirectory);
+        bsdAsyncFailureCallbacks(appDirectory);
+        bsdNativeReadFailure(appDirectory);
+#endif
 #if SC_PLATFORM_LINUX
         eventLoopWatchInvalidation(appDirectory);
         eventLoopOverflow(appDirectory);
@@ -68,8 +79,8 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             {
 #if SC_PLATFORM_APPLE
                 return appleStartWakeUp();
-#elif SC_PLATFORM_LINUX
-                return linuxStartSharedFileReadiness();
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+                return startSharedFileReadiness();
 #else
                 FileSystemWatcher::FolderWatcher watcher;
                 return windowsStartFolderExternalCompletion(watcher, nullptr);
@@ -1047,6 +1058,18 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     }
 #endif
 
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    void bsdFailedRunnerInitialization(const StringView appDirectory);
+    void bsdCapacityAndFailure(const StringView appDirectory);
+    void bsdDescriptorExhaustion(const StringView appDirectory);
+    void bsdPassiveEntries(const StringView appDirectory);
+    void bsdExtendedStorage(const StringView appDirectory);
+    void bsdCallbackLifecycle(const StringView appDirectory);
+    void bsdDynamicTreeAndRootLoss(const StringView appDirectory);
+    void bsdAsyncFailureCallbacks(const StringView appDirectory);
+    void bsdNativeReadFailure(const StringView appDirectory);
+#endif
+
 #if SC_PLATFORM_LINUX
     void eventLoopLongNotificationPath()
     {
@@ -1686,6 +1709,10 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     }
 #endif
 };
+
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#include "FileSystemWatcherBSDAsyncTest.inl"
+#endif
 
 namespace SC
 {

@@ -48,8 +48,10 @@ struct SC::Thread::Internal
     {
 #if SC_PLATFORM_APPLE
         pthread_setname_np(nameNullTerminated);
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
         pthread_setname_np(pthread_self(), nameNullTerminated);
+#elif SC_PLATFORM_NETBSD
+        pthread_setname_np(pthread_self(), "%s", const_cast<char*>(nameNullTerminated));
 #endif
     }
 

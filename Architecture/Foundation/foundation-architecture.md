@@ -78,3 +78,4 @@ Inferred anti-inspirations: it avoids centralizing every convenient helper in on
 - [FOUNDATION-0002 - Keep Foundation tests and documentation as the home for Common primitives](foundation-0002-keep-foundation-tests-and-documentation-as-the-home-for-common-primitives.md)
 - [FOUNDATION-0003 - Keep C++ runtime shims optional and Foundation-owned](foundation-0003-keep-cpp-runtime-shims-optional-and-foundation-owned.md)
 - [FOUNDATION-0004 - Delegate Fil-C glibc TLS cleanup to bundled ABI](foundation-0004-delegate-filc-glibc-tls-cleanup-to-bundled-abi.md)
+- [FOUNDATION-0005 - Match BSD exact-width integer types](foundation-0005-match-bsd-exact-width-integer-types.md)

@@ -34,11 +34,25 @@ extern "C"
 #elif SC_PLATFORM_APPLE
 #include <sys/proc.h>
 #include <sys/sysctl.h>
+#elif SC_PLATFORM_FREEBSD
+#include <sys/proc.h>
+#include <sys/sysctl.h>
+#include <sys/user.h>
+#elif SC_PLATFORM_NETBSD
+#include <sys/sysctl.h>
 #endif
 #include <signal.h>
 #include <sys/mman.h>
 #include <ucontext.h>
 #include <unistd.h>
+
+namespace SC
+{
+namespace FiberVirtualReservation
+{
+#include "../Common/PosixVirtualReservation.inl"
+} // namespace FiberVirtualReservation
+} // namespace SC
 #endif
 
 #if SC_COMPILER_FILC && defined(__GLIBC__)
@@ -123,6 +137,15 @@ static size_t roundUpToFiberAllocatorPageSize(size_t size)
     return (size + pageSize - 1) / pageSize * pageSize;
 }
 
+static void* fiberReserveVirtualMemory(size_t size)
+{
+#if SC_PLATFORM_WINDOWS
+    return ::VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
+#else
+    return FiberVirtualReservation::reserveReadWritePages(size);
+#endif
+}
+
 } // namespace
 
 struct FiberVirtualMemory
@@ -145,15 +168,7 @@ struct FiberVirtualMemory
         }
         reservedBytes  = roundUpToPageSize(maxCapacityInBytes);
         committedBytes = 0;
-#if SC_PLATFORM_WINDOWS
-        memory = ::VirtualAlloc(nullptr, reservedBytes, MEM_RESERVE, PAGE_NOACCESS);
-#else
-        memory = ::mmap(nullptr, reservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (memory == MAP_FAILED)
-        {
-            memory = nullptr;
-        }
-#endif
+        memory         = fiberReserveVirtualMemory(reservedBytes);
         return memory != nullptr;
     }
 
@@ -339,7 +354,13 @@ static Result fiberDecommitNoAccess(void* memory, size_t size)
     {
         return Result::Error(FibersResultCategory, FibersError::MemoryDecommitFailed);
     }
-    if (::madvise(memory, size, MADV_DONTNEED) != 0)
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    // Released stacks need no retained contents. BSD's MADV_DONTNEED only lowers page priority.
+    constexpr int discardAdvice = MADV_FREE;
+#else
+    constexpr int discardAdvice = MADV_DONTNEED;
+#endif
+    if (::madvise(memory, size, discardAdvice) != 0)
     {
         return Result::Error(FibersResultCategory, FibersError::MemoryReleaseFailed);
     }
@@ -415,7 +436,7 @@ static void fiberStackGrowthUnlock()
 #endif
 }
 
-#if !SC_FIBERS_HAS_ADDRESS_SANITIZER
+#if !SC_FIBERS_HAS_ADDRESS_SANITIZER && (!(SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) || SC_PLATFORM_ARM64)
 static bool fiberStackGrowthDebuggerAttached()
 {
 #if SC_PLATFORM_WINDOWS
@@ -427,6 +448,20 @@ static bool fiberStackGrowthDebuggerAttached()
     size_t            informationSize    = sizeof(processInformation);
     return sysctl(mib, 4, &processInformation, &informationSize, nullptr, 0) == 0 and
            (processInformation.kp_proc.p_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_FREEBSD
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+
+    struct kinfo_proc processInformation = {};
+    size_t            informationSize    = sizeof(processInformation);
+    return sysctl(mib, 4, &processInformation, &informationSize, nullptr, 0) == 0 and
+           informationSize == sizeof(processInformation) and (processInformation.ki_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_NETBSD
+    struct kinfo_proc2 processInformation = {};
+    int                mib[6] = {CTL_KERN, KERN_PROC2, KERN_PROC_PID, getpid(), sizeof(processInformation), 1};
+
+    size_t informationSize = sizeof(processInformation);
+    return sysctl(mib, 6, &processInformation, &informationSize, nullptr, 0) == 0 and
+           informationSize == sizeof(processInformation) and (processInformation.p_flag & P_TRACED) != 0;
 #elif SC_PLATFORM_LINUX
     const int statusFile = open("/proc/self/status", O_RDONLY);
     if (statusFile < 0)
@@ -694,15 +729,19 @@ static_assert(__atomic_always_lock_free(sizeof(size_t), nullptr),
 
 static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
 {
-    ucontext_t& context = *static_cast<ucontext_t*>(rawContext);
+    [[maybe_unused]] auto* context = static_cast<const ucontext_t*>(rawContext);
 #if SC_PLATFORM_APPLE && SC_PLATFORM_ARM64
-    return reinterpret_cast<void*>(context.uc_mcontext->__ss.__sp);
+    return reinterpret_cast<void*>(context->uc_mcontext->__ss.__sp);
 #elif SC_PLATFORM_APPLE && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
-    return reinterpret_cast<void*>(context.uc_mcontext->__ss.__rsp);
+    return reinterpret_cast<void*>(context->uc_mcontext->__ss.__rsp);
 #elif SC_PLATFORM_LINUX && SC_PLATFORM_ARM64
-    return reinterpret_cast<void*>(context.uc_mcontext.sp);
+    return reinterpret_cast<void*>(context->uc_mcontext.sp);
 #elif SC_PLATFORM_LINUX && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
-    return reinterpret_cast<void*>(context.uc_mcontext.gregs[REG_RSP]);
+    return reinterpret_cast<void*>(context->uc_mcontext.gregs[REG_RSP]);
+#elif SC_PLATFORM_NETBSD && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(_UC_MACHINE_SP(context));
+#elif SC_PLATFORM_FREEBSD && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(context->uc_mcontext.mc_gpregs.gp_sp);
 #else
     return nullptr;
 #endif
@@ -3409,7 +3448,7 @@ Result FiberStackGrowthRuntime::close() { return internal.get().close(); }
 
 bool FiberStackGrowthRuntime::isSupported()
 {
-#if SC_FIBERS_HAS_ADDRESS_SANITIZER
+#if SC_FIBERS_HAS_ADDRESS_SANITIZER || ((SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && !SC_PLATFORM_ARM64)
     return false;
 #else
     return not fiberStackGrowthDebuggerAttached();
@@ -3551,15 +3590,7 @@ Result FiberAllocator::createVirtual(FiberAllocatorVirtualOptions options)
     resetState();
     virtualReservedBytes  = roundUpToFiberAllocatorPageSize(options.reserveBytes);
     virtualCommittedBytes = 0;
-#if SC_PLATFORM_WINDOWS
-    virtualMemory = ::VirtualAlloc(nullptr, virtualReservedBytes, MEM_RESERVE, PAGE_NOACCESS);
-#else
-    virtualMemory = ::mmap(nullptr, virtualReservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (virtualMemory == MAP_FAILED)
-    {
-        virtualMemory = nullptr;
-    }
-#endif
+    virtualMemory         = fiberReserveVirtualMemory(virtualReservedBytes);
     if (virtualMemory == nullptr)
     {
         resetState();

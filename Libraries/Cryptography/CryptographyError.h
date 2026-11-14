@@ -131,6 +131,7 @@ enum class CryptographyErrorDetail : uint16_t
     OpenSSL3HmacInitialize,
     OpenSSL3HmacUpdate,
     OpenSSL3HmacFinalize,
+    BSDGetEntropy,
 };
 
 /// @brief Kind of the scalar diagnostic context stored in ResultCryptography.
