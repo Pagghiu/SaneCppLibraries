@@ -1796,7 +1796,7 @@ __attribute__((naked)) void SC_fiberContextTrampoline()
                          "ud2\n");
 }
 
-__attribute__((naked)) void SC_fiberContextSwitch(FiberContextPlatform* from, FiberContextPlatform* to)
+__attribute__((naked)) void SC_fiberContextSwitch(FiberContextPlatform*, FiberContextPlatform*)
 {
     __asm__ __volatile__("movq %rsp, 0(%rdi)\n"
                          "movq %rbp, 8(%rdi)\n"
