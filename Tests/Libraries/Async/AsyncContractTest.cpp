@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Async/Async.h"
 #include "Libraries/Async/AsyncErrorFormatter.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/ThreadPool.h"
 #if SC_PLATFORM_LINUX
@@ -114,6 +116,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             if (test_section("refused socket connect has portable identity"))
             {
                 refusedSocketConnect();
+#if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_EMSCRIPTEN
+                if (options.apiType != AsyncEventLoop::Options::ApiType::ForceUseIoUring)
+                    refusedSocketConnect(true);
+#endif
             }
 #if !SC_PLATFORM_WINDOWS
             if (test_section("file send operation error"))
@@ -316,7 +322,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void fileReadOperationError();
     void fileWriteOperationError();
     void posixSocketConnectPreservesForeignErrors();
-    void refusedSocketConnect();
+    void refusedSocketConnect(bool immediate = false);
     void fileSendOperationError();
     void ioUringCompletionError();
     void closeCallbackRunsAfterRequestIsFree();
@@ -684,18 +690,44 @@ void SC::AsyncContractTest::fileSendOperationError()
 #endif
 }
 
-void SC::AsyncContractTest::refusedSocketConnect()
+void SC::AsyncContractTest::refusedSocketConnect(bool immediate)
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
-    SocketIPAddress address;
-    SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", report.mapPort(5471)));
-    // Reserve the destination without listening: no unrelated process can accept this connection.
+    SocketAddress    address;
     SocketDescriptor reserved;
-    SC_TEST_EXPECT(reserved.create(address.getAddressFamily()));
+    StringPath       socketPath;
+    FileSystem       fs;
+    auto             removeSocket = MakeDeferred(
+        [&]
+        {
+            if (not socketPath.isEmpty())
+                (void)fs.removeFile(socketPath.view());
+        });
+
+    SocketFlags::ProtocolType protocol = SocketFlags::ProtocolTcp;
+    if (immediate)
+    {
+        // A bound Unix stream socket without a listener reliably refuses during submission.
+        SC_TEST_EXPECT(StringBuilder::format(socketPath, "/tmp/sc-async-refusal-{}.sock", report.mapPort(5471)));
+        if (fs.exists(socketPath.view()))
+            SC_TEST_EXPECT(fs.removeFile(socketPath.view()));
+        SC_TEST_EXPECT(address.fromUnixPath(socketPath.view()));
+        protocol = SocketFlags::ProtocolDefault;
+    }
+    else
+    {
+        SocketIPAddress loopback;
+        SC_TEST_EXPECT(loopback.fromAddressPort("127.0.0.1", report.mapPort(5471)));
+        address = SocketAddress(loopback);
+    }
+
+    const auto family = address.getAddressFamily();
+    SC_TEST_EXPECT(reserved.create(family, SocketFlags::SocketStream, protocol));
+    // Keep the address bound so an unrelated process cannot accept this connection.
     SC_TEST_EXPECT(SocketServer(reserved).bind(address));
     SocketDescriptor client;
-    SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(address.getAddressFamily(), client));
+    SC_TEST_EXPECT(eventLoop.createAsyncSocket(family, SocketFlags::SocketStream, protocol, client));
     AsyncSocketConnect connect;
     Result             observed  = Result(true);
     int                callbacks = 0;
@@ -704,7 +736,7 @@ void SC::AsyncContractTest::refusedSocketConnect()
         observed = result.isValid();
         callbacks++;
     };
-    SC_TEST_EXPECT(connect.start(eventLoop, client, SocketAddress(address)));
+    SC_TEST_EXPECT(connect.start(eventLoop, client, address));
     SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return callbacks == 1; }));
     SC_TEST_EXPECT(observed.isError(AsyncResultCategory, AsyncError::SocketConnectFailed));
     SC_TEST_EXPECT(connect.isFree());

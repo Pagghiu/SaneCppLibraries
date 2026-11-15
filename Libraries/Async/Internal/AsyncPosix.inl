@@ -590,14 +590,16 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         SocketDescriptor client;
         SC_TRY(client.assign(async.handle));
-        auto               detach  = MakeDeferred([&] { client.detach(); });
-        const ResultSocket result  = SocketClient(client).connect(async.address);
-        const bool         pending = not result and result.contextKind == SocketErrorContextKind::NativeError and
-                             (result.context.nativeError == EAGAIN or result.context.nativeError == EINPROGRESS);
-        if (not pending)
+        auto               detach = MakeDeferred([&] { client.detach(); });
+        const ResultSocket result = SocketClient(client).connect(async.address);
+        const uint32_t     nativeError =
+            result.contextKind == SocketErrorContextKind::NativeError ? result.context.nativeError : 0;
+        if (nativeError != EAGAIN and nativeError != EINPROGRESS)
         {
-            // A nonblocking connect can report refusal immediately. Deliver it during dispatch.
-            async.immediateConnectResult = result.toResult();
+            // A refusal during submission has the same Async identity as a refusal read from SO_ERROR.
+            async.immediateConnectResult = nativeError == ECONNREFUSED
+                                               ? Result::Error(AsyncResultCategory, AsyncError::SocketConnectFailed)
+                                               : result.toResult();
             async.flags |= Internal::Flag_ManualCompletion;
             return Result(true);
         }
