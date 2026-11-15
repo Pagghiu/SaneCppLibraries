@@ -63,7 +63,7 @@ the base system link libraries, including `libmd` on FreeBSD.
 | --- | --- | --- |
 | Native build | Shared SCTest suite, all 56 generated single-file targets, and executable exports for plugins | Generated BSD targets and cross-builds from BSD hosts are unsupported. |
 | Filesystem and Async | File copying and iteration, recursive watches with NetBSD kqueue and FreeBSD inotify in threaded and event loop modes, timers, sockets, and process I/O | Watchers use bounded inventory storage. NetBSD Async file sends use buffered I/O. FreeBSD uses native `sendfile`. |
-| Memory and fibers | Protected reservations, incremental fiber stack growth, and AsyncFibers | Incremental stack growth on BSD is available on ARM64. The runtime-owned stack mode requires Fil-C on glibc. |
+| Memory and fibers | Protected reservations, incremental fiber stack growth, and AsyncFibers | Incremental stack growth on BSD is available on ARM64 and x86_64. The runtime-owned stack mode requires Fil-C on glibc. |
 | Hashing and cryptography | MD5, SHA-1, SHA-256, native entropy, and OpenSSL 3 provider tests | Native BSD cryptography supplies entropy. AES and HMAC require the OpenSSL 3 provider. FreeBSD hashing links `libmd`. |
 | Compression and HTTP | zlib streams, HTTP and WebSocket suites, and a separate TLS and HTTP/2 loopback fixture | HttpClient loads libcurl at runtime. TLS and HTTP/2 depend on its capabilities. |
 | Plugins | Native compilation, diamond dependencies, interface calls, and reload from a watcher event | The host exports the libraries used by the plugin. The host and plugin need a compatible C++ ABI and an acyclic dependency graph. |

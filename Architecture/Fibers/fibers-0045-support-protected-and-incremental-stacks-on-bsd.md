@@ -11,10 +11,12 @@ access to a reservation made with plain `PROT_NONE`.
 
 ## Decision
 
-On BSD ARM64, read the interrupted pointer from NetBSD's `_UC_MACHINE_SP` or FreeBSD's `gp_sp`. Keep the
-existing reservation-bound checks, alternate signal stack, and fault forwarding from FIBERS-0034. Query the
-native process trace flag on each BSD so a debugger continues to exclude incremental stack growth. Other BSD
-architectures leave incremental commitment unavailable until their signal contexts are qualified.
+On BSD ARM64, read the interrupted pointer from NetBSD's `_UC_MACHINE_SP` or FreeBSD's `gp_sp`. On x86_64,
+read NetBSD's raw `_REG_RSP` or FreeBSD's `mc_rsp`. NetBSD's x86_64 `_UC_MACHINE_SP` subtracts the ABI
+red zone, while the bounds check needs the actual interrupted register. Keep the existing reservation-bound
+checks, alternate signal stack, and fault forwarding from FIBERS-0034. Query the native process trace flag on
+each BSD so a debugger continues to exclude incremental stack growth. Other BSD architectures leave incremental
+commitment unavailable until their signal contexts are qualified.
 
 Route Fibers' virtual allocator and stack reservations through the same private function. On NetBSD request
 `PROT_NONE` with a maximum protection of read/write so the initial mapping stays inaccessible and later commits

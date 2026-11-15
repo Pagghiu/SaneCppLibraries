@@ -436,7 +436,14 @@ static void fiberStackGrowthUnlock()
 #endif
 }
 
-#if !SC_FIBERS_HAS_ADDRESS_SANITIZER && (!(SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) || SC_PLATFORM_ARM64)
+// Enable incremental stacks on BSD only on architectures with a known interrupted stack pointer.
+#if (SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && !SC_PLATFORM_ARM64 && !defined(__x86_64__)
+#define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 0
+#else
+#define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 1
+#endif
+
+#if !SC_FIBERS_HAS_ADDRESS_SANITIZER && SC_FIBERS_HAS_STACK_GROWTH_CONTEXT
 static bool fiberStackGrowthDebuggerAttached()
 {
 #if SC_PLATFORM_WINDOWS
@@ -740,8 +747,13 @@ static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
     return reinterpret_cast<void*>(context->uc_mcontext.gregs[REG_RSP]);
 #elif SC_PLATFORM_NETBSD && SC_PLATFORM_ARM64
     return reinterpret_cast<void*>(_UC_MACHINE_SP(context));
+#elif SC_PLATFORM_NETBSD && defined(__x86_64__)
+    // _UC_MACHINE_SP subtracts the red zone. Validate the actual interrupted RSP.
+    return reinterpret_cast<void*>(context->uc_mcontext.__gregs[_REG_RSP]);
 #elif SC_PLATFORM_FREEBSD && SC_PLATFORM_ARM64
     return reinterpret_cast<void*>(context->uc_mcontext.mc_gpregs.gp_sp);
+#elif SC_PLATFORM_FREEBSD && defined(__x86_64__)
+    return reinterpret_cast<void*>(context->uc_mcontext.mc_rsp);
 #else
     return nullptr;
 #endif
@@ -3448,7 +3460,7 @@ Result FiberStackGrowthRuntime::close() { return internal.get().close(); }
 
 bool FiberStackGrowthRuntime::isSupported()
 {
-#if SC_FIBERS_HAS_ADDRESS_SANITIZER || ((SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && !SC_PLATFORM_ARM64)
+#if SC_FIBERS_HAS_ADDRESS_SANITIZER || !SC_FIBERS_HAS_STACK_GROWTH_CONTEXT
     return false;
 #else
     return not fiberStackGrowthDebuggerAttached();

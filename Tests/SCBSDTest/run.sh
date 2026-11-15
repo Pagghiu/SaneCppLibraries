@@ -36,7 +36,7 @@ if [ "$mode" = prebuilt ]; then
     executable=${1:?Pass the cross-built SCTest path under _Build/_Outputs.}
     shift
     test_root=$(mktemp -d "$scratch/prebuilt.XXXXXXXX")
-    export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1
+    export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
     "$executable" --library-root "$repo" --test-root "$test_root" "$@"
 elif [ "$mode" = all ] || [ "$mode" = prebuilt-headers ]; then
     if [ "$mode" = all ]; then
@@ -47,7 +47,7 @@ elif [ "$mode" = all ] || [ "$mode" = prebuilt-headers ]; then
         exit 1
     fi
     ./SC.sh build configure SCTest
-    export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1
+    export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
     run_suite Debug --all-tests
     run_suite Release --all-tests
     ./SC.sh build compile "SCSingleFileLibs:" Debug
