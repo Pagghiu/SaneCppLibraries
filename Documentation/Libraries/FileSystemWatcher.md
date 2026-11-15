@@ -30,7 +30,7 @@ behavior can also vary with the filesystem. Treat a notification as a reason to 
 transaction log. The SCExample hot-reload system follows that rule: it remembers a changed path when possible, but falls
 back to a full rescan for structural, ambiguous, or multiple changes.
 
-The library watches directory trees recursively, subject to the Linux caveat below. It is less suitable when every write
+The library watches directory trees recursively. It is less suitable when every write
 must be observed, when old and new rename names must be paired, or when application correctness depends on replaying an
 exact sequence of changes. A polling and snapshot/diff design is a better fallback for those requirements.
 
@@ -119,7 +119,7 @@ after its callback returns.
 |:--------|:-----------------|:---------------|
 | Windows | Native buffer overflow | Failed directory completion or rearm ends that folder. A worker wait failure ends all roots on the thread runner. |
 | Apple | Native drops, event ID wrap, coalesced subtree or mount events, and shared stream refresh | A native root-change event ends the affected folder. |
-| Linux | Shared queue overflow, an unrepresentable event path, subtree invalidation, or a new directory | Root invalidation ends that folder. A fatal read, wait, or readiness failure ends the shared monitor. |
+| Linux | Shared queue overflow, an unrepresentable event path, or a directory tree change | Root invalidation or failed directory registration ends that folder. A fatal read, wait, or readiness failure ends the shared monitor. |
 
 The backend reports the loss it can observe. Filesystem and native API behavior can limit which events arrive.
 
@@ -136,9 +136,9 @@ bounded SC object storage; it is not a promise that native watcher setup perform
 | Linux | `inotify`, one watch per directory discovered during setup | Paths must be ASCII or UTF-8; recursive capacity and stored relative paths are bounded as described above |
 
 Changes that bypass the watched directory entry may not produce a notification. Examples include modifying a file through
-a symbolic or hard link outside the watched tree, and some memory-mapped writes. On Linux, subdirectories created after
-`watch` produce a structural notification but are not themselves registered recursively; stop and restart the watcher or
-rescan through another mechanism if their descendants must be observed. On every platform, callers should tolerate a
+a symbolic or hard link outside the watched tree, and some memory-mapped writes. On Linux, the watcher registers new or
+moved-in subdirectories recursively and then reports `RescanRequired` for changes that may have happened before
+registration. On every platform, callers should tolerate a
 coarse rescan signal and races between notification and inspection: by the time a callback runs, the named path may already
 have changed again or disappeared.
 

@@ -38,6 +38,9 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::close() { return internal.get
 
 SC::ResultFileSystemWatcher SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringSpan path)
 {
+#if SC_PLATFORM_LINUX
+    return internal.get().watch(watcher, path);
+#else
     if (internal.get().self == nullptr)
         return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized);
     if (watcher.parent != nullptr)
@@ -51,6 +54,7 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::watch(FolderWatcher& watcher,
     watcher.parent = this;
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
+#endif
 #endif
 }
 

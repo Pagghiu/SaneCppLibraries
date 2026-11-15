@@ -16,12 +16,14 @@ use a root-level `AddRemoveRename` with an empty relative path so consumers of t
 still receive a change hint. `WatchStopped` reports the failure and preserves the identity of a foreign
 runner error. Restoring recursive coverage can require stopping and registering the watch again.
 
-- Linux broadcasts queue overflow to active folders as `RescanRequired`. Descendant invalidation,
-  new directories, and an unrepresentable notification path request a rescan for the affected folder.
-  Suppress invalidated subtrees. Stop a folder on root invalidation and the owner on fatal read, wait,
-  or readiness failure. Classify invalidation per folder because a shared descriptor can identify
-  different parts of overlapping watches. Walk the live folder list during broadcast so callbacks
-  can remove watches.
+- Linux broadcasts queue overflow to active folders as `RescanRequired`. On a directory entry
+  change, verify the parent directory's identity, retire any departed subtree and register the
+  current subtree recursively. Send `RescanRequired` after registration because inotify cannot
+  replay changes made before the new watches were installed. Reclaim retired watch slots and path
+  storage while preserving watches still used by overlapping folders. Stop the affected folder if
+  it cannot track the updated tree. Root invalidation stops the affected folder and fatal read,
+  wait, or readiness failures stop the owner. Walk the live folder list during status delivery
+  so callbacks can remove watches.
 - Apple routes FSEvents using canonical root paths and reports the caller's original spelling.
   Native drops and event ID wraps affect all active roots. Coalesced subtree and mount changes
   affect roots intersecting the native path by component. A root change stops the matching watch.

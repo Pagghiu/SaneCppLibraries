@@ -68,7 +68,7 @@ struct FileSystemWatcher
         static constexpr int Windows = 3 * sizeof(void*);
         // The Apple backend keeps a Notification and structured result inline during event-loop handoff.
         static constexpr int Apple   = 61 * sizeof(void*);
-        static constexpr int Linux   = sizeof(void*) * 4;
+        static constexpr int Linux   = 256;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -108,7 +108,7 @@ struct FileSystemWatcher
 
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
         static constexpr int Apple   = sizeof(StringPath) + sizeof(void*);
-        static constexpr int Linux   = 1056 + 4096 + 8;
+        static constexpr int Linux   = 24 * MaxNumberOfSubdirs + 4096 + 32;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);

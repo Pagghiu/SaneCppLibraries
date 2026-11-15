@@ -1280,8 +1280,11 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(state.innerRescans == 2);
         SC_TEST_EXPECT(state.validStatus);
 
-        SC_TEST_EXPECT(inner.stopWatching());
-        SC_TEST_EXPECT(owner.watch(inner, moved.view()));
+        // The structural notifications run after directory registration. Later changes must be visible on
+        // the original watch, including in a populated subtree moved into the tree.
+        state.movedSeen = false;
+        SC_TEST_EXPECT(write(createdDirectory.view(), "restarted.txt"));
+        SC_TEST_EXPECT(runUntil(loop, [&state] { return state.movedSeen; }));
         state.movedSeen = false;
         SC_TEST_EXPECT(write(importedDirectory.view(), "restarted.txt"));
         SC_TEST_EXPECT(runUntil(loop, [&state] { return state.movedSeen; }));
