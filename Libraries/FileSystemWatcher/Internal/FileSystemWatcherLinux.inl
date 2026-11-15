@@ -35,8 +35,9 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
         void    suppress() { notifyID = -nativeID(); }
     };
 
-    Pair   notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
-    size_t notifyHandlesCount = 0;
+    Pair     notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
+    size_t   notifyHandlesCount = 0;
+    uint64_t registration       = 0;
 
     char relativePathsStorage[4096];
 
@@ -75,6 +76,7 @@ struct SC::FileSystemWatcher::Internal
     struct Delivery
     {
         Delivery* previous;
+        uint64_t  latestRegistration;
         bool      alive = true;
     };
 
@@ -84,6 +86,8 @@ struct SC::FileSystemWatcher::Internal
     pthread_t      callbackThread{};
     Delivery*      delivery = nullptr;
     bool           closing  = false;
+
+    uint64_t latestRegistration = 0;
 
     int  notifyFd         = -1; // inotify file descriptor
     bool monitoringFailed = false;
@@ -526,8 +530,11 @@ struct SC::FileSystemWatcher::Internal
             return {FileSystemWatcherError::AlreadyWatching};
         if (not entry.path.assign(path))
             return {FileSystemWatcherError::PathPreparationFailed, FileSystemWatcherErrorDetail::AssignWatchPath};
+        if (latestRegistration == static_cast<uint64_t>(-1))
+            return {FileSystemWatcherError::WatchLimitExceeded};
         entry.parent = self;
         self->watchers.queueBack(entry);
+        entry.internal.get().registration = ++latestRegistration;
         return startWatching(&entry);
     }
 
@@ -702,7 +709,7 @@ struct SC::FileSystemWatcher::Internal
             mutex.unlock();
             return false;
         }
-        Delivery frame{delivery};
+        Delivery frame{delivery, latestRegistration};
         delivery = &frame;
         visit(frame);
         if (not frame.alive)
@@ -726,28 +733,18 @@ struct SC::FileSystemWatcher::Internal
     template <typename Visit>
     void forEachLiveFolder(WatcherLinkedList& watchers, Delivery& frame, Visit visit)
     {
-        // Rescan the live list after each callback: it may stop and release another folder.
-        // Address order visits each remaining folder at most once without auxiliary storage.
-        uintptr_t previousAddress = 0;
-        bool      havePrevious    = false;
+        // Callbacks can remove other folders or start a new registration at the same address.
+        // Traverse the live list in registration order and exclude registrations made during this batch.
+        uint64_t previous = 0;
         while (frame.alive and not closing)
         {
-            FolderWatcher* next        = nullptr;
-            uintptr_t      nextAddress = 0;
-            for (FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
-            {
-                const uintptr_t address = reinterpret_cast<uintptr_t>(entry);
-                if ((not havePrevious or address > previousAddress) and (next == nullptr or address < nextAddress))
-                {
-                    next        = entry;
-                    nextAddress = address;
-                }
-            }
-            if (next == nullptr)
+            FolderWatcher* entry = watchers.front;
+            while (entry != nullptr and entry->internal.get().registration <= previous)
+                entry = entry->next;
+            if (entry == nullptr or entry->internal.get().registration > frame.latestRegistration)
                 break;
-            previousAddress = nextAddress;
-            havePrevious    = true;
-            visit(*next);
+            previous = entry->internal.get().registration;
+            visit(*entry);
         }
     }
 

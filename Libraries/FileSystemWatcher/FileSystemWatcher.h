@@ -108,7 +108,7 @@ struct FileSystemWatcher
 
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
         static constexpr int Apple   = sizeof(StringPath) + sizeof(void*);
-        static constexpr int Linux   = 24 * MaxNumberOfSubdirs + 4096 + 32;
+        static constexpr int Linux   = 24 * MaxNumberOfSubdirs + 4096 + 40;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);

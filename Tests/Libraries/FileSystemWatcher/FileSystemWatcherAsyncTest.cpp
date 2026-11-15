@@ -1387,12 +1387,13 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             bool     secondStatus  = false;
             bool     after         = false;
         } state;
+        // Register the folders in reverse address order. Callbacks may discard later registrations.
         FileSystemWatcher::FolderWatcher watchers[3];
-        state.first                = &watchers[0];
+        state.first                = &watchers[2];
         state.victim               = &watchers[1];
         state.expectedFirst        = firstPath.view();
         state.expectedSecond       = secondPath.view();
-        watchers[0].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        watchers[2].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
         {
             if (notification.relativePath.isEmpty() and
                 notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
@@ -1406,7 +1407,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             }
         };
         watchers[1].notifyCallback = [&state](const FileSystemWatcher::Notification&) { state.victimCalled = true; };
-        watchers[2].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
+        watchers[0].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
         {
             if (notification.relativePath.isEmpty() and
                 notification.operation == FileSystemWatcher::Operation::AddRemoveRename)
@@ -1426,9 +1427,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(watcherReady);
         if (not watcherReady)
             return;
-        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[0], firstPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[2], firstPath.view()));
         SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[1], victimPath.view()));
-        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[2], secondPath.view()));
+        SC_TEST_EXPECT(fileEventsWatcher.watch(watchers[0], secondPath.view()));
         submitQueuedWatcher(eventLoop);
 
         bool generated = true;
