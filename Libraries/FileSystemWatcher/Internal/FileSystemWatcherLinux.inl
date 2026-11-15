@@ -90,6 +90,8 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
+        if (self != nullptr or runner.get().shutdownPipe[0] != -1)
+            return {FileSystemWatcherError::InitializationFailed};
         self             = &parent;
         threadingRunner  = &runner.get();
         monitoringFailed = false;
@@ -118,6 +120,8 @@ struct SC::FileSystemWatcher::Internal
 
     ResultFileSystemWatcher init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
+        if (self != nullptr or runner.fileSystemWatcher != nullptr)
+            return {FileSystemWatcherError::InitializationFailed};
         self             = &parent;
         eventLoopRunner  = &runner;
         monitoringFailed = false;

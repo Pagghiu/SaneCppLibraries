@@ -18,6 +18,8 @@ struct FileSystemWatcherLinuxTest : TestCase
 {
     FileSystemWatcherLinuxTest(TestReport& report) : TestCase(report, "FileSystemWatcherLinuxTest")
     {
+        if (test_section("one watcher owner per runner"))
+            checkRunnerOwnership();
         if (test_section("shutdown descriptors close before watching"))
             checkDescriptors(Scenario::CloseWithoutWatch);
         if (test_section("shutdown pipe failure leaves watcher reusable"))
@@ -27,6 +29,31 @@ struct FileSystemWatcherLinuxTest : TestCase
     }
 
   private:
+    void checkRunnerOwnership()
+    {
+        struct IdleRunner : FileSystemWatcher::EventLoopRunner
+        {
+            Result linuxStartSharedFileReadiness() override { return Result(true); }
+            Result linuxStopSharedFileReadiness() override { return Result(true); }
+        } idle;
+        FileSystemWatcher::ThreadRunner thread;
+        FileSystemWatcher               first, second;
+
+        SC_TEST_EXPECT(first.init(thread));
+        SC_TEST_EXPECT(first.init(idle).isError(FileSystemWatcherError::InitializationFailed));
+        SC_TEST_EXPECT(second.init(thread).isError(FileSystemWatcherError::InitializationFailed));
+        SC_TEST_EXPECT(first.close());
+        SC_TEST_EXPECT(second.init(thread));
+        SC_TEST_EXPECT(second.close());
+
+        SC_TEST_EXPECT(first.init(idle));
+        SC_TEST_EXPECT(first.init(thread).isError(FileSystemWatcherError::InitializationFailed));
+        SC_TEST_EXPECT(second.init(idle).isError(FileSystemWatcherError::InitializationFailed));
+        SC_TEST_EXPECT(first.close());
+        SC_TEST_EXPECT(second.init(idle));
+        SC_TEST_EXPECT(second.close());
+    }
+
     enum class Scenario
     {
         CloseWithoutWatch,
