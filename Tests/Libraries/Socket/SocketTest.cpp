@@ -457,9 +457,12 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
         Result      writeRes   = Result(false);
         Result      closeRes   = Result(false);
         EventObject eventObject;
-        uint16_t    port = 0;
+        uint16_t    port           = 0;
+        bool        expectShutdown = false;
+        bool        peerSawEof     = true;
     } params;
-    params.port = tcpPort;
+    params.port           = tcpPort;
+    params.expectShutdown = protocol == SocketFlags::ProtocolTcp;
     SocketDescriptor clientSocket;
     SC_TEST_EXPECT(clientSocket.create(nativeAddress.getAddressFamily(), socketType, protocol));
     auto func = [&clientSocket, &params](Thread& thread)
@@ -473,6 +476,11 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
         buf[0]++;
         params.writeRes = client.write({buf, sizeof(buf)});
         params.eventObject.wait();
+        if (params.expectShutdown)
+        {
+            Span<char> received;
+            params.peerSawEof = client.readWithTimeout(buf, received, 2000) and received.empty();
+        }
         params.closeRes = clientSocket.close();
     };
     Thread thread;
@@ -501,10 +509,12 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
         // This only makes sense on TCP sockets, it will fail on unconnected UDP sockets
         SC_TEST_EXPECT(socket.shutdown(SocketFlags::ShutdownBoth));
     }
-    SC_TEST_EXPECT(socket.close());
-    SC_TEST_EXPECT(server.close());
+    // Wait for the peer to observe EOF while this socket is still open.
     params.eventObject.signal();
     SC_TEST_EXPECT(thread.join());
+    SC_TEST_EXPECT(params.peerSawEof);
+    SC_TEST_EXPECT(socket.close());
+    SC_TEST_EXPECT(server.close());
     SC_TEST_EXPECT(params.connectRes and params.writeRes and params.closeRes);
 }
 

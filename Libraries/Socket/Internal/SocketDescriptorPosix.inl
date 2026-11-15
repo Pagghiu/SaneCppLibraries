@@ -262,8 +262,7 @@ ResultSocket SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType)
 {
     if (shutdownType != SocketFlags::ShutdownBoth)
         return {SocketError::InvalidShutdownType, SocketErrorDetail::ShutdownSocket};
-    int how = 0;
-    if (::shutdown(handle, how) != 0)
+    if (::shutdown(handle, SHUT_RDWR) != 0)
         return ResultSocket::withNativeError(SocketError::ShutdownFailed, SocketErrorDetail::ShutdownSocket,
                                              static_cast<uint32_t>(errno));
     return {};
