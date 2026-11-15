@@ -8,10 +8,10 @@
 #include <dirent.h>      // opendir, readdir, closedir
 #include <errno.h>       // errno
 #include <fcntl.h>       // open, O_RDONLY, O_DIRECTORY
+#include <poll.h>        // poll
 #include <stdio.h>       // snprintf
 #include <string.h>      // strlen
 #include <sys/inotify.h> // inotify
-#include <sys/select.h>  // fd_set / FD_ZERO
 #include <sys/stat.h>    // fstat
 #include <unistd.h>      // read
 
@@ -205,7 +205,7 @@ struct SC::FileSystemWatcher::Internal
             {
                 threadingRunner->shouldStop.exchange(true);
 
-                // Write to shutdownPipe to unblock the ::select() in the dedicated thread
+                // Write to shutdownPipe to wake the watcher thread.
                 char dummy = 1;
                 while (::write(threadingRunner->shutdownPipe[1], &dummy, sizeof(dummy)) == -1)
                 {
@@ -644,34 +644,23 @@ struct SC::FileSystemWatcher::Internal
                 return;
             }
 
-            // Setup a select fd_set to listen on both notifyFd and shutdownPipe simultaneously
-            fd_set    fds;
-            const int maxFd = currentNotifyFd > shutdownFd ? currentNotifyFd : shutdownFd;
-
-            int selectRes;
+            pollfd descriptors[] = {{shutdownFd, POLLIN, 0}, {currentNotifyFd, POLLIN, 0}};
+            int    ready;
             do
-            {
-                // select may alter the sets on interruption, so rebuild them for each retry.
-                FD_ZERO(&fds);
-                FD_SET(currentNotifyFd, &fds);
-                FD_SET(shutdownFd, &fds);
-                // Block until some events are received on the notifyFd or when shutdownPipe is written to
-                selectRes = ::select(maxFd + 1, &fds, nullptr, nullptr, nullptr);
-            } while (selectRes == -1 and errno == EINTR);
+                ready = ::poll(descriptors, sizeof(descriptors) / sizeof(descriptors[0]), -1);
+            while (ready == -1 and errno == EINTR);
 
-            if (selectRes == -1)
+            const int status = descriptors[0].revents | descriptors[1].revents;
+            if (ready == -1 or (status & (POLLERR | POLLHUP | POLLNVAL)))
             {
-                failMonitoring(ResultFileSystemWatcher(FileSystemWatcherError::MonitoringFailed,
-                                                       FileSystemWatcherErrorDetail::LinuxWaitForEvents,
-                                                       static_cast<uint32_t>(errno)));
+                const int nativeError = ready == -1 ? errno : (status & POLLNVAL) ? EBADF : EIO;
+                failMonitoring({FileSystemWatcherError::MonitoringFailed,
+                                FileSystemWatcherErrorDetail::LinuxWaitForEvents, static_cast<uint32_t>(nativeError)});
                 return;
             }
-            if (FD_ISSET(shutdownFd, &fds))
-            {
-                return; // Interrupted by write to shutdown pipe (from close())
-            }
-            // Here select has received data on notifyHandle
-            if (not readAndNotify(currentNotifyFd))
+            if (descriptors[0].revents & POLLIN)
+                return;
+            if ((descriptors[1].revents & POLLIN) and not readAndNotify(currentNotifyFd))
                 return;
         }
         threadingRunner->shouldStop.exchange(false);
