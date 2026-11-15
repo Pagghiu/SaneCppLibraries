@@ -11,19 +11,22 @@
 #include "Internal/FileSystemWatcherWindows.inl"
 #elif SC_PLATFORM_APPLE
 #include "Internal/FileSystemWatcherApple.inl"
-#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_NETBSD
 #include "Internal/FileSystemWatcherBSD.inl"
 #else
-#include "Internal/FileSystemWatcherLinux.inl"
+#include "Internal/FileSystemWatcherInotify.inl"
 #endif
 
 SC::FileSystemWatcher::FolderWatcher::FolderWatcher(Span<char> buffer) : FolderWatcher(buffer, {}) {}
 
 SC::FileSystemWatcher::FolderWatcher::FolderWatcher(Span<char> buffer, Span<char> entryStorage)
 {
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
     subFolderRelativePathsBuffer = buffer;
-#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_FREEBSD
+    internal.get().entryStorage = entryStorage;
+#endif
+#elif SC_PLATFORM_NETBSD
     internal.get().nameStorage  = buffer;
     internal.get().entryStorage = entryStorage;
 #else

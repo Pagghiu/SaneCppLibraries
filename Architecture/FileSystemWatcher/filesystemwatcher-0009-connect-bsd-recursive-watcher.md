@@ -5,7 +5,7 @@ Date: 2026-11-14
 
 ## Context
 
-NetBSD and FreeBSD report vnode events for open objects. Recursive coverage needs to track
+NetBSD reports vnode events for open objects. Recursive coverage needs to track
 a changing directory tree and stale events can outlive the descriptors that originally
 generated them. The watcher must remain bounded and preserve its two delivery modes.
 
@@ -49,6 +49,22 @@ lossless history of directory changes.
 
 ## Confirmation
 
-Run shared threaded and Async tests on NetBSD and FreeBSD and verify descriptor reuse,
+Run shared threaded and Async tests on NetBSD and verify descriptor reuse,
 nested changes, root loss, callback shutdown, rescan hints, and recovery. Exercise bounded
 storage and native scan, registration, and cleanup failure paths.
+
+## FreeBSD directory notifications
+
+FreeBSD uses its native inotify API with the shared Linux directory inventory.
+Register each open directory with `inotify_add_watch_at`; regular-file events
+arrive through the directory registration. Caller storage extends the maximum
+number of directories. A small kqueue observes the inotify descriptor and a user
+event, allowing both delivery modes to report passive entries at registration
+even when the directory itself is idle. The shared backend retires departed
+subtrees and reports `RescanRequired` after discovering arrivals. A failed
+registration stops that folder. Other folders on the owner can keep monitoring.
+
+FreeBSD still reports `CoverageLimited` for symlinks and special files.
+Directory watches can report some changes to those entries, such as symlink
+metadata updates, but the contract allows partial coverage. Confirm the
+caller-storage and descriptor-limit cases through the existing watcher suite.

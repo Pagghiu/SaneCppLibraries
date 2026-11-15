@@ -25,7 +25,7 @@ A change preserves this decision when public notifications still use the coarse 
 - [FileSystemWatcher public API](../../Libraries/FileSystemWatcher/FileSystemWatcher.h)
 - [Windows watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherWindows.inl)
 - [Apple watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherApple.inl)
-- [Linux watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherLinux.inl)
+- [Inotify watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherInotify.inl)
 - [FileSystemWatcher tests](../../Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp)
 - [FileSystemWatcher async tests](../../Tests/Libraries/FileSystemWatcher/FileSystemWatcherAsyncTest.cpp)
 - [SC-0008 - Prefer native OS APIs over third-party dependencies](../Global/sc-0008-prefer-native-os-apis-over-third-party-dependencies.md)

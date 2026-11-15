@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 void SC::FileSystemWatcherAsyncTest::bsdFailedRunnerInitialization(const StringView appDirectory)
@@ -82,8 +83,8 @@ void SC::FileSystemWatcherAsyncTest::bsdCapacityAndFailure(const StringView appD
     StringPath observerDirectory;
     SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__bsd_capacity"}));
     SC_TEST_EXPECT(Path::join(observerDirectory, {appDirectory, "__bsd_observer"}));
-    SC_TEST_EXPECT(fs.write("__bsd_capacity/a", "a"));
-    SC_TEST_EXPECT(fs.write("__bsd_capacity/b", "b"));
+    SC_TEST_EXPECT(fs.makeDirectory("__bsd_capacity/a"));
+    SC_TEST_EXPECT(fs.makeDirectory("__bsd_capacity/b"));
 
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
@@ -109,8 +110,9 @@ void SC::FileSystemWatcherAsyncTest::bsdCapacityAndFailure(const StringView appD
     FileSystemWatcher::FolderWatcher observer;
     struct State
     {
-        int limitedStops  = 0;
-        int observerStops = 0;
+        int  limitedStops    = 0;
+        int  observerStops   = 0;
+        bool observerChanged = false;
 
         ResultFileSystemWatcher failure;
     } state;
@@ -126,28 +128,49 @@ void SC::FileSystemWatcherAsyncTest::bsdCapacityAndFailure(const StringView appD
     {
         if (event.kind == FileSystemWatcher::NotificationKind::WatchStopped)
             ++state.observerStops;
+        if (event.kind == FileSystemWatcher::NotificationKind::Change and event.relativePath == "still-watched")
+            state.observerChanged = true;
     };
     const ResultFileSystemWatcher initiallyFull = owner.watch(limited, directory.view());
     SC_TEST_EXPECT(initiallyFull.isError(FileSystemWatcherError::WatchLimitExceeded));
-    SC_TEST_EXPECT(initiallyFull.detail == FileSystemWatcherErrorDetail::BSDInventory);
+    const auto setupDetail = SC_PLATFORM_FREEBSD ? FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity
+                                                 : FileSystemWatcherErrorDetail::BSDInventory;
+    SC_TEST_EXPECT(initiallyFull.detail == setupDetail);
     SC_TEST_EXPECT(limited.stopWatching().isError(FileSystemWatcherError::NotWatching));
-    SC_TEST_EXPECT(fs.removeFile("__bsd_capacity/b"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("__bsd_capacity/b"));
     SC_TEST_EXPECT(owner.watch(limited, directory.view()));
     SC_TEST_EXPECT(owner.watch(observer, observerDirectory.view()));
     submitQueuedWatcher(eventLoop);
-    SC_TEST_EXPECT(fs.write("__bsd_capacity/b", "b"));
-    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.limitedStops == 1 and state.observerStops == 1; }));
-    SC_TEST_EXPECT(state.failure.isError(FileSystemWatcherError::WatchLimitExceeded));
-    SC_TEST_EXPECT(state.failure.detail == FileSystemWatcherErrorDetail::BSDReconcile);
-    FileSystemWatcher::FolderWatcher another;
-    another.notifyCallback = [](const FileSystemWatcher::Notification&) {};
-    SC_TEST_EXPECT(owner.watch(another, observerDirectory.view()).isError(FileSystemWatcherError::MonitoringFailed));
-    SC_TEST_EXPECT(owner.close());
-    ownerOpen = false;
-    SC_TEST_EXPECT(owner.init(runner));
-    ownerOpen = true;
-    SC_TEST_EXPECT(owner.watch(another, directory.view()));
-    SC_TEST_EXPECT(another.stopWatching());
+    SC_TEST_EXPECT(fs.makeDirectory("__bsd_capacity/b"));
+    if (SC_PLATFORM_FREEBSD)
+    {
+        SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.limitedStops == 1; }));
+        SC_TEST_EXPECT(state.failure.isError(FileSystemWatcherError::WatchLimitExceeded));
+        SC_TEST_EXPECT(state.failure.detail == FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity);
+        SC_TEST_EXPECT(fs.write("__bsd_observer/still-watched", "content"));
+        SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.observerChanged; }));
+        SC_TEST_EXPECT(state.observerStops == 0);
+        SC_TEST_EXPECT(limited.stopWatching());
+        SC_TEST_EXPECT(fs.removeEmptyDirectory("__bsd_capacity/b"));
+        SC_TEST_EXPECT(owner.watch(limited, directory.view()));
+        SC_TEST_EXPECT(limited.stopWatching());
+    }
+    else
+    {
+        SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.limitedStops == 1 and state.observerStops == 1; }));
+        SC_TEST_EXPECT(state.failure.isError(FileSystemWatcherError::WatchLimitExceeded));
+        SC_TEST_EXPECT(state.failure.detail == FileSystemWatcherErrorDetail::BSDReconcile);
+        FileSystemWatcher::FolderWatcher another;
+        another.notifyCallback = [](const FileSystemWatcher::Notification&) {};
+        SC_TEST_EXPECT(
+            owner.watch(another, observerDirectory.view()).isError(FileSystemWatcherError::MonitoringFailed));
+        SC_TEST_EXPECT(owner.close());
+        ownerOpen = false;
+        SC_TEST_EXPECT(owner.init(runner));
+        ownerOpen = true;
+        SC_TEST_EXPECT(owner.watch(another, directory.view()));
+        SC_TEST_EXPECT(another.stopWatching());
+    }
     SC_TEST_EXPECT(owner.close());
     closeOwner.disarm();
     SC_TEST_EXPECT(eventLoop.close());
@@ -162,7 +185,7 @@ void SC::FileSystemWatcherAsyncTest::bsdDescriptorExhaustion(const StringView ap
     FileSystem fs;
     SC_TEST_EXPECT(fs.init(appDirectory));
     SC_TEST_EXPECT(fs.makeDirectory("__bsd_descriptors"));
-    SC_TEST_EXPECT(fs.write("__bsd_descriptors/file", "content"));
+    SC_TEST_EXPECT(fs.makeDirectory("__bsd_descriptors/child"));
     auto removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive("__bsd_descriptors"); });
 
     StringPath directory;
@@ -208,7 +231,9 @@ void SC::FileSystemWatcherAsyncTest::bsdDescriptorExhaustion(const StringView ap
     SC_TEST_EXPECT(::close(available) == 0);
     const ResultFileSystemWatcher failed = owner.watch(watcher, directory.view());
     SC_TEST_EXPECT(failed.isError(FileSystemWatcherError::WatchSetupFailed));
-    SC_TEST_EXPECT(failed.detail == FileSystemWatcherErrorDetail::BSDInventory);
+    const auto failureDetail = SC_PLATFORM_FREEBSD ? FileSystemWatcherErrorDetail::LinuxOpenSubdirectory
+                                                   : FileSystemWatcherErrorDetail::BSDInventory;
+    SC_TEST_EXPECT(failed.detail == failureDetail);
     SC_TEST_EXPECT(failed.nativeError == EMFILE);
     SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
     errno = 0;
@@ -281,6 +306,12 @@ void SC::FileSystemWatcherAsyncTest::bsdPassiveEntries(const StringView appDirec
     SC_TEST_EXPECT(fs.createSymbolicLink(target.view(), firstLink.view()));
     SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.limited == 3; }));
     SC_TEST_EXPECT(state.correct);
+    StringPath fifo;
+    SC_TEST_EXPECT(Path::join(fifo, {directory.view(), "subdir", "fifo"}));
+    SC_TEST_EXPECT(fs.makeDirectory("__bsd_passive/subdir"));
+    SC_TEST_EXPECT(::mkfifo(fifo.view().getNullTerminatedNative(), 0600) == 0);
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.limited == 4; }));
+    SC_TEST_EXPECT(state.correct);
     SC_TEST_EXPECT(owner.close());
     closeOwner.disarm();
     SC_TEST_EXPECT(eventLoop.close());
@@ -303,7 +334,7 @@ void SC::FileSystemWatcherAsyncTest::bsdExtendedStorage(const StringView appDire
     {
         StringPath name;
         SC_TEST_EXPECT(StringBuilder::format(name, "__bsd_large/item-{}", index));
-        SC_TEST_EXPECT(fs.write(name.view(), "content"));
+        SC_TEST_EXPECT(fs.makeDirectory(name.view()));
     }
 
     AsyncEventLoop eventLoop;
@@ -338,12 +369,12 @@ void SC::FileSystemWatcherAsyncTest::bsdExtendedStorage(const StringView appDire
     int matching            = 0;
     expanded.notifyCallback = [&matching](const FileSystemWatcher::Notification& event)
     {
-        if (event.kind == FileSystemWatcher::NotificationKind::Change and event.relativePath == "item-130")
+        if (event.kind == FileSystemWatcher::NotificationKind::Change and event.relativePath == "item-129/observed")
             ++matching;
     };
     SC_TEST_EXPECT(owner.watch(expanded, directory.view()));
     submitQueuedWatcher(eventLoop);
-    SC_TEST_EXPECT(fs.write("__bsd_large/item-130", "added"));
+    SC_TEST_EXPECT(fs.write("__bsd_large/item-129/observed", "added"));
     SC_TEST_EXPECT(runUntil(eventLoop, [&matching] { return matching > 0; }));
     SC_TEST_EXPECT(expanded.stopWatching());
     SC_TEST_EXPECT(owner.close());
@@ -436,6 +467,31 @@ void SC::FileSystemWatcherAsyncTest::bsdDynamicTreeAndRootLoss(const StringView 
         });
     StringPath directory;
     SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__bsd_dynamic"}));
+    constexpr size_t existingFiles = SC_PLATFORM_FREEBSD ? 512 : 0;
+    for (size_t index = 0; index < existingFiles; ++index)
+    {
+        StringPath file;
+        SC_TEST_EXPECT(StringBuilder::format(file, "__bsd_dynamic/file-{}", index));
+        SC_TEST_EXPECT(fs.write(file.view(), "content"));
+    }
+    struct rlimit originalLimit{};
+    bool          limitedDescriptors     = false;
+    auto          restoreDescriptorLimit = MakeDeferred(
+        [&]
+        {
+            if (limitedDescriptors)
+                (void)::setrlimit(RLIMIT_NOFILE, &originalLimit);
+        });
+    if (SC_PLATFORM_FREEBSD)
+    {
+        SC_TEST_EXPECT(::getrlimit(RLIMIT_NOFILE, &originalLimit) == 0);
+        auto limited = originalLimit;
+        if (limited.rlim_cur > 64)
+            limited.rlim_cur = 64;
+        SC_TEST_EXPECT(::setrlimit(RLIMIT_NOFILE, &limited) == 0);
+        limitedDescriptors = true;
+    }
+
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
     auto closeLoop = MakeDeferred([&] { (void)eventLoop.close(); });
@@ -444,7 +500,6 @@ void SC::FileSystemWatcherAsyncTest::bsdDynamicTreeAndRootLoss(const StringView 
     runner.init(eventLoop);
     FileSystemWatcher owner;
     SC_TEST_EXPECT(owner.init(runner));
-    auto closeOwner = MakeDeferred([&] { (void)owner.close(); });
     struct State
     {
         StringView expected;
@@ -460,10 +515,13 @@ void SC::FileSystemWatcherAsyncTest::bsdDynamicTreeAndRootLoss(const StringView 
         if (event.kind == FileSystemWatcher::NotificationKind::WatchStopped)
         {
             ++state.stopped;
-            state.stopError = event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                              event.failure.detail == FileSystemWatcherErrorDetail::BSDReconcile;
+            constexpr auto rootLoss = SC_PLATFORM_FREEBSD ? FileSystemWatcherErrorDetail::LinuxWatchInvalidated
+                                                          : FileSystemWatcherErrorDetail::BSDReconcile;
+            state.stopError =
+                event.failure.isError(FileSystemWatcherError::MonitoringFailed) and event.failure.detail == rootLoss;
         }
-        else if (event.kind == FileSystemWatcher::NotificationKind::Change)
+        else if (event.kind == FileSystemWatcher::NotificationKind::Change or
+                 event.kind == FileSystemWatcher::NotificationKind::RescanRequired)
         {
             if (event.operation == FileSystemWatcher::Operation::AddRemoveRename)
                 ++state.structural;
@@ -471,6 +529,7 @@ void SC::FileSystemWatcherAsyncTest::bsdDynamicTreeAndRootLoss(const StringView 
                 ++state.matching;
         }
     };
+    auto closeOwner = MakeDeferred([&] { (void)owner.close(); });
     SC_TEST_EXPECT(owner.watch(watcher, directory.view()));
     submitQueuedWatcher(eventLoop);
     SC_TEST_EXPECT(fs.makeDirectory("__bsd_dynamic/new"));
@@ -487,6 +546,15 @@ void SC::FileSystemWatcherAsyncTest::bsdDynamicTreeAndRootLoss(const StringView 
     state.expected = "moved/deep/existing";
     state.matching = 0;
     SC_TEST_EXPECT(fs.write("__bsd_dynamic/moved/deep/existing", "changed"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.matching > 0; }));
+    SC_TEST_EXPECT(fs.makeDirectory("__bsd_moved"));
+    SC_TEST_EXPECT(fs.write("__bsd_moved/preexisting", "a"));
+    const int beforeImport = state.structural;
+    SC_TEST_EXPECT(fs.rename("__bsd_moved", "__bsd_dynamic/imported"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state, beforeImport] { return state.structural > beforeImport; }));
+    state.expected = "imported/preexisting";
+    state.matching = 0;
+    SC_TEST_EXPECT(fs.write("__bsd_dynamic/imported/preexisting", "b"));
     SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.matching > 0; }));
     SC_TEST_EXPECT(fs.rename("__bsd_dynamic", "__bsd_moved"));
     SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.stopped > 0; }));

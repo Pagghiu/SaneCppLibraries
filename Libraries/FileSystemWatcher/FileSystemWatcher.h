@@ -179,7 +179,7 @@ struct FileSystemWatcher
         /// @brief Byte storage sufficient for at least `numberOfEntries` BSD entries, or zero if the size overflows.
         static constexpr size_t entryStorageSize(size_t numberOfEntries)
         {
-            constexpr size_t bytesPerEntry = 65;
+            constexpr size_t bytesPerEntry = SC_PLATFORM_FREEBSD ? 24 : 65;
             constexpr size_t padding       = alignof(uint64_t) - 1;
             return numberOfEntries == 0 or numberOfEntries > (static_cast<size_t>(-1) - padding) / bytesPerEntry
                        ? 0
@@ -214,7 +214,7 @@ struct FileSystemWatcher
 
         StringPath path;
 
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
         Span<char> subFolderRelativePathsBuffer;
 #endif
     };

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Common/PlatformMacrosType.h"
 
-#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_NETBSD
 
 #include "Libraries/Common/Deferred.h"
 #include "Libraries/FileSystem/FileSystem.h"

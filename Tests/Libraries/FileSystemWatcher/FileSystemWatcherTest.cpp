@@ -571,6 +571,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(fs.makeDirectory("__bsd_thread_callback"));
         auto removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive("__bsd_thread_callback"); });
 
+        SC_TEST_EXPECT(fs.createSymbolicLink("__bsd_thread_callback/missing", "__bsd_thread_callback/link"));
         StringPath directory;
         SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__bsd_thread_callback"}));
         FileSystemWatcher::ThreadRunner runner;
@@ -586,11 +587,18 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystemWatcher::FolderWatcher* watcher = nullptr;
 
             EventObject completed;
-            bool        closeRejected = false;
-            bool        stopped       = false;
+            bool        closeRejected   = false;
+            bool        stopped         = false;
+            bool        coverageLimited = false;
         } state{&owner, &watcher};
         watcher.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
         {
+            if (event.kind == FileSystemWatcher::NotificationKind::CoverageLimited)
+            {
+                state.coverageLimited =
+                    event.failure.isError(FileSystemWatcherError::CoverageLimited) and event.relativePath.isEmpty();
+                return;
+            }
             if (event.kind != FileSystemWatcher::NotificationKind::Change)
                 return;
             const ResultFileSystemWatcher closed = state.owner->close();
@@ -602,6 +610,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(owner.watch(watcher, directory.view()));
         SC_TEST_EXPECT(fs.write("__bsd_thread_callback/file", "content"));
         state.completed.wait();
+        SC_TEST_EXPECT(state.coverageLimited);
         SC_TEST_EXPECT(state.closeRejected);
         SC_TEST_EXPECT(state.stopped);
         SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));

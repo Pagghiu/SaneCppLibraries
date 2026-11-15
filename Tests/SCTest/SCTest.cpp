@@ -465,7 +465,7 @@ int main(int argc, const char* argv[])
     SC_RUN_TEST(runFileSystemWatcherAsyncTest);
 #if SC_PLATFORM_LINUX
     SC_RUN_TEST(runFileSystemWatcherLinuxTest);
-#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_NETBSD
     SC_RUN_TEST(runFileSystemWatcherBSDTest);
 #endif
 
