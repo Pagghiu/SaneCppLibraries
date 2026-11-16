@@ -116,6 +116,8 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
     const char* zlib_library_path = "libz.dylib";
 #elif SC_PLATFORM_FREEBSD
     const char* zlib_library_path = "libz.so.6";
+#elif SC_PLATFORM_OPENBSD
+    const char* zlib_library_path = "libz.so";
 #else
     const char* zlib_library_path = "libz.so.1";
 #endif

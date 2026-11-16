@@ -561,7 +561,7 @@ SC::ResultPlugin SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     compiler.type = Type::GnuCompiler;
     if (not compiler.compilerPath.assign("g++") or not compiler.linkerPath.assign("g++"))
         return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
-#elif SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     compiler.type = Type::ClangCompiler;
     if (not compiler.compilerPath.assign("clang++") or not compiler.linkerPath.assign("clang++"))
         return ResultPlugin(PluginError::PathCapacityExceeded, PluginErrorDetail::CompilerFindConfiguration);
