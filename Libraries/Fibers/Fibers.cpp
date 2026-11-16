@@ -162,7 +162,7 @@ struct FiberVirtualMemory
 
     static size_t roundUpToPageSize(size_t size) { return roundUpToFiberAllocatorPageSize(size); }
 
-    bool reserve(size_t maxCapacityInBytes)
+    bool reserve(size_t maxCapacityInBytes, size_t metadataPrefix = 0)
     {
         if (memory != nullptr)
         {
@@ -171,6 +171,21 @@ struct FiberVirtualMemory
         reservedBytes  = roundUpToPageSize(maxCapacityInBytes);
         committedBytes = 0;
         memory         = fiberReserveVirtualMemory(reservedBytes);
+#if SC_PLATFORM_OPENBSD
+        if (memory != nullptr)
+        {
+            void*        stackBegin = static_cast<char*>(memory) + metadataPrefix;
+            const size_t stackBytes = reservedBytes - metadataPrefix;
+            if (::mmap(stackBegin, stackBytes, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK | MAP_FIXED, -1, 0) == MAP_FAILED or
+                ::mprotect(stackBegin, stackBytes, PROT_NONE) != 0)
+            {
+                release();
+            }
+        }
+#else
+        (void)metadataPrefix;
+#endif
         return memory != nullptr;
     }
 
@@ -1380,7 +1395,7 @@ struct FiberStackClassInternal
         maxStacks       = options.maxStacks;
 
         const size_t totalBytes = metadataBytes + slotStrideBytes * maxStacks;
-        if (not virtualMemory.reserve(totalBytes))
+        if (not virtualMemory.reserve(totalBytes, metadataBytes))
         {
             resetMetadata();
             return Result::Error(FibersResultCategory, FibersError::MemoryReservationFailed);
@@ -1442,7 +1457,7 @@ struct FiberStackClassInternal
             peakActiveStacks = activeStacks;
         }
         updatePeakCommittedBytes();
-        outStack = FiberStack(stackMemory);
+        outStack = FiberStack(stackMemory, nullptr, SC_PLATFORM_OPENBSD);
         if (highWaterAvailable)
         {
             committedMemory(index).fillHighWaterMark();
@@ -3367,7 +3382,9 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
 
 FiberStack::FiberStack(Span<char> memory) : stackMemory(memory) {}
 
-FiberStack::FiberStack(Span<char> memory, void* owner) : stackMemory(memory), stackOwner(owner) {}
+FiberStack::FiberStack(Span<char> memory, void* owner, bool mapped)
+    : stackMemory(memory), stackOwner(owner), nativeStackMapping(mapped)
+{}
 
 FiberStack FiberStack::runtimeOwned(size_t sizeInBytes)
 {
@@ -3507,7 +3524,7 @@ void FiberVirtualStack::release() { internal.get().release(); }
 FiberStack FiberVirtualStack::stack() const
 {
     const FiberVirtualStackInternal& self = internal.get();
-    return FiberStack(self.stackMemory, const_cast<FiberVirtualStackInternal*>(&self));
+    return FiberStack(self.stackMemory, const_cast<FiberVirtualStackInternal*>(&self), SC_PLATFORM_OPENBSD);
 }
 
 Span<char> FiberVirtualStack::memory() const { return internal.get().stackMemory; }
@@ -7647,7 +7664,8 @@ Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack
     Result createResult =
         stack.isRuntimeOwned()
             ? FiberContextOperations::createRuntimeOwned(task.context(), stack.sizeInBytes(), taskEntry, &task)
-            : FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task);
+            : FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task,
+                                             stack.nativeStackMapping);
     if (not createResult)
     {
         task.procedure            = FiberTask::Procedure();
@@ -9830,17 +9848,69 @@ Result FiberContextOperations::captureCurrent(FiberContext& context)
     return Result(true);
 }
 
-Result FiberContextOperations::create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData)
+#if SC_PLATFORM_OPENBSD
+static Result prepareOpenBSDFiberStack(Span<char>& stack)
+{
+    const size_t pageSize  = fiberAllocatorPageSize();
+    const size_t spanBegin = reinterpret_cast<size_t>(stack.data());
+    const size_t spanEnd   = spanBegin + stack.sizeInBytes();
+    // sigaltstack remaps the pages wholly inside the span, excluding an aligned bottom guard page.
+    const size_t mappedBegin = (spanBegin + pageSize) & ~(pageSize - 1);
+    const size_t mappedEnd   = spanEnd & ~(pageSize - 1);
+    if (stack.sizeInBytes() < MINSIGSTKSZ or mappedEnd <= mappedBegin or
+        mappedEnd - mappedBegin < FiberStackMinimumSize)
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
+
+    // The remap zeroes the new stack pages. Preserve any unused high-water prefix.
+    char* const  mappedMemory = reinterpret_cast<char*>(mappedBegin);
+    size_t       unusedBytes  = 0;
+    const size_t mappedBytes  = mappedEnd - mappedBegin;
+    while (unusedBytes < mappedBytes and ::memcmp(mappedMemory + unusedBytes, &FiberStackHighWaterMark, 1) == 0)
+        ++unusedBytes;
+
+    sigset_t blockedSignals;
+    sigset_t previousSignals;
+    if (::sigfillset(&blockedSignals) != 0 or ::pthread_sigmask(SIG_SETMASK, &blockedSignals, &previousSignals) != 0)
+        return Result::Error(FibersResultCategory, FibersError::SignalStackInstallFailed);
+
+    stack_t previousStack  = {};
+    stack_t temporaryStack = {};
+    temporaryStack.ss_sp   = stack.data();
+    temporaryStack.ss_size = stack.sizeInBytes();
+    const bool canInstall  = ::sigaltstack(nullptr, &previousStack) == 0 and (previousStack.ss_flags & SS_DISABLE) != 0;
+    const bool installed   = canInstall and ::sigaltstack(&temporaryStack, nullptr) == 0;
+    const bool restored    = not installed or ::sigaltstack(&previousStack, nullptr) == 0;
+    const bool maskRestored = ::pthread_sigmask(SIG_SETMASK, &previousSignals, nullptr) == 0;
+    if (not restored or not maskRestored)
+        return Result::Error(FibersResultCategory, FibersError::SignalStackRestoreFailed);
+    if (not installed)
+        return Result::Error(FibersResultCategory, FibersError::SignalStackInstallFailed);
+
+    ::memset(mappedMemory, static_cast<unsigned char>(FiberStackHighWaterMark), unusedBytes);
+    stack = {mappedMemory, mappedBytes};
+    return Result(true);
+}
+#endif
+
+Result FiberContextOperations::create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData,
+                                      bool nativeStackMapping)
 {
     if (entry == nullptr)
     {
         return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
     }
-    FiberStack fiberStack(stack);
-    if (not fiberStack.isUsable())
+    if (not FiberStack(stack).isUsable())
     {
         return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
     }
+#if SC_PLATFORM_OPENBSD
+    if (not nativeStackMapping)
+    {
+        SC_TRY(prepareOpenBSDFiberStack(stack));
+    }
+#else
+    (void)nativeStackMapping;
+#endif
 
 #if SC_COMPILER_FILC
     // Caller storage cannot represent the runtime's hidden, garbage-collected stack.
@@ -9848,7 +9918,7 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
     (void)userData;
     return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
 #else
-    const size_t usableStackSize = fiberStack.usableSizeInBytes();
+    const size_t usableStackSize = FiberStack(stack).usableSizeInBytes();
     char*        stackTop        = stack.data() + stack.sizeInBytes();
     stackTop                     = static_cast<char*>(alignDown(stackTop, FiberStackAlignment));
 

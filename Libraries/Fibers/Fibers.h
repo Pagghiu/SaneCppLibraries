@@ -176,6 +176,8 @@ struct SC_FIBERS_EXPORT FiberStackGrowthThread
 };
 
 //! Caller-owned stack storage used by fiber contexts.
+//! OpenBSD registers full pages inside the supplied raw span during context creation.
+//! Reserve FiberVirtualStack or FiberStackClass storage when the creating thread has an alternate signal stack.
 struct SC_FIBERS_EXPORT FiberStack
 {
     explicit FiberStack(Span<char> memory);
@@ -197,14 +199,16 @@ struct SC_FIBERS_EXPORT FiberStack
   private:
     friend struct FiberScheduler;
     friend struct FiberVirtualStack;
+    friend struct FiberStackClassInternal;
 
-    FiberStack(Span<char> memory, void* owner);
+    FiberStack(Span<char> memory, void* owner, bool nativeStackMapping);
 
     Span<char> stackMemory;
     void*      stackOwner = nullptr;
 
-    size_t runtimeStackSize  = 0;
-    bool   runtimeOwnedStack = false;
+    size_t runtimeStackSize   = 0;
+    bool   runtimeOwnedStack  = false;
+    bool   nativeStackMapping = false;
 };
 
 struct FiberVirtualStackDefinition
