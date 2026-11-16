@@ -128,19 +128,28 @@ static SC::Result createPosixPTYPair(SC::FileDescriptor& master, SC::StringPath&
                                      SC::Result prepareFailure = SC::Result(false),
                                      SC::Result nameFailure    = SC::Result(false))
 {
-    int openFlags = O_RDWR | O_NOCTTY;
-#ifdef O_CLOEXEC
-    openFlags |= O_CLOEXEC;
-#endif
-    int masterFd;
-    do
+    const auto openMaster = [](int flags)
     {
-        masterFd = ::posix_openpt(openFlags);
-    } while (masterFd == -1 and errno == EINTR);
+        int descriptor;
+        do
+        {
+            descriptor = ::posix_openpt(flags);
+        } while (descriptor == -1 and errno == EINTR);
+        return descriptor;
+    };
+    constexpr int openFlags = O_RDWR | O_NOCTTY;
+#ifdef O_CLOEXEC
+    int masterFd = openMaster(openFlags | O_CLOEXEC);
+    // posix_openpt can reject O_CLOEXEC even when the platform defines it.
+    if (masterFd == -1 and errno == EINVAL)
+        masterFd = openMaster(openFlags);
+#else
+    const int masterFd = openMaster(openFlags);
+#endif
     if (masterFd == -1)
         return createFailure;
 
-    if (::grantpt(masterFd) != 0 or ::unlockpt(masterFd) != 0)
+    if (::fcntl(masterFd, F_SETFD, FD_CLOEXEC) != 0 or ::grantpt(masterFd) != 0 or ::unlockpt(masterFd) != 0)
     {
         (void)::close(masterFd);
         return prepareFailure;
