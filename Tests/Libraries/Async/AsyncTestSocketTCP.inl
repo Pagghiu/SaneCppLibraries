@@ -163,23 +163,26 @@ void SC::AsyncTest::socketTCPConnect()
     SC_TEST_EXPECT(context.acceptedCount == 2);
     SC_TEST_EXPECT(connectedCount == 2);
 
-    char       receiveBuffer[1] = {0};
-    Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
-
-    AsyncSocketReceive receiveAsync;
+    char               receiveBuffers[2] = {};
+    AsyncSocketReceive receives[2];
     int                receiveCalls = 0;
-    receiveAsync.callback           = [&](AsyncSocketReceive::Result& res)
+    for (int i = 0; i < 2; ++i)
     {
-        Span<char> readData;
-        SC_TEST_EXPECT(res.get(readData));
-        SC_TEST_EXPECT(readData.data()[0] == 1);
-        receiveCalls++;
-    };
-    SC_TEST_EXPECT(receiveAsync.start(eventLoop, context.acceptedClient[0], receiveData));
-    char v = 1;
-    SC_TEST_EXPECT(SocketClient(clients[0]).write({&v, 1}));
+        receives[i].callback = [&](AsyncSocketReceive::Result& res)
+        {
+            Span<char> readData;
+            SC_TEST_EXPECT(res.get(readData));
+            SC_TEST_EXPECT(readData.sizeInBytes() == 1 and readData.data()[0] == 1);
+            receiveCalls++;
+        };
+        SC_TEST_EXPECT(receives[i].start(eventLoop, context.acceptedClient[i], {&receiveBuffers[i], 1}));
+    }
+    // Concurrent connects can be accepted in either order.
+    char value = 1;
+    SC_TEST_EXPECT(SocketClient(clients[0]).write({&value, 1}));
+    SC_TEST_EXPECT(SocketClient(clients[1]).write({&value, 1}));
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(receiveCalls == 1);
+    SC_TEST_EXPECT(receiveCalls == 2);
     SC_TEST_EXPECT(context.acceptedClient[0].close());
     SC_TEST_EXPECT(context.acceptedClient[1].close());
 }
