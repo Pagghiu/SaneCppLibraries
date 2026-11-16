@@ -1560,9 +1560,11 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #include <sys/clonefile.h>
 #elif SC_PLATFORM_LINUX
 #include <sys/sendfile.h>
-#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#if !SC_PLATFORM_OPENBSD
 #include <sys/sysctl.h>
 #include <sys/types.h>
+#endif
 namespace SC
 {
 namespace FileSystemBSDDetail
@@ -2361,7 +2363,7 @@ SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(String
 
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
-#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     return FileSystemBSDDetail::getExecutablePath(executablePath);
 #else
     const int pathLength = ::readlink("/proc/self/exe", executablePath.writableSpan().data(), StringPath::MaxPath);

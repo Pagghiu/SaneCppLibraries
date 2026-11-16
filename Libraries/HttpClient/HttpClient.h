@@ -492,7 +492,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClient
     alignas(uint64_t) char storage[128];
 #elif SC_PLATFORM_WINDOWS
     alignas(uint64_t) char storage[128];
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     alignas(uint64_t) char storage[512];
 #else
     alignas(uint64_t) char storage[8];
@@ -600,7 +600,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
     alignas(uint64_t) char storage[512];
 #elif SC_PLATFORM_WINDOWS
     alignas(uint64_t) char storage[256];
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     alignas(uint64_t) char storage[512];
 #else
     alignas(uint64_t) char storage[8];

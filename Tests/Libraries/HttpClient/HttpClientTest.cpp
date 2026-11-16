@@ -15,14 +15,14 @@
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
 
-#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #include "Libraries/HttpClient/Internal/HttpClientLibCurlAPI.h"
 #endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #include <limits.h>
 #endif
 
@@ -41,7 +41,7 @@ struct SC::HttpClientTest : public SC::TestCase
 {
     HttpClientTest(SC::TestReport& report) : TestCase(report, "HttpClientTest")
     {
-#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         if (const char* fixture = ::getenv("SC_TEST_HTTP_LIBCURL_FIXTURE"))
         {
             if (test_section("libcurl runtime fixture"))
@@ -468,7 +468,7 @@ struct SC::HttpClientTest : public SC::TestCase
         }
     }
 
-#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     void libcurlRuntimeFixture(StringView fixture)
     {
         const bool available = fixture == "basic" or fixture == "tls" or fixture == "http2";
@@ -509,7 +509,7 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(capabilities.requireBackend(HttpClientCapabilities::AppleURLSession));
         SC_TEST_EXPECT(strcmp(capabilities.getBackendName(), "apple-url-session") == 0);
         SC_TEST_EXPECT(strcmp(HttpClientCapabilities::getBackendName(capabilities.backend), "apple-url-session") == 0);
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         SC_TEST_EXPECT(capabilities.backend == HttpClientCapabilities::LibCurl);
         SC_TEST_EXPECT(capabilities.hasBackend(HttpClientCapabilities::LibCurl));
         SC_TEST_EXPECT(capabilities.requireBackend(HttpClientCapabilities::LibCurl));
@@ -695,7 +695,7 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(not capabilities.supports(HttpClientCapabilities::ProxyHttp));
         SC_TEST_EXPECT(not capabilities.supports(HttpClientCapabilities::ProxyAuthorization));
         SC_TEST_EXPECT(not capabilities.supports(HttpClientCapabilities::ProxyBypassList));
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         HttpClientLibCurlLoader curl;
         SC_TEST_EXPECT(curl.init());
         const bool curlSupportsHttp2 = curl.supportsFeature(CURL_VERSION_HTTP2);
@@ -3068,7 +3068,7 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
-#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         {
             HttpClientRequest  request;
             HttpClientResponse response;
