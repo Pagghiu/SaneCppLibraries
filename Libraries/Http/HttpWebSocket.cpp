@@ -11,7 +11,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <bcrypt.h>
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #include <dlfcn.h>
 #if SC_PLATFORM_LINUX
 #if defined(__has_include)
@@ -420,7 +420,7 @@ static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t> data, uint8_t di
     FreeLibrary(library);
     return success;
 }
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 using HttpWebSocketEVPSha1Function   = const void* (*)();
 using HttpWebSocketEVPDigestFunction = int (*)(const void*, size_t, unsigned char*, unsigned int*, const void*, void*);
 
@@ -444,6 +444,8 @@ static bool scHttpWebSocketLibCryptoSha1(SC::Span<const uint8_t> data, uint8_t d
     static constexpr const char* LibraryNames[] = {"libcrypto.so.16", "libcrypto.so"};
 #elif SC_PLATFORM_FREEBSD
     static constexpr const char* LibraryNames[] = {"libcrypto.so.35", "libcrypto.so"};
+#elif SC_PLATFORM_OPENBSD
+    static constexpr const char* LibraryNames[] = {"libcrypto.so"};
 #else
     static constexpr const char* LibraryNames[] = {"libcrypto.so.3", "libcrypto.so.1.1"};
 #endif
