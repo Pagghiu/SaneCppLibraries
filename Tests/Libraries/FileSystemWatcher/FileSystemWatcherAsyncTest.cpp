@@ -83,7 +83,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             {
 #if SC_PLATFORM_APPLE
                 return appleStartWakeUp();
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
                 return startSharedFileReadiness();
 #else
                 FileSystemWatcher::FolderWatcher watcher;

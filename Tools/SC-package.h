@@ -50,6 +50,7 @@ namespace Tools
         break;
     case Platform::Linux:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Windows:
     case Platform::Emscripten:

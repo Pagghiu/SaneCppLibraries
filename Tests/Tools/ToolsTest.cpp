@@ -192,6 +192,7 @@ static StringView qemuPackageDirectory()
         }
         break;
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return {};
     }
@@ -268,6 +269,7 @@ struct SupportToolsTest : public TestCase
         case Platform::Emscripten: expected = "emscripten"; break;
         case Platform::NetBSD: expected = "netbsd"; break;
         case Platform::FreeBSD: expected = "freebsd"; break;
+        case Platform::OpenBSD: expected = "openbsd"; break;
         }
         const Download download;
         SC_TEST_EXPECT(download.packagePlatform.view() == expected);
@@ -296,6 +298,7 @@ struct SupportToolsTest : public TestCase
         switch (HostPlatform)
         {
         case Platform::NetBSD:
+        case Platform::OpenBSD:
         case Platform::FreeBSD: {
             String               cache   = format("{}/unsupported-cache", outputDirectory);
             String               install = format("{}/unsupported-install", outputDirectory);
@@ -1140,6 +1143,7 @@ struct SupportToolsTest : public TestCase
             switch (HostPlatform)
             {
             case Platform::NetBSD:
+            case Platform::OpenBSD:
             case Platform::FreeBSD:
                 SC_TEST_EXPECT(result.isError(BuildResultCategory, BuildError::InvalidOptionCombination));
                 break;

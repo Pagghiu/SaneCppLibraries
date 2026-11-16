@@ -56,7 +56,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
-#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #include <errno.h>
 #include <unistd.h>
 #endif
@@ -141,12 +141,14 @@ static ResultCryptography withMaximumBytes(CryptographyError error, Cryptography
     return {error, detail};
 }
 
+#if SC_CRYPTOGRAPHY_SYMMETRIC_BACKEND || SC_PLATFORM_LINUX
 static ResultCryptography withActualBytes(CryptographyError error, CryptographyErrorDetail detail, size_t bytes)
 {
     if (bytes <= static_cast<size_t>(0xffffffffu))
         return ResultCryptography::withActualBytes(error, detail, static_cast<uint32_t>(bytes));
     return {error, detail};
 }
+#endif
 
 static size_t keySize(Cryptography::AeadType type)
 {
@@ -3019,7 +3021,7 @@ SC::ResultCryptography SC::Cryptography::queryFeatures(Backend backend, Features
     }
 #endif
 #endif
-#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     outFeatures.secureRandom = true;
 #endif
 #if SC_CRYPTOGRAPHY_OPENSSL3
@@ -3083,7 +3085,7 @@ SC::ResultCryptography SC::Cryptography::Random::fill(Span<uint8_t> output)
         total += static_cast<size_t>(res);
     }
     return ResultCryptography(true);
-#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     constexpr size_t maximumEntropyChunk = 256;
     size_t           offset              = 0;
     while (offset < output.sizeInBytes())

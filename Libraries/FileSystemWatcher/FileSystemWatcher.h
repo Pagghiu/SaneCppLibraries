@@ -232,7 +232,7 @@ struct FileSystemWatcher
         virtual void   appleResetHandoff()      = 0;
         virtual Result appleWakeUpAndWait()     = 0;
 
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         // On failure, no readiness request may remain active or retain notifyFd.
 #if SC_PLATFORM_LINUX
         virtual Result linuxStartSharedFileReadiness() = 0;
@@ -286,7 +286,7 @@ struct FileSystemWatcher
     ResultFileSystemWatcher watch(FolderWatcher& watcher, StringSpan path);
 
     bool asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
-#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     void asyncNotifyFailure(Result failure);
 #elif SC_PLATFORM_WINDOWS
     void asyncNotifyFailure(FolderWatcher& watcher, Result failure);
@@ -387,7 +387,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 
     T_AsyncLoopWakeUp asyncWakeUp = {};
     T_EventObject     eventObject = {};
-#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #if SC_PLATFORM_LINUX
     virtual Result linuxStartSharedFileReadiness() override { return startSharedFileReadiness(); }
     virtual Result linuxStopSharedFileReadiness() override { return stopSharedFileReadiness(); }

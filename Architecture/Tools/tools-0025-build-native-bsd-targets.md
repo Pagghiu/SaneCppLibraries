@@ -35,3 +35,18 @@ FileSystemWatcher, package installers, cross builds, exported symbols or other u
 Compile and run native Debug and Release targets, including a digest known-answer test, on both guests. Check output
 platform identity, default and explicit sanitizer policy, required system link libraries and failure of unsupported
 options. Retain existing-platform Debug/Release suites and generated single-file compilation.
+
+## OpenBSD extension
+
+OpenBSD uses its own platform identity, the native ELF build path, and the base Clang toolchain. Link pthread
+and libexecinfo. The runtime loader and the BSD digest routines come from libc. The native Debug preset leaves ASan
+disabled because the OpenBSD 8.0 base compiler set lacks its runtime.
+
+The initial qualification covers native OpenBSD 8.0 amd64 builds and the filesystem iteration, process, threading,
+socket, and hashing libraries. The bootstrap uses the shared POSIX tools implementation, including the existing kqueue
+backends for Async and the file watcher. The smoke harness uses the absolute invocation path supplied by the build
+tool for tests that need the executable or its directory. Automatic executable path lookup remains open.
+
+The built-in workspace needs Git for GUI dependency resolution before compiling SCTest. With that configuration
+step omitted in a diagnostic checkout, SCTest reaches the HttpClient compile, where OpenBSD still needs native
+condition-variable support. Cross-build profiles and incremental fiber stacks also require separate qualification.

@@ -176,11 +176,12 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
             // It also needs paths where clang_rt.asan_*.dll exist to be manually set before debugging
             // NetBSD's base GCC ASan cannot run with the default ASLR policy on the tested guest.
             // FreeBSD's base Clang ASan can deadlock when fork overlaps sanitizer thread startup.
+            // OpenBSD's base Clang does not ship an ASan runtime.
             if (parameters.generator != Generator::VisualStudio2022 and
                 parameters.generator != Generator::VisualStudio2019 and
                 not(parameters.generator == Generator::Native and
                     (parameters.platform == Platform::Windows or parameters.platform == Platform::NetBSD or
-                     parameters.platform == Platform::FreeBSD)))
+                     parameters.platform == Platform::FreeBSD or parameters.platform == Platform::OpenBSD)))
             {
                 compile.enableASAN = true;
             }
@@ -360,7 +361,7 @@ SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& pa
         SC_TRY(project.addLinkLibraries(
             {"Advapi32", "bcrypt", "Dbghelp", "Mswsock", "ntdll", "Rstrtmgr", "Winhttp", "Ws2_32"}));
     }
-    else if (parameters.platform == Platform::NetBSD)
+    else if (parameters.platform == Platform::NetBSD or parameters.platform == Platform::OpenBSD)
     {
         SC_TRY(project.addLinkLibraries({"execinfo", "pthread"}));
     }
@@ -572,7 +573,8 @@ SC::Result SC::Build::Definition::configure(StringView workspaceName, const Buil
 {
     if ((parameters.platform == Platform::NetBSD or parameters.platform == Platform::FreeBSD or
          parameters.targetMachine.platform == Platform::NetBSD or
-         parameters.targetMachine.platform == Platform::FreeBSD) and
+         parameters.targetMachine.platform == Platform::FreeBSD or parameters.platform == Platform::OpenBSD or
+         parameters.targetMachine.platform == Platform::OpenBSD) and
         parameters.generator != Generator::Native)
         return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     for (const auto& workspace : workspaces)

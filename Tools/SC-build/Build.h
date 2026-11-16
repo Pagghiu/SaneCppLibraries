@@ -52,7 +52,8 @@ struct Platform
         Linux,
         Wasm,
         NetBSD,
-        FreeBSD
+        FreeBSD,
+        OpenBSD
     };
 
     /// @brief Get StringView from Platform::Type
@@ -67,6 +68,7 @@ struct Platform
         case Wasm: return "wasm";
         case NetBSD: return "netbsd";
         case FreeBSD: return "freebsd";
+        case OpenBSD: return "openbsd";
         }
         Assert::unreachable();
     }

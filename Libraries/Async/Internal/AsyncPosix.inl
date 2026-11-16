@@ -315,7 +315,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     const int totalNumEvents;
 
   public:
-#if SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     KernelEventsPosix(KernelQueue&, AsyncKernelEvents& kernelEvents)
         : parentKernelEvents(*this),
 #else
@@ -391,7 +391,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static constexpr short SOCKET_INPUT_EVENTS_MASK  = EVFILT_READ;
     static constexpr short SOCKET_OUTPUT_EVENTS_MASK = EVFILT_WRITE;
 
-#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     static constexpr unsigned int PROCESS_EXIT_FLAGS = NOTE_EXIT;
 #else
     static constexpr unsigned int PROCESS_EXIT_FLAGS = NOTE_EXIT | NOTE_EXITSTATUS;
@@ -1207,7 +1207,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     struct PosixSendFile
     {
-#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         static ssize_t sendFile(int outFd, int inFd, SC::int64_t& offset, size_t count, bool& notImplemented)
         {
             notImplemented = false;
@@ -1219,8 +1219,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 errno = EINVAL;
                 return -1;
             }
-#if SC_PLATFORM_NETBSD
-            // NetBSD has no sendfile. Keep storage bounded and re-read any unsent suffix by offset.
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+            // NetBSD and OpenBSD have no sendfile. Keep storage bounded and re-read any unsent suffix by offset.
             char         buffer[4096];
             const size_t toRead = count < sizeof(buffer) ? count : sizeof(buffer);
             ssize_t      bytesRead;
@@ -1306,7 +1306,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
 #endif
 
-        static constexpr bool usesZeroCopy() { return not SC_PLATFORM_NETBSD; }
+        static constexpr bool usesZeroCopy() { return not(SC_PLATFORM_NETBSD or SC_PLATFORM_OPENBSD); }
     };
 
     static Result teardownAsync(AsyncFileSend*, AsyncTeardown& teardown)

@@ -91,6 +91,7 @@ static constexpr StringView buildPlatformName(Platform::Type platform)
     case Platform::Linux: return "linux";
     case Platform::NetBSD: return "netbsd";
     case Platform::FreeBSD: return "freebsd";
+    case Platform::OpenBSD: return "openbsd";
     case Platform::Windows: return "windows";
     case Platform::Wasm: return "wasm";
     case Platform::Unknown: return "unknown";
@@ -937,7 +938,7 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
             project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
         }
 
-        if (parameters.platform == Platform::NetBSD)
+        if (parameters.platform == Platform::NetBSD or parameters.platform == Platform::OpenBSD)
         {
             SC_TRY(project.addLinkLibraries({"execinfo", "pthread"}));
         }

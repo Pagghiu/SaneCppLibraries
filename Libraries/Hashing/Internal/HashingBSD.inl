@@ -65,16 +65,20 @@ SC_HASHING_BSD_MACROS(SC_HASHING_BSD_PUSH)
 #pragma push_macro("__SHA2_H__")
 #pragma push_macro("_SHA_H_")
 #pragma push_macro("_SHA256_H_")
+#pragma push_macro("_SHA1_H")
+#pragma push_macro("_SHA2_H")
 #undef _MD5_H_
 #undef _SYS_MD5_H_
 #undef _SYS_SHA1_H_
 #undef __SHA2_H__
 #undef _SHA_H_
 #undef _SHA256_H_
+#undef _SHA1_H
+#undef _SHA2_H
 namespace sc_hashing_bsd_native
 {
 #include <md5.h>
-#if SC_PLATFORM_NETBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
 #include <sha1.h>
 #include <sha2.h>
 #else
@@ -82,6 +86,8 @@ namespace sc_hashing_bsd_native
 #include <sha256.h>
 #endif
 } // namespace sc_hashing_bsd_native
+#pragma pop_macro("_SHA2_H")
+#pragma pop_macro("_SHA1_H")
 #pragma pop_macro("_SHA256_H_")
 #pragma pop_macro("_SHA_H_")
 #pragma pop_macro("__SHA2_H__")
@@ -97,9 +103,13 @@ namespace SC
 {
 namespace
 {
-using BSDHashingMD5Context    = ::sc_hashing_bsd_native::MD5_CTX;
+using BSDHashingMD5Context = ::sc_hashing_bsd_native::MD5_CTX;
+#if SC_PLATFORM_OPENBSD
+using BSDHashingSHA256Context = ::sc_hashing_bsd_native::SHA2_CTX;
+#else
 using BSDHashingSHA256Context = ::sc_hashing_bsd_native::SHA256_CTX;
-#if SC_PLATFORM_NETBSD
+#endif
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
 using BSDHashingSHA1Context = ::sc_hashing_bsd_native::SHA1_CTX;
 
 constexpr size_t bsdHashingNativeSHA1Length = SHA1_DIGEST_LENGTH;
@@ -128,12 +138,18 @@ extern "C" decltype(::sc_hashing_bsd_native::MD5Update) bsdHashingMD5Update __as
     SC_HASHING_BSD_STRINGIFY(MD5Update));
 extern "C" decltype(::sc_hashing_bsd_native::MD5Final) bsdHashingMD5Final __asm__(SC_HASHING_BSD_STRINGIFY(MD5Final));
 
+#if SC_PLATFORM_OPENBSD
+extern "C" decltype(::sc_hashing_bsd_native::SHA256Init)   bsdHashingSHA256Init __asm__("SHA256Init");
+extern "C" decltype(::sc_hashing_bsd_native::SHA256Update) bsdHashingSHA256Update __asm__("SHA256Update");
+extern "C" decltype(::sc_hashing_bsd_native::SHA256Final)  bsdHashingSHA256Final __asm__("SHA256Final");
+#else
 extern "C" decltype(::sc_hashing_bsd_native::SHA256_Init) bsdHashingSHA256Init __asm__(
     SC_HASHING_BSD_STRINGIFY(SHA256_Init));
 extern "C" decltype(::sc_hashing_bsd_native::SHA256_Update) bsdHashingSHA256Update __asm__(
     SC_HASHING_BSD_STRINGIFY(SHA256_Update));
 extern "C" decltype(::sc_hashing_bsd_native::SHA256_Final) bsdHashingSHA256Final __asm__(
     SC_HASHING_BSD_STRINGIFY(SHA256_Final));
+#endif
 } // namespace
 } // namespace SC
 #undef SC_HASHING_BSD_STRINGIFY

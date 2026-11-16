@@ -111,6 +111,7 @@ static Build::Platform::Type getBuildPlatform()
     case SC::Platform::Linux: return Build::Platform::Linux;
     case SC::Platform::NetBSD: return Build::Platform::NetBSD;
     case SC::Platform::FreeBSD: return Build::Platform::FreeBSD;
+    case SC::Platform::OpenBSD: return Build::Platform::OpenBSD;
     case SC::Platform::Windows: return Build::Platform::Windows;
     case SC::Platform::Emscripten: return Build::Platform::Wasm;
     }
@@ -184,6 +185,7 @@ static size_t getSmallFixtureMaxBytes()
     case SC::Platform::Linux: return SmallFixtureMaxBytesLinux;
     case SC::Platform::Windows: return SmallFixtureMaxBytesWindows;
     case SC::Platform::NetBSD:
+    case SC::Platform::OpenBSD:
     case SC::Platform::FreeBSD:
     case SC::Platform::Emscripten: break;
     }
@@ -1120,6 +1122,7 @@ static Result computeBuildDirectoryName(const Build::Action& action, String& bui
     case Build::Platform::Windows: targetOS = "windows"; break;
     case Build::Platform::NetBSD: targetOS = "netbsd"; break;
     case Build::Platform::FreeBSD: targetOS = "freebsd"; break;
+    case Build::Platform::OpenBSD: targetOS = "openbsd"; break;
     case Build::Platform::Wasm: targetOS = "wasm"; break;
     case Build::Platform::Unknown: return fixtureFailure(BuildFixtureFailure::UnsupportedPlatform);
     }

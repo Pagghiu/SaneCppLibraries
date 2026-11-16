@@ -40,6 +40,7 @@ static constexpr StringView helpHostPlatformName(Build::Platform::Type platform)
     case Build::Platform::Linux: return "Linux";
     case Build::Platform::NetBSD: return "NetBSD";
     case Build::Platform::FreeBSD: return "FreeBSD";
+    case Build::Platform::OpenBSD: return "OpenBSD";
     case Build::Platform::Wasm: return "Wasm";
     case Build::Platform::Unknown: return "unknown";
     }
@@ -232,6 +233,7 @@ static void applyHostDefaultBuildParameters(Build::Action& action)
     case Platform::Linux: action.parameters.hostMachine.platform = Build::Platform::Linux; break;
     case Platform::NetBSD: action.parameters.hostMachine.platform = Build::Platform::NetBSD; break;
     case Platform::FreeBSD: action.parameters.hostMachine.platform = Build::Platform::FreeBSD; break;
+    case Platform::OpenBSD: action.parameters.hostMachine.platform = Build::Platform::OpenBSD; break;
     default: break;
     }
     switch (HostInstructionSet)
@@ -263,6 +265,10 @@ static void applyHostDefaultBuildParameters(Build::Action& action)
     case Platform::FreeBSD:
         action.parameters.generator = Build::Generator::Native;
         action.parameters.platform  = Build::Platform::FreeBSD;
+        break;
+    case Platform::OpenBSD:
+        action.parameters.generator = Build::Generator::Native;
+        action.parameters.platform  = Build::Platform::OpenBSD;
         break;
     default: break;
     }
@@ -794,7 +800,8 @@ static Result validateBuildActionCombination(Build::Action::Type actionType, con
                                              const Build::Action& action, Console& console)
 {
     if ((action.parameters.platform == Build::Platform::NetBSD or
-         action.parameters.platform == Build::Platform::FreeBSD) and
+         action.parameters.platform == Build::Platform::FreeBSD or
+         action.parameters.platform == Build::Platform::OpenBSD) and
         action.parameters.generator != Build::Generator::Native)
     {
         return printBuildActionCombinationError(console, "BSD targets currently require the native generator");
@@ -1164,6 +1171,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     case Platform::Apple:
     case Platform::Linux:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD: applyHostDefaultBuildParameters(action); break;
     default: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     }
@@ -1570,6 +1578,7 @@ static Result runBuildConfigure(Tool::Arguments& arguments)
     {
     case Platform::NetBSD: action.parameters.platform = Build::Platform::NetBSD; break;
     case Platform::FreeBSD: action.parameters.platform = Build::Platform::FreeBSD; break;
+    case Platform::OpenBSD: action.parameters.platform = Build::Platform::OpenBSD; break;
     default: return Result(true);
     }
     arguments.console.print("Executing \"{}\" for Native on {} platform\n", arguments.action,
@@ -1624,6 +1633,7 @@ static Result runBuildDocumentation(StringView doxygenExecutable, Tool::Argument
     case Platform::Windows: SC_TRY(process.setEnvironment("PACKAGES_PLATFORM", "windows")); break;
     case Platform::Emscripten:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD: return Result::Error(BuildResultCategory, BuildError::UnsupportedPlatform);
     }
     SC_TRY(process.exec({doxygenExecutable}));

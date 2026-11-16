@@ -52,7 +52,11 @@ typedef enum
 /// @brief Opaque object holding state of hashing
 typedef struct
 {
+#if defined(__OpenBSD__)
+    uint64_t opaque[27];
+#else
     uint64_t opaque[14];
+#endif
 } sc_hashing_t;
 
 /// @brief Hash result

@@ -8,7 +8,7 @@
 #include "Libraries/Containers/Array.h"
 
 static_assert(SC_PLATFORM_APPLE + SC_PLATFORM_LINUX + SC_PLATFORM_WINDOWS + SC_PLATFORM_EMSCRIPTEN +
-                      SC_PLATFORM_NETBSD + SC_PLATFORM_FREEBSD ==
+                      SC_PLATFORM_NETBSD + SC_PLATFORM_FREEBSD + SC_PLATFORM_OPENBSD ==
                   1,
               "Exactly one host platform must be selected");
 #if SC_PLATFORM_APPLE
@@ -23,6 +23,8 @@ static_assert(SC::HostPlatform == SC::Platform::Emscripten, "Platform detection 
 static_assert(SC::HostPlatform == SC::Platform::NetBSD, "Platform detection must agree");
 #elif SC_PLATFORM_FREEBSD
 static_assert(SC::HostPlatform == SC::Platform::FreeBSD, "Platform detection must agree");
+#elif SC_PLATFORM_OPENBSD
+static_assert(SC::HostPlatform == SC::Platform::OpenBSD, "Platform detection must agree");
 #endif
 
 // This bounded core check can also run independently while a platform cannot build SCTest yet.

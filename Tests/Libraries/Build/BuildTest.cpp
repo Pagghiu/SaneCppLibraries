@@ -77,6 +77,7 @@ static constexpr StringView supportMatrixHostName(Build::Platform::Type platform
     case Build::Platform::Linux: return "Linux";
     case Build::Platform::NetBSD: return "NetBSD";
     case Build::Platform::FreeBSD: return "FreeBSD";
+    case Build::Platform::OpenBSD: return "OpenBSD";
     case Build::Platform::Wasm: return "Wasm";
     case Build::Platform::Unknown: return "unknown";
     }
@@ -161,7 +162,10 @@ struct SC::BuildTest : public SC::TestCase
             SC_TEST_EXPECT(Build::Platform::toString(Build::Platform::NetBSD) == "netbsd");
             SC_TEST_EXPECT(Build::Platform::toString(Build::Platform::FreeBSD) == "freebsd");
 
-            const Build::Platform::Type platforms[] = {Build::Platform::NetBSD, Build::Platform::FreeBSD};
+            SC_TEST_EXPECT(Build::Platform::toString(Build::Platform::OpenBSD) == "openbsd");
+
+            const Build::Platform::Type platforms[] = {Build::Platform::NetBSD, Build::Platform::FreeBSD,
+                                                       Build::Platform::OpenBSD};
             for (const Build::Platform::Type platform : platforms)
             {
                 Build::Parameters parameters;

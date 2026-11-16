@@ -1,11 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #ifdef SC_FOUNDATION_PLATFORM_TYPE_DEFINITION_H
-#if SC_FOUNDATION_PLATFORM_TYPE_DEFINITION_H != 3
+#if SC_FOUNDATION_PLATFORM_TYPE_DEFINITION_H != 4
 #error "PlatformType.h has been included multiple times in different versions."
 #endif
 #else
-#define SC_FOUNDATION_PLATFORM_TYPE_DEFINITION_H 3 // Increment to indicate a new version of the file
+#define SC_FOUNDATION_PLATFORM_TYPE_DEFINITION_H 4 // Increment to indicate a new version of the file
 
 namespace SC
 {
@@ -19,6 +19,7 @@ enum class Platform
     Emscripten,
     NetBSD,
     FreeBSD,
+    OpenBSD,
 };
 
 /// @brief Holds information about operating system
@@ -33,6 +34,7 @@ struct OperatingSystem
         Linux,
         NetBSD,
         FreeBSD,
+        OpenBSD,
     };
 };
 
@@ -48,6 +50,8 @@ static constexpr Platform HostPlatform = Platform::Linux;
 static constexpr Platform HostPlatform = Platform::NetBSD;
 #elif defined(__FreeBSD__)
 static constexpr Platform HostPlatform = Platform::FreeBSD;
+#elif defined(__OpenBSD__)
+static constexpr Platform HostPlatform = Platform::OpenBSD;
 #else
 #error "Unsupported platform"
 #endif

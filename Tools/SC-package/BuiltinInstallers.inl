@@ -75,6 +75,7 @@ static StringView hostPlatformName()
            : HostPlatform == Platform::Linux      ? StringView::fromNullTerminated("linux", StringEncoding::Ascii)
            : HostPlatform == Platform::NetBSD     ? StringView::fromNullTerminated("netbsd", StringEncoding::Ascii)
            : HostPlatform == Platform::FreeBSD    ? StringView::fromNullTerminated("freebsd", StringEncoding::Ascii)
+           : HostPlatform == Platform::OpenBSD    ? StringView::fromNullTerminated("openbsd", StringEncoding::Ascii)
            : HostPlatform == Platform::Windows    ? StringView::fromNullTerminated("windows", StringEncoding::Ascii)
            : HostPlatform == Platform::Emscripten ? StringView::fromNullTerminated("emscripten", StringEncoding::Ascii)
                                                   : StringView::fromNullTerminated("unknown", StringEncoding::Ascii);
@@ -103,6 +104,7 @@ static Result resolveHostCommandPath(StringView executable, String& output)
     case Platform::Windows: SC_TRY(process.exec({"where", executable}, commandPath)); break;
     case Platform::Apple:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Linux: SC_TRY(process.exec({"which", executable}, commandPath)); break;
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::HostCommandUnavailable);
@@ -834,6 +836,7 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
         return resolveLinuxWineExecutable(packagesCacheDirectory, packagesInstallDirectory, wineExecutable);
     case Platform::Windows:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -869,6 +872,7 @@ static constexpr StringView qemuRunnerCacheLeafName()
         }
         break;
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return StringSpan{};
     }
@@ -904,6 +908,7 @@ static constexpr StringView qemuRunnerInstallLeafName()
         }
         break;
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return StringSpan{};
     }
@@ -1722,6 +1727,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     }
     break;
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -1739,6 +1745,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
             break;
         case Platform::Windows: path = format("{0}/doxygen.exe", package.installDirectoryLink); break;
         case Platform::NetBSD:
+        case Platform::OpenBSD:
         case Platform::FreeBSD:
         case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
         }
@@ -1844,6 +1851,7 @@ Result findExecutablePath(StringView executableName, String& foundPath)
     break;
     case Platform::Apple:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Linux: SC_TRY(Process().exec({"which", executableName}, foundPath)); break;
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
@@ -2068,6 +2076,7 @@ static Result resolveHostLLVMArchive(StringView packageName, StringView packages
         break;
     }
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -3158,6 +3167,7 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
         break;
     case Platform::Windows:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -3646,6 +3656,7 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     case Platform::Apple:
     case Platform::Windows:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -3804,6 +3815,7 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
     case Platform::Apple:
     case Platform::Windows:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -3941,6 +3953,7 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
     case Platform::Linux: return installLinuxWineRunner(packagesCacheDirectory, packagesInstallDirectory, package);
     case Platform::Windows:
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD:
     case Platform::Emscripten: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     }
@@ -3994,6 +4007,7 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
     switch (HostPlatform)
     {
     case Platform::NetBSD:
+    case Platform::OpenBSD:
     case Platform::FreeBSD: return Result::Error(PackageResultCategory, PackageError::InstallerHostUnsupported);
     default: break;
     }

@@ -43,7 +43,9 @@ extern "C"
 #endif
 #include <signal.h>
 #include <sys/mman.h>
+#if !SC_PLATFORM_OPENBSD
 #include <ucontext.h>
+#endif
 #include <unistd.h>
 
 namespace SC
@@ -437,7 +439,7 @@ static void fiberStackGrowthUnlock()
 }
 
 // Enable incremental stacks on BSD only on architectures with a known interrupted stack pointer.
-#if (SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && !SC_PLATFORM_ARM64 && !defined(__x86_64__)
+#if SC_PLATFORM_OPENBSD || ((SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && !SC_PLATFORM_ARM64 && !defined(__x86_64__))
 #define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 0
 #else
 #define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 1
@@ -736,7 +738,11 @@ static_assert(__atomic_always_lock_free(sizeof(size_t), nullptr),
 
 static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
 {
+#if SC_PLATFORM_OPENBSD
+    (void)rawContext;
+#else
     [[maybe_unused]] auto* context = static_cast<const ucontext_t*>(rawContext);
+#endif
 #if SC_PLATFORM_APPLE && SC_PLATFORM_ARM64
     return reinterpret_cast<void*>(context->uc_mcontext->__ss.__sp);
 #elif SC_PLATFORM_APPLE && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT

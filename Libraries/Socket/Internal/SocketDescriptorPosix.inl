@@ -18,6 +18,12 @@ namespace SC
 {
 namespace
 {
+#if SC_PLATFORM_OPENBSD
+using IPv4MulticastOption = unsigned char;
+#else
+using IPv4MulticastOption = int;
+#endif
+
 static ResultSocket getFileFlags(int flagRead, const int fileDescriptor, int& outFlags)
 {
     do
@@ -191,9 +197,9 @@ ResultSocket SocketDescriptor::leaveMulticastGroup(const SocketIPAddress& multic
 
 ResultSocket SocketDescriptor::setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback)
 {
-    int active = enableLoopback ? 1 : 0;
     if (addressFamily == SocketFlags::AddressFamilyIPV4)
     {
+        const IPv4MulticastOption active = enableLoopback ? 1 : 0;
         if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_LOOP, &active, sizeof(active)) != 0)
             return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
                                                  SocketErrorDetail::SetIPv4MulticastLoopback,
@@ -202,6 +208,7 @@ ResultSocket SocketDescriptor::setMulticastLoopback(SocketFlags::AddressFamily a
     }
     else
     {
+        const int active = enableLoopback ? 1 : 0;
         if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &active, sizeof(active)) != 0)
             return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
                                                  SocketErrorDetail::SetIPv6MulticastLoopback,
@@ -214,7 +221,13 @@ ResultSocket SocketDescriptor::setMulticastHops(SocketFlags::AddressFamily addre
 {
     if (addressFamily == SocketFlags::AddressFamilyIPV4)
     {
-        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_TTL, &hops, sizeof(hops)) != 0)
+#if SC_PLATFORM_OPENBSD
+        if (hops < 0 or hops > 255)
+            return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
+                                                 SocketErrorDetail::SetIPv4MulticastHops, EINVAL);
+#endif
+        const auto ttl = static_cast<IPv4MulticastOption>(hops);
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) != 0)
             return ResultSocket::withNativeError(SocketError::SocketOptionFailed,
                                                  SocketErrorDetail::SetIPv4MulticastHops, static_cast<uint32_t>(errno));
         return {};
