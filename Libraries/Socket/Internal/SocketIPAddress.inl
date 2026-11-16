@@ -271,7 +271,8 @@ SC::ResultSocket SC::SocketAddress::getUnixName(Span<const char>& output, UnixNa
     const sockaddr_un& address = handle.reinterpret_as<const sockaddr_un>();
     if (address.sun_family != AF_UNIX or nativeSize < offsetof(sockaddr_un, sun_path))
         return {SocketError::AddressTypeMismatch, SocketErrorDetail::ExtractUnixAddress};
-    const size_t nameSize = nativeSize - offsetof(sockaddr_un, sun_path);
+    const size_t nativeNameSize = nativeSize - offsetof(sockaddr_un, sun_path);
+    const size_t nameSize       = nativeNameSize < sizeof(address.sun_path) ? nativeNameSize : sizeof(address.sun_path);
     if (nameSize == 0)
     {
         output        = {};
@@ -284,9 +285,11 @@ SC::ResultSocket SC::SocketAddress::getUnixName(Span<const char>& output, UnixNa
     }
     else
     {
-        const size_t pathSize = address.sun_path[nameSize - 1] == '\0' ? nameSize - 1 : nameSize;
-        output                = {address.sun_path, pathSize};
-        unixNamespace         = UnixNamespace::Pathname;
+        size_t pathSize = 0;
+        while (pathSize < nameSize and address.sun_path[pathSize] != '\0')
+            ++pathSize;
+        output        = {address.sun_path, pathSize};
+        unixNamespace = UnixNamespace::Pathname;
     }
     return {};
 #else
