@@ -598,7 +598,8 @@ struct SupportToolsTest : public TestCase
         }
         if (test_section("build rejects cross compilation involving BSD"))
         {
-            const bool    bsdHost = HostPlatform == Platform::NetBSD or HostPlatform == Platform::FreeBSD;
+            const bool bsdHost = HostPlatform == Platform::NetBSD or HostPlatform == Platform::FreeBSD or
+                                 HostPlatform == Platform::OpenBSD;
             Build::Action action;
             action.action               = Build::Action::Compile;
             action.parameters.generator = Build::Generator::Native;

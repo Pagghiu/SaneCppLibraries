@@ -726,7 +726,7 @@ void SC::AsyncContractTest::refusedSocketConnect(bool immediate)
     SC_TEST_EXPECT(reserved.create(family, SocketFlags::SocketStream, protocol));
     // Keep the address bound so an unrelated process cannot accept this connection.
     SC_TEST_EXPECT(SocketServer(reserved).bind(address));
-#if SC_PLATFORM_NETBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
     if (not immediate)
     {
         // Shut down a TCP listener to keep its address reserved and reject incoming connections.
