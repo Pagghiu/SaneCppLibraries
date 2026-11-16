@@ -786,12 +786,13 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
         sokolWarnings.addSelection("Examples/SCExample", "SCExampleSokol.c");
         sokolWarnings.compile.disableClangWarnings({"unknown-pragmas"});
         project.addSpecificFileFlags(sokolWarnings);
-
-        SourceFiles imguiWarnings;
-        imguiWarnings.addSelection(imgui.packageLocalDirectory.view(), "*.cpp");
-        imguiWarnings.compile.disableClangWarnings({"uninitialized-const-pointer"});
-        project.addSpecificFileFlags(imguiWarnings);
     }
+
+    // The pinned widgets source passes an unused pointer for an empty string. ImGui fixed this in 431f2c5abd.
+    SourceFiles imguiWarnings;
+    SC_TRY(imguiWarnings.addSelection(imgui.packageLocalDirectory.view(), "imgui_widgets.cpp"));
+    SC_TRY(imguiWarnings.compile.disableClangWarnings({"uninitialized-const-pointer", "unknown-warning-option"}));
+    SC_TRY(project.addSpecificFileFlags(imguiWarnings));
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
