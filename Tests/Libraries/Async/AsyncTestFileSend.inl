@@ -255,7 +255,7 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst,
         SC_TEST_EXPECT(memcmp(ctx.receiveBuffer, testContent + rangeOffset, rangeLength) == 0);
     }
 
-#if SC_PLATFORM_NETBSD
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
     SC_TEST_EXPECT(not eofGuard.zeroCopy);
 #elif SC_PLATFORM_WINDOWS
     if (useThreadPool)
