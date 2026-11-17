@@ -657,16 +657,30 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result appendUniqueSymbolLines(StringView text, Vector<String>& symbols)
+    static Result appendExportedSymbols(StringView text, bool posixFormat, Vector<String>& symbols)
     {
         StringViewTokenizer tokenizer(text);
         while (tokenizer.tokenizeNextLine())
         {
-            const StringView line = tokenizer.component.trimWhiteSpaces();
-            if (not line.isEmpty())
+            StringView name = tokenizer.component.trimWhiteSpaces();
+            if (posixFormat)
+            {
+                StringViewTokenizer fields(name);
+                if (not fields.tokenizeNext({' ', '\t'}))
+                    continue;
+                name = fields.component;
+                if (not fields.tokenizeNext({' ', '\t'}))
+                    continue;
+                const StringView type = fields.component;
+                // OpenBSD nm includes file records even with -g. Undefined records have no value.
+                if (type.sizeInBytes() != 1 or type == "F" or type == "U" or not fields.tokenizeNext({' ', '\t'}) or
+                    not fields.tokenizeNext({' ', '\t'}) or not fields.remaining.isEmpty())
+                    continue;
+            }
+            if (not name.isEmpty())
             {
                 String symbol = StringEncoding::Utf8;
-                SC_TRY(symbol.assign(line));
+                SC_TRY(symbol.assign(name));
                 SC_TRY(symbols.push_back(move(symbol)));
             }
         }
@@ -675,7 +689,8 @@ struct SC::Build::NativeBuild
 
     static Result writeExportedSymbolsFiles(FileSystem& fs, const ResolvedProject& resolvedProject, String& signature)
     {
-        Vector<String> symbols;
+        const Platform::Type platform = targetPlatform(resolvedProject.targetContext);
+        Vector<String>       symbols;
         for (const ResolvedSource& source : resolvedProject.sources)
         {
             if (not WriterInternal::isRenderItemInExportSet(*resolvedProject.project, source.displayPath.view()))
@@ -689,12 +704,12 @@ struct SC::Build::NativeBuild
 
             CommandLine nmCommand;
             SC_TRY(nmCommand.append(isBSDCrossTarget(resolvedProject.targetContext) ? "llvm-nm"_a8 : "nm"_a8));
-            switch (targetPlatform(resolvedProject.targetContext))
+            switch (platform)
             {
             case Platform::Apple: SC_TRY(nmCommand.append("-gjU")); break;
+            case Platform::OpenBSD: SC_TRY(nmCommand.append("-gP")); break;
             case Platform::Linux:
             case Platform::NetBSD:
-            case Platform::OpenBSD:
             case Platform::FreeBSD:
                 SC_TRY(nmCommand.append("-g"));
                 SC_TRY(nmCommand.append("--defined-only"));
@@ -712,7 +727,7 @@ struct SC::Build::NativeBuild
             SC_TRY(runCapturedCommand(fs, nmCommand, StringView(), resolvedProject.adapter, StringView(), nmJob));
             if (nmJob.status != NativeJobStatus::Succeeded)
                 return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
-            SC_TRY(appendUniqueSymbolLines(nmJob.stdOut.view(), symbols));
+            SC_TRY(appendExportedSymbols(nmJob.stdOut.view(), platform == Platform::OpenBSD, symbols));
         }
 
         Algorithms::bubbleSort(symbols.begin(), symbols.end(), [](const String& left, const String& right)

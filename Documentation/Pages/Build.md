@@ -57,6 +57,21 @@ guest's ASLR policy, and the FreeBSD Clang sanitizer could deadlock during concu
 Projects may enable it explicitly when their toolchain and workload support it. Sane C++ library integration supplies
 the base system link libraries, including `libmd` on FreeBSD.
 
+## Native OpenBSD
+
+Experimental OpenBSD support was verified on OpenBSD 8.0 amd64 with base Clang. Install Git for pinned build
+dependencies and curl for the HttpClient tests. From a guest-local checkout, run the shared suite in both configurations.
+
+```sh
+for configuration in Debug Release; do
+    ./SC.sh build compile SCTest "$configuration" &&
+        ./SC.sh build run SCTest "$configuration" -- --all-tests || exit 1
+done
+```
+
+The OpenBSD port uses kqueue for Async and file watching, with buffered Async file sends. Incremental fiber stack
+growth, the optional OpenSSL 3 provider, and the separate TLS/HTTP2 fixture remain outside this validation.
+
 ## BSD support matrix
 
 | Area | Verified on NetBSD 11 and FreeBSD 15.1 | Requirements and limits |

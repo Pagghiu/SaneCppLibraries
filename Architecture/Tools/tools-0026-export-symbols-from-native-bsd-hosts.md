@@ -16,6 +16,10 @@ when Release dead-code stripping and export preservation are enabled, generate t
 for native Linux. Use the native `nm` and `objcopy` tools to preserve selected symbols. The tested FreeBSD linker does not
 provide GNU `--gc-keep-exported`; its dynamic exports are retained using `-rdynamic` with the dynamic list.
 
+Native OpenBSD uses the same dynamic list and strip flow with its base tools. Read names from `nm -gP` and filter
+out undefined symbols and file records because the base `nm` lacks the GNU defined-only and names-only switches.
+See the [OpenBSD nm manual](https://man.openbsd.org/OpenBSD-8.0/nm.1).
+
 Apply the executable dynamic-export flag to directory-only native Linux projects as well as projects that export Sane
 libraries. Generated BSD backends and cross-target toolchains remain outside this decision.
 
