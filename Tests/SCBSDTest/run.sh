@@ -5,8 +5,18 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$repo"
 case "$(uname -s)" in
     NetBSD|FreeBSD) ;;
-    *) printf '%s\n' 'Run this validation in a NetBSD or FreeBSD checkout.' >&2; exit 1 ;;
+    OpenBSD) ;;
+    *) printf '%s\n' 'Run this validation in a NetBSD, FreeBSD, or OpenBSD checkout.' >&2; exit 1 ;;
 esac
+
+require_optional_backends()
+{
+    case "$(uname -s)" in
+        NetBSD|FreeBSD)
+            export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
+            ;;
+    esac
+}
 
 run_suite()
 {
@@ -36,7 +46,7 @@ if [ "$mode" = prebuilt ]; then
     executable=${1:?Pass the cross-built SCTest path under _Build/_Outputs.}
     shift
     test_root=$(mktemp -d "$scratch/prebuilt.XXXXXXXX")
-    export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
+    require_optional_backends
     "$executable" --library-root "$repo" --test-root "$test_root" "$@"
 elif [ "$mode" = all ] || [ "$mode" = prebuilt-headers ]; then
     if [ "$mode" = all ]; then
@@ -47,7 +57,7 @@ elif [ "$mode" = all ] || [ "$mode" = prebuilt-headers ]; then
         exit 1
     fi
     ./SC.sh build configure SCTest
-    export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
+    require_optional_backends
     run_suite Debug --all-tests
     run_suite Release --all-tests
     ./SC.sh build compile "SCSingleFileLibs:" Debug

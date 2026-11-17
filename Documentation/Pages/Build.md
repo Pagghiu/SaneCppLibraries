@@ -72,6 +72,11 @@ done
 The OpenBSD port uses kqueue for Async and file watching, with buffered Async file sends. Incremental fiber stack
 growth, the optional OpenSSL 3 provider, and the separate TLS/HTTP2 fixture remain outside this validation.
 
+The BSD GitHub Actions workflow validates OpenBSD amd64 with the shared `SCTest --all-tests` suite and generated
+single-file targets in Debug and Release. It runs a native guest on an Ubuntu x86_64 runner and caches the
+prepared VM with Git and curl installed. The shared validation entry point is
+`sh Tests/SCBSDTest/run.sh prebuilt-headers`.
+
 ## BSD support matrix
 
 | Area | Verified on NetBSD 11 and FreeBSD 15.1 | Requirements and limits |

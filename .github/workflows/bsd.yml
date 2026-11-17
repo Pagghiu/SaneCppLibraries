@@ -25,6 +25,8 @@ jobs:
             release: '15.1'
           - os: NetBSD
             release: '11.0'
+          - os: OpenBSD
+            release: '8.0'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -60,6 +62,23 @@ jobs:
             set -eu
             export PATH="/usr/pkg/bin:$PATH"
             export LD_LIBRARY_PATH=/usr/pkg/lib
+            uname -a
+            time sh Tests/SCBSDTest/run.sh prebuilt-headers
+
+      - name: Test OpenBSD
+        if: matrix.os == 'OpenBSD'
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: ${{ matrix.release }}
+          arch: x86_64
+          sync: rsync
+          copyback: false
+          cache-after-prepare: true
+          prepare: |
+            set -eu
+            pkg_add curl git
+          run: |
+            set -eu
             uname -a
             time sh Tests/SCBSDTest/run.sh prebuilt-headers
 
