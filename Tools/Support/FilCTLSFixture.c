@@ -24,6 +24,14 @@
 #define RESPONSE_BODY_SIZE (sizeof(RESPONSE_BODY) - 1)
 #define READ_BUFFER_SIZE   16384
 
+#ifndef SC_TLS_FIXTURE_OPENSSL_VERSION_PREFIX
+#define SC_TLS_FIXTURE_OPENSSL_VERSION_PREFIX "OpenSSL 3.6.5 "
+#endif
+
+#ifndef SC_TLS_FIXTURE_NGHTTP2_VERSION
+#define SC_TLS_FIXTURE_NGHTTP2_VERSION "1.70.0"
+#endif
+
 typedef struct ResponseSource
 {
     size_t offset;
@@ -377,8 +385,10 @@ int main(int argc, char** argv)
 
     const char*         opensslVersion = OpenSSL_version(OPENSSL_VERSION);
     const nghttp2_info* nghttp2Version = nghttp2_version(0);
-    if (opensslVersion == NULL or strncmp(opensslVersion, "OpenSSL 3.6.5 ", 14) != 0 or nghttp2Version ==
-        NULL or strcmp(nghttp2Version->version_str, "1.70.0") != 0)
+    if (opensslVersion == NULL or
+        strncmp(opensslVersion, SC_TLS_FIXTURE_OPENSSL_VERSION_PREFIX,
+                sizeof(SC_TLS_FIXTURE_OPENSSL_VERSION_PREFIX) - 1) != 0 or
+        nghttp2Version == NULL or strcmp(nghttp2Version->version_str, SC_TLS_FIXTURE_NGHTTP2_VERSION) != 0)
     {
         fprintf(stderr, "unexpected runtime versions: %s / %s\n",
                 opensslVersion == NULL ? "unknown OpenSSL" : opensslVersion,
