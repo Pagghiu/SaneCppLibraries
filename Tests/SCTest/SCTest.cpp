@@ -79,6 +79,7 @@ void runHttpStressTest(TestReport& report);
 
 // HttpClient
 void runHttpClientTest(TestReport& report);
+void runHttpClientThreadingTest(TestReport& report);
 
 // Plugin
 void runPluginTest(TestReport& report);
@@ -489,6 +490,7 @@ int main(int argc, const char* argv[])
 
     // HttpClient tests
     SC_RUN_TEST(runHttpClientTest);
+    SC_RUN_TEST(runHttpClientThreadingTest);
 
     // Plugin tests
 #if SC_XCTEST
