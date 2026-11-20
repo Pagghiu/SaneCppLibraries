@@ -83,6 +83,8 @@ void runHttpClientThreadingTest(TestReport& report);
 
 // Plugin
 void runPluginTest(TestReport& report);
+void runPluginDynamicLibraryTest(TestReport& report);
+void runPluginCompilerSmokeTest(TestReport& report);
 
 // Process
 void runProcessTest(TestReport& report);
@@ -493,6 +495,8 @@ int main(int argc, const char* argv[])
     SC_RUN_TEST(runHttpClientThreadingTest);
 
     // Plugin tests
+    SC_RUN_TEST(runPluginDynamicLibraryTest);
+    SC_RUN_TEST(runPluginCompilerSmokeTest);
 #if SC_XCTEST
 #else
     SC_RUN_TEST(runPluginTest);
