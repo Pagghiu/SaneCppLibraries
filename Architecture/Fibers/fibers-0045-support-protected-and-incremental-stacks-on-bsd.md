@@ -28,3 +28,10 @@ restores no access and uses `MADV_FREE` so the kernel may discard the released p
 Run the existing Fibers and AsyncFibers suites on both BSDs. Explicitly exercise the terminal, foreign, nested, and
 restored signal actions through the incremental fault section. Run the stack-growth lifecycle under a debugger
 to verify that it refuses incremental growth when traced.
+
+## OpenBSD extension
+
+OpenBSD reports the interrupted stack pointer in `sigcontext` through `sc_rsp` on amd64 and
+`sc_sp` on ARM64. Use those registers with the existing POSIX fault handling and the OpenBSD
+stack mappings from FIBERS-0046. Read the process trace state through `KERN_PROC_PID` and
+`PS_TRACED`.

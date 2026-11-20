@@ -29,6 +29,7 @@ extern "C"
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #if SC_PLATFORM_LINUX
 #include <sched.h>
 #elif SC_PLATFORM_APPLE
@@ -40,8 +41,10 @@ extern "C"
 #include <sys/user.h>
 #elif SC_PLATFORM_NETBSD
 #include <sys/sysctl.h>
+#elif SC_PLATFORM_OPENBSD
+#include <sys/proc.h>
+#include <sys/sysctl.h>
 #endif
-#include <signal.h>
 #include <sys/mman.h>
 #if !SC_PLATFORM_OPENBSD
 #include <ucontext.h>
@@ -454,7 +457,7 @@ static void fiberStackGrowthUnlock()
 }
 
 // Enable incremental stacks on BSD only on architectures with a known interrupted stack pointer.
-#if SC_PLATFORM_OPENBSD || ((SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD) && !SC_PLATFORM_ARM64 && !defined(__x86_64__))
+#if (SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD) && !SC_PLATFORM_ARM64 && !defined(__x86_64__)
 #define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 0
 #else
 #define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 1
@@ -486,6 +489,13 @@ static bool fiberStackGrowthDebuggerAttached()
     size_t informationSize = sizeof(processInformation);
     return sysctl(mib, 6, &processInformation, &informationSize, nullptr, 0) == 0 and
            informationSize == sizeof(processInformation) and (processInformation.p_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_OPENBSD
+    struct kinfo_proc processInformation = {};
+    int               mib[6] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid(), sizeof(processInformation), 1};
+
+    size_t informationSize = sizeof(processInformation);
+    return sysctl(mib, 6, &processInformation, &informationSize, nullptr, 0) == 0 and
+           informationSize == sizeof(processInformation) and (processInformation.p_psflags & PS_TRACED) != 0;
 #elif SC_PLATFORM_LINUX
     const int statusFile = open("/proc/self/status", O_RDONLY);
     if (statusFile < 0)
@@ -754,7 +764,7 @@ static_assert(__atomic_always_lock_free(sizeof(size_t), nullptr),
 static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
 {
 #if SC_PLATFORM_OPENBSD
-    (void)rawContext;
+    [[maybe_unused]] auto* context = static_cast<const struct sigcontext*>(rawContext);
 #else
     [[maybe_unused]] auto* context = static_cast<const ucontext_t*>(rawContext);
 #endif
@@ -775,6 +785,10 @@ static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
     return reinterpret_cast<void*>(context->uc_mcontext.mc_gpregs.gp_sp);
 #elif SC_PLATFORM_FREEBSD && defined(__x86_64__)
     return reinterpret_cast<void*>(context->uc_mcontext.mc_rsp);
+#elif SC_PLATFORM_OPENBSD && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(context->sc_sp);
+#elif SC_PLATFORM_OPENBSD && defined(__x86_64__)
+    return reinterpret_cast<void*>(context->sc_rsp);
 #else
     return nullptr;
 #endif
