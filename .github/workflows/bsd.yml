@@ -76,9 +76,10 @@ jobs:
           cache-after-prepare: true
           prepare: |
             set -eu
-            pkg_add curl git
+            pkg_add curl git 'openssl%3.5'
           run: |
             set -eu
+            export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
             uname -a
             time sh Tests/SCBSDTest/run.sh prebuilt-headers
 
@@ -182,7 +183,7 @@ jobs:
           sync: 'no'
           copyback: false
           cache-after-prepare: true
-          prepare: pkg_add curl git
+          prepare: pkg_add curl git 'openssl%3.5'
 
       - name: Transfer and run SCTest in the ARM64 guest
         run: |
@@ -194,6 +195,9 @@ jobs:
             netbsd)
               export PATH="/usr/pkg/bin:$PATH"
               export LD_LIBRARY_PATH=/usr/pkg/lib
+              ;;
+            openbsd)
+              export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
               ;;
           esac
           uname -a

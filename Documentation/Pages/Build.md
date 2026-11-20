@@ -59,7 +59,7 @@ the base system link libraries, including `libmd` on FreeBSD.
 
 ## Native OpenBSD
 
-Experimental OpenBSD support was verified on OpenBSD 8.0 amd64 with base Clang. Install Git for pinned build
+Experimental OpenBSD support uses OpenBSD 8.0 and base Clang. Install Git for pinned build
 dependencies and curl for the HttpClient tests. From a guest-local checkout, run the shared suite in both configurations.
 
 ```sh
@@ -71,12 +71,13 @@ done
 
 The OpenBSD port uses kqueue for Async and file watching, with buffered Async file sends. The separate TLS/HTTP2
 loopback fixture passed on OpenBSD amd64 with HTTP/2-enabled libcurl. The optional Cryptography provider can use the
-OpenBSD OpenSSL 3.5 package. The base LibreSSL library supplies the platform WebSocket digest path.
+OpenBSD OpenSSL 3.5 package (`pkg_add 'openssl%3.5'`). The base LibreSSL library supplies the platform WebSocket
+digest path. Incremental fiber stacks use the native fault context on amd64 and ARM64.
 
-The BSD GitHub Actions workflow validates OpenBSD amd64 with the shared `SCTest --all-tests` suite and generated
-single-file targets in Debug and Release. It runs a native guest on an Ubuntu x86_64 runner and caches the
-prepared VM with Git and curl installed. The shared validation entry point is
-`sh Tests/SCBSDTest/run.sh prebuilt-headers`.
+The BSD GitHub Actions workflow runs the shared `SCTest --all-tests` suite in Debug and Release on amd64 and ARM64.
+It also builds the generated single-file targets on amd64. The ARM64 job cross-builds on Ubuntu x86_64 using
+LLVM 22 and the release sysroot, then runs the executables inside the OpenBSD guest. Both jobs require the
+OpenSSL 3 provider and incremental stack growth. See `Tests/SCBSDTest/README.md` for the shared run commands.
 
 ## BSD support matrix
 

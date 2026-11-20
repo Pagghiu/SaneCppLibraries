@@ -1,8 +1,8 @@
 # Native BSD validation
 
 Use a guest-local checkout on NetBSD 11 with GCC, FreeBSD 15.1 with Clang, or OpenBSD 8.0 amd64
-with base Clang. The BSD GitHub Actions workflow runs native validation on x86_64 guests for all three
-systems and runs prebuilt SCTest on NetBSD and FreeBSD ARM64 guests.
+with base Clang. The BSD GitHub Actions workflow runs native validation on x86_64 guests and
+runs prebuilt SCTest on ARM64 guests for all three systems.
 The complete run needs Python 3 for amalgamation, Git and package inputs for the build tests,
 and libcurl visible to the dynamic loader. NetBSD and FreeBSD also require OpenSSL 3. If Git is installed outside
 the base system, put it on PATH and configure its runtime library search path before starting.
@@ -17,9 +17,10 @@ sh Tests/SCBSDTest/run.sh Release --test FibersTest --test-section 'incremental 
 The default run regenerates the single-file sources, configures projects, compiles and runs
 SCTest with `--all-tests` in Debug and Release, and builds the single-file targets in both
 configurations.
-NetBSD and FreeBSD require the OpenSSL 3 provider and incremental fiber stack tests to run. OpenBSD
-uses the existing native cryptography capability checks and fixed fiber stacks. The complete run may fetch packages
-on a cold cache. An explicit configuration runs the selected SCTest cases. Each invocation
+NetBSD and FreeBSD require the OpenSSL 3 provider and incremental fiber stack tests to run. OpenBSD CI
+also requires both capabilities. Use `SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1` and
+`SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1` to request the same checks in a local OpenBSD run. The complete
+run may fetch packages on a cold cache. An explicit configuration runs the selected SCTest cases. Each invocation
 uses temporary test storage. Use separate checkouts and distinct port offsets for concurrent
 validation on the same guest.
 
@@ -44,6 +45,6 @@ sh Tests/SCBSDTest/run.sh prebuilt _Build/_Outputs/freebsd-arm64-Native-clang-Re
 The prebuilt mode runs the suite without recompiling it. Plugin tests still compile their small
 fixtures with the guest's base compiler.
 
-OpenBSD CI installs Git and curl through `pkg_add` and caches the prepared guest image. It runs the
-same shared suite and generated targets in both configurations. TLS/HTTP2 integration uses a separate
-fixture and remains outside the OpenBSD CI coverage.
+OpenBSD CI installs Git, curl and `openssl%3.5` through `pkg_add` and caches the prepared guest image.
+The amd64 job builds the generated targets in both configurations. The ARM64 job cross-builds on Ubuntu
+with LLVM 22. The separate TLS/HTTP2 loopback fixture was verified on OpenBSD amd64.
