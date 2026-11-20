@@ -84,7 +84,7 @@ jobs:
 
   cross-test:
     name: ${{ matrix.os }} ${{ matrix.release }} ARM64 cross-build
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -93,14 +93,21 @@ jobs:
           - os: FreeBSD
             target: freebsd
             release: '15.1'
+            runner: ubuntu-24.04
+            llvm: 19
           - os: NetBSD
             target: netbsd
             release: '11.0'
+            runner: ubuntu-24.04
+            llvm: 19
           - os: OpenBSD
             target: openbsd
             release: '8.0'
+            runner: ubuntu-26.04
+            llvm: 22
     env:
       BSD_TARGET: ${{ matrix.target }}
+      LLVM_VERSION: ${{ matrix.llvm }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -109,8 +116,8 @@ jobs:
       - name: Install cross-build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-19 lld-19 llvm-19
-          echo /usr/lib/llvm-19/bin >> "$GITHUB_PATH"
+          sudo apt-get install -y "clang-$LLVM_VERSION" "lld-$LLVM_VERSION" "llvm-$LLVM_VERSION"
+          echo "/usr/lib/llvm-$LLVM_VERSION/bin" >> "$GITHUB_PATH"
 
       - name: Cache BSD release archives
         uses: actions/cache@v5
