@@ -69,8 +69,9 @@ for configuration in Debug Release; do
 done
 ```
 
-The OpenBSD port uses kqueue for Async and file watching, with buffered Async file sends. Incremental fiber stack
-growth, the optional OpenSSL 3 provider, and the separate TLS/HTTP2 fixture remain outside this validation.
+The OpenBSD port uses kqueue for Async and file watching, with buffered Async file sends. The separate TLS/HTTP2
+loopback fixture passed on OpenBSD amd64 with HTTP/2-enabled libcurl. The optional Cryptography provider can use the
+OpenBSD OpenSSL 3.5 package. The base LibreSSL library supplies the platform WebSocket digest path.
 
 The BSD GitHub Actions workflow validates OpenBSD amd64 with the shared `SCTest --all-tests` suite and generated
 single-file targets in Debug and Release. It runs a native guest on an Ubuntu x86_64 runner and caches the

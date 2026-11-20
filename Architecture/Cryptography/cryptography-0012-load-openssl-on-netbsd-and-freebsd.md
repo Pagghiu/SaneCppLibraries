@@ -27,3 +27,9 @@ This keeps the same diagnostics when a provider is unavailable.
 Run the existing native and required OpenSSL suites on both BSDs with Debug and Release. Check larger
 random buffers, runtime absence, rejected ABI and fallback selection. Compile the regenerated standalone
 library on both BSDs and run the existing desktop regressions.
+
+## OpenBSD extension
+
+OpenBSD ships LibreSSL in its base system. The optional OpenSSL backend checks the upstream OpenSSL 3
+library name, the OpenBSD OpenSSL 3.5 port's private library directory, and the normal loader search
+path. It applies the same required-symbol and major-version checks to every candidate.

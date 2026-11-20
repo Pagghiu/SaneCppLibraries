@@ -2055,7 +2055,8 @@ void CryptographyTest::testOverlapRejected()
 void runCryptographyTest(SC::TestReport& report)
 {
     CryptographyTest nativeTest(report, Cryptography::Backend::Native, "CryptographyTest");
-#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD ||      \
+    SC_PLATFORM_OPENBSD
     CryptographyTest openSSLTest(report, Cryptography::Backend::OpenSSL, "CryptographyOpenSSLTest");
 #endif
 }

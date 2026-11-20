@@ -22,7 +22,14 @@ struct OpenSSL3RuntimePosix
         if (load("/usr/lib/libcrypto.so"))
             return;
 #endif
-        load("libcrypto.so.3");
+        if (load("libcrypto.so.3"))
+            return;
+#if SC_PLATFORM_OPENBSD
+        // OpenBSD resolves the versioned library in the port's private directory.
+        if (load("/usr/local/lib/eopenssl35/libcrypto.so"))
+            return;
+        load("libcrypto.so");
+#endif
     }
 
     bool load(const char* path)
