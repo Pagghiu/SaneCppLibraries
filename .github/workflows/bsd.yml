@@ -96,6 +96,9 @@ jobs:
           - os: NetBSD
             target: netbsd
             release: '11.0'
+          - os: OpenBSD
+            target: openbsd
+            release: '8.0'
     env:
       BSD_TARGET: ${{ matrix.target }}
     steps:
@@ -162,6 +165,17 @@ jobs:
           sync: 'no'
           copyback: false
           prepare: pkg_add curl git-base mozilla-rootcerts-openssl
+
+      - name: Boot OpenBSD ARM64
+        if: matrix.target == 'openbsd'
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: ${{ matrix.release }}
+          arch: aarch64
+          sync: 'no'
+          copyback: false
+          cache-after-prepare: true
+          prepare: pkg_add curl git
 
       - name: Transfer and run SCTest in the ARM64 guest
         run: |

@@ -23,3 +23,9 @@ continues to exercise the plugin compiler and linker.
 
 Exercise the shared SCTest suite in both configurations on FreeBSD and NetBSD ARM64.
 Report host compile and guest run times separately.
+
+## OpenBSD extension
+
+The `openbsd-arm64` profile uses the OpenBSD 8.0 base and compiler sets for the sysroot. Cross-builds
+use LLVM's name-only symbol output. Native OpenBSD keeps the base `nm` POSIX format. The ARM64 job
+compiles on Ubuntu and runs the existing suite inside the OpenBSD guest.

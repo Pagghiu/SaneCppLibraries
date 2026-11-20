@@ -82,17 +82,18 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
     if (actionType == Build::Action::Compile or actionType == Build::Action::CompileObjects or
         actionType == Build::Action::Run)
     {
-        if (not output.append("\nTarget profiles:\n"
-                              "  - host / native: build for the current host machine\n"
-                              "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
-                              "  - linux-glibc-x86_64: Linux glibc target profile\n"
-                              "  - linux-glibc-arm64: Linux glibc arm64 target profile\n"
-                              "  - linux-musl-x86_64: Linux musl target profile\n"
-                              "  - linux-musl-arm64: Linux musl arm64 target profile\n"
-                              "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
-                              "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
-                              "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"
-                              "  - freebsd-arm64 / netbsd-arm64: BSD cross-build with Clang, LLD and --sysroot\n"))
+        if (not output.append(
+                "\nTarget profiles:\n"
+                "  - host / native: build for the current host machine\n"
+                "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
+                "  - linux-glibc-x86_64: Linux glibc target profile\n"
+                "  - linux-glibc-arm64: Linux glibc arm64 target profile\n"
+                "  - linux-musl-x86_64: Linux musl target profile\n"
+                "  - linux-musl-arm64: Linux musl arm64 target profile\n"
+                "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
+                "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
+                "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"
+                "  - freebsd-arm64 / netbsd-arm64 / openbsd-arm64: BSD cross-build with Clang, LLD and --sysroot\n"))
             return Result::Error(BuildResultCategory, BuildError::HelpOutputFailed);
         if (not output.append("\nToolchain values:\n"
                               "  - default / host-default: host-default compiler family\n"
@@ -285,17 +286,22 @@ static Result applyTargetProfileValue(Build::Action& action, StringView targetPr
     }
 
     const bool freeBSDArm64 = targetProfile.equalsIgnoreCaseASCII("freebsd-arm64");
-    if (freeBSDArm64 or targetProfile.equalsIgnoreCaseASCII("netbsd-arm64"))
+    const bool openBSDArm64 = targetProfile.equalsIgnoreCaseASCII("openbsd-arm64");
+    if (freeBSDArm64 or openBSDArm64 or targetProfile.equalsIgnoreCaseASCII("netbsd-arm64"))
     {
-        action.parameters.platform               = freeBSDArm64 ? Build::Platform::FreeBSD : Build::Platform::NetBSD;
-        action.parameters.targetMachine.platform = action.parameters.platform;
-        action.parameters.architecture           = Build::Architecture::Arm64;
+        action.parameters.platform                   = freeBSDArm64   ? Build::Platform::FreeBSD
+                                                       : openBSDArm64 ? Build::Platform::OpenBSD
+                                                                      : Build::Platform::NetBSD;
+        action.parameters.targetMachine.platform     = action.parameters.platform;
+        action.parameters.architecture               = Build::Architecture::Arm64;
         action.parameters.targetMachine.architecture = action.parameters.architecture;
         action.parameters.targetMachine.environment  = Build::TargetEnvironment::Native;
         action.parameters.generator                  = Build::Generator::Native;
         action.parameters.toolchain.family           = Build::Toolchain::Clang;
-        SC_TRY(action.parameters.toolchain.targetTriple.assign(freeBSDArm64 ? "aarch64-unknown-freebsd15.1"_a8
-                                                                            : "aarch64-unknown-netbsd11.0"_a8));
+        const StringView triple                      = freeBSDArm64   ? "aarch64-unknown-freebsd15.1"_a8
+                                                       : openBSDArm64 ? "aarch64-unknown-openbsd8.0"_a8
+                                                                      : "aarch64-unknown-netbsd11.0"_a8;
+        SC_TRY(action.parameters.toolchain.targetTriple.assign(triple));
         return Result(true);
     }
 
@@ -1206,7 +1212,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     options[numOptions].help =
         "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, windows-msvc-x86_64, "
         "windows-msvc-arm64, linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, linux-musl-arm64, "
-        "freebsd-arm64, netbsd-arm64)";
+        "freebsd-arm64, netbsd-arm64, openbsd-arm64)";
     options[numOptions].valueName = "PROFILE";
     options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
     numOptions++;

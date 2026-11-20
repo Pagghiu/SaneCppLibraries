@@ -691,6 +691,8 @@ struct SC::Build::NativeBuild
     {
         const Platform::Type platform = targetPlatform(resolvedProject.targetContext);
         Vector<String>       symbols;
+        const bool           crossBSD = isBSDCrossTarget(resolvedProject.targetContext);
+        const bool           posixNm  = platform == Platform::OpenBSD and not crossBSD;
         for (const ResolvedSource& source : resolvedProject.sources)
         {
             if (not WriterInternal::isRenderItemInExportSet(*resolvedProject.project, source.displayPath.view()))
@@ -703,14 +705,19 @@ struct SC::Build::NativeBuild
             }
 
             CommandLine nmCommand;
-            SC_TRY(nmCommand.append(isBSDCrossTarget(resolvedProject.targetContext) ? "llvm-nm"_a8 : "nm"_a8));
+            SC_TRY(nmCommand.append(crossBSD ? "llvm-nm"_a8 : "nm"_a8));
             switch (platform)
             {
             case Platform::Apple: SC_TRY(nmCommand.append("-gjU")); break;
-            case Platform::OpenBSD: SC_TRY(nmCommand.append("-gP")); break;
+            case Platform::OpenBSD:
             case Platform::Linux:
             case Platform::NetBSD:
             case Platform::FreeBSD:
+                if (posixNm)
+                {
+                    SC_TRY(nmCommand.append("-gP"));
+                    break;
+                }
                 SC_TRY(nmCommand.append("-g"));
                 SC_TRY(nmCommand.append("--defined-only"));
                 SC_TRY(nmCommand.append("-j"));
@@ -727,7 +734,7 @@ struct SC::Build::NativeBuild
             SC_TRY(runCapturedCommand(fs, nmCommand, StringView(), resolvedProject.adapter, StringView(), nmJob));
             if (nmJob.status != NativeJobStatus::Succeeded)
                 return Result::Error(BuildResultCategory, BuildError::BuildCommandExitedUnsuccessfully);
-            SC_TRY(appendExportedSymbols(nmJob.stdOut.view(), platform == Platform::OpenBSD, symbols));
+            SC_TRY(appendExportedSymbols(nmJob.stdOut.view(), posixNm, symbols));
         }
 
         Algorithms::bubbleSort(symbols.begin(), symbols.end(), [](const String& left, const String& right)
@@ -2875,9 +2882,10 @@ struct SC::Build::NativeBuild
                     parameters.toolchain.family != Toolchain::Clang or
                     parameters.platform != context.targetMachine.platform)
                     return Result::Error(BuildResultCategory, BuildError::ToolchainTargetUnsupported);
-                const StringView triple = parameters.toolchain.targetTriple.view();
-                const StringView platform =
-                    context.targetMachine.platform == Platform::FreeBSD ? "-freebsd"_a8 : "-netbsd"_a8;
+                const StringView triple   = parameters.toolchain.targetTriple.view();
+                const StringView platform = context.targetMachine.platform == Platform::FreeBSD   ? "-freebsd"_a8
+                                            : context.targetMachine.platform == Platform::OpenBSD ? "-openbsd"_a8
+                                                                                                  : "-netbsd"_a8;
                 if (not triple.startsWith("aarch64-") or not triple.containsString(platform))
                     return Result::Error(BuildResultCategory, BuildError::TargetTripleUnsupportedForToolchain);
                 if (parameters.toolchain.sysroot.view().isEmpty())
@@ -2902,7 +2910,8 @@ struct SC::Build::NativeBuild
     static constexpr bool isBSDCrossTarget(const ResolvedTargetContext& context)
     {
         return (context.targetMachine.platform == Platform::NetBSD or
-                context.targetMachine.platform == Platform::FreeBSD) and
+                context.targetMachine.platform == Platform::FreeBSD or
+                context.targetMachine.platform == Platform::OpenBSD) and
                context.targetMachine.platform != context.buildMachine.platform;
     }
 
