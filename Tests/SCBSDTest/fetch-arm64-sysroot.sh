@@ -42,6 +42,13 @@ case "$target" in
         fetch comp80.tgz sha256sum 7552eaf6ee6c607a3fb174e0a77efcd40aa6c62540884069cf2dffc7b8c0c10d
         tar -xf "$archives/base80.tgz" -C "$sysroot" ./usr/lib ./usr/libexec/ld.so
         tar -xf "$archives/comp80.tgz" -C "$sysroot" ./usr/include ./usr/lib
+        # Upstream LLD needs unversioned linker names. The shared objects retain their versioned SONAMEs.
+        for library in "$sysroot"/usr/lib/lib*.so.[0-9]*; do
+            name=${library%.so.*}.so
+            if [ ! -e "$name" ]; then
+                ln -s "${library##*/}" "$name"
+            fi
+        done
         test -f "$sysroot/usr/include/machine/signal.h"
         ;;
     *) printf 'Unknown BSD target: %s\n' "$target" >&2; exit 1 ;;

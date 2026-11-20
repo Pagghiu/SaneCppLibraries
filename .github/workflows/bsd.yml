@@ -137,7 +137,11 @@ jobs:
           clang --version
           for config in Debug Release; do
             time ./SC.sh build compile SCTest "$config" --target "$BSD_TARGET-arm64" --sysroot "$RUNNER_TEMP/bsd-sysroot"
-            readelf -h "_Build/_Outputs/$BSD_TARGET-arm64-Native-clang-$config/SCTest"
+            executable="_Build/_Outputs/$BSD_TARGET-arm64-Native-clang-$config/SCTest"
+            readelf -h "$executable"
+            if [ "$BSD_TARGET" = openbsd ]; then
+              readelf -d "$executable" | grep 'Shared library: \[libc\.so\.'
+            fi
           done
 
       - name: Stage guest checkout and binaries

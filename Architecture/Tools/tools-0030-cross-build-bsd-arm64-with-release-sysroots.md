@@ -29,3 +29,7 @@ Report host compile and guest run times separately.
 The `openbsd-arm64` profile uses the OpenBSD 8.0 base and compiler sets for the sysroot. Cross-builds
 use LLVM's name-only symbol output. Native OpenBSD keeps the base `nm` POSIX format. The ARM64 job
 compiles on Ubuntu and runs the existing suite inside the OpenBSD guest.
+
+The OpenBSD release sets contain versioned shared libraries. Create unversioned linker names inside
+the cross sysroot so upstream LLD can select the shared libraries and record their versioned SONAMEs.
+Check for a shared libc dependency before staging the test executable.
