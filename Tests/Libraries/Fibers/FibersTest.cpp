@@ -644,8 +644,13 @@ struct SC::FibersTest : public SC::TestCase
             waited = ::waitpid(child, &status, 0);
         } while (waited < 0 and errno == EINTR);
         SC_TEST_EXPECT(waited == child);
-        SC_TEST_EXPECT((WIFEXITED(status) and WEXITSTATUS(status) != 0) or
-                       (WIFSIGNALED(status) and WTERMSIG(status) == SIGABRT));
+        const int terminationSignal   = WIFSIGNALED(status) ? WTERMSIG(status) : 0;
+        bool      sanitizerTerminated = terminationSignal == SIGABRT;
+#if SC_PLATFORM_APPLE
+        // Under LLDB, the probe can terminate with SIGTRAP after ASan emits its report.
+        sanitizerTerminated = sanitizerTerminated or terminationSignal == SIGTRAP;
+#endif
+        SC_TEST_EXPECT((WIFEXITED(status) and WEXITSTATUS(status) != 0) or sanitizerTerminated);
         SC_TEST_EXPECT(::strstr(output, "Fibers ASan probe resumed") != nullptr);
         SC_TEST_EXPECT(::strstr(output, "ERROR: AddressSanitizer: stack-buffer-overflow") != nullptr);
     }
