@@ -19,10 +19,17 @@ use separate jobs. Each job boots its guest once and runs the staged Debug and R
 executables from their normal checkout-relative paths. Guest-native plugin fixture compilation
 continues to exercise the plugin compiler and linker.
 
+NetBSD installs its base-system C++ headers under `/usr/include/g++`, which an upstream Clang
+cross compiler does not discover from `--sysroot` alone. When a NetBSD cross-built target opts
+into standard C++ headers, add that target-owned directory as a system include path. Native
+NetBSD keeps using its compiler's normal header discovery, and strict no-standard-C++ targets
+keep the existing `-nostdinc++` boundary.
+
 ## Confirmation
 
 Exercise the shared SCTest suite in both configurations on FreeBSD and NetBSD ARM64.
-Report host compile and guest run times separately.
+Compile the generated single-file targets in both configurations, including the Await targets
+that require the system C++ headers. Report host compile and guest run times separately.
 
 ## OpenBSD extension
 

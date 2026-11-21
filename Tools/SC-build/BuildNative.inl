@@ -2365,6 +2365,16 @@ struct SC::Build::NativeBuild
             SC_TRY(StringBuilder::format(option, "-I{}", absolutePath.view()));
             SC_TRY(commandLine.append(option.view()));
         }
+        if (flags.includeStdCpp and isBSDCrossTarget(resolvedProject.targetContext) and
+            targetPlatform(resolvedProject.targetContext) == Platform::NetBSD)
+        {
+            String includePath = StringEncoding::Utf8;
+            SC_TRY(Path::join(includePath, {resolvedProject.resolvedSysroot.view(), "usr", "include", "g++"}));
+
+            String option = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(option, "-isystem{}", includePath.view()));
+            SC_TRY(commandLine.append(option.view()));
+        }
         const Vector<String>& extraCompilerFlags = resolvedProject.parameters->toolchain.extraCompilerFlags;
         for (const String& extraCompilerFlag : extraCompilerFlags)
         {
