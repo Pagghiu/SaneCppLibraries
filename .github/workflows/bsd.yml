@@ -86,7 +86,7 @@ jobs:
   cross-test:
     name: ${{ matrix.os }} ${{ matrix.release }} ARM64 cross-build
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -131,12 +131,16 @@ jobs:
           time sh Tests/SCBSDTest/fetch-arm64-sysroot.sh "$BSD_TARGET" \
             "$RUNNER_TEMP/bsd-sysroot" "$RUNNER_TEMP/bsd-$BSD_TARGET-arm64"
 
-      - name: Cross-compile SCTest on x86_64
+      - name: Generate single-file libraries
+        run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+
+      - name: Cross-compile tests and generated libraries on x86_64
         run: |
           uname -m
           clang --version
           for config in Debug Release; do
             time ./SC.sh build compile SCTest "$config" --target "$BSD_TARGET-arm64" --sysroot "$RUNNER_TEMP/bsd-sysroot"
+            time ./SC.sh build compile "SCSingleFileLibs:" "$config" --target "$BSD_TARGET-arm64" --sysroot "$RUNNER_TEMP/bsd-sysroot"
             executable="_Build/_Outputs/$BSD_TARGET-arm64-Native-clang-$config/SCTest"
             readelf -h "$executable"
             if [ "$BSD_TARGET" = openbsd ]; then
