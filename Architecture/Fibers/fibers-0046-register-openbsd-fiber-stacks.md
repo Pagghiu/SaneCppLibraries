@@ -20,7 +20,12 @@ the remap zeroes. Temporarily mask signals during registration and restore the o
 existing alternate signal stack can use FiberVirtualStack or FiberStackClass, which already have native stack
 mappings.
 
+On ARM64, place the initial stack pointer one aligned frame inside the registered interval. OpenBSD validates the
+saved stack pointer itself against MAP_STACK before servicing a page fault, so the usual one-past-the-end initial
+pointer can prevent the first stack write from faulting in successfully.
+
 ## Confirmation
 
 The existing FibersTest and AsyncFibersTest groups, including cross-thread resume and I/O, passed on OpenBSD 8.0
-amd64 in Debug. The same FibersTest group passed in Debug and Release on macOS.
+amd64 in Debug. The completed stack storage reuse regression and the full FibersTest group pass on OpenBSD 8.0 ARM64
+in Release. The same FibersTest group passed in Debug and Release on macOS.

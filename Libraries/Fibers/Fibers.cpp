@@ -9960,6 +9960,11 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
     context.platform.r12                = reinterpret_cast<void*>(entry);
     context.platform.r13                = userData;
 #elif SC_PLATFORM_ARM64
+#if SC_PLATFORM_OPENBSD
+    // OpenBSD validates the interrupted stack pointer against MAP_STACK before handling a page fault.
+    // Keep the initial pointer inside the mapping instead of at its exclusive end.
+    stackTop -= FiberStackAlignment;
+#endif
     context.platform.sp  = stackTop;
     context.platform.x19 = reinterpret_cast<void*>(entry);
     context.platform.x20 = userData;
