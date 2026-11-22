@@ -1,11 +1,19 @@
 # Copyright (c) Stefano Cristiano
 # SPDX-License-Identifier: MIT
+param(
+    [ValidatePattern('^[0-9]+\.[0-9]+$')]
+    [string]$ToolsetVersion
+)
+
 $ErrorActionPreference = 'Stop'
 
 if (-not $env:GITHUB_ENV) {
     throw 'GITHUB_ENV must identify the environment file for subsequent CI steps.'
 }
 if ($env:VSCMD_VER) {
+    if ($ToolsetVersion -and $env:VCToolsVersion -notlike "$ToolsetVersion.*") {
+        throw "MSVC toolset $env:VCToolsVersion is already initialized. Expected $ToolsetVersion.x."
+    }
     Write-Host "MSVC environment already initialized: $env:VSCMD_VER"
     return
 }
@@ -21,7 +29,8 @@ Get-ChildItem Env: | ForEach-Object { $before[$_.Name] = $_.Value }
 
 # Match SC.bat's compiler host/target and telemetry settings. JSON preserves Unicode,
 # embedded equals signs and multiline values without printing the environment.
-$command = 'set __VSCMD_ARG_NO_LOGO=1&& set VSCMD_SKIP_SENDTELEMETRY=1&& set VCPKG_KEEP_ENV_VARS=VSCMD_SKIP_SENDTELEMETRY&& call "{0}" x86_amd64 >nul && python -c "import json, os; print(json.dumps(dict(os.environ)))"' -f $vcvars
+$toolsetArgument = if ($ToolsetVersion) { " -vcvars_ver=$ToolsetVersion" } else { '' }
+$command = 'set __VSCMD_ARG_NO_LOGO=1&& set VSCMD_SKIP_SENDTELEMETRY=1&& set VCPKG_KEEP_ENV_VARS=VSCMD_SKIP_SENDTELEMETRY&& call "{0}" x86_amd64{1} >nul && python -c "import json, os; print(json.dumps(dict(os.environ)))"' -f $vcvars, $toolsetArgument
 $serialized = & $env:ComSpec /d /c $command
 if ($LASTEXITCODE -ne 0) {
     throw "MSVC environment initialization failed: $LASTEXITCODE"
@@ -46,4 +55,4 @@ foreach ($property in $after.PSObject.Properties) {
 }
 # Persist PATH in full to retain vcvarsall's exact search order, not just new entries.
 [System.IO.File]::AppendAllLines($env:GITHUB_ENV, $lines, [System.Text.UTF8Encoding]::new($false))
-Write-Host "Initialized MSVC $($after.VSCMD_VER): $($after.VSCMD_ARG_HOST_ARCH) -> $($after.VSCMD_ARG_TGT_ARCH)"
+Write-Host "Initialized MSVC toolset $($after.VCToolsVersion): $($after.VSCMD_ARG_HOST_ARCH) -> $($after.VSCMD_ARG_TGT_ARCH)"

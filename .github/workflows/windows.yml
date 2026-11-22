@@ -248,9 +248,10 @@ jobs:
         persist-credentials: false
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
-    - name: Initialize MSVC environment
+    - name: Initialize MSVC v143 environment
       shell: pwsh
-      run: ./Support/Scripts/InitializeMsvcEnvironment.ps1
+      # The pinned stdexec fails to compile with MSVC 14.52 on windows-2025.
+      run: ./Support/Scripts/InitializeMsvcEnvironment.ps1 -ToolsetVersion 14.44
     - name: configure SCSingleFileLibs
       shell: cmd
       run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
