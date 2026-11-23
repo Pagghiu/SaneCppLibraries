@@ -33,8 +33,8 @@ struct FileSystemWatcherLinuxTest : TestCase
     {
         struct IdleRunner : FileSystemWatcher::EventLoopRunner
         {
-            Result linuxStartSharedFileReadiness() override { return Result(true); }
-            Result linuxStopSharedFileReadiness() override { return Result(true); }
+            Result posixStartSharedFileReadiness() override { return Result(true); }
+            Result posixStopSharedFileReadiness() override { return Result(true); }
         } idle;
         FileSystemWatcher::ThreadRunner thread;
         FileSystemWatcher               first, second;
@@ -97,8 +97,8 @@ struct FileSystemWatcherLinuxTest : TestCase
         else
         {
             const auto detail = scenario == Scenario::ShutdownPipeFailure
-                                    ? FileSystemWatcherErrorDetail::LinuxCreateShutdownPipe
-                                    : FileSystemWatcherErrorDetail::LinuxInitializeInotify;
+                                    ? FileSystemWatcherErrorDetail::PosixCreateShutdownPipe
+                                    : FileSystemWatcherErrorDetail::InotifyInitialize;
             if (not initialized.isError(FileSystemWatcherError::InitializationFailed) or initialized.detail != detail or
                 initialized.nativeError != EMFILE or
                 not watcher.close().isError(FileSystemWatcherError::NotInitialized))

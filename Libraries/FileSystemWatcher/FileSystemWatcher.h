@@ -215,8 +215,8 @@ struct FileSystemWatcher
 
 #elif SC_PLATFORM_LINUX
         // On failure, no readiness request may remain active or retain notifyFd.
-        virtual Result linuxStartSharedFileReadiness() = 0;
-        virtual Result linuxStopSharedFileReadiness()  = 0;
+        virtual Result posixStartSharedFileReadiness() = 0;
+        virtual Result posixStopSharedFileReadiness()  = 0;
 
         int notifyFd = -1;
 
@@ -364,7 +364,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
     T_AsyncLoopWakeUp asyncWakeUp = {};
     T_EventObject     eventObject = {};
 #elif SC_PLATFORM_LINUX
-    virtual Result linuxStartSharedFileReadiness() override
+    virtual Result posixStartSharedFileReadiness() override
     {
         if (eventLoop == nullptr or fileSystemWatcher == nullptr)
             return Result::Error(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized);
@@ -373,12 +373,12 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         return asyncPoll.start(*eventLoop, notifyFd);
     }
 
-    virtual Result linuxStopSharedFileReadiness() override
+    virtual Result posixStopSharedFileReadiness() override
     {
-        if (linuxDeliveryAlive != nullptr)
+        if (posixDeliveryAlive != nullptr)
         {
-            *linuxDeliveryAlive = false;
-            linuxDeliveryAlive  = nullptr;
+            *posixDeliveryAlive = false;
+            posixDeliveryAlive  = nullptr;
         }
         if (not asyncPoll.isFree())
         {
@@ -394,7 +394,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
     void onEventLoopNotification(typename T_AsyncFileReadiness::Result& result)
     {
         bool deliveryAlive = true;
-        linuxDeliveryAlive = &deliveryAlive;
+        posixDeliveryAlive = &deliveryAlive;
 
         bool rearm = false;
         if (result.isValid())
@@ -407,13 +407,13 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         }
         if (deliveryAlive)
         {
-            linuxDeliveryAlive = nullptr;
+            posixDeliveryAlive = nullptr;
             if (rearm)
                 result.reactivateRequest(true);
         }
     }
 
-    bool* linuxDeliveryAlive = nullptr;
+    bool* posixDeliveryAlive = nullptr;
 
     T_AsyncFileReadiness asyncPoll = {};
 #else

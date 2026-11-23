@@ -35,35 +35,41 @@ inline bool appendFileSystemWatcherErrorDetail(ResultErrorFormatter& formatter, 
     case FileSystemWatcherErrorDetail::WindowsCancelDirectoryChanges:
         formatter.append("Windows cancel directory changes");
         break;
-    case FileSystemWatcherErrorDetail::LinuxCreateShutdownPipe: formatter.append("Linux create shutdown pipe"); break;
-    case FileSystemWatcherErrorDetail::LinuxInitializeInotify: formatter.append("Linux initialize inotify"); break;
-    case FileSystemWatcherErrorDetail::LinuxWriteShutdownPipe: formatter.append("Linux write shutdown pipe"); break;
-    case FileSystemWatcherErrorDetail::LinuxInotifyDescriptor: formatter.append("Linux inotify descriptor"); break;
-    case FileSystemWatcherErrorDetail::LinuxRemoveWatch: formatter.append("Linux remove watch"); break;
-    case FileSystemWatcherErrorDetail::LinuxAddRootWatch: formatter.append("Linux add root watch"); break;
-    case FileSystemWatcherErrorDetail::LinuxAddSubdirectoryWatch:
-        formatter.append("Linux add subdirectory watch");
+    case FileSystemWatcherErrorDetail::PosixCreateShutdownPipe: formatter.append("POSIX create shutdown pipe"); break;
+    case FileSystemWatcherErrorDetail::InotifyInitialize: formatter.append("inotify initialize"); break;
+    case FileSystemWatcherErrorDetail::PosixWriteShutdownPipe: formatter.append("POSIX write shutdown pipe"); break;
+    case FileSystemWatcherErrorDetail::InotifyDescriptor: formatter.append("inotify descriptor"); break;
+    case FileSystemWatcherErrorDetail::InotifyRemoveWatch: formatter.append("inotify remove watch"); break;
+    case FileSystemWatcherErrorDetail::InotifyAddRootWatch: formatter.append("inotify add root watch"); break;
+    case FileSystemWatcherErrorDetail::InotifyAddSubdirectoryWatch:
+        formatter.append("inotify add subdirectory watch");
         break;
-    case FileSystemWatcherErrorDetail::LinuxOpenRootDirectory: formatter.append("Linux open root directory"); break;
-    case FileSystemWatcherErrorDetail::LinuxOpenDirectoryStream: formatter.append("Linux open directory stream"); break;
-    case FileSystemWatcherErrorDetail::LinuxReadDirectoryEntries:
-        formatter.append("Linux read directory entries");
+    case FileSystemWatcherErrorDetail::InotifyOpenRootDirectory: formatter.append("inotify open root directory"); break;
+    case FileSystemWatcherErrorDetail::InotifyOpenDirectoryStream:
+        formatter.append("inotify open directory stream");
         break;
-    case FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry:
-        formatter.append("Linux inspect directory entry");
+    case FileSystemWatcherErrorDetail::InotifyReadDirectoryEntries:
+        formatter.append("inotify read directory entries");
         break;
-    case FileSystemWatcherErrorDetail::LinuxOpenSubdirectory: formatter.append("Linux open subdirectory"); break;
-    case FileSystemWatcherErrorDetail::LinuxReadEvents: formatter.append("Linux read events"); break;
-    case FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity:
-        formatter.append("Linux verify directory identity");
+    case FileSystemWatcherErrorDetail::InotifyInspectDirectoryEntry:
+        formatter.append("inotify inspect directory entry");
         break;
-    case FileSystemWatcherErrorDetail::LinuxWatchInvalidated: formatter.append("Linux watch invalidated"); break;
-    case FileSystemWatcherErrorDetail::LinuxWaitForEvents: formatter.append("Linux wait for events"); break;
-    case FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity: formatter.append("Linux watch handle capacity"); break;
-    case FileSystemWatcherErrorDetail::LinuxPendingDirectoryCapacity:
-        formatter.append("Linux pending directory capacity");
+    case FileSystemWatcherErrorDetail::InotifyOpenSubdirectory: formatter.append("inotify open subdirectory"); break;
+    case FileSystemWatcherErrorDetail::InotifyReadEvents: formatter.append("inotify read events"); break;
+    case FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity:
+        formatter.append("inotify verify directory identity");
         break;
-    case FileSystemWatcherErrorDetail::LinuxRelativePathStorage: formatter.append("Linux relative path storage"); break;
+    case FileSystemWatcherErrorDetail::InotifyWatchInvalidated: formatter.append("inotify watch invalidated"); break;
+    case FileSystemWatcherErrorDetail::InotifyWaitForEvents: formatter.append("inotify wait for events"); break;
+    case FileSystemWatcherErrorDetail::InotifyWatchHandleCapacity:
+        formatter.append("inotify watch handle capacity");
+        break;
+    case FileSystemWatcherErrorDetail::InotifyPendingDirectoryCapacity:
+        formatter.append("inotify pending directory capacity");
+        break;
+    case FileSystemWatcherErrorDetail::InotifyRelativePathStorage:
+        formatter.append("inotify relative path storage");
+        break;
     case FileSystemWatcherErrorDetail::AppleRunLoop: formatter.append("Apple run loop"); break;
     case FileSystemWatcherErrorDetail::AppleCreateRunLoopSource:
         formatter.append("Apple create run loop source");

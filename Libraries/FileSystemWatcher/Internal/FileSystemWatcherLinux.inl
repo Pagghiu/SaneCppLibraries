@@ -107,7 +107,7 @@ struct SC::FileSystemWatcher::Internal
             self            = nullptr;
             threadingRunner = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
-                                           FileSystemWatcherErrorDetail::LinuxCreateShutdownPipe, nativeError);
+                                           FileSystemWatcherErrorDetail::PosixCreateShutdownPipe, nativeError);
         }
         notifyFd = ::inotify_init1(IN_CLOEXEC);
         if (notifyFd == -1)
@@ -117,7 +117,7 @@ struct SC::FileSystemWatcher::Internal
             self            = nullptr;
             threadingRunner = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
-                                           FileSystemWatcherErrorDetail::LinuxInitializeInotify, nativeError);
+                                           FileSystemWatcherErrorDetail::InotifyInitialize, nativeError);
         }
         return ResultFileSystemWatcher(true);
     }
@@ -138,11 +138,11 @@ struct SC::FileSystemWatcher::Internal
             self            = nullptr;
             eventLoopRunner = nullptr;
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
-                                           FileSystemWatcherErrorDetail::LinuxInitializeInotify, nativeError);
+                                           FileSystemWatcherErrorDetail::InotifyInitialize, nativeError);
         }
 
         eventLoopRunner->internalInit(parent, notifyFd);
-        const Result started = eventLoopRunner->linuxStartSharedFileReadiness();
+        const Result started = eventLoopRunner->posixStartSharedFileReadiness();
         if (not started)
         {
             ::close(notifyFd);
@@ -196,7 +196,7 @@ struct SC::FileSystemWatcher::Internal
     {
         if (eventLoopRunner)
         {
-            SC_TRY(eventLoopRunner->linuxStopSharedFileReadiness());
+            SC_TRY(eventLoopRunner->posixStopSharedFileReadiness());
         }
 
         if (threadingRunner)
@@ -213,7 +213,7 @@ struct SC::FileSystemWatcher::Internal
                     {
                         const uint32_t nativeError = static_cast<uint32_t>(errno);
                         return ResultFileSystemWatcher(FileSystemWatcherError::CloseFailed,
-                                                       FileSystemWatcherErrorDetail::LinuxWriteShutdownPipe,
+                                                       FileSystemWatcherErrorDetail::PosixWriteShutdownPipe,
                                                        nativeError);
                     }
                 }
@@ -278,7 +278,7 @@ struct SC::FileSystemWatcher::Internal
             removed = ::inotify_rm_watch(notifyFd, watchId);
         while (removed == -1 and errno == EINTR);
         if (removed == -1 and errno != EINVAL)
-            return {FileSystemWatcherError::StopWatchingFailed, FileSystemWatcherErrorDetail::LinuxRemoveWatch,
+            return {FileSystemWatcherError::StopWatchingFailed, FileSystemWatcherErrorDetail::InotifyRemoveWatch,
                     static_cast<uint32_t>(errno)};
         return ResultFileSystemWatcher(true);
     }
@@ -304,7 +304,7 @@ struct SC::FileSystemWatcher::Internal
         if (notifyFd == -1)
         {
             return ResultFileSystemWatcher(FileSystemWatcherError::StopWatchingFailed,
-                                           FileSystemWatcherErrorDetail::LinuxInotifyDescriptor);
+                                           FileSystemWatcherErrorDetail::InotifyDescriptor);
         }
 
         ResultFileSystemWatcher result(true);
@@ -365,10 +365,10 @@ struct SC::FileSystemWatcher::Internal
         struct stat opened, named;
         if (::fstat(directoryFd, &opened) == -1 or ::fstatat(parentFd, name, &named, flags) == -1)
             return {FileSystemWatcherError::WatchSetupFailed,
-                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
+                    FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
         if (not sameDirectory(opened, named))
             return {FileSystemWatcherError::WatchSetupFailed,
-                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, ESTALE};
+                    FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, ESTALE};
         return ResultFileSystemWatcher(true);
     }
 
@@ -388,7 +388,8 @@ struct SC::FileSystemWatcher::Internal
                                             const char* path)
     {
         if (folder.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
-            return {FileSystemWatcherError::WatchLimitExceeded, FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity};
+            return {FileSystemWatcherError::WatchLimitExceeded,
+                    FileSystemWatcherErrorDetail::InotifyWatchHandleCapacity};
         if (path[0] == '/')
             ++path;
 
@@ -397,13 +398,13 @@ struct SC::FileSystemWatcher::Internal
         const auto oldLength    = folder.relativePaths.length;
         const auto relativePath = StringSpan::fromNullTerminated(path, StringEncoding::Utf8);
         if (not relativePath.appendNullTerminatedTo(folder.relativePaths, false))
-            return {FileSystemWatcherError::BufferTooSmall, FileSystemWatcherErrorDetail::LinuxRelativePathStorage};
+            return {FileSystemWatcherError::BufferTooSmall, FileSystemWatcherErrorDetail::InotifyRelativePathStorage};
 
         pair.notifyID = registerDirectory(fd);
         if (pair.notifyID == -1)
         {
             folder.relativePaths.length = oldLength;
-            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::LinuxAddSubdirectoryWatch,
+            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::InotifyAddSubdirectoryWatch,
                     static_cast<uint32_t>(errno)};
         }
         pair.device                                       = static_cast<uint64_t>(status.st_dev);
@@ -436,7 +437,7 @@ struct SC::FileSystemWatcher::Internal
                 const uint32_t nativeError = static_cast<uint32_t>(errno);
                 ::close(fd);
                 return {FileSystemWatcherError::WatchSetupFailed,
-                        FileSystemWatcherErrorDetail::LinuxOpenDirectoryStream, nativeError};
+                        FileSystemWatcherErrorDetail::InotifyOpenDirectoryStream, nativeError};
             }
             pending[depth++] = {stream, watchIndex};
             return ResultFileSystemWatcher(true);
@@ -459,7 +460,7 @@ struct SC::FileSystemWatcher::Internal
                     continue;
                 if (nativeError != 0)
                     return {FileSystemWatcherError::WatchSetupFailed,
-                            FileSystemWatcherErrorDetail::LinuxReadDirectoryEntries,
+                            FileSystemWatcherErrorDetail::InotifyReadDirectoryEntries,
                             static_cast<uint32_t>(nativeError)};
                 ::closedir(pending[--depth].stream);
                 continue;
@@ -476,7 +477,7 @@ struct SC::FileSystemWatcher::Internal
             while (inspected == -1 and errno == EINTR);
             if (inspected == -1 and errno != ENOENT)
                 return {FileSystemWatcherError::WatchSetupFailed,
-                        FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry, static_cast<uint32_t>(errno)};
+                        FileSystemWatcherErrorDetail::InotifyInspectDirectoryEntry, static_cast<uint32_t>(errno)};
             if (inspected == -1 or not S_ISDIR(status.st_mode))
                 continue;
 
@@ -489,17 +490,17 @@ struct SC::FileSystemWatcher::Internal
                 const int nativeError = errno;
                 if (nativeError == ENOENT)
                     continue;
-                return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::LinuxOpenSubdirectory,
+                return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::InotifyOpenSubdirectory,
                         static_cast<uint32_t>(nativeError)};
             }
             auto        closeChild = MakeDeferred([childFd] { ::close(childFd); });
             struct stat opened;
             if (::fstat(childFd, &opened) == -1)
                 return {FileSystemWatcherError::WatchSetupFailed,
-                        FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
+                        FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
             if (not sameDirectory(status, opened))
                 return {FileSystemWatcherError::WatchSetupFailed,
-                        FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, ESTALE};
+                        FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, ESTALE};
 
             const auto pathReady = getSubFolderPath(currentPath, entry.path, name, folder, directory.watchIndex);
             if (not pathReady)
@@ -565,13 +566,13 @@ struct SC::FileSystemWatcher::Internal
         {
             detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized,
-                                           FileSystemWatcherErrorDetail::LinuxInotifyDescriptor);
+                                           FileSystemWatcherErrorDetail::InotifyDescriptor);
         }
         if (opaque.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
         {
             detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
-                                           FileSystemWatcherErrorDetail::LinuxWatchHandleCapacity);
+                                           FileSystemWatcherErrorDetail::InotifyWatchHandleCapacity);
         }
 
         // Open the root before registering it, so an open failure cannot leave an inotify watch behind.
@@ -581,7 +582,7 @@ struct SC::FileSystemWatcher::Internal
             const uint32_t nativeError = static_cast<uint32_t>(errno);
             detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                           FileSystemWatcherErrorDetail::LinuxOpenRootDirectory, nativeError);
+                                           FileSystemWatcherErrorDetail::InotifyOpenRootDirectory, nativeError);
         }
         auto closeRoot = MakeDeferred([rootFd] { ::close(rootFd); });
 
@@ -591,7 +592,7 @@ struct SC::FileSystemWatcher::Internal
             const uint32_t nativeError = static_cast<uint32_t>(errno);
             detachUnstartedWatcher(*entry);
             return {FileSystemWatcherError::WatchSetupFailed,
-                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, nativeError};
+                    FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, nativeError};
         }
 
         const int newHandle = registerDirectory(rootFd);
@@ -600,7 +601,7 @@ struct SC::FileSystemWatcher::Internal
             const uint32_t nativeError = static_cast<uint32_t>(errno);
             detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchSetupFailed,
-                                           FileSystemWatcherErrorDetail::LinuxAddRootWatch, nativeError);
+                                           FileSystemWatcherErrorDetail::InotifyAddRootWatch, nativeError);
         }
         FolderWatcherInternal::Pair pair;
         pair.notifyID                                     = newHandle;
@@ -655,7 +656,8 @@ struct SC::FileSystemWatcher::Internal
             {
                 const int nativeError = ready == -1 ? errno : (status & POLLNVAL) ? EBADF : EIO;
                 failMonitoring({FileSystemWatcherError::MonitoringFailed,
-                                FileSystemWatcherErrorDetail::LinuxWaitForEvents, static_cast<uint32_t>(nativeError)});
+                                FileSystemWatcherErrorDetail::InotifyWaitForEvents,
+                                static_cast<uint32_t>(nativeError)});
                 return;
             }
             if (descriptors[0].revents & POLLIN)
@@ -682,7 +684,7 @@ struct SC::FileSystemWatcher::Internal
         {
             const uint32_t nativeError = numReadBytes == -1 ? static_cast<uint32_t>(errno) : 0;
             failMonitoring(ResultFileSystemWatcher(FileSystemWatcherError::MonitoringFailed,
-                                                   FileSystemWatcherErrorDetail::LinuxReadEvents, nativeError));
+                                                   FileSystemWatcherErrorDetail::InotifyReadEvents, nativeError));
             return false;
         }
         return dispatch([&](Delivery& frame)
@@ -806,22 +808,22 @@ struct SC::FileSystemWatcher::Internal
         {
             if (errno == ENOENT or errno == ENOTDIR)
                 return ResultFileSystemWatcher(true); // A queued event for an already departed parent.
-            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::LinuxOpenSubdirectory,
+            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::InotifyOpenSubdirectory,
                     static_cast<uint32_t>(errno)};
         }
         auto        closeParent = MakeDeferred([parentFd] { ::close(parentFd); });
         struct stat parentStatus;
         if (::fstat(parentFd, &parentStatus) == -1)
             return {FileSystemWatcherError::WatchSetupFailed,
-                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
+                    FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
         if (not folder.notifyHandles[parentIndex].matches(parentStatus))
             return ResultFileSystemWatcher(true);
 
         struct stat childStatus;
         const bool  exists = ::fstatat(parentFd, event.name, &childStatus, AT_SYMLINK_NOFOLLOW) == 0;
         if (not exists and errno != ENOENT)
-            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry,
-                    static_cast<uint32_t>(errno)};
+            return {FileSystemWatcherError::WatchSetupFailed,
+                    FileSystemWatcherErrorDetail::InotifyInspectDirectoryEntry, static_cast<uint32_t>(errno)};
 
         // If a path already denotes the registered directory, a queued event for it needs no update.
         for (size_t index = 1; index < folder.notifyHandlesCount; ++index)
@@ -884,17 +886,17 @@ struct SC::FileSystemWatcher::Internal
         {
             if (errno == ENOENT)
                 return ResultFileSystemWatcher(true);
-            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::LinuxOpenSubdirectory,
+            return {FileSystemWatcherError::WatchSetupFailed, FileSystemWatcherErrorDetail::InotifyOpenSubdirectory,
                     static_cast<uint32_t>(errno)};
         }
         auto        closeChild = MakeDeferred([childFd] { ::close(childFd); });
         struct stat opened;
         if (::fstat(childFd, &opened) == -1)
             return {FileSystemWatcherError::WatchSetupFailed,
-                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
+                    FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, static_cast<uint32_t>(errno)};
         if (not sameDirectory(childStatus, opened))
             return {FileSystemWatcherError::WatchSetupFailed,
-                    FileSystemWatcherErrorDetail::LinuxVerifyDirectoryIdentity, ESTALE};
+                    FileSystemWatcherErrorDetail::InotifyVerifyDirectoryIdentity, ESTALE};
         const int  childIndex = static_cast<int>(folder.notifyHandlesCount);
         const auto added      = addSubdirectory(folder, childFd, opened, relative);
         if (not added)
@@ -945,8 +947,9 @@ struct SC::FileSystemWatcher::Internal
         }
 
         if (rootLost)
-            notifyRoot(entry, NotificationKind::WatchStopped, frame,
-                       {FileSystemWatcherError::MonitoringFailed, FileSystemWatcherErrorDetail::LinuxWatchInvalidated});
+            notifyRoot(
+                entry, NotificationKind::WatchStopped, frame,
+                {FileSystemWatcherError::MonitoringFailed, FileSystemWatcherErrorDetail::InotifyWatchInvalidated});
         else if (subtreeLost)
             notifyRoot(entry, NotificationKind::RescanRequired, frame);
     }

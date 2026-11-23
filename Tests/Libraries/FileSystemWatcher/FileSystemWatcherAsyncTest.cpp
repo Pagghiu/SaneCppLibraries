@@ -69,7 +69,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #if SC_PLATFORM_APPLE
                 return appleStartWakeUp();
 #elif SC_PLATFORM_LINUX
-                return linuxStartSharedFileReadiness();
+                return posixStartSharedFileReadiness();
 #else
                 FileSystemWatcher::FolderWatcher watcher;
                 return windowsStartFolderExternalCompletion(watcher, nullptr);
@@ -682,7 +682,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         limitedWatcher.notifyCallback                = [](const FileSystemWatcher::Notification&){};
         const ResultFileSystemWatcher limitedFailure = fileEventsWatcher.watch(limitedWatcher, directoryPath.view());
         SC_TEST_EXPECT(limitedFailure.isError(FileSystemWatcherError::BufferTooSmall));
-        SC_TEST_EXPECT(limitedFailure.detail == FileSystemWatcherErrorDetail::LinuxRelativePathStorage);
+        SC_TEST_EXPECT(limitedFailure.detail == FileSystemWatcherErrorDetail::InotifyRelativePathStorage);
         SC_TEST_EXPECT(limitedWatcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
         SC_TEST_EXPECT(writeAndObserve(directoryPath.view(), "rollback-root.txt", bothWatchers));
         SC_TEST_EXPECT(writeAndObserve(childPath.view(), "rollback-child.txt", bothWatchers));
@@ -1216,7 +1216,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 ++state.outerStopped;
                 state.validStatus = state.validStatus and event.relativePath.isEmpty() and
                                     event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                                    event.failure.detail == FileSystemWatcherErrorDetail::LinuxWatchInvalidated;
+                                    event.failure.detail == FileSystemWatcherErrorDetail::InotifyWatchInvalidated;
             }
             const StringView path = event.relativePath;
             state.stalePath |= path.endsWith("stale.txt");
@@ -1234,7 +1234,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 ++state.innerStopped;
                 state.validStatus = state.validStatus and event.relativePath.isEmpty() and
                                     event.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                                    event.failure.detail == FileSystemWatcherErrorDetail::LinuxWatchInvalidated;
+                                    event.failure.detail == FileSystemWatcherErrorDetail::InotifyWatchInvalidated;
             }
             const StringView path = event.relativePath;
             state.stalePath |= path.endsWith("stale.txt");
@@ -1571,7 +1571,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             state.failureDetails = notification.basePath == state.path and notification.relativePath.isEmpty() and
                                    notification.operation == FileSystemWatcher::Operation::AddRemoveRename and
                                    notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                                   notification.failure.detail == FileSystemWatcherErrorDetail::LinuxReadEvents and
+                                   notification.failure.detail == FileSystemWatcherErrorDetail::InotifyReadEvents and
                                    notification.failure.nativeError == EBADF;
             if (::dup2(state.backupFd, state.fd) == state.fd)
             {
@@ -1594,10 +1594,11 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             if (notification.kind == FileSystemWatcher::NotificationKind::WatchStopped)
             {
                 ++state.failures;
-                state.failureDetails = state.failureDetails and notification.basePath == state.path and
-                                       notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                                       notification.failure.detail == FileSystemWatcherErrorDetail::LinuxReadEvents and
-                                       notification.failure.nativeError == EBADF;
+                state.failureDetails =
+                    state.failureDetails and notification.basePath == state.path and
+                    notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                    notification.failure.detail == FileSystemWatcherErrorDetail::InotifyReadEvents and
+                    notification.failure.nativeError == EBADF;
                 state.closed = static_cast<bool>(state.owner->close());
             }
         };

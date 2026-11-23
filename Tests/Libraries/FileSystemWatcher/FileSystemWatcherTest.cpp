@@ -74,7 +74,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(notWatching.isError(FileSystemWatcherError::NotWatching));
 
         ResultFileSystemWatcher detailed(FileSystemWatcherError::WatchSetupFailed,
-                                         FileSystemWatcherErrorDetail::LinuxAddRootWatch, 12345);
+                                         FileSystemWatcherErrorDetail::InotifyAddRootWatch, 12345);
         const Result            plain = detailed;
         SC_TEST_EXPECT(plain.isError(FileSystemWatcherResultCategory, FileSystemWatcherError::WatchSetupFailed));
 
@@ -102,17 +102,17 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(notification.kind == FileSystemWatcher::NotificationKind::Change);
         SC_TEST_EXPECT(notification.failure);
         const ResultFileSystemWatcher monitoringFailure(FileSystemWatcherError::MonitoringFailed,
-                                                        FileSystemWatcherErrorDetail::LinuxReadEvents, 5);
+                                                        FileSystemWatcherErrorDetail::InotifyReadEvents, 5);
         const ResultErrorFormat monitoringFormat = formatFileSystemWatcherError(monitoringFailure, formattedMessage);
         SC_TEST_EXPECT(monitoringFormat);
         SC_TEST_EXPECT(StringView::fromNullTerminated(formattedMessage, StringEncoding::Ascii)
-                           .containsString("Linux read events"));
+                           .containsString("inotify read events"));
         const ResultFileSystemWatcher waitFailure(FileSystemWatcherError::MonitoringFailed,
-                                                  FileSystemWatcherErrorDetail::LinuxWaitForEvents, 5);
+                                                  FileSystemWatcherErrorDetail::InotifyWaitForEvents, 5);
         const ResultErrorFormat       waitFormat = formatFileSystemWatcherError(waitFailure, formattedMessage);
         SC_TEST_EXPECT(waitFormat);
         SC_TEST_EXPECT(StringView::fromNullTerminated(formattedMessage, StringEncoding::Ascii)
-                           .containsString("Linux wait for events"));
+                           .containsString("inotify wait for events"));
 
         FileSystemWatcher::ThreadRunner runner;
         SC_TEST_EXPECT(fileEventsWatcher.init(runner));
@@ -204,7 +204,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         limitedWatcher.notifyCallback                 = [](const FileSystemWatcher::Notification&) {};
         const ResultFileSystemWatcher capacityFailure = fileEventsWatcher.watch(limitedWatcher, directoryPath.view());
         SC_TEST_EXPECT(capacityFailure.isError(FileSystemWatcherError::BufferTooSmall));
-        SC_TEST_EXPECT(capacityFailure.detail == FileSystemWatcherErrorDetail::LinuxRelativePathStorage);
+        SC_TEST_EXPECT(capacityFailure.detail == FileSystemWatcherErrorDetail::InotifyRelativePathStorage);
         const ResultFileSystemWatcher afterFailure = limitedWatcher.stopWatching();
         SC_TEST_EXPECT(afterFailure.isError(FileSystemWatcherError::NotWatching));
         SC_TEST_EXPECT(fs.removeDirectoryRecursive(childPath.view()));
@@ -223,7 +223,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             const ResultFileSystemWatcher inaccessible =
                 fileEventsWatcher.watch(inaccessibleWatcher, directoryPath.view());
             SC_TEST_EXPECT(inaccessible.isError(FileSystemWatcherError::WatchSetupFailed));
-            SC_TEST_EXPECT(inaccessible.detail == FileSystemWatcherErrorDetail::LinuxInspectDirectoryEntry);
+            SC_TEST_EXPECT(inaccessible.detail == FileSystemWatcherErrorDetail::InotifyInspectDirectoryEntry);
             SC_TEST_EXPECT(inaccessible.nativeError != 0);
             if (inaccessible)
                 SC_TEST_EXPECT(inaccessibleWatcher.stopWatching());
