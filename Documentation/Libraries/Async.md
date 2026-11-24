@@ -20,7 +20,7 @@ operating-system resources such as queues, descriptors, and threads.
 
 Synchronous I/O can leave a thread waiting for a file, socket, timer, or child process. `Async` lets one thread submit
 many such operations and dispatch their completions from a single `AsyncEventLoop`. It presents the same
-completion-based model over IOCP on Windows, kqueue on macOS, and io_uring or epoll on Linux.
+completion-based model over IOCP on Windows, kqueue on macOS, NetBSD, FreeBSD and OpenBSD, and io_uring or epoll on Linux.
 
 Use `Async` when you need:
 
@@ -179,6 +179,7 @@ The common request model maps to different operating-system facilities:
 |----------|---------|-----------------------|
 | Windows  | IOCP / `OVERLAPPED` | Completion-based socket and file I/O; some handle readiness concepts do not map portably. |
 | macOS    | kqueue | Readiness and event notifications; blocking file work uses a supplied thread pool. |
+| NetBSD, FreeBSD and OpenBSD | kqueue | Experimental lower-tier support. NetBSD and OpenBSD file sends use a bounded copied path; FreeBSD uses native `sendfile`. |
 | Linux    | direct io_uring, falling back to epoll | No `liburing` dependency; native file I/O is preferred when io_uring is available. |
 
 The Linux backend first attempts direct io_uring setup and falls back to epoll when the kernel or runtime policy does
@@ -193,6 +194,7 @@ of stable request objects when an application needs many operations.
 
 🟨 MVP
 This is usable but needs some more testing and a few more features.
+NetBSD, FreeBSD, and OpenBSD belong to the lower experimental platform tier described in [Platforms](@ref page_platforms).
 
 # Videos
 

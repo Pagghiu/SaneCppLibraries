@@ -93,3 +93,4 @@ Inferred negative target: avoid APIs that make request lifetime look owned by th
 - [ASYNC-0022 - Drain Windows external cancellations](async-0022-drain-windows-external-cancellations.md)
 - [ASYNC-0023 - Resume short io_uring socket writes](async-0023-resume-short-io-uring-socket-writes.md)
 - [ASYNC-0024 - Dispatch immediate POSIX connect results](async-0024-dispatch-immediate-posix-connect-results.md)
+- [ASYNC-0025 - Use kqueue on BSD](async-0025-use-kqueue-on-bsd.md)

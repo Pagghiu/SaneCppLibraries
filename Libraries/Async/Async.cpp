@@ -2219,7 +2219,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
         (void)static_cast<AsyncSignal&>(async).signalFd.get(
             teardown.fileHandle, Result::Error(AsyncResultCategory, AsyncError::InvalidHandle));
         static_cast<AsyncSignal&>(async).signalFd.detach();
-#elif SC_PLATFORM_APPLE
+#elif SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         teardown.signalNumber = static_cast<AsyncSignal&>(async).signalNumber;
 #endif
         break;
@@ -2391,7 +2391,7 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
     case AsyncRequest::State::Active: {
         // Request is active so it needs cancelAsync and teardown before pushing it to cancellation queue
         bool needsTeardownFlag = false;
-#if SC_PLATFORM_APPLE
+#if SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         needsTeardownFlag = true;
 #elif SC_PLATFORM_LINUX
         needsTeardownFlag = kernelQueue.get().isEpoll;

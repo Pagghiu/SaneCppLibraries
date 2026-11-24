@@ -11,8 +11,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <bcrypt.h>
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #include <dlfcn.h>
+#if SC_PLATFORM_LINUX
 #if defined(__has_include)
 #if __has_include(<linux/if_alg.h>)
 #include <linux/if_alg.h>
@@ -38,9 +39,12 @@ using SCHttpWebSocketSockAddrAlg = sockaddr_alg;
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
+#endif
 
 #include <string.h>
 
+namespace SC
+{
 namespace
 {
 using size_t   = SC::size_t;
@@ -416,7 +420,7 @@ static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t> data, uint8_t di
     FreeLibrary(library);
     return success;
 }
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 using HttpWebSocketEVPSha1Function   = const void* (*)();
 using HttpWebSocketEVPDigestFunction = int (*)(const void*, size_t, unsigned char*, unsigned int*, const void*, void*);
 
@@ -436,7 +440,15 @@ static bool scHttpWebSocketLibCryptoSha1(SC::Span<const uint8_t> data, uint8_t d
     {
         return false;
     }
+#if SC_PLATFORM_NETBSD
+    static constexpr const char* LibraryNames[] = {"libcrypto.so.16", "libcrypto.so"};
+#elif SC_PLATFORM_FREEBSD
+    static constexpr const char* LibraryNames[] = {"libcrypto.so.35", "libcrypto.so"};
+#elif SC_PLATFORM_OPENBSD
+    static constexpr const char* LibraryNames[] = {"libcrypto.so"};
+#else
     static constexpr const char* LibraryNames[] = {"libcrypto.so.3", "libcrypto.so.1.1"};
+#endif
     for (const char* libraryName : LibraryNames)
     {
         void* library = ::dlopen(libraryName, RTLD_LAZY | RTLD_LOCAL);
@@ -465,6 +477,7 @@ static bool scHttpWebSocketLibCryptoSha1(SC::Span<const uint8_t> data, uint8_t d
     return false;
 }
 
+#if SC_PLATFORM_LINUX
 static bool scHttpWebSocketAFAlgSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
 {
     SCHttpWebSocketSockAddrAlg sa = {};
@@ -497,13 +510,21 @@ static bool scHttpWebSocketAFAlgSha1(SC::Span<const uint8_t> data, uint8_t diges
     return readBytes == 20;
 }
 
+#endif
+
 static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t> data, uint8_t digest[20])
 {
     if (scHttpWebSocketForcePlatformSha1Unavailable)
     {
         return false;
     }
-    return scHttpWebSocketLibCryptoSha1(data, digest) or scHttpWebSocketAFAlgSha1(data, digest);
+    if (scHttpWebSocketLibCryptoSha1(data, digest))
+        return true;
+#if SC_PLATFORM_LINUX
+    return scHttpWebSocketAFAlgSha1(data, digest);
+#else
+    return false;
+#endif
 }
 #else
 static bool scHttpWebSocketPlatformSha1(SC::Span<const uint8_t>, uint8_t[20]) { return false; }
@@ -539,6 +560,7 @@ static void scHttpWebSocketSelfContainedSha1RepeatedByte(uint8_t value, size_t c
     sha1.finish(digest);
 }
 } // namespace
+} // namespace SC
 
 namespace SC
 {

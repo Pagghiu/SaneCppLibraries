@@ -384,6 +384,11 @@ that task with an error before entering its stack.
 Close every incremental growth runtime before attaching a debugger to the process. Attaching after incremental
 execution starts is outside the supported tooling contract.
 
+Incremental commitment is available on ARM64 and x86_64 NetBSD, FreeBSD, and OpenBSD. NetBSD reserves inaccessible
+pages with future read/write protection so stack commits work under PaX MPROTECT. OpenBSD uses registered stack mappings
+and validates the interrupted stack pointer against those mappings. All three BSD ports belong to the lower experimental
+platform tier described in [Platforms](@ref page_platforms).
+
 `FiberWorkerPool` can register and close all of its worker threads through `FiberWorkerPoolOptions`. Set
 `stackGrowthRuntime` to the open process owner. On POSIX, also provide one flat
 `stackGrowthSignalStackStorage` span containing at least `workerCount * FiberStackGrowthSignalStackSize` bytes; the
@@ -567,7 +572,7 @@ Current support includes:
 
 - caller-provided `FiberStack` memory;
 - virtual stack reservation and fixed-size `FiberStackClass` pools;
-- internal context creation and switching on macOS, Linux, and Windows for supported 64-bit architectures;
+- internal context creation and switching on macOS, Linux, Windows, NetBSD, FreeBSD, and OpenBSD for supported 64-bit architectures;
 - caller-owned `FiberTask` objects and allocator-backed `FiberTaskClass` storage;
 - caller-owned stackless `FiberJob` records with a fixed-capacity, single-thread-driven scheduler prototype;
 - fixed-storage or allocator-backed `FiberJobPool` reuse with explicit completed-result retention and release;

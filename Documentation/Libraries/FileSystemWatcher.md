@@ -5,7 +5,7 @@
 [TOC]
 
 [SaneCppFileSystemWatcher.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcher.h)
-wraps the native directory-watching facilities on Windows, macOS, and Linux. It is aimed at systems such as hot reloaders,
+wraps the native directory-watching facilities on Windows, macOS, Linux, NetBSD, FreeBSD, and OpenBSD. It is aimed at systems such as hot reloaders,
 asset pipelines, and development tools that need to know *that a watched tree changed* and then decide what work to redo.
 
 # Dependencies
@@ -56,11 +56,12 @@ The notification kind guides recovery.
 - `Change` identifies a possible filesystem change. An empty relative path can represent changes anywhere under the root.
 - `RescanRequired` means the caller should reconcile the tree. Re-register the watch if native coverage was lost, such
   as when a Linux directory arrives after setup.
+- `CoverageLimited` means monitoring continues with the limitation described by `Notification::failure`.
 - `WatchStopped` means monitoring for the reported root has ended. Inspect `Notification::failure`. The folder
   remains attached until explicitly stopped or the owner is closed. When a shared monitor fails, close and
   reinitialize the owner before starting new watches.
 
-Both status notifications use an empty relative path and the coarse `AddRemoveRename` operation.
+The three status notifications use an empty relative path and the coarse `AddRemoveRename` operation.
 An ordinary `Change` does not guarantee complete coverage.
 
 The watched root must be an existing directory. A missing root or a regular file is rejected, and the same
@@ -96,30 +97,36 @@ their platform storage inline. Their addresses and lifetimes are part of the con
 
 Apple supports up to 1024 watched paths. Windows `ThreadRunner` supports up to 63 watched roots per owner because
 one slot in its native wait set is reserved for control. Each Windows folder has a 16 KiB native change buffer.
-Linux installs one `inotify` watch per directory found during setup and tracks up to 128 directories per
-`FolderWatcher`. Relative paths are stored in caller-provided memory. The default Linux path store is 4 KiB; pass a larger `Span<char>` to the `FolderWatcher`
-constructor for broader or deeper trees. That buffer is ignored on Windows and Apple platforms.
+Linux and FreeBSD use one inotify watch per directory and track up to 128 directories per
+`FolderWatcher` by default. FreeBSD receives regular-file events through directory registrations without
+opening a descriptor per file. NetBSD and OpenBSD track up to 128 regular files and directories and use a descriptor for
+each. All three BSD backends use 4 KiB of default path storage. Pass a larger `Span<char>` to the `FolderWatcher` constructor
+for broader or deeper trees.
 
-If Linux reports a recursive setup failure after registering watches, it attempts to remove all of them. The
-`FolderWatcher` can be reused when cleanup succeeds; if a removal fails, `watch` returns the cleanup error.
-Linux opens descendants relative to their parent directory and skips directory symlinks during discovery. Registering
-the opened directories with inotify requires `/proc/self/fd`. Disappearing entries can be skipped during discovery.
-A replacement detected during registration fails setup and rolls back. Restart the watch to restore coverage of
-directories created after setup.
-When Linux folder watches on the same owner overlap, stopping one folder leaves shared native watches active for the
-other folders that still use them.
+On NetBSD, FreeBSD, and OpenBSD, the two-argument constructor also takes an entry buffer. Use
+`FolderWatcher::entryStorageSize(numberOfEntries)` to reserve space for entries including the root. The
+buffers must remain valid and disjoint until the watch stops. Setup rolls back if storage or descriptors run out.
 
-If the shared Linux inotify queue overflows, each remaining folder receives a `RescanRequired` notification because
-individual names were lost. Rescan and restart the watch if recursive coverage must include directories created during
-the loss. A fatal inotify read, worker wait or Async readiness failure sends `WatchStopped` to each remaining folder;
-the owner rejects new watches until it is closed and reinitialized. Close a Linux ThreadRunner from another thread
-after its callback returns.
+NetBSD, FreeBSD, and OpenBSD emit `CoverageLimited` when a watch starts with passive entries or discovers new ones.
+They do not follow directory symlinks. Directory entry changes can still produce structural hints, and FreeBSD
+can report some metadata changes on the entries themselves. Special-file data activity may go unreported.
+BSD thread callbacks can stop watches. Close the owner from another thread after its callback returns.
+
+Linux resolves open directory descriptors through `/proc/self/fd` to add inotify watches. FreeBSD registers
+them directly with `inotify_add_watch_at`. Overlapping roots on the same owner share their native directory
+registrations. When a shared inotify queue overflows, each active folder receives `RescanRequired`. Restart
+the watch after rescanning if recursive coverage must include directories created during the loss.
+A fatal inotify read, worker wait, or Async readiness failure ends the shared monitor and requires
+reinitializing the owner. On NetBSD and OpenBSD a root loss, vnode revocation, or failed reconciliation also ends the
+shared monitor. Those backends retry a descendant identity mismatch once and report `RescanRequired` if the
+retry restores coverage.
 
 | Backend | `RescanRequired` | `WatchStopped` |
 |:--------|:-----------------|:---------------|
 | Windows | Native buffer overflow | Failed directory completion or rearm ends that folder. A worker wait failure ends all roots on the thread runner. |
 | Apple | Native drops, event ID wrap, coalesced subtree or mount events, and shared stream refresh | A native root-change event ends the affected folder. |
-| Linux | Shared queue overflow, an unrepresentable event path, or a directory tree change | Root invalidation or failed directory registration ends that folder. A fatal read, wait, or readiness failure ends the shared monitor. |
+| Linux and FreeBSD | Shared queue overflow, an unrepresentable event path, or a directory tree change | Root invalidation or failed directory registration ends that folder. A fatal read, wait, or readiness failure ends the shared monitor. |
+| NetBSD and OpenBSD | Recovered identity mismatch or an unrepresentable event path | Root loss, vnode revocation, failed reconciliation, or a fatal queue/readiness error ends the shared monitor. |
 
 The backend reports the loss it can observe. Filesystem and native API behavior can limit which events arrive.
 
@@ -133,10 +140,11 @@ bounded SC object storage; it is not a promise that native watcher setup perform
 |:---------|:-----------------|:----------------------|
 | Windows | `ReadDirectoryChangesW` with subtree watching | Relative paths are UTF-16; buffer overflow loses individual names and produces a conservative root notification |
 | macOS | FSEvents with per-file events | Events can be coalesced; stream setup has roughly 200 ms latency and structural distinctions remain intentionally coarse |
-| Linux | `inotify`, one watch per directory discovered during setup | Paths must be ASCII or UTF-8; recursive capacity and stored relative paths are bounded as described above |
+| Linux, FreeBSD | `inotify`, one watch per directory | Paths must be ASCII or UTF-8; recursive capacity and stored relative paths are bounded as described above |
+| NetBSD, OpenBSD | `kqueue`, with a bounded inventory of directory and regular-file vnodes | Directory changes are reconciled recursively; descriptor limits and passive-entry notifications apply |
 
 Changes that bypass the watched directory entry may not produce a notification. Examples include modifying a file through
-a symbolic or hard link outside the watched tree, and some memory-mapped writes. On Linux, the watcher registers new or
+a symbolic or hard link outside the watched tree, and some memory-mapped writes. On Linux and FreeBSD, the watcher registers new or
 moved-in subdirectories recursively and then reports `RescanRequired` for changes that may have happened before
 registration. On every platform, callers should tolerate a
 coarse rescan signal and races between notification and inspection: by the time a callback runs, the named path may already
@@ -159,8 +167,9 @@ keeps backend callbacks short and absorbs duplicate bursts.
 
 # Status and further material
 
-🟩 **Usable.** The threaded and event loop modes pass the shared suite. The watcher reports coarse events
-and uses bounded storage for recursive watches. There is no portable polling fallback.
+🟩 **Usable on the primary desktop platforms.** NetBSD, FreeBSD, and OpenBSD support belongs to the lower experimental
+platform tier. The threaded and event loop modes pass the shared suite on the tested BSD releases and architectures.
+The watcher reports coarse events and uses bounded storage for recursive watches. There is no portable polling fallback.
 
 - [SCExample](@ref page_examples) contains the production-shaped hot-reload consumer.
 - [Linux inotify implementation video](https://www.youtube.com/watch?v=92saVDCRnCI) discusses one backend.

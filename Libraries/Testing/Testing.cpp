@@ -31,6 +31,18 @@ namespace TestingWindowsDetail
 #if SC_PLATFORM_APPLE
 #include <CoreFoundation/CoreFoundation.h>
 #include <mach-o/dyld.h>
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#if !SC_PLATFORM_OPENBSD
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
+namespace SC
+{
+namespace TestingBSDDetail
+{
+#include "../Common/ExecutablePathBSD.inl"
+}
+} // namespace SC
 #endif
 #endif
 
@@ -445,6 +457,8 @@ static StringSpan getExecutablePath(StringPath& executablePath)
         return executablePath.view();
     }
     return {};
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+    return TestingBSDDetail::getExecutablePath(executablePath);
 #else
     const int pathLength = ::readlink("/proc/self/exe", executablePath.writableSpan().data(), StringPath::MaxPath);
     if (pathLength > 0)

@@ -480,7 +480,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClient
 
   private:
     friend struct Internal;
-    friend struct HttpClientLinuxCallbacks;
+    friend struct HttpClientLibCurlCallbacks;
     struct Internal;
 
     Result platformInit();
@@ -492,7 +492,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClient
     alignas(uint64_t) char storage[128];
 #elif SC_PLATFORM_WINDOWS
     alignas(uint64_t) char storage[128];
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     alignas(uint64_t) char storage[512];
 #else
     alignas(uint64_t) char storage[8];
@@ -540,7 +540,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
   private:
     friend struct HttpClientTest; // Exercise the request-body callback contract without a native backend.
     friend struct HttpClientAppleCallbacks;
-    friend struct HttpClientLinuxCallbacks;
+    friend struct HttpClientLibCurlCallbacks;
     friend struct HttpClientWindowsCallbacks;
 
     Result platformInit();
@@ -600,7 +600,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
     alignas(uint64_t) char storage[512];
 #elif SC_PLATFORM_WINDOWS
     alignas(uint64_t) char storage[256];
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     alignas(uint64_t) char storage[512];
 #else
     alignas(uint64_t) char storage[8];

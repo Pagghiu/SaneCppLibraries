@@ -24,7 +24,7 @@ Unlike `FileSystemIterator`, it observes future changes rather than enumerating 
 
 ## Inspirations
 
-The evidenced inspirations are native watch APIs: Windows `ReadDirectoryChangesW`, Apple `FSEvents`, and Linux `inotify`. The Async integration is inspired by the existing `SC::AsyncEventLoop` shape, but it is expressed as a template bridge so the watcher core remains independently consumable.
+The evidenced inspirations are native watch APIs: Windows `ReadDirectoryChangesW`, Apple `FSEvents`, Linux `inotify`, and BSD `kqueue`. The Async integration is inspired by the existing `SC::AsyncEventLoop` shape, but it is expressed as a template bridge so the watcher core remains independently consumable.
 
 ## Anti-Inspirations
 
@@ -45,7 +45,8 @@ Do not add mandatory polling fallback, caller-owned thread injection, exact nati
 - [FileSystemWatcher implementation](../../Libraries/FileSystemWatcher/FileSystemWatcher.cpp)
 - [Windows watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherWindows.inl)
 - [Apple watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherApple.inl)
-- [Linux watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherLinux.inl)
+- [Inotify watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherInotify.inl)
+- [NetBSD and OpenBSD kqueue watcher backend](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherKqueue.inl)
 - [Threading adapter used internally](../../Libraries/FileSystemWatcher/Internal/FileSystemWatcherThreading.h)
 - [FileSystemWatcher tests](../../Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp)
 - [FileSystemWatcher async tests](../../Tests/Libraries/FileSystemWatcher/FileSystemWatcherAsyncTest.cpp)
@@ -65,3 +66,4 @@ Do not add mandatory polling fallback, caller-owned thread injection, exact nati
 - [FILESYSTEMWATCHER-0006 - Own Linux watches by directory identity](filesystemwatcher-0006-share-linux-watches-between-folders.md)
 - [FILESYSTEMWATCHER-0007 - Report watcher coverage loss](filesystemwatcher-0007-report-watcher-coverage-loss.md)
 - [FILESYSTEMWATCHER-0008 - Keep Windows thread wait handles stable](filesystemwatcher-0008-keep-windows-thread-wait-handles-stable.md)
+- [FILESYSTEMWATCHER-0009 - Reconcile BSD directory watches with kqueue](filesystemwatcher-0009-connect-bsd-recursive-watcher.md)

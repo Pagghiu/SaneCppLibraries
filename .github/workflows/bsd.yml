@@ -1,0 +1,230 @@
+name: BSD
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bsd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} ${{ matrix.release }} x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: FreeBSD
+            release: '15.1'
+          - os: NetBSD
+            release: '11.0'
+          - os: OpenBSD
+            release: '8.0'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Generate single-file libraries
+        run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+
+      - name: Test FreeBSD
+        if: matrix.os == 'FreeBSD'
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
+        with:
+          release: ${{ matrix.release }}
+          arch: x86_64
+          sync: rsync
+          copyback: false
+          prepare: pkg install -y ca_root_nss curl git
+          run: |
+            set -eu
+            uname -a
+            time sh Tests/SCTest/BSD/run.sh prebuilt-headers
+
+      - name: Test NetBSD
+        if: matrix.os == 'NetBSD'
+        uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
+        with:
+          release: ${{ matrix.release }}
+          arch: x86_64
+          sync: rsync
+          copyback: false
+          prepare: pkg_add curl git-base mozilla-rootcerts-openssl
+          run: |
+            set -eu
+            export PATH="/usr/pkg/bin:$PATH"
+            export LD_LIBRARY_PATH=/usr/pkg/lib
+            uname -a
+            time sh Tests/SCTest/BSD/run.sh prebuilt-headers
+
+      - name: Test OpenBSD
+        if: matrix.os == 'OpenBSD'
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: ${{ matrix.release }}
+          arch: x86_64
+          sync: rsync
+          copyback: false
+          cache-after-prepare: true
+          prepare: |
+            set -eu
+            pkg_add curl git nghttp2 'openssl%3.5'
+          run: |
+            set -eu
+            export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
+            uname -a
+            time sh Tests/SCTest/BSD/run.sh prebuilt-headers
+            time sh Tests/SCTest/BSD/run-http-fixtures.sh \
+              _Build/_Outputs/openbsd-x86_64-Native-clang-Debug/SCTest \
+              _Build/_Outputs/openbsd-x86_64-Native-clang-Release/SCTest
+            time sh Tests/Libraries/HttpClient/run-libcurl-runtime-fixture.sh prebuilt \
+              _Build/_Outputs/openbsd-x86_64-Native-clang-Debug/SCTest \
+              _Build/_Outputs/openbsd-x86_64-Native-clang-Release/SCTest
+
+  cross-test:
+    name: ${{ matrix.os }} ${{ matrix.release }} ARM64 cross-build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: FreeBSD
+            target: freebsd
+            release: '15.1'
+            runner: ubuntu-24.04
+            llvm: 19
+          - os: NetBSD
+            target: netbsd
+            release: '11.0'
+            runner: ubuntu-24.04
+            llvm: 19
+          - os: OpenBSD
+            target: openbsd
+            release: '8.0'
+            runner: ubuntu-26.04
+            llvm: 22
+    env:
+      BSD_TARGET: ${{ matrix.target }}
+      LLVM_VERSION: ${{ matrix.llvm }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install cross-build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y "clang-$LLVM_VERSION" "lld-$LLVM_VERSION" "llvm-$LLVM_VERSION"
+          echo "/usr/lib/llvm-$LLVM_VERSION/bin" >> "$GITHUB_PATH"
+
+      - name: Cache BSD release archives
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/bsd-${{ matrix.target }}-arm64
+          key: sc-bsd-arm64-sysroot-${{ matrix.target }}-${{ matrix.release }}-${{ hashFiles('Tests/SCTest/BSD/fetch-arm64-sysroot.sh') }}
+
+      - name: Extract BSD release sysroot
+        run: |
+          time sh Tests/SCTest/BSD/fetch-arm64-sysroot.sh "$BSD_TARGET" \
+            "$RUNNER_TEMP/bsd-sysroot" "$RUNNER_TEMP/bsd-$BSD_TARGET-arm64"
+
+      - name: Generate single-file libraries
+        run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+
+      - name: Cross-compile tests and generated libraries on x86_64
+        run: |
+          uname -m
+          clang --version
+          for config in Debug Release; do
+            time ./SC.sh build compile SCTest "$config" --target "$BSD_TARGET-arm64" --sysroot "$RUNNER_TEMP/bsd-sysroot"
+            time ./SC.sh build compile "SCSingleFileLibs:" "$config" --target "$BSD_TARGET-arm64" --sysroot "$RUNNER_TEMP/bsd-sysroot"
+            executable="_Build/_Outputs/$BSD_TARGET-arm64-Native-clang-$config/SCTest"
+            readelf -h "$executable"
+            if [ "$BSD_TARGET" = openbsd ]; then
+              readelf -d "$executable" | grep 'Shared library: \[libc\.so\.'
+            fi
+          done
+
+      - name: Stage guest checkout and binaries
+        run: |
+          mkdir guest
+          git archive HEAD | tar -xf - -C guest
+          for config in Debug Release; do
+            executable="_Build/_Outputs/$BSD_TARGET-arm64-Native-clang-$config/SCTest"
+            install -D -m 755 "$executable" "guest/$executable"
+          done
+          tar --format=pax -czf "$RUNNER_TEMP/bsd-tests.tar.gz" -C guest .
+
+      - name: Boot FreeBSD ARM64
+        if: matrix.target == 'freebsd'
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
+        with:
+          release: ${{ matrix.release }}
+          arch: aarch64
+          sync: 'no'
+          copyback: false
+          cache-after-prepare: true
+          prepare: |
+            set -eu
+            pkg install -y ca_root_nss curl git
+            pkg clean -ay
+
+      - name: Boot NetBSD ARM64
+        if: matrix.target == 'netbsd'
+        uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
+        with:
+          release: ${{ matrix.release }}
+          arch: aarch64
+          sync: 'no'
+          copyback: false
+          prepare: pkg_add curl git-base mozilla-rootcerts-openssl
+
+      - name: Boot OpenBSD ARM64
+        if: matrix.target == 'openbsd'
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: ${{ matrix.release }}
+          arch: aarch64
+          sync: 'no'
+          copyback: false
+          cache-after-prepare: true
+          prepare: pkg_add curl git nghttp2 'openssl%3.5'
+
+      - name: Transfer and run SCTest in the ARM64 guest
+        run: |
+          time ssh "$BSD_TARGET" 'mkdir -p "$HOME/sc-tests" && tar -xzf - -C "$HOME/sc-tests"' \
+            < "$RUNNER_TEMP/bsd-tests.tar.gz"
+          ssh "$BSD_TARGET" sh -s -- "$BSD_TARGET" <<'GUEST'
+          set -eu
+          case "$1" in
+            netbsd)
+              export PATH="/usr/pkg/bin:$PATH"
+              export LD_LIBRARY_PATH=/usr/pkg/lib
+              ;;
+            openbsd)
+              export SC_CRYPTOGRAPHY_TEST_REQUIRE_OPENSSL=1 SC_FIBERS_TEST_REQUIRE_STACK_GROWTH=1
+              ;;
+          esac
+          uname -a
+          cd "$HOME/sc-tests"
+          for config in Debug Release; do
+            time sh Tests/SCTest/BSD/run.sh prebuilt "_Build/_Outputs/$1-arm64-Native-clang-$config/SCTest" --all-tests
+          done
+          if [ "$1" = openbsd ]; then
+            time sh Tests/SCTest/BSD/run-http-fixtures.sh \
+              _Build/_Outputs/openbsd-arm64-Native-clang-Debug/SCTest \
+              _Build/_Outputs/openbsd-arm64-Native-clang-Release/SCTest
+            time sh Tests/Libraries/HttpClient/run-libcurl-runtime-fixture.sh prebuilt \
+              _Build/_Outputs/openbsd-arm64-Native-clang-Debug/SCTest \
+              _Build/_Outputs/openbsd-arm64-Native-clang-Release/SCTest
+          fi
+          GUEST

@@ -163,39 +163,40 @@ static Result writeFakeQEMURunner(FileSystem& fs, StringView path, StringView na
 }
 #endif
 
-static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot)
+static StringView qemuPackageDirectory()
 {
-    StringView leaf;
     switch (HostPlatform)
     {
     case Platform::Apple:
         switch (HostInstructionSet)
         {
-        case InstructionSet::ARM64: leaf = "macos_arm64"; break;
-        case InstructionSet::Intel64: leaf = "macos_intel64"; break;
-        case InstructionSet::Intel32: return Result(false);
+        case InstructionSet::ARM64: return "qemu_macos_arm64";
+        case InstructionSet::Intel64: return "qemu_macos_intel64";
+        case InstructionSet::Intel32: return {};
         }
         break;
     case Platform::Linux:
         switch (HostInstructionSet)
         {
-        case InstructionSet::ARM64: leaf = "linux_arm64"; break;
-        case InstructionSet::Intel64: leaf = "linux_intel64"; break;
-        case InstructionSet::Intel32: return Result(false);
+        case InstructionSet::ARM64: return "qemu_linux_arm64";
+        case InstructionSet::Intel64: return "qemu_linux_intel64";
+        case InstructionSet::Intel32: return {};
         }
         break;
     case Platform::Windows:
         switch (HostInstructionSet)
         {
-        case InstructionSet::ARM64: leaf = "windows_arm64"; break;
-        case InstructionSet::Intel64: leaf = "windows_intel64"; break;
-        case InstructionSet::Intel32: return Result(false);
+        case InstructionSet::ARM64: return "qemu_windows_arm64";
+        case InstructionSet::Intel64: return "qemu_windows_intel64";
+        case InstructionSet::Intel32: return {};
         }
         break;
-    case Platform::Emscripten: return Result(false);
+    case Platform::NetBSD:
+    case Platform::OpenBSD:
+    case Platform::FreeBSD:
+    case Platform::Emscripten: return {};
     }
-    SC_TRY(StringBuilder::format(packageRoot, "{}/qemu_{}", packagesRoot, leaf));
-    return Result(true);
+    return {};
 }
 
 struct SupportToolsTest : public TestCase
@@ -245,11 +246,97 @@ struct SupportToolsTest : public TestCase
         testBuildCLIRejection(arguments, args);
         testHeavyTools(arguments, args, runHeavySections);
         testPackageInputs(arguments, args, outputDirectory);
+        testPackageHostIdentity(outputDirectory);
         testPackageCommands(arguments, args, outputDirectory);
         testPackageReceipts(arguments, args, outputDirectory);
         testPackageOutput(arguments, args, outputDirectory, runHeavySections);
         testFilCZLibCache(outputDirectory, runHeavySections);
         testScratchIsolation(outputDirectory);
+    }
+
+    SC_TOOLS_TEST_NO_INLINE void testPackageHostIdentity(StringPath& outputDirectory)
+    {
+        if (not test_section("package host identity and receipt"))
+            return;
+
+        using namespace SC::Tools;
+        StringView expected;
+        switch (HostPlatform)
+        {
+        case Platform::Apple: expected = "macos"; break;
+        case Platform::Linux: expected = "linux"; break;
+        case Platform::Windows: expected = "windows"; break;
+        case Platform::Emscripten: expected = "emscripten"; break;
+        case Platform::NetBSD: expected = "netbsd"; break;
+        case Platform::FreeBSD: expected = "freebsd"; break;
+        case Platform::OpenBSD: expected = "openbsd"; break;
+        }
+        const Download download;
+        SC_TEST_EXPECT(download.packagePlatform.view() == expected);
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init("."));
+        String packageRoot = format("{}/host-identity", outputDirectory);
+        SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(packageRoot.view()));
+        Package package;
+        package.installDirectoryLink = packageRoot.view();
+        PackageReceiptInfo info;
+        info.packageName = "host-identity";
+        SC_TEST_EXPECT(writePackageReceipt(package, info, {}));
+
+        String receiptPath = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(receiptPath, {packageRoot.view(), PackageReceiptFileName}));
+        String receipt = StringEncoding::Utf8;
+        SC_TEST_EXPECT(fs.read(receiptPath.view(), receipt));
+        StringView afterKey;
+        StringView afterColon;
+        SC_TEST_EXPECT(StringView(receipt.view()).splitAfter("\"hostPlatform\"", afterKey));
+        SC_TEST_EXPECT(afterKey.splitAfter(":", afterColon));
+        const String expectedValue = format("\"{}\"", expected);
+        SC_TEST_EXPECT(afterColon.trimWhiteSpaces().startsWith(expectedValue.view()));
+
+        switch (HostPlatform)
+        {
+        case Platform::NetBSD:
+        case Platform::OpenBSD:
+        case Platform::FreeBSD: {
+            String               cache   = format("{}/unsupported-cache", outputDirectory);
+            String               install = format("{}/unsupported-install", outputDirectory);
+            constexpr StringView names[] = {
+                "doxygen",
+                "clang",
+                "llvm",
+                "qemu",
+                "filc",
+                "zlib-filc",
+                "curl-filc",
+                "openssl-filc",
+                "nghttp2-filc",
+                "llvm-mingw",
+                "linux-sysroot-glibc-x86_64",
+                "linux-sysroot-glibc-arm64",
+                "linux-sysroot-musl-x86_64",
+                "linux-sysroot-musl-arm64",
+                "wine",
+                "msvc",
+            };
+            const PackageRegistry registry = builtinPackageRegistry();
+            for (StringView name : names)
+            {
+                const auto* entry = registry.find(name);
+                SC_TEST_EXPECT(entry != nullptr);
+                if (entry == nullptr)
+                    continue;
+                Package candidate;
+                SC_TEST_EXPECT(entry->install(cache.view(), install.view(), candidate, {&name, 1})
+                                   .isError(PackageResultCategory, PackageError::InstallerHostUnsupported));
+            }
+            SC_TEST_EXPECT(not fs.exists(cache.view()));
+            SC_TEST_EXPECT(not fs.exists(install.view()));
+            break;
+        }
+        default: break;
+        }
     }
 
     SC_TOOLS_TEST_NO_INLINE void testScratchIsolation(StringPath& outputDirectory)
@@ -508,6 +595,26 @@ struct SupportToolsTest : public TestCase
             Build::Action action;
             SC_TEST_EXPECT(Build::Action::execute(action, configureEmptyBuildDefinition)
                                .isError(BuildResultCategory, BuildError::NoWorkspacesDefined));
+        }
+        if (test_section("build rejects cross compilation involving BSD"))
+        {
+            const bool bsdHost = HostPlatform == Platform::NetBSD or HostPlatform == Platform::FreeBSD or
+                                 HostPlatform == Platform::OpenBSD;
+            Build::Action action;
+            action.action               = Build::Action::Compile;
+            action.parameters.generator = Build::Generator::Native;
+            action.parameters.platform  = bsdHost ? Build::Platform::Linux : Build::Platform::NetBSD;
+            const auto configure        = [](Build::Definition& definition, const Build::Parameters&) -> Result
+            { return Result(definition.workspaces.push_back({"Workspace"})); };
+            const BuildError error =
+                bsdHost ? BuildError::ToolchainHostUnsupported : BuildError::ToolchainTargetUnsupported;
+            SC_TEST_EXPECT(Build::Action::execute(action, configure).isError(BuildResultCategory, error));
+
+            Build::Definition definition;
+            action.parameters.platform  = Build::Platform::NetBSD;
+            action.parameters.generator = Build::Generator::Make;
+            SC_TEST_EXPECT(definition.configure("Workspace", action.parameters)
+                               .isError(BuildResultCategory, BuildError::UnsupportedPlatform));
         }
     }
 
@@ -1032,9 +1139,20 @@ struct SupportToolsTest : public TestCase
             Build::Action           action;
             BuildCLIResolvedStorage storage;
             BuildCLIStatus          status = BuildCLIStatus::Error;
-            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
-            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            const Result result = prepareBuildAction(Build::Action::Compile, arguments, action, storage, status);
             SC_TEST_EXPECT(action.parameters.generator == Build::Generator::VisualStudio2022);
+            switch (HostPlatform)
+            {
+            case Platform::NetBSD:
+            case Platform::OpenBSD:
+            case Platform::FreeBSD:
+                SC_TEST_EXPECT(result.isError(BuildResultCategory, BuildError::InvalidOptionCombination));
+                break;
+            default:
+                SC_TEST_EXPECT(result);
+                SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+                break;
+            }
         }
         if (test_section("build cli named options override legacy positional values"))
         {
@@ -1569,7 +1687,7 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryValueMissing));
         }
-        if (test_section("install qemu reports missing imported directory"))
+        if (test_section("install qemu validates host and import directory"))
         {
             String missingDirectory = StringEncoding::Utf8;
             SC_TEST_EXPECT(Path::join(missingDirectory, {outputDirectory.view(), "missing-qemu-import"}));
@@ -1579,8 +1697,9 @@ struct SupportToolsTest : public TestCase
             args[1]             = "--import-directory";
             args[2]             = missingDirectory.view();
             arguments.arguments = {args, 3};
-            SC_TEST_EXPECT(
-                runPackageTool(arguments).isError(PackageResultCategory, PackageError::ImportDirectoryMissing));
+            const auto expected = qemuPackageDirectory().isEmpty() ? PackageError::InstallerHostUnsupported
+                                                                   : PackageError::ImportDirectoryMissing;
+            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, expected));
         }
         if (test_section("install qemu rejects unknown option"))
         {
@@ -1647,6 +1766,27 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(checkFileHash(sourcePath.view(), Hashing::TypeSHA256, "invalid")
                                .isError(PackageResultCategory, PackageError::SourceHashMismatch));
         }
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+        if (test_section("package download validates fetched bytes"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            String source  = StringEncoding::Utf8;
+            String fetched = StringEncoding::Utf8;
+            String url     = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(source, {outputDirectory.view(), "download-source.txt"}));
+            SC_TEST_EXPECT(Path::join(fetched, {outputDirectory.view(), "download-result.txt"}));
+            SC_TEST_EXPECT(StringBuilder::format(url, "file://localhost{}", source.view()));
+            SC_TEST_EXPECT(fs.writeString(source.view(), "abc"));
+            const StringView hash = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+            SC_TEST_EXPECT(downloadFileHash(url.view(), fetched.view(), Hashing::TypeSHA256, hash));
+            SC_TEST_EXPECT(fs.writeString(source.view(), "changed"));
+            SC_TEST_EXPECT(downloadFileHash(url.view(), fetched.view(), Hashing::TypeSHA256, hash));
+            SC_TEST_EXPECT(fs.removeFile(fetched.view()));
+            SC_TEST_EXPECT(downloadFileHash(url.view(), fetched.view(), Hashing::TypeSHA256, hash)
+                               .isError(PackageResultCategory, PackageError::SourceHashMismatch));
+        }
+#endif
         if (test_section("pinned Git package validates the full revision"))
         {
             FileSystem fs;
@@ -1928,57 +2068,7 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(runPackageTool(arguments, badRegistry));
         }
 #if !SC_PLATFORM_WINDOWS
-        if (test_section("package repair writes qemu receipt for existing layout"))
-        {
-            FileSystem fs;
-            SC_TEST_EXPECT(fs.init("."));
-
-            String packagesRoot = StringEncoding::Utf8;
-            String packageRoot  = StringEncoding::Utf8;
-            String binRoot      = StringEncoding::Utf8;
-            String qemuX86_64   = StringEncoding::Utf8;
-            String qemuArm64    = StringEncoding::Utf8;
-            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
-            SC_TEST_EXPECT(qemuRepairPackageRoot(packagesRoot.view(), packageRoot));
-            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
-            SC_TEST_EXPECT(Path::join(qemuX86_64, {binRoot.view(), "qemu-x86_64"}));
-            SC_TEST_EXPECT(Path::join(qemuArm64, {binRoot.view(), "qemu-aarch64"}));
-            if (fs.existsAndIsDirectory(packageRoot.view()))
-            {
-                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
-            }
-            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
-
-            arguments.tool      = "package";
-            arguments.action    = "repair";
-            args[0]             = "qemu";
-            arguments.arguments = {args, 1};
-            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::RunnerSetMissing));
-
-            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuX86_64.view(), "qemu-x86_64"));
-            SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::Arm64RunnerMissing));
-            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuArm64.view(), "qemu-aarch64"));
-            SC_TEST_EXPECT(runPackageTool(arguments));
-
-            String resolved = StringEncoding::Utf8;
-            SC_TEST_EXPECT(
-                resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUX86_64, resolved));
-            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-x86_64"));
-            SC_TEST_EXPECT(
-                resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUArm64, resolved));
-            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-aarch64"));
-
-            arguments.action    = "verify";
-            args[0]             = "qemu";
-            arguments.arguments = {args, 1};
-            SC_TEST_EXPECT(runPackageTool(arguments));
-
-            arguments.action = "exports";
-            SC_TEST_EXPECT(runPackageTool(arguments));
-
-            arguments.action = "receipt";
-            SC_TEST_EXPECT(runPackageTool(arguments));
-        }
+        testQEMURepair(arguments, args, outputDirectory);
 #endif
         if (test_section("package repair migrates llvm-mingw compiler exports"))
         {
@@ -2044,6 +2134,61 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::ToolchainWindowsGNUArm64,
                                                         resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("aarch64-w64-mingw32-clang"));
+        }
+        ProcessEnvironment archiveEnvironment;
+        StringSpan         archiveURL;
+        if (archiveEnvironment.get("SC_TEST_PACKAGE_ARCHIVE_URL", archiveURL) and
+            test_section("package commands install pinned archive"))
+        {
+            StringSpan digest;
+            SC_TEST_EXPECT(archiveEnvironment.get("SC_TEST_PACKAGE_ARCHIVE_SHA256", digest) and
+                           digest.sizeInBytes() == 64);
+            if (digest.sizeInBytes() != 64)
+                return;
+
+            const PackageReceiptExport exports[] = {{PackageExportKind::Asset, "fixture", "payload.txt"}};
+            PackageRecipe              recipe;
+            recipe.download.url           = archiveURL;
+            recipe.download.expectedHash  = digest;
+            recipe.download.hashType      = Hashing::TypeSHA256;
+            recipe.exports                = exports;
+            recipe.functions.testFunction = [](const Download&, const Package& package) -> Result
+            {
+                FileSystem fs;
+                SC_TRY(fs.init(package.installDirectoryLink.view()));
+                String payload = StringEncoding::Utf8;
+                SC_TRY(fs.read("payload.txt", payload));
+                return Result(payload.view() == "archive fixture");
+            };
+            const PackageRegistryEntry entry    = {"archive-fixture",
+                                                   "archive-fixture",
+                                                   PackageKind::Asset,
+                                                   "Pinned archive fixture",
+                                                   "host",
+                                                   "loopback fixture",
+                                                   false,
+                                                   {},
+                                                   {},
+                                                   nullptr,
+                                                   &recipe};
+            const PackageRegistry      registry = {{&entry, 1}};
+            Package                    package;
+            arguments.tool             = "package";
+            args[0]                    = "archive-fixture";
+            arguments.arguments        = {args, 1};
+            const StringView actions[] = {"install", "verify", "doctor", "receipt", "exports", "install"};
+            for (StringView action : actions)
+            {
+                arguments.action = action;
+                SC_TEST_EXPECT(runPackageTool(arguments, registry, &package));
+            }
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(resolvePackageExportPath(package.installDirectoryLink.view(), "fixture", resolved));
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            String payload = StringEncoding::Utf8;
+            SC_TEST_EXPECT(fs.read(resolved.view(), payload));
+            SC_TEST_EXPECT(payload.view() == "archive fixture");
         }
         if (test_section("package commands accept external copy recipe"))
         {
@@ -2132,6 +2277,73 @@ struct SupportToolsTest : public TestCase
         }
     }
 
+#if !SC_PLATFORM_WINDOWS
+    SC_TOOLS_TEST_NO_INLINE void testQEMURepair(Tools::Tool::Arguments& arguments, StringView (&args)[10],
+                                                StringPath&             outputDirectory)
+    {
+        using namespace SC::Tools;
+
+        if (not test_section("package repair writes qemu receipt for existing layout"))
+            return;
+
+        arguments.tool      = "package";
+        arguments.action    = "repair";
+        args[0]             = "qemu";
+        arguments.arguments = {args, 1};
+
+        const StringView packageDirectory = qemuPackageDirectory();
+        if (packageDirectory.isEmpty())
+        {
+            SC_TEST_EXPECT(
+                runPackageTool(arguments).isError(PackageResultCategory, PackageError::RepairUnsupportedOnHost));
+            return;
+        }
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init("."));
+
+        String packagesRoot = StringEncoding::Utf8;
+        String packageRoot  = StringEncoding::Utf8;
+        String binRoot      = StringEncoding::Utf8;
+        String qemuX86_64   = StringEncoding::Utf8;
+        String qemuArm64    = StringEncoding::Utf8;
+        SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+        SC_TEST_EXPECT(Path::join(packageRoot, {packagesRoot.view(), packageDirectory}));
+        SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+        SC_TEST_EXPECT(Path::join(qemuX86_64, {binRoot.view(), "qemu-x86_64"}));
+        SC_TEST_EXPECT(Path::join(qemuArm64, {binRoot.view(), "qemu-aarch64"}));
+        if (fs.existsAndIsDirectory(packageRoot.view()))
+        {
+            SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+        }
+        SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+
+        SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::RunnerSetMissing));
+
+        SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuX86_64.view(), "qemu-x86_64"));
+        SC_TEST_EXPECT(runPackageTool(arguments).isError(PackageResultCategory, PackageError::Arm64RunnerMissing));
+        SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuArm64.view(), "qemu-aarch64"));
+        SC_TEST_EXPECT(runPackageTool(arguments));
+
+        String resolved = StringEncoding::Utf8;
+        SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUX86_64, resolved));
+        SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-x86_64"));
+        SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUArm64, resolved));
+        SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-aarch64"));
+
+        arguments.action    = "verify";
+        args[0]             = "qemu";
+        arguments.arguments = {args, 1};
+        SC_TEST_EXPECT(runPackageTool(arguments));
+
+        arguments.action = "exports";
+        SC_TEST_EXPECT(runPackageTool(arguments));
+
+        arguments.action = "receipt";
+        SC_TEST_EXPECT(runPackageTool(arguments));
+    }
+#endif
+
     SC_TOOLS_TEST_NO_INLINE void testPackageReceipts(Tools::Tool::Arguments& arguments, StringView (&args)[10],
                                                      StringPath&             outputDirectory)
     {
@@ -2201,7 +2413,10 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
             SC_TEST_EXPECT(Path::join(llvmRoot, {packagesRoot.view(), "llvm"}));
             SC_TEST_EXPECT(Path::join(sysrootRoot, {packagesRoot.view(), "linux-sysroot_glibc_arm64"}));
-            SC_TEST_EXPECT(qemuRepairPackageRoot(packagesRoot.view(), qemuRoot));
+            // Verification discovers receipts by their package name, including on hosts without repair support.
+            const StringView qemuDirectory = qemuPackageDirectory();
+            SC_TEST_EXPECT(
+                Path::join(qemuRoot, {packagesRoot.view(), qemuDirectory.isEmpty() ? "qemu" : qemuDirectory}));
             SC_TEST_EXPECT(Path::join(wineRoot, {packagesRoot.view(), "wine-stable"}));
             SC_TEST_EXPECT(Path::join(msvcRoot, {packagesRoot.view(), "msvc"}));
 

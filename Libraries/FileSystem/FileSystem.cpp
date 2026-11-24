@@ -1560,6 +1560,18 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #include <sys/clonefile.h>
 #elif SC_PLATFORM_LINUX
 #include <sys/sendfile.h>
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#if !SC_PLATFORM_OPENBSD
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
+namespace SC
+{
+namespace FileSystemBSDDetail
+{
+#include "../Common/ExecutablePathBSD.inl"
+}
+} // namespace SC
 #endif
 struct SC::FileSystem::Operations::Internal
 {
@@ -2218,6 +2230,8 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
     }
     auto closeOutput = MakeDeferred([&] { ::close(outputDescriptor); });
 
+    bool useBufferedCopy = true;
+#if SC_PLATFORM_LINUX
     off_t remaining = inputStat.st_size;
     while (remaining > 0)
     {
@@ -2235,10 +2249,11 @@ SC::ResultFileSystem SC::FileSystem::Operations::Internal::copyFile(StringSpan s
         remaining -= static_cast<off_t>(sent);
     }
     // A zero-sized source can still provide data, for example through a virtual filesystem.
-    const bool useBufferedCopy = remaining != 0 or inputStat.st_size == 0;
+    useBufferedCopy = remaining != 0 or inputStat.st_size == 0;
+#endif
     if (useBufferedCopy)
     {
-        // Complete the copy with buffered reads and writes if sendfile cannot finish.
+        // NetBSD uses buffered copying; Linux falls back here if sendfile fails.
         constexpr size_t bufferSize = 4096;
 
         char buffer[bufferSize];
@@ -2348,6 +2363,9 @@ SC::ResultFileSystem SC::FileSystem::Operations::removeDirectoryRecursive(String
 
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+    return FileSystemBSDDetail::getExecutablePath(executablePath);
+#else
     const int pathLength = ::readlink("/proc/self/exe", executablePath.writableSpan().data(), StringPath::MaxPath);
     if (pathLength > 0)
     {
@@ -2355,6 +2373,7 @@ SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executa
         return executablePath.view();
     }
     return {};
+#endif
 }
 
 SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)

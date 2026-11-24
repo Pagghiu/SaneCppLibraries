@@ -160,9 +160,10 @@ calls into cooperative waits.
 🟥 Draft
 
 The implementation has focused tests for same-thread and worker-pool waits, sockets, datagrams, files, `fileSend`,
-process exit, signals, cancellation races, and command-queue overflow on macOS, Linux, and Windows. The API is still
-draft: DNS and stream conveniences are absent, backend coverage follows what `Async` supports on each platform, and the
-run-loop/cancellation surface may evolve as larger applications exercise it.
+process exit, signals, cancellation races, and command-queue overflow on macOS, Linux, Windows, NetBSD, FreeBSD, and
+OpenBSD. The BSD implementations belong to the lower experimental platform tier. The API is still draft: DNS and stream
+conveniences are absent, backend coverage follows what `Async` supports on each platform, and the run-loop/cancellation
+surface may evolve as larger applications exercise it.
 
 For the exact operation list and result fields, see [SC::AsyncFiberIO](@ref SC::AsyncFiberIO) and the
 [AsyncFibers module](@ref group_async_fibers). `Examples/FibersDemo` is the smallest end-to-end example;

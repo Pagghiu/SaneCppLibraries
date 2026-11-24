@@ -19,7 +19,8 @@ inspect metadata; and work with links and permissions.
 
 Use File System when the unit of work is a **path or directory tree**, rather than an already-open byte stream. It fits
 setup and cleanup code, installers, build tools, caches, configuration loading and other synchronous workflows that need
-the same behavior on Windows, macOS and Linux.
+the same behavior on Windows, macOS and Linux. NetBSD, FreeBSD, and OpenBSD provide the same API in the lower
+experimental platform tier.
 
 The library covers the common path-level operations:
 

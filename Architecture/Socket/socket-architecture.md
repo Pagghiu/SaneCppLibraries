@@ -72,3 +72,5 @@ Inferred anti-inspirations include callback-driven networking frameworks, hidden
 - [SOCKET-0002 - Expose Socket options as explicit descriptor operations](socket-0002-expose-socket-options-as-explicit-descriptor-operations.md)
 - [SOCKET-0003 - Expose unconnected datagrams as descriptor operations](socket-0003-expose-unconnected-datagrams-as-descriptor-operations.md)
 - [SOCKET-0004 - Use family-neutral addresses for Unix-domain sockets](socket-0004-use-family-neutral-addresses-for-unix-domain-sockets.md)
+- [SOCKET-0005 - Use structured Result errors](socket-0005-use-structured-result-errors.md)
+- [SOCKET-0006 - Avoid the OpenBSD blocking loopback connect wait](socket-0006-avoid-blocking-loopback-connect-on-openbsd.md)

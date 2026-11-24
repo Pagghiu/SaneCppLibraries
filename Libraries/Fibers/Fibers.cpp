@@ -29,16 +29,35 @@ extern "C"
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #if SC_PLATFORM_LINUX
 #include <sched.h>
 #elif SC_PLATFORM_APPLE
 #include <sys/proc.h>
 #include <sys/sysctl.h>
+#elif SC_PLATFORM_FREEBSD
+#include <sys/proc.h>
+#include <sys/sysctl.h>
+#include <sys/user.h>
+#elif SC_PLATFORM_NETBSD
+#include <sys/sysctl.h>
+#elif SC_PLATFORM_OPENBSD
+#include <sys/proc.h>
+#include <sys/sysctl.h>
 #endif
-#include <signal.h>
 #include <sys/mman.h>
+#if !SC_PLATFORM_OPENBSD
 #include <ucontext.h>
+#endif
 #include <unistd.h>
+
+namespace SC
+{
+namespace FiberVirtualReservation
+{
+#include "../Common/PosixVirtualReservation.inl"
+} // namespace FiberVirtualReservation
+} // namespace SC
 #endif
 
 #if SC_COMPILER_FILC && defined(__GLIBC__)
@@ -123,6 +142,15 @@ static size_t roundUpToFiberAllocatorPageSize(size_t size)
     return (size + pageSize - 1) / pageSize * pageSize;
 }
 
+static void* fiberReserveVirtualMemory(size_t size)
+{
+#if SC_PLATFORM_WINDOWS
+    return ::VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
+#else
+    return FiberVirtualReservation::reserveReadWritePages(size);
+#endif
+}
+
 } // namespace
 
 struct FiberVirtualMemory
@@ -137,7 +165,7 @@ struct FiberVirtualMemory
 
     static size_t roundUpToPageSize(size_t size) { return roundUpToFiberAllocatorPageSize(size); }
 
-    bool reserve(size_t maxCapacityInBytes)
+    bool reserve(size_t maxCapacityInBytes, size_t metadataPrefix = 0)
     {
         if (memory != nullptr)
         {
@@ -145,14 +173,21 @@ struct FiberVirtualMemory
         }
         reservedBytes  = roundUpToPageSize(maxCapacityInBytes);
         committedBytes = 0;
-#if SC_PLATFORM_WINDOWS
-        memory = ::VirtualAlloc(nullptr, reservedBytes, MEM_RESERVE, PAGE_NOACCESS);
-#else
-        memory = ::mmap(nullptr, reservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (memory == MAP_FAILED)
+        memory         = fiberReserveVirtualMemory(reservedBytes);
+#if SC_PLATFORM_OPENBSD
+        if (memory != nullptr)
         {
-            memory = nullptr;
+            void*        stackBegin = static_cast<char*>(memory) + metadataPrefix;
+            const size_t stackBytes = reservedBytes - metadataPrefix;
+            if (::mmap(stackBegin, stackBytes, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK | MAP_FIXED, -1, 0) == MAP_FAILED or
+                ::mprotect(stackBegin, stackBytes, PROT_NONE) != 0)
+            {
+                release();
+            }
         }
+#else
+        (void)metadataPrefix;
 #endif
         return memory != nullptr;
     }
@@ -339,7 +374,13 @@ static Result fiberDecommitNoAccess(void* memory, size_t size)
     {
         return Result::Error(FibersResultCategory, FibersError::MemoryDecommitFailed);
     }
-    if (::madvise(memory, size, MADV_DONTNEED) != 0)
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    // Released stacks need no retained contents. BSD's MADV_DONTNEED only lowers page priority.
+    constexpr int discardAdvice = MADV_FREE;
+#else
+    constexpr int discardAdvice = MADV_DONTNEED;
+#endif
+    if (::madvise(memory, size, discardAdvice) != 0)
     {
         return Result::Error(FibersResultCategory, FibersError::MemoryReleaseFailed);
     }
@@ -415,7 +456,14 @@ static void fiberStackGrowthUnlock()
 #endif
 }
 
-#if !SC_FIBERS_HAS_ADDRESS_SANITIZER
+// Enable incremental stacks on BSD only on architectures with a known interrupted stack pointer.
+#if (SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD) && !SC_PLATFORM_ARM64 && !defined(__x86_64__)
+#define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 0
+#else
+#define SC_FIBERS_HAS_STACK_GROWTH_CONTEXT 1
+#endif
+
+#if !SC_FIBERS_HAS_ADDRESS_SANITIZER && SC_FIBERS_HAS_STACK_GROWTH_CONTEXT
 static bool fiberStackGrowthDebuggerAttached()
 {
 #if SC_PLATFORM_WINDOWS
@@ -427,6 +475,27 @@ static bool fiberStackGrowthDebuggerAttached()
     size_t            informationSize    = sizeof(processInformation);
     return sysctl(mib, 4, &processInformation, &informationSize, nullptr, 0) == 0 and
            (processInformation.kp_proc.p_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_FREEBSD
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+
+    struct kinfo_proc processInformation = {};
+    size_t            informationSize    = sizeof(processInformation);
+    return sysctl(mib, 4, &processInformation, &informationSize, nullptr, 0) == 0 and
+           informationSize == sizeof(processInformation) and (processInformation.ki_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_NETBSD
+    struct kinfo_proc2 processInformation = {};
+    int                mib[6] = {CTL_KERN, KERN_PROC2, KERN_PROC_PID, getpid(), sizeof(processInformation), 1};
+
+    size_t informationSize = sizeof(processInformation);
+    return sysctl(mib, 6, &processInformation, &informationSize, nullptr, 0) == 0 and
+           informationSize == sizeof(processInformation) and (processInformation.p_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_OPENBSD
+    struct kinfo_proc processInformation = {};
+    int               mib[6] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid(), sizeof(processInformation), 1};
+
+    size_t informationSize = sizeof(processInformation);
+    return sysctl(mib, 6, &processInformation, &informationSize, nullptr, 0) == 0 and
+           informationSize == sizeof(processInformation) and (processInformation.p_psflags & PS_TRACED) != 0;
 #elif SC_PLATFORM_LINUX
     const int statusFile = open("/proc/self/status", O_RDONLY);
     if (statusFile < 0)
@@ -694,15 +763,32 @@ static_assert(__atomic_always_lock_free(sizeof(size_t), nullptr),
 
 static void* fiberStackGrowthInterruptedStackPointer(void* rawContext)
 {
-    ucontext_t& context = *static_cast<ucontext_t*>(rawContext);
+#if SC_PLATFORM_OPENBSD
+    [[maybe_unused]] auto* context = static_cast<const struct sigcontext*>(rawContext);
+#else
+    [[maybe_unused]] auto* context = static_cast<const ucontext_t*>(rawContext);
+#endif
 #if SC_PLATFORM_APPLE && SC_PLATFORM_ARM64
-    return reinterpret_cast<void*>(context.uc_mcontext->__ss.__sp);
+    return reinterpret_cast<void*>(context->uc_mcontext->__ss.__sp);
 #elif SC_PLATFORM_APPLE && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
-    return reinterpret_cast<void*>(context.uc_mcontext->__ss.__rsp);
+    return reinterpret_cast<void*>(context->uc_mcontext->__ss.__rsp);
 #elif SC_PLATFORM_LINUX && SC_PLATFORM_ARM64
-    return reinterpret_cast<void*>(context.uc_mcontext.sp);
+    return reinterpret_cast<void*>(context->uc_mcontext.sp);
 #elif SC_PLATFORM_LINUX && SC_PLATFORM_INTEL && SC_PLATFORM_64_BIT
-    return reinterpret_cast<void*>(context.uc_mcontext.gregs[REG_RSP]);
+    return reinterpret_cast<void*>(context->uc_mcontext.gregs[REG_RSP]);
+#elif SC_PLATFORM_NETBSD && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(_UC_MACHINE_SP(context));
+#elif SC_PLATFORM_NETBSD && defined(__x86_64__)
+    // _UC_MACHINE_SP subtracts the red zone. Validate the actual interrupted RSP.
+    return reinterpret_cast<void*>(context->uc_mcontext.__gregs[_REG_RSP]);
+#elif SC_PLATFORM_FREEBSD && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(context->uc_mcontext.mc_gpregs.gp_sp);
+#elif SC_PLATFORM_FREEBSD && defined(__x86_64__)
+    return reinterpret_cast<void*>(context->uc_mcontext.mc_rsp);
+#elif SC_PLATFORM_OPENBSD && SC_PLATFORM_ARM64
+    return reinterpret_cast<void*>(context->sc_sp);
+#elif SC_PLATFORM_OPENBSD && defined(__x86_64__)
+    return reinterpret_cast<void*>(context->sc_rsp);
 #else
     return nullptr;
 #endif
@@ -1323,7 +1409,7 @@ struct FiberStackClassInternal
         maxStacks       = options.maxStacks;
 
         const size_t totalBytes = metadataBytes + slotStrideBytes * maxStacks;
-        if (not virtualMemory.reserve(totalBytes))
+        if (not virtualMemory.reserve(totalBytes, metadataBytes))
         {
             resetMetadata();
             return Result::Error(FibersResultCategory, FibersError::MemoryReservationFailed);
@@ -1385,7 +1471,7 @@ struct FiberStackClassInternal
             peakActiveStacks = activeStacks;
         }
         updatePeakCommittedBytes();
-        outStack = FiberStack(stackMemory);
+        outStack = FiberStack(stackMemory, nullptr, SC_PLATFORM_OPENBSD);
         if (highWaterAvailable)
         {
             committedMemory(index).fillHighWaterMark();
@@ -3310,7 +3396,9 @@ Result FiberJobWorkerPool::workerMain(size_t workerIndex)
 
 FiberStack::FiberStack(Span<char> memory) : stackMemory(memory) {}
 
-FiberStack::FiberStack(Span<char> memory, void* owner) : stackMemory(memory), stackOwner(owner) {}
+FiberStack::FiberStack(Span<char> memory, void* owner, bool mapped)
+    : stackMemory(memory), stackOwner(owner), nativeStackMapping(mapped)
+{}
 
 FiberStack FiberStack::runtimeOwned(size_t sizeInBytes)
 {
@@ -3409,7 +3497,7 @@ Result FiberStackGrowthRuntime::close() { return internal.get().close(); }
 
 bool FiberStackGrowthRuntime::isSupported()
 {
-#if SC_FIBERS_HAS_ADDRESS_SANITIZER
+#if SC_FIBERS_HAS_ADDRESS_SANITIZER || !SC_FIBERS_HAS_STACK_GROWTH_CONTEXT
     return false;
 #else
     return not fiberStackGrowthDebuggerAttached();
@@ -3450,7 +3538,7 @@ void FiberVirtualStack::release() { internal.get().release(); }
 FiberStack FiberVirtualStack::stack() const
 {
     const FiberVirtualStackInternal& self = internal.get();
-    return FiberStack(self.stackMemory, const_cast<FiberVirtualStackInternal*>(&self));
+    return FiberStack(self.stackMemory, const_cast<FiberVirtualStackInternal*>(&self), SC_PLATFORM_OPENBSD);
 }
 
 Span<char> FiberVirtualStack::memory() const { return internal.get().stackMemory; }
@@ -3551,15 +3639,7 @@ Result FiberAllocator::createVirtual(FiberAllocatorVirtualOptions options)
     resetState();
     virtualReservedBytes  = roundUpToFiberAllocatorPageSize(options.reserveBytes);
     virtualCommittedBytes = 0;
-#if SC_PLATFORM_WINDOWS
-    virtualMemory = ::VirtualAlloc(nullptr, virtualReservedBytes, MEM_RESERVE, PAGE_NOACCESS);
-#else
-    virtualMemory = ::mmap(nullptr, virtualReservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (virtualMemory == MAP_FAILED)
-    {
-        virtualMemory = nullptr;
-    }
-#endif
+    virtualMemory         = fiberReserveVirtualMemory(virtualReservedBytes);
     if (virtualMemory == nullptr)
     {
         resetState();
@@ -7598,7 +7678,8 @@ Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack
     Result createResult =
         stack.isRuntimeOwned()
             ? FiberContextOperations::createRuntimeOwned(task.context(), stack.sizeInBytes(), taskEntry, &task)
-            : FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task);
+            : FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task,
+                                             stack.nativeStackMapping);
     if (not createResult)
     {
         task.procedure            = FiberTask::Procedure();
@@ -9781,17 +9862,69 @@ Result FiberContextOperations::captureCurrent(FiberContext& context)
     return Result(true);
 }
 
-Result FiberContextOperations::create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData)
+#if SC_PLATFORM_OPENBSD
+static Result prepareOpenBSDFiberStack(Span<char>& stack)
+{
+    const size_t pageSize  = fiberAllocatorPageSize();
+    const size_t spanBegin = reinterpret_cast<size_t>(stack.data());
+    const size_t spanEnd   = spanBegin + stack.sizeInBytes();
+    // sigaltstack remaps the pages wholly inside the span, excluding an aligned bottom guard page.
+    const size_t mappedBegin = (spanBegin + pageSize) & ~(pageSize - 1);
+    const size_t mappedEnd   = spanEnd & ~(pageSize - 1);
+    if (stack.sizeInBytes() < MINSIGSTKSZ or mappedEnd <= mappedBegin or
+        mappedEnd - mappedBegin < FiberStackMinimumSize)
+        return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
+
+    // The remap zeroes the new stack pages. Preserve any unused high-water prefix.
+    char* const  mappedMemory = reinterpret_cast<char*>(mappedBegin);
+    size_t       unusedBytes  = 0;
+    const size_t mappedBytes  = mappedEnd - mappedBegin;
+    while (unusedBytes < mappedBytes and ::memcmp(mappedMemory + unusedBytes, &FiberStackHighWaterMark, 1) == 0)
+        ++unusedBytes;
+
+    sigset_t blockedSignals;
+    sigset_t previousSignals;
+    if (::sigfillset(&blockedSignals) != 0 or ::pthread_sigmask(SIG_SETMASK, &blockedSignals, &previousSignals) != 0)
+        return Result::Error(FibersResultCategory, FibersError::SignalStackInstallFailed);
+
+    stack_t previousStack  = {};
+    stack_t temporaryStack = {};
+    temporaryStack.ss_sp   = stack.data();
+    temporaryStack.ss_size = stack.sizeInBytes();
+    const bool canInstall  = ::sigaltstack(nullptr, &previousStack) == 0 and (previousStack.ss_flags & SS_DISABLE) != 0;
+    const bool installed   = canInstall and ::sigaltstack(&temporaryStack, nullptr) == 0;
+    const bool restored    = not installed or ::sigaltstack(&previousStack, nullptr) == 0;
+    const bool maskRestored = ::pthread_sigmask(SIG_SETMASK, &previousSignals, nullptr) == 0;
+    if (not restored or not maskRestored)
+        return Result::Error(FibersResultCategory, FibersError::SignalStackRestoreFailed);
+    if (not installed)
+        return Result::Error(FibersResultCategory, FibersError::SignalStackInstallFailed);
+
+    ::memset(mappedMemory, static_cast<unsigned char>(FiberStackHighWaterMark), unusedBytes);
+    stack = {mappedMemory, mappedBytes};
+    return Result(true);
+}
+#endif
+
+Result FiberContextOperations::create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData,
+                                      bool nativeStackMapping)
 {
     if (entry == nullptr)
     {
         return Result::Error(FibersResultCategory, FibersError::InvalidProcedure);
     }
-    FiberStack fiberStack(stack);
-    if (not fiberStack.isUsable())
+    if (not FiberStack(stack).isUsable())
     {
         return Result::Error(FibersResultCategory, FibersError::StorageTooSmall);
     }
+#if SC_PLATFORM_OPENBSD
+    if (not nativeStackMapping)
+    {
+        SC_TRY(prepareOpenBSDFiberStack(stack));
+    }
+#else
+    (void)nativeStackMapping;
+#endif
 
 #if SC_COMPILER_FILC
     // Caller storage cannot represent the runtime's hidden, garbage-collected stack.
@@ -9799,7 +9932,7 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
     (void)userData;
     return Result::Error(FibersResultCategory, FibersError::OperationUnsupported);
 #else
-    const size_t usableStackSize = fiberStack.usableSizeInBytes();
+    const size_t usableStackSize = FiberStack(stack).usableSizeInBytes();
     char*        stackTop        = stack.data() + stack.sizeInBytes();
     stackTop                     = static_cast<char*>(alignDown(stackTop, FiberStackAlignment));
 
@@ -9827,6 +9960,11 @@ Result FiberContextOperations::create(FiberContext& context, Span<char> stack, F
     context.platform.r12                = reinterpret_cast<void*>(entry);
     context.platform.r13                = userData;
 #elif SC_PLATFORM_ARM64
+#if SC_PLATFORM_OPENBSD
+    // OpenBSD validates the interrupted stack pointer against MAP_STACK before handling a page fault.
+    // Keep the initial pointer inside the mapping instead of at its exclusive end.
+    stackTop -= FiberStackAlignment;
+#endif
     context.platform.sp  = stackTop;
     context.platform.x19 = reinterpret_cast<void*>(entry);
     context.platform.x20 = userData;

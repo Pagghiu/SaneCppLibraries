@@ -131,6 +131,11 @@ Install a package managed by the built-in catalog:
 ./SC.sh package install llvm
 ```
 
+On NetBSD and FreeBSD, archive downloads can fall back to the base system's `ftp` or `fetch` when
+`curl` and `wget` are unavailable. Git-backed packages require Git. Built-in installers for pinned
+Doxygen and LLVM binaries, QEMU, Wine, MSVC, LLVM MinGW, Fil-C, and Linux sysroots report unsupported
+hosts on NetBSD, FreeBSD, and OpenBSD. Use the native compiler for BSD builds.
+
 Some large or host-specific tools can be registered from an existing directory instead of downloaded:
 
 ```bash
@@ -273,6 +278,10 @@ action and arguments.
 
 `ToolsBootstrap` is deliberately small. The selected tool is linked with the Sane C++ unity build, so custom tools can
 use the libraries without maintaining another project definition. Build products remain below `_Build/_Tools`.
+
+On the tested NetBSD, FreeBSD, and OpenBSD hosts, the tool bootstrap builds the unity sources and runs the native build
+and full shared test suite. Package support depends on the selected installer. All three BSD systems belong to the lower
+experimental platform tier. See the [BSD build instructions](@ref page_build) for the exact support boundary.
 
 # Know the boundary
 

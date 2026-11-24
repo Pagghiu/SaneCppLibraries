@@ -15,6 +15,10 @@
 #include <sys/stat.h>    // fstat
 #include <unistd.h>      // read
 
+#if SC_PLATFORM_FREEBSD
+#include <sys/event.h> // kevent and EVFILT_USER
+#endif
+
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
     struct Pair
@@ -35,13 +39,57 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
         void    suppress() { notifyID = -nativeID(); }
     };
 
-    Pair     notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
+#if SC_PLATFORM_FREEBSD
+    Pair       defaultHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
+    Span<Pair> notifyHandles{defaultHandles};
+    Span<char> entryStorage;
+    bool       limitedPending = false;
+#else
+    Pair notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
+#endif
     size_t   notifyHandlesCount = 0;
     uint64_t registration       = 0;
 
     char relativePathsStorage[4096];
 
     StringSpan::NativeWritable relativePaths;
+
+    size_t capacity() const
+    {
+#if SC_PLATFORM_FREEBSD
+        return notifyHandles.sizeInElements();
+#else
+        return FolderWatcherSizes::MaxNumberOfSubdirs;
+#endif
+    }
+
+#if SC_PLATFORM_FREEBSD
+    ResultFileSystemWatcher prepareStorage()
+    {
+        static_assert(sizeof(Pair) == FileSystemWatcher::FolderWatcher::entryStorageSize(1) - alignof(uint64_t) + 1,
+                      "FolderWatcher::entryStorageSize must match inotify directory storage");
+        limitedPending = false;
+        notifyHandles  = defaultHandles;
+        if (entryStorage.empty())
+            return ResultFileSystemWatcher(true);
+
+        const uintptr_t entries  = reinterpret_cast<uintptr_t>(entryStorage.data());
+        const uintptr_t paths    = reinterpret_cast<uintptr_t>(relativePaths.writableSpan.data());
+        const bool      overlaps = entries >= paths ? entries - paths < relativePaths.writableSpan.sizeInBytes()
+                                                    : paths - entries < entryStorage.sizeInBytes();
+        const size_t    padding  = (alignof(Pair) - entries % alignof(Pair)) % alignof(Pair);
+        if (entries == 0 or paths == 0 or overlaps or padding >= entryStorage.sizeInBytes())
+            return {FileSystemWatcherError::BufferTooSmall, FileSystemWatcherErrorDetail::BSDEntryStorage};
+
+        const size_t count = (entryStorage.sizeInBytes() - padding) / sizeof(Pair);
+        if (count == 0)
+            return {FileSystemWatcherError::BufferTooSmall, FileSystemWatcherErrorDetail::BSDEntryStorage};
+        Pair* handles = reinterpret_cast<Pair*>(entryStorage.data() + padding);
+        placementNewArray(handles, count);
+        notifyHandles = {handles, count};
+        return ResultFileSystemWatcher(true);
+    }
+#endif
 
     FolderWatcherInternal() { relativePaths.writableSpan = {relativePathsStorage}; }
 };
@@ -92,6 +140,82 @@ struct SC::FileSystemWatcher::Internal
     int  notifyFd         = -1; // inotify file descriptor
     bool monitoringFailed = false;
 
+#if SC_PLATFORM_FREEBSD
+    int readinessQueue = -1;
+
+    ResultFileSystemWatcher wakeForCoverage()
+    {
+        struct kevent event;
+        EV_SET(&event, 0, EVFILT_USER, 0, NOTE_TRIGGER, 0, nullptr);
+        if (changeQueue(&event, 1, nullptr, 0) == -1)
+            return {FileSystemWatcherError::MonitoringFailed, FileSystemWatcherErrorDetail::KqueueTriggerControlEvent,
+                    static_cast<uint32_t>(errno)};
+        return ResultFileSystemWatcher(true);
+    }
+
+    int changeQueue(const struct kevent* changes, int changeCount, struct kevent* events, int capacity)
+    {
+        const struct timespec noWait = {0, 0};
+        int                   result;
+        do
+            result = ::kevent(readinessQueue, changes, changeCount, events, capacity, &noWait);
+        while (result == -1 and errno == EINTR);
+        return result;
+    }
+#endif
+
+    int readinessDescriptor() const
+    {
+#if SC_PLATFORM_FREEBSD
+        return readinessQueue;
+#else
+        return notifyFd;
+#endif
+    }
+
+    void closeDescriptors()
+    {
+#if SC_PLATFORM_FREEBSD
+        if (readinessQueue != -1)
+        {
+            ::close(readinessQueue);
+            readinessQueue = -1;
+        }
+#endif
+        if (notifyFd != -1)
+        {
+            ::close(notifyFd);
+            notifyFd = -1;
+        }
+    }
+
+    ResultFileSystemWatcher initDescriptors(int flags)
+    {
+#if SC_PLATFORM_FREEBSD
+        // A control wakeup can arrive without an inotify record.
+        flags |= IN_NONBLOCK;
+#endif
+        notifyFd = ::inotify_init1(flags);
+        if (notifyFd == -1)
+            return {FileSystemWatcherError::InitializationFailed, FileSystemWatcherErrorDetail::InotifyInitialize,
+                    static_cast<uint32_t>(errno)};
+#if SC_PLATFORM_FREEBSD
+        auto rollback  = MakeDeferred([this] { closeDescriptors(); });
+        readinessQueue = ::kqueuex(KQUEUE_CLOEXEC);
+        if (readinessQueue == -1)
+            return {FileSystemWatcherError::InitializationFailed, FileSystemWatcherErrorDetail::KqueueCreate,
+                    static_cast<uint32_t>(errno)};
+        struct kevent changes[2];
+        EV_SET(&changes[0], notifyFd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+        EV_SET(&changes[1], 0, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, nullptr);
+        if (changeQueue(changes, 2, nullptr, 0) == -1)
+            return {FileSystemWatcherError::InitializationFailed,
+                    FileSystemWatcherErrorDetail::KqueueRegisterControlEvent, static_cast<uint32_t>(errno)};
+        rollback.disarm();
+#endif
+        return ResultFileSystemWatcher(true);
+    }
+
     ResultFileSystemWatcher init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         if (self != nullptr or runner.get().shutdownPipe[0] != -1)
@@ -109,15 +233,13 @@ struct SC::FileSystemWatcher::Internal
             return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
                                            FileSystemWatcherErrorDetail::PosixCreateShutdownPipe, nativeError);
         }
-        notifyFd = ::inotify_init1(IN_CLOEXEC);
-        if (notifyFd == -1)
+        const auto initialized = initDescriptors(IN_CLOEXEC);
+        if (not initialized)
         {
-            const uint32_t nativeError = static_cast<uint32_t>(errno);
             threadingRunner->closeShutdownPipe();
             self            = nullptr;
             threadingRunner = nullptr;
-            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
-                                           FileSystemWatcherErrorDetail::InotifyInitialize, nativeError);
+            return initialized;
         }
         return ResultFileSystemWatcher(true);
     }
@@ -130,23 +252,19 @@ struct SC::FileSystemWatcher::Internal
         eventLoopRunner  = &runner;
         monitoringFailed = false;
 
-        notifyFd = ::inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
-        if (notifyFd == -1)
+        const auto initialized = initDescriptors(IN_NONBLOCK | IN_CLOEXEC);
+        if (not initialized)
         {
-            const uint32_t nativeError = static_cast<uint32_t>(errno);
-
             self            = nullptr;
             eventLoopRunner = nullptr;
-            return ResultFileSystemWatcher(FileSystemWatcherError::InitializationFailed,
-                                           FileSystemWatcherErrorDetail::InotifyInitialize, nativeError);
+            return initialized;
         }
 
-        eventLoopRunner->internalInit(parent, notifyFd);
+        eventLoopRunner->internalInit(parent, readinessDescriptor());
         const Result started = eventLoopRunner->posixStartSharedFileReadiness();
         if (not started)
         {
-            ::close(notifyFd);
-            notifyFd = -1;
+            closeDescriptors();
 
             eventLoopRunner->notifyFd          = -1;
             eventLoopRunner->fileSystemWatcher = nullptr;
@@ -237,11 +355,7 @@ struct SC::FileSystemWatcher::Internal
         {
             threadingRunner->closeShutdownPipe();
         }
-        if (notifyFd != -1)
-        {
-            ::close(notifyFd);
-            notifyFd = -1;
-        }
+        closeDescriptors();
         self = nullptr;
         if (eventLoopRunner)
         {
@@ -346,13 +460,16 @@ struct SC::FileSystemWatcher::Internal
 
     int registerDirectory(int directoryFd)
     {
-        // inotify takes a path. Resolve the open descriptor through procfs so registration
-        // and enumeration use the same object even if its directory entry is replaced.
-        char descriptorPath[sizeof("/proc/self/fd/") + 3 * sizeof(int)];
-        ::snprintf(descriptorPath, sizeof(descriptorPath), "/proc/self/fd/%d", directoryFd);
         constexpr int mask = IN_ONLYDIR | IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF |
                              IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
+#if SC_PLATFORM_FREEBSD
+        return ::inotify_add_watch_at(notifyFd, directoryFd, ".", mask);
+#else
+        // Resolve the open descriptor through procfs so registration and enumeration use the same object.
+        char descriptorPath[sizeof("/proc/self/fd/") + 3 * sizeof(int)];
+        ::snprintf(descriptorPath, sizeof(descriptorPath), "/proc/self/fd/%d", directoryFd);
         return ::inotify_add_watch(notifyFd, descriptorPath, mask);
+#endif
     }
 
     static bool sameDirectory(const struct stat& first, const struct stat& second)
@@ -387,7 +504,7 @@ struct SC::FileSystemWatcher::Internal
     ResultFileSystemWatcher addSubdirectory(FolderWatcherInternal& folder, int fd, const struct stat& status,
                                             const char* path)
     {
-        if (folder.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
+        if (folder.notifyHandlesCount >= folder.capacity())
             return {FileSystemWatcherError::WatchLimitExceeded,
                     FileSystemWatcherErrorDetail::InotifyWatchHandleCapacity};
         if (path[0] == '/')
@@ -421,9 +538,14 @@ struct SC::FileSystemWatcher::Internal
             DIR* stream;
             int  watchIndex;
         };
+#if SC_PLATFORM_FREEBSD
+        // Each additional directory needs at least a separator and one path byte.
+        Directory pending[1 + StringPath::MaxPath / 2];
+#else
         Directory pending[FolderWatcherSizes::MaxNumberOfSubdirs];
-        size_t    depth        = 0;
-        auto      closeStreams = MakeDeferred(
+#endif
+        size_t depth        = 0;
+        auto   closeStreams = MakeDeferred(
             [&]
             {
                 while (depth != 0)
@@ -431,6 +553,12 @@ struct SC::FileSystemWatcher::Internal
             });
         const auto push = [&](int fd, int watchIndex) -> ResultFileSystemWatcher
         {
+            if (depth == sizeof(pending) / sizeof(pending[0]))
+            {
+                ::close(fd);
+                return {FileSystemWatcherError::WatchLimitExceeded,
+                        FileSystemWatcherErrorDetail::InotifyPendingDirectoryCapacity};
+            }
             DIR* stream = ::fdopendir(fd);
             if (stream == nullptr)
             {
@@ -478,8 +606,15 @@ struct SC::FileSystemWatcher::Internal
             if (inspected == -1 and errno != ENOENT)
                 return {FileSystemWatcherError::WatchSetupFailed,
                         FileSystemWatcherErrorDetail::InotifyInspectDirectoryEntry, static_cast<uint32_t>(errno)};
-            if (inspected == -1 or not S_ISDIR(status.st_mode))
+            if (inspected == -1)
                 continue;
+            if (not S_ISDIR(status.st_mode))
+            {
+#if SC_PLATFORM_FREEBSD
+                folder.limitedPending |= not S_ISREG(status.st_mode);
+#endif
+                continue;
+            }
 
             int childFd;
             do
@@ -559,6 +694,14 @@ struct SC::FileSystemWatcher::Internal
             opaque.relativePaths.writableSpan = entry->subFolderRelativePathsBuffer;
         }
         opaque.relativePaths.length = 0;
+#if SC_PLATFORM_FREEBSD
+        const auto storage = opaque.prepareStorage();
+        if (not storage)
+        {
+            detachUnstartedWatcher(*entry);
+            return storage;
+        }
+#endif
 
         StringPath currentPath = entry->path;
 
@@ -568,7 +711,7 @@ struct SC::FileSystemWatcher::Internal
             return ResultFileSystemWatcher(FileSystemWatcherError::NotInitialized,
                                            FileSystemWatcherErrorDetail::InotifyDescriptor);
         }
-        if (opaque.notifyHandlesCount >= FolderWatcherSizes::MaxNumberOfSubdirs)
+        if (opaque.notifyHandlesCount >= opaque.capacity())
         {
             detachUnstartedWatcher(*entry);
             return ResultFileSystemWatcher(FileSystemWatcherError::WatchLimitExceeded,
@@ -618,6 +761,14 @@ struct SC::FileSystemWatcher::Internal
         const auto scanned = scanSubdirectories(*entry, rootFd, 0);
         if (not scanned)
             return failStartWatching(*entry, scanned);
+#if SC_PLATFORM_FREEBSD
+        if (opaque.limitedPending)
+        {
+            const auto woken = wakeForCoverage();
+            if (not woken)
+                return failStartWatching(*entry, woken);
+        }
+#endif
 
         // Launch the thread that monitors the inotify watch if we're on thread runner
         if (threadingRunner and not threadingRunner->thread.wasStarted())
@@ -639,7 +790,7 @@ struct SC::FileSystemWatcher::Internal
         while (not runner.shouldStop.load())
         {
             const int shutdownFd      = runner.shutdownPipe[0];
-            const int currentNotifyFd = notifyFd;
+            const int currentNotifyFd = readinessDescriptor();
             if (shutdownFd == -1 or currentNotifyFd == -1)
             {
                 return;
@@ -662,14 +813,23 @@ struct SC::FileSystemWatcher::Internal
             }
             if (descriptors[0].revents & POLLIN)
                 return;
-            if ((descriptors[1].revents & POLLIN) and not readAndNotify(currentNotifyFd))
+            if ((descriptors[1].revents & POLLIN) and not readAndNotify())
                 return;
         }
         threadingRunner->shouldStop.exchange(false);
     }
 
-    bool readAndNotify(const int notifyFd)
+    bool readAndNotify()
     {
+#if SC_PLATFORM_FREEBSD
+        struct kevent events[2];
+        if (changeQueue(nullptr, 0, events, 2) == -1)
+        {
+            failMonitoring({FileSystemWatcherError::MonitoringFailed, FileSystemWatcherErrorDetail::InotifyReadEvents,
+                            static_cast<uint32_t>(errno)});
+            return false;
+        }
+#endif
         int                                numReadBytes;
         alignas(struct inotify_event) char inotifyBuffer[3 * 1024];
         // TODO: Handle the case where kernel is sending more than 3kb of events.
@@ -678,17 +838,23 @@ struct SC::FileSystemWatcher::Internal
             numReadBytes = ::read(notifyFd, inotifyBuffer, sizeof(inotifyBuffer));
         } while (numReadBytes == -1 and errno == EINTR);
 
-        if (numReadBytes == -1 and (errno == EAGAIN or errno == EWOULDBLOCK))
-            return true;
-        if (numReadBytes <= 0)
+        const bool wouldBlock = numReadBytes == -1 and (errno == EAGAIN or errno == EWOULDBLOCK);
+        if (not wouldBlock and numReadBytes <= 0)
         {
             const uint32_t nativeError = numReadBytes == -1 ? static_cast<uint32_t>(errno) : 0;
             failMonitoring(ResultFileSystemWatcher(FileSystemWatcherError::MonitoringFailed,
                                                    FileSystemWatcherErrorDetail::InotifyReadEvents, nativeError));
             return false;
         }
-        return dispatch([&](Delivery& frame)
-                        { notifyWatchers({inotifyBuffer, static_cast<size_t>(numReadBytes)}, self->watchers, frame); });
+        return dispatch(
+            [&](Delivery& frame)
+            {
+#if SC_PLATFORM_FREEBSD
+                notifyLimitedCoverage(frame);
+#endif
+                if (frame.alive and not closing and not wouldBlock)
+                    notifyWatchers({inotifyBuffer, static_cast<size_t>(numReadBytes)}, self->watchers, frame);
+            });
     }
 
     template <typename Visit>
@@ -781,6 +947,36 @@ struct SC::FileSystemWatcher::Internal
                                   notifyRoot(entry, kind, frame, failure);
                           });
     }
+
+#if SC_PLATFORM_FREEBSD
+    void notifyLimitedCoverage(Delivery& frame)
+    {
+        forEachLiveFolder(self->watchers, frame,
+                          [&](FolderWatcher& entry)
+                          {
+                              auto& folder = entry.internal.get();
+                              if (folder.notifyHandles[0].notifyID > 0 and folder.limitedPending)
+                              {
+                                  folder.limitedPending = false;
+                                  notifyRoot(entry, NotificationKind::CoverageLimited, frame,
+                                             {FileSystemWatcherError::CoverageLimited,
+                                              FileSystemWatcherErrorDetail::BSDPassiveEntries});
+                              }
+                          });
+    }
+
+    static bool isPassiveArrival(FolderWatcher& entry, size_t index, const struct inotify_event& event)
+    {
+        if (event.len == 0 or not(event.mask & (IN_CREATE | IN_MOVED_TO)))
+            return false;
+        StringPath path;
+        if (not getSubFolderPath(path, entry.path, event.name, entry.internal.get(), static_cast<int>(index)))
+            return false;
+        struct stat status;
+        return ::lstat(path.view().bytesIncludingTerminator(), &status) == 0 and not S_ISDIR(status.st_mode) and
+               not S_ISREG(status.st_mode);
+    }
+#endif
 
     ResultFileSystemWatcher updateDirectory(FolderWatcher& entry, size_t parentIndex, const inotify_event& event)
     {
@@ -991,7 +1187,11 @@ struct SC::FileSystemWatcher::Internal
                                       {
                                           if (folder.notifyHandles[idx].notifyID != event->wd)
                                               continue;
-                                          const auto updated = updateDirectory(entry, idx, *event);
+                                          auto updated = updateDirectory(entry, idx, *event);
+#if SC_PLATFORM_FREEBSD
+                                          if (updated and folder.limitedPending)
+                                              updated = wakeForCoverage();
+#endif
                                           if (updated)
                                           {
                                               // Mutations before registration must still be recovered by a rescan.
@@ -1021,6 +1221,15 @@ struct SC::FileSystemWatcher::Internal
                                   {
                                       if (folder.notifyHandles[idx].notifyID == event->wd)
                                       {
+#if SC_PLATFORM_FREEBSD
+                                          if (isPassiveArrival(entry, idx, *event))
+                                          {
+                                              notifyRoot(entry, NotificationKind::CoverageLimited, frame,
+                                                         {FileSystemWatcherError::CoverageLimited,
+                                                          FileSystemWatcherErrorDetail::BSDPassiveEntries});
+                                              return;
+                                          }
+#endif
                                           notifySingleEvent(event, previousEvent, entry, idx, frame);
                                           prevEvent = event;
                                           return;
@@ -1096,10 +1305,7 @@ SC::ResultFileSystemWatcher SC::FileSystemWatcher::Notification::getFullPath(Str
     return ResultFileSystemWatcher(true);
 }
 
-bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
-{
-    return internal.get().readAndNotify(internal.get().notifyFd);
-}
+bool SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t) { return internal.get().readAndNotify(); }
 
 void SC::FileSystemWatcher::asyncNotifyFailure(Result failure)
 {

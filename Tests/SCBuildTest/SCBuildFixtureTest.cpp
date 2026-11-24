@@ -109,6 +109,9 @@ static Build::Platform::Type getBuildPlatform()
     {
     case SC::Platform::Apple: return Build::Platform::Apple;
     case SC::Platform::Linux: return Build::Platform::Linux;
+    case SC::Platform::NetBSD: return Build::Platform::NetBSD;
+    case SC::Platform::FreeBSD: return Build::Platform::FreeBSD;
+    case SC::Platform::OpenBSD: return Build::Platform::OpenBSD;
     case SC::Platform::Windows: return Build::Platform::Windows;
     case SC::Platform::Emscripten: return Build::Platform::Wasm;
     }
@@ -181,6 +184,9 @@ static size_t getSmallFixtureMaxBytes()
     case SC::Platform::Apple: return SmallFixtureMaxBytesMacOS;
     case SC::Platform::Linux: return SmallFixtureMaxBytesLinux;
     case SC::Platform::Windows: return SmallFixtureMaxBytesWindows;
+    case SC::Platform::NetBSD:
+    case SC::Platform::OpenBSD:
+    case SC::Platform::FreeBSD:
     case SC::Platform::Emscripten: break;
     }
     Assert::unreachable();
@@ -259,7 +265,7 @@ static Result setDynamicLinkedLibraryPath(StringView libraryPath)
     return Result(true);
 }
 
-#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX or SC_PLATFORM_NETBSD or SC_PLATFORM_FREEBSD
 static Result resolveHostToolPath(StringView toolName, String& toolPath)
 {
     Process process;
@@ -269,6 +275,9 @@ static Result resolveHostToolPath(StringView toolName, String& toolPath)
     SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
     return Result(true);
 }
+#endif
+
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 
 #if SC_PLATFORM_APPLE
 static bool tryResolveHostToolPath(StringView toolName, String& toolPath)
@@ -849,7 +858,7 @@ static Result configureTinyConsoleProgram(Build::Definition& definition, const B
     return Result(true);
 }
 
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX or SC_PLATFORM_NETBSD or SC_PLATFORM_FREEBSD
 static Result configureNativeExportsProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {FixtureWorkspaceName};
@@ -864,7 +873,8 @@ static Result configureNativeExportsProgram(Build::Definition& definition, const
     SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/NativeExports/Host.c"));
     SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/NativeExports/Hidden.c"));
     SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/NativeExports/Exported/Exports.c"));
-    SC_TRY(project.addLinkLibraries({"dl"}));
+    if (parameters.platform != Build::Platform::NetBSD)
+        SC_TRY(project.addLinkLibraries({"dl"}));
 
     SC_TRY(workspace.projects.push_back(move(project)));
     SC_TRY(definition.workspaces.push_back(move(workspace)));
@@ -1110,6 +1120,9 @@ static Result computeBuildDirectoryName(const Build::Action& action, String& bui
         }
         break;
     case Build::Platform::Windows: targetOS = "windows"; break;
+    case Build::Platform::NetBSD: targetOS = "netbsd"; break;
+    case Build::Platform::FreeBSD: targetOS = "freebsd"; break;
+    case Build::Platform::OpenBSD: targetOS = "openbsd"; break;
     case Build::Platform::Wasm: targetOS = "wasm"; break;
     case Build::Platform::Unknown: return fixtureFailure(BuildFixtureFailure::UnsupportedPlatform);
     }
@@ -4403,7 +4416,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(verifyNoSCExportsFromExecutable(executablePath.view(), importLibraryPath.view()));
         }
 
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX or SC_PLATFORM_NETBSD or SC_PLATFORM_FREEBSD
         if (test_section("native backend exports symbols from a source directory"))
         {
             String             buildRoot = StringEncoding::Utf8;

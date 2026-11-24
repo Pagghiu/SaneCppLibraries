@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#elif SC_PLATFORM_FREEBSD
+#include <sys/sysctl.h>
 #elif SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -49,9 +51,22 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         appleRootChanged(appDirectory);
         appleRefreshOverlappingWatchers(appDirectory);
 #endif
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+        bsdCapacityAndFailure(appDirectory);
+        bsdFailedRunnerInitialization(appDirectory);
+        bsdDescriptorExhaustion(appDirectory);
+        bsdExtendedStorage(appDirectory);
+        bsdPassiveEntries(appDirectory);
+        bsdCallbackLifecycle(appDirectory);
+        bsdDynamicTreeAndRootLoss(appDirectory);
+        bsdAsyncFailureCallbacks(appDirectory);
+        bsdNativeReadFailure(appDirectory);
+#endif
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
         eventLoopWatchInvalidation(appDirectory);
         eventLoopOverflow(appDirectory);
+#endif
+#if SC_PLATFORM_LINUX
         eventLoopLongNotificationPath();
         eventLoopReadFailure(appDirectory);
 #endif
@@ -68,8 +83,8 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             {
 #if SC_PLATFORM_APPLE
                 return appleStartWakeUp();
-#elif SC_PLATFORM_LINUX
-                return posixStartSharedFileReadiness();
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+                return startSharedFileReadiness();
 #else
                 FileSystemWatcher::FolderWatcher watcher;
                 return windowsStartFolderExternalCompletion(watcher, nullptr);
@@ -1047,6 +1062,18 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     }
 #endif
 
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+    void bsdFailedRunnerInitialization(const StringView appDirectory);
+    void bsdCapacityAndFailure(const StringView appDirectory);
+    void bsdDescriptorExhaustion(const StringView appDirectory);
+    void bsdPassiveEntries(const StringView appDirectory);
+    void bsdExtendedStorage(const StringView appDirectory);
+    void bsdCallbackLifecycle(const StringView appDirectory);
+    void bsdDynamicTreeAndRootLoss(const StringView appDirectory);
+    void bsdAsyncFailureCallbacks(const StringView appDirectory);
+    void bsdNativeReadFailure(const StringView appDirectory);
+#endif
+
 #if SC_PLATFORM_LINUX
     void eventLoopLongNotificationPath()
     {
@@ -1153,6 +1180,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         closeLoop.disarm();
     }
 
+#endif
+
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
     void eventLoopWatchInvalidation(const StringView appDirectory)
     {
         if (not test_section("AsyncEventLoop inotify watch invalidation"))
@@ -1300,6 +1330,13 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         if (not test_section("AsyncEventLoop inotify overflow"))
             return;
 
+        int32_t queueLimit = 0;
+#if SC_PLATFORM_FREEBSD
+        size_t     limitSize = sizeof(queueLimit);
+        const bool parsed =
+            ::sysctlbyname("vfs.inotify.max_queued_events", &queueLimit, &limitSize, nullptr, 0) == 0 and
+            limitSize == sizeof(queueLimit) and queueLimit > 0;
+#else
         FileDescriptor limitFile;
         if (not limitFile.open("/proc/sys/fs/inotify/max_queued_events", FileOpen{}))
         {
@@ -1313,9 +1350,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(limitFile.close());
         if (not readLimit)
             return;
-        int32_t          queueLimit = 0;
         const StringView limitText({limitBuffer, limitBytes.sizeInBytes()}, false, StringEncoding::Ascii);
         const bool       parsed = limitText.trimWhiteSpaces().parseInt32(queueLimit) and queueLimit > 0;
+#endif
         SC_TEST_EXPECT(parsed);
         if (not parsed)
             return;
@@ -1469,6 +1506,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             removeDirectory.disarm();
     }
 
+#endif
+
+#if SC_PLATFORM_LINUX
     void eventLoopReadFailure(const StringView appDirectory)
     {
         if (not test_section("AsyncEventLoop inotify read failure"))
@@ -1687,6 +1727,10 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     }
 #endif
 };
+
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#include "FileSystemWatcherBSDAsyncTest.inl"
+#endif
 
 namespace SC
 {

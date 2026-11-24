@@ -9108,6 +9108,15 @@ struct SC::FibersTest : public SC::TestCase
     {
         if (not FiberStackGrowthRuntime::isSupported())
         {
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996) // getenv
+#endif
+            const char* required = ::getenv("SC_FIBERS_TEST_REQUIRE_STACK_GROWTH");
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+            SC_TEST_EXPECT(required == nullptr or required[0] != '1');
             return;
         }
 

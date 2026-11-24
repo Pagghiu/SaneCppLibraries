@@ -44,7 +44,10 @@ struct FSWThread
 #else
 #include <errno.h>   // errno
 #include <pthread.h> // pthread_
-#include <unistd.h>  // usleep
+#if SC_PLATFORM_OPENBSD
+#include <pthread_np.h>
+#endif
+#include <unistd.h> // usleep
 namespace SC
 {
 // Atomic bool for thread safety
@@ -161,6 +164,10 @@ struct FSWThread
     {
 #if SC_PLATFORM_APPLE
         pthread_setname_np(name);
+#elif SC_PLATFORM_OPENBSD
+        pthread_set_name_np(pthread_self(), name);
+#elif SC_PLATFORM_NETBSD
+        pthread_setname_np(pthread_self(), "%s", const_cast<char*>(name));
 #else
         pthread_setname_np(pthread_self(), name);
 #endif

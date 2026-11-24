@@ -69,8 +69,11 @@ page_faq) explains the compile and link settings when you intentionally need it.
 
 The unity build selects platform implementations at compile time. Depending on the libraries used, a target may need:
 
-- Apple system frameworks such as CoreFoundation or CoreServices;
-- Linux system libraries such as `dl` and `pthread`;
+- Apple system frameworks such as CoreFoundation or CoreServices.
+- Linux system libraries such as `dl` and `pthread`.
+- NetBSD system libraries such as `execinfo` and `pthread`. The base system provides the dynamic loader API and digest routines.
+- FreeBSD system libraries such as `dl`, `execinfo`, `md`, and `pthread`.
+- OpenBSD system libraries such as `execinfo` and `pthread`. OpenSSL 3 is an optional package runtime.
 - Windows system libraries, many of which are selected by the headers with `#pragma comment(lib, ...)`.
 
 Start from the link settings used by the corresponding repository example or test rather than adding every possible
@@ -79,8 +82,8 @@ system library. This keeps a small consumer target honest about what it actually
 # Plugins need exported library symbols
 
 When using [Plugin](@ref library_plugin) without `SC::Build`, define `SC_EXPORT_LIBRARY_<LIBRARY>=1` in the host for
-each Sane C++ library that a plugin must resolve. Linux hosts also need exported executable symbols, normally through
-`-rdynamic`.
+each Sane C++ library that a plugin must resolve. Linux, NetBSD, FreeBSD, and OpenBSD hosts also need exported executable
+symbols, normally through `-rdynamic`.
 
 # When to use SC::Build
 

@@ -71,12 +71,13 @@ Do not model `Http` after heap-backed web frameworks, full-message AST parsers, 
 
 ## Decision Log
 
-- [HTTP-0008 - Own transport hooks as an exclusive group](http-0008-own-transport-hooks-as-an-exclusive-group.md)
-- [HTTP-0009 - Use low-latency TCP for the built-in server listener](http-0009-enable-low-latency-server-tcp.md)
-
 - [HTTP-0001 - Keep HTTP on caller-provided async connection storage](http-0001-keep-http-on-caller-provided-async-connection-storage.md)
 - [HTTP-0002 - Share incoming/outgoing message cores across server and async client](http-0002-share-incoming-outgoing-message-cores-across-server-and-async-client.md)
 - [HTTP-0003 - Keep HTTP parser and body framing incremental, not AST-based](http-0003-keep-http-parser-and-body-framing-incremental-not-ast-based.md)
+
 - [HTTP-0004 - Keep transport concerns in HttpAsyncClient, outside message types](http-0004-keep-transport-concerns-in-httpasyncclient-outside-message-types.md)
 - [HTTP-0005 - Allow externally owned async transports](http-0005-allow-external-async-transports.md)
 - [HTTP-0006 - Make WebSocket SHA-1 provider policy explicit](http-0006-make-websocket-sha1-provider-policy-explicit.md)
+- [HTTP-0008 - Own transport hooks as an exclusive group](http-0008-own-transport-hooks-as-an-exclusive-group.md)
+- [HTTP-0009 - Use low-latency TCP for the built-in server listener](http-0009-enable-low-latency-server-tcp.md)
+- [HTTP-0010 - Use BSD system SHA-1 providers for WebSocket handshakes](http-0010-use-bsd-system-sha1-providers.md)

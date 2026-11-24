@@ -69,7 +69,7 @@ struct FileSystemWatcher
         // The Apple backend keeps a Notification and structured result inline during event-loop handoff.
         static constexpr int Apple   = 61 * sizeof(void*);
         static constexpr int Linux   = 256;
-        static constexpr int Default = Linux;
+        static constexpr int Default = 512; // BSD keeps a mutex and callback-lifetime state inline.
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -93,7 +93,7 @@ struct FileSystemWatcher
         static constexpr int Windows = (2 * MaxWatchablePaths + 2) * sizeof(void*) + sizeof(uint64_t);
         static constexpr int Apple   = sizeof(void*);
         static constexpr int Linux   = sizeof(void*) * 6;
-        static constexpr int Default = Linux;
+        static constexpr int Default = 256; // BSD thread and shutdown state.
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -109,7 +109,7 @@ struct FileSystemWatcher
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
         static constexpr int Apple   = sizeof(StringPath) + sizeof(void*);
         static constexpr int Linux   = 24 * MaxNumberOfSubdirs + 4096 + 40;
-        static constexpr int Default = Linux;
+        static constexpr int Default = 13 * 1024; // BSD bounded vnode inventory and path storage.
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -128,9 +128,10 @@ struct FileSystemWatcher
     /// @brief Describes whether a notification represents a change or a loss of monitoring information.
     enum class NotificationKind
     {
-        Change,         ///< A file or directory may have changed
-        RescanRequired, ///< Changes were lost; rescan the watched tree and restore coverage if necessary
-        WatchStopped,   ///< Monitoring has stopped for this root; inspect Notification::failure before restarting
+        Change,          ///< A file or directory may have changed
+        RescanRequired,  ///< Changes were lost; rescan the watched tree and restore coverage if necessary
+        WatchStopped,    ///< Monitoring has stopped for this root; inspect Notification::failure before restarting
+        CoverageLimited, ///< Some entries cannot be monitored directly; inspect Notification::failure
     };
 
     /// @brief Notification holding type and path
@@ -142,7 +143,7 @@ struct FileSystemWatcher
         Operation        operation = Operation::Modified;      ///< Coarse change class
         NotificationKind kind      = NotificationKind::Change; ///< Change or monitoring status
 
-        ResultFileSystemWatcher failure; ///< Failure when kind is WatchStopped; successful otherwise
+        ResultFileSystemWatcher failure; ///< Failure for WatchStopped or CoverageLimited; successful otherwise
 
         /// @brief Get the full path of the file being watched.
         /// @param path StringPath that will hold full (absolute) path
@@ -163,9 +164,27 @@ struct FileSystemWatcher
     {
         /// @brief Constructs a folder watcher
         /// @param subFolderRelativePathsBuffer User provided buffer used to sub-folders relative paths.
-        /// When an empty span is passed, the internal 1Kb buffer is used.
-        /// This buffer is used on Linux only when watching folders recursively, it's unused on Windows / macOS.
+        /// When an empty span is passed, the internal 4 KiB buffer is used.
+        /// This buffer is used for recursive paths on Linux and BSD; it is unused on Windows and macOS.
         FolderWatcher(Span<char> subFolderRelativePathsBuffer = {});
+
+        /// @brief Supplies optional storage for more watched entries on BSD.
+        /// @param subFolderRelativePathsBuffer Optional storage for relative path components.
+        /// @param entryStorage Optional byte storage for native entries and reconciliation marks. It must not overlap
+        /// the path buffer or be used for anything else until this watcher is stopped. Other platforms ignore it.
+        /// @note On BSD, use entryStorageSize(numberOfEntries) to reserve enough bytes for the requested entries,
+        /// including the root; a zero-length span selects the built-in storage.
+        FolderWatcher(Span<char> subFolderRelativePathsBuffer, Span<char> entryStorage);
+
+        /// @brief Byte storage sufficient for at least `numberOfEntries` BSD entries, or zero if the size overflows.
+        static constexpr size_t entryStorageSize(size_t numberOfEntries)
+        {
+            constexpr size_t bytesPerEntry = SC_PLATFORM_FREEBSD ? 24 : 65;
+            constexpr size_t padding       = alignof(uint64_t) - 1;
+            return numberOfEntries == 0 or numberOfEntries > (static_cast<size_t>(-1) - padding) / bytesPerEntry
+                       ? 0
+                       : numberOfEntries * bytesPerEntry + padding;
+        }
 
         Function<void(const Notification&)> notifyCallback; ///< Function that will be called on a notification
 
@@ -195,7 +214,7 @@ struct FileSystemWatcher
 
         StringPath path;
 
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
         Span<char> subFolderRelativePathsBuffer;
 #endif
     };
@@ -213,7 +232,7 @@ struct FileSystemWatcher
         virtual void   appleResetHandoff()      = 0;
         virtual Result appleWakeUpAndWait()     = 0;
 
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         // On failure, no readiness request may remain active or retain notifyFd.
         virtual Result posixStartSharedFileReadiness() = 0;
         virtual Result posixStopSharedFileReadiness()  = 0;
@@ -262,7 +281,7 @@ struct FileSystemWatcher
     ResultFileSystemWatcher watch(FolderWatcher& watcher, StringSpan path);
 
     bool asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     void asyncNotifyFailure(Result failure);
 #elif SC_PLATFORM_WINDOWS
     void asyncNotifyFailure(FolderWatcher& watcher, Result failure);
@@ -363,8 +382,11 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 
     T_AsyncLoopWakeUp asyncWakeUp = {};
     T_EventObject     eventObject = {};
-#elif SC_PLATFORM_LINUX
-    virtual Result posixStartSharedFileReadiness() override
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+    virtual Result posixStartSharedFileReadiness() override { return startSharedFileReadiness(); }
+    virtual Result posixStopSharedFileReadiness() override { return stopSharedFileReadiness(); }
+
+    Result startSharedFileReadiness()
     {
         if (eventLoop == nullptr or fileSystemWatcher == nullptr)
             return Result::Error(FileSystemWatcherResultCategory, FileSystemWatcherError::NotInitialized);
@@ -373,12 +395,12 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         return asyncPoll.start(*eventLoop, notifyFd);
     }
 
-    virtual Result posixStopSharedFileReadiness() override
+    Result stopSharedFileReadiness()
     {
-        if (posixDeliveryAlive != nullptr)
+        if (sharedDeliveryAlive != nullptr)
         {
-            *posixDeliveryAlive = false;
-            posixDeliveryAlive  = nullptr;
+            *sharedDeliveryAlive = false;
+            sharedDeliveryAlive  = nullptr;
         }
         if (not asyncPoll.isFree())
         {
@@ -393,8 +415,8 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 
     void onEventLoopNotification(typename T_AsyncFileReadiness::Result& result)
     {
-        bool deliveryAlive = true;
-        posixDeliveryAlive = &deliveryAlive;
+        bool deliveryAlive  = true;
+        sharedDeliveryAlive = &deliveryAlive;
 
         bool rearm = false;
         if (result.isValid())
@@ -407,13 +429,13 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         }
         if (deliveryAlive)
         {
-            posixDeliveryAlive = nullptr;
+            sharedDeliveryAlive = nullptr;
             if (rearm)
                 result.reactivateRequest(true);
         }
     }
 
-    bool* posixDeliveryAlive = nullptr;
+    bool* sharedDeliveryAlive = nullptr;
 
     T_AsyncFileReadiness asyncPoll = {};
 #else

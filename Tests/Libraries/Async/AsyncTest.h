@@ -80,9 +80,12 @@ struct SC::AsyncTest : public SC::TestCase
     void fileReadWrite(bool useThreadPool);
     void fileEndOfFile(bool useThreadPool);
     void fileWriteMultiple(bool useThreadPool);
-    void fileSend(bool useThreadPool, bool pastEOF = false, bool cancelFirst = false);
+    void fileSend(bool useThreadPool, bool pastEOF = false, bool cancelFirst = false, bool large = false);
     void fileReadiness();
     void fileReadinessCancel();
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    void bsdNestedKqueueReadiness();
+#endif
     void fileWorkerAssociatedCompletion();
     void fileReadCancelQuiescence(bool drainBeforeCancel = false);
     void externalCompletionManual();

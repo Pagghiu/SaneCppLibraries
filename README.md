@@ -10,6 +10,7 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
 
 **Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux, built for Agents.
+NetBSD, FreeBSD and OpenBSD are available as a lower, experimental support tier with release-specific CI coverage.
 
 [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):  
 ✅ Fast compile times  

@@ -104,7 +104,8 @@ struct SC_FIBERS_EXPORT FiberContextOperations
     static Result switchToChecked(FiberContext& from, FiberContext& to);
 
     static Result captureCurrent(FiberContext& context);
-    static Result create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData);
+    static Result create(FiberContext& context, Span<char> stack, FiberContextEntry entry, void* userData,
+                         bool nativeStackMapping = false);
     static void   switchTo(FiberContext& from, FiberContext& to);
 
     [[noreturn]] static void switchToAndFinish(FiberContext& from, FiberContext& to);

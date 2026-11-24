@@ -4,18 +4,27 @@
 
 #include <string.h>
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#define SC_HTTP_CLIENT_USE_PTHREAD 1
 #include <errno.h>
 #include <pthread.h>
 #include <time.h>
+#else
+#define SC_HTTP_CLIENT_USE_PTHREAD 0
+#endif
+
+#if SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#define SC_HTTP_CLIENT_USE_LIBCURL 1
+#else
+#define SC_HTTP_CLIENT_USE_LIBCURL 0
 #endif
 
 #if SC_PLATFORM_APPLE
 #include "Internal/HttpClientApple.inl"
 #elif SC_PLATFORM_WINDOWS
 #include "Internal/HttpClientWindows.inl"
-#elif SC_PLATFORM_LINUX
-#include "Internal/HttpClientLinux.inl"
+#elif SC_HTTP_CLIENT_USE_LIBCURL
+#include "Internal/HttpClientLibCurl.inl"
 #else
 SC::HttpClient::HttpClient() {}
 SC::HttpClient::~HttpClient() {}
@@ -521,7 +530,7 @@ namespace
 #if SC_PLATFORM_WINDOWS
 using HttpClientLocalMutexStorage             = CRITICAL_SECTION;
 using HttpClientLocalConditionVariableStorage = CONDITION_VARIABLE;
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
 using HttpClientLocalMutexStorage             = pthread_mutex_t;
 using HttpClientLocalConditionVariableStorage = pthread_cond_t;
 
@@ -560,7 +569,7 @@ SC::HttpClientLocalMutex::HttpClientLocalMutex()
 
 #if SC_PLATFORM_WINDOWS
     InitializeCriticalSection(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_mutex_init(reinterpret_cast<HttpClientLocalMutexStorage*>(storage), nullptr);
 #endif
 }
@@ -569,7 +578,7 @@ SC::HttpClientLocalMutex::~HttpClientLocalMutex()
 {
 #if SC_PLATFORM_WINDOWS
     DeleteCriticalSection(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_mutex_destroy(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
 #endif
 }
@@ -578,7 +587,7 @@ void SC::HttpClientLocalMutex::lock()
 {
 #if SC_PLATFORM_WINDOWS
     EnterCriticalSection(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_mutex_lock(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
 #endif
 }
@@ -587,7 +596,7 @@ void SC::HttpClientLocalMutex::unlock()
 {
 #if SC_PLATFORM_WINDOWS
     LeaveCriticalSection(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_mutex_unlock(reinterpret_cast<HttpClientLocalMutexStorage*>(storage));
 #endif
 }
@@ -601,14 +610,14 @@ SC::HttpClientLocalConditionVariable::HttpClientLocalConditionVariable()
 
 #if SC_PLATFORM_WINDOWS
     InitializeConditionVariable(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_cond_init(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage), nullptr);
 #endif
 }
 
 SC::HttpClientLocalConditionVariable::~HttpClientLocalConditionVariable()
 {
-#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#if SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_cond_destroy(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage));
 #endif
 }
@@ -618,7 +627,7 @@ void SC::HttpClientLocalConditionVariable::wait(HttpClientLocalMutex& mutex)
 #if SC_PLATFORM_WINDOWS
     (void)SleepConditionVariableCS(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage),
                                    reinterpret_cast<HttpClientLocalMutexStorage*>(mutex.storage), INFINITE);
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_cond_wait(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage),
                             reinterpret_cast<HttpClientLocalMutexStorage*>(mutex.storage));
 #endif
@@ -630,7 +639,7 @@ bool SC::HttpClientLocalConditionVariable::wait(HttpClientLocalMutex& mutex, uin
     return SleepConditionVariableCS(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage),
                                     reinterpret_cast<HttpClientLocalMutexStorage*>(mutex.storage),
                                     timeoutMilliseconds) != 0;
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     const timespec deadline = httpClientMakeAbsoluteTimeout(timeoutMilliseconds);
     return pthread_cond_timedwait(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage),
                                   reinterpret_cast<HttpClientLocalMutexStorage*>(mutex.storage),
@@ -646,7 +655,7 @@ void SC::HttpClientLocalConditionVariable::signal()
 {
 #if SC_PLATFORM_WINDOWS
     WakeConditionVariable(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_cond_signal(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage));
 #endif
 }
@@ -655,7 +664,7 @@ void SC::HttpClientLocalConditionVariable::broadcast()
 {
 #if SC_PLATFORM_WINDOWS
     WakeAllConditionVariable(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage));
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_PTHREAD
     (void)pthread_cond_broadcast(reinterpret_cast<HttpClientLocalConditionVariableStorage*>(storage));
 #endif
 }
@@ -666,7 +675,7 @@ SC::HttpClientCapabilities SC::HttpClient::getCapabilities()
 
 #if SC_PLATFORM_APPLE
     capabilities.backend = HttpClientCapabilities::AppleURLSession;
-#elif SC_PLATFORM_LINUX
+#elif SC_HTTP_CLIENT_USE_LIBCURL
     capabilities.backend = HttpClientCapabilities::LibCurl;
 #elif SC_PLATFORM_WINDOWS
     capabilities.backend = HttpClientCapabilities::WinHttp;
@@ -695,8 +704,8 @@ SC::HttpClientCapabilities SC::HttpClient::getCapabilities()
     capabilities.proxyHttp                  = false;
     capabilities.proxyAuthorization         = false;
     capabilities.proxyBypassList            = false;
-#elif SC_PLATFORM_LINUX
-    const HttpClientLinuxRuntimeFeatures& runtimeFeatures = getHttpClientLinuxRuntimeFeatures();
+#elif SC_HTTP_CLIENT_USE_LIBCURL
+    const HttpClientLibCurlRuntimeFeatures& runtimeFeatures = getHttpClientLibCurlRuntimeFeatures();
 
     capabilities.protocolHttp11Only         = true;
     capabilities.protocolHttp2Preferred     = runtimeFeatures.http2;
@@ -1838,3 +1847,6 @@ SC::Result SC::HttpClient::executeBlocking(const HttpClientRequest& request, Htt
     SC_TRY(client.close());
     return finalRes;
 }
+
+#undef SC_HTTP_CLIENT_USE_PTHREAD
+#undef SC_HTTP_CLIENT_USE_LIBCURL

@@ -18,7 +18,8 @@ to perform hidden allocations.
 # When to use Process
 
 Use Process when a program needs to start a known executable and control its working directory, environment, standard
-input, standard output, or standard error on Windows, macOS, and Linux. It covers two common shapes:
+input, standard output, or standard error on Windows, macOS, and Linux. NetBSD, FreeBSD, and OpenBSD provide the same API
+in the lower experimental platform tier. Process covers two common shapes:
 
 - one child, represented by SC::Process; and
 - a shell-like pipeline, represented by SC::ProcessChain and a caller-owned SC::Process for every stage.

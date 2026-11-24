@@ -76,7 +76,9 @@ struct Hashing
     [[nodiscard]] bool setType(Type newType);
 
   private:
-#if SC_PLATFORM_APPLE
+#if SC_PLATFORM_OPENBSD
+    alignas(uint64_t) char buffer[208];
+#elif SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
     alignas(uint64_t) char buffer[104];
 #elif SC_PLATFORM_WINDOWS
     alignas(uint64_t) char buffer[16];

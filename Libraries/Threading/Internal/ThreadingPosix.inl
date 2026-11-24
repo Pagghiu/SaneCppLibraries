@@ -4,6 +4,9 @@
 
 #include <errno.h> // errno
 #include <pthread.h>
+#if SC_PLATFORM_OPENBSD
+#include <pthread_np.h>
+#endif
 #include <string.h> // memcpy
 #include <unistd.h> // usleep
 SC::Mutex::Mutex() { pthread_mutex_init(&mutex.reinterpret_as<pthread_mutex_t>(), 0); }
@@ -48,8 +51,12 @@ struct SC::Thread::Internal
     {
 #if SC_PLATFORM_APPLE
         pthread_setname_np(nameNullTerminated);
-#elif SC_PLATFORM_LINUX
+#elif SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
         pthread_setname_np(pthread_self(), nameNullTerminated);
+#elif SC_PLATFORM_OPENBSD
+        pthread_set_name_np(pthread_self(), nameNullTerminated);
+#elif SC_PLATFORM_NETBSD
+        pthread_setname_np(pthread_self(), "%s", const_cast<char*>(nameNullTerminated));
 #endif
     }
 

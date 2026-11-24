@@ -30,15 +30,16 @@
 
 #else
 
-#include <errno.h>     // For error handling
-#include <netdb.h>     // socklen_t/getsockopt/recv
-#include <signal.h>    // signal / sigset_t
-#include <sys/event.h> // kqueue
-#include <sys/stat.h>  // fstat
-#include <sys/time.h>  // timespec
-#include <sys/uio.h>   // writev, pwritev
-#include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
-#include <unistd.h>    // read/write/pread/pwrite
+#include <errno.h>      // For error handling
+#include <netdb.h>      // socklen_t/getsockopt/recv
+#include <signal.h>     // signal / sigset_t
+#include <sys/event.h>  // kqueue
+#include <sys/socket.h> // socket operations
+#include <sys/stat.h>   // fstat
+#include <sys/time.h>   // timespec
+#include <sys/uio.h>    // writev, pwritev
+#include <sys/wait.h>   // WIFEXITED / WEXITSTATUS
+#include <unistd.h>     // read/write/pread/pwrite
 #endif
 
 #if not SC_ASYNC_USE_EPOLL
@@ -314,7 +315,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     const int totalNumEvents;
 
   public:
-#if SC_PLATFORM_APPLE
+#if SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     KernelEventsPosix(KernelQueue&, AsyncKernelEvents& kernelEvents)
         : parentKernelEvents(*this),
 #else
@@ -389,6 +390,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static constexpr short SOCKET_INPUT_EVENTS_MASK  = EVFILT_READ;
     static constexpr short SOCKET_OUTPUT_EVENTS_MASK = EVFILT_WRITE;
+
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+    static constexpr unsigned int PROCESS_EXIT_FLAGS = NOTE_EXIT;
+#else
+    static constexpr unsigned int PROCESS_EXIT_FLAGS = NOTE_EXIT | NOTE_EXITSTATUS;
+#endif
 
     Result setEventWatcher(AsyncEventLoop& eventLoop, AsyncRequest& async, int fileDescriptor, short filter,
                            unsigned int options = 0, unsigned int flags = EV_ADD)
@@ -1196,10 +1203,61 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // File SEND (sendfile on Linux/macOS)
+    // File SEND (native sendfile or bounded copied transfer)
     //-------------------------------------------------------------------------------------------------------
     struct PosixSendFile
     {
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+        static ssize_t sendFile(int outFd, int inFd, SC::int64_t& offset, size_t count, bool& notImplemented)
+        {
+            notImplemented = false;
+            if (count == 0)
+                return 0;
+            const off_t position = static_cast<off_t>(offset);
+            if (position < 0 or static_cast<SC::int64_t>(position) != offset)
+            {
+                errno = EINVAL;
+                return -1;
+            }
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+            // NetBSD and OpenBSD have no sendfile. Keep storage bounded and re-read any unsent suffix by offset.
+            char         buffer[4096];
+            const size_t toRead = count < sizeof(buffer) ? count : sizeof(buffer);
+            ssize_t      bytesRead;
+            do
+            {
+                bytesRead = ::pread(inFd, buffer, toRead, position);
+            } while (bytesRead < 0 and errno == EINTR);
+            if (bytesRead <= 0)
+                return bytesRead;
+            ssize_t sent;
+            do
+            {
+                sent = ::send(outFd, buffer, static_cast<size_t>(bytesRead), MSG_NOSIGNAL);
+            } while (sent < 0 and errno == EINTR);
+            if (sent > 0)
+                offset += static_cast<SC::int64_t>(sent);
+            return sent;
+#else
+            // FreeBSD reports a transferred prefix separately, including on EINTR or EAGAIN.
+            constexpr size_t maxTransfer = 0x3fffffff;
+            const size_t     requested   = count < maxTransfer ? count : maxTransfer;
+            off_t            sent        = 0;
+            int              result;
+            do
+            {
+                sent   = 0;
+                result = ::sendfile(inFd, outFd, position, requested, nullptr, &sent, 0);
+            } while (result < 0 and errno == EINTR and sent == 0);
+            if (sent > 0)
+            {
+                offset += static_cast<SC::int64_t>(sent);
+                return static_cast<ssize_t>(sent);
+            }
+            return result == 0 ? 0 : -1;
+#endif
+        }
+#else
         static ssize_t sendFile(int out_fd, int in_fd, off_t& offset, size_t count, bool& notImplemented)
         {
             if (count == 0)
@@ -1246,6 +1304,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             return -1;
 #endif
         }
+#endif
+
+        static constexpr bool usesZeroCopy() { return not(SC_PLATFORM_NETBSD or SC_PLATFORM_OPENBSD); }
     };
 
     static Result teardownAsync(AsyncFileSend*, AsyncTeardown& teardown)
@@ -1256,7 +1317,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileSend& async)
     {
         bool notImplemented = false;
-        // on macOS and Linux we use sendfile
+        // Continue a partial transfer when the socket becomes writable.
         ssize_t res =
             PosixSendFile::sendFile(async.socketHandle, async.fileHandle, async.offset, async.length, notImplemented);
 
@@ -1301,7 +1362,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         AsyncFileSend& async = result.getAsync();
 
         result.completionData.bytesTransferred = async.bytesSent;
-        result.completionData.usedZeroCopy     = async.bytesSent > 0;
+        result.completionData.usedZeroCopy     = async.bytesSent > 0 and PosixSendFile::usesZeroCopy();
 
         if (async.bytesSent < async.length)
         {
@@ -1313,7 +1374,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             {
                 async.bytesSent += static_cast<size_t>(res);
                 result.completionData.bytesTransferred = async.bytesSent;
-                result.completionData.usedZeroCopy     = async.bytesSent > 0;
+                result.completionData.usedZeroCopy     = async.bytesSent > 0 and PosixSendFile::usesZeroCopy();
                 if (res == 0)
                     return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
             }
@@ -1345,7 +1406,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static Result executeOperation(AsyncFileSend& async, AsyncFileSend::CompletionData& completionData)
     {
         completionData.bytesTransferred = async.bytesSent;
-        completionData.usedZeroCopy     = async.bytesSent > 0;
+        completionData.usedZeroCopy     = async.bytesSent > 0 and PosixSendFile::usesZeroCopy();
         while (async.bytesSent < async.length)
         {
             bool    notImplemented;
@@ -1356,7 +1417,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             {
                 async.bytesSent += static_cast<size_t>(res);
                 completionData.bytesTransferred = async.bytesSent;
-                completionData.usedZeroCopy     = async.bytesSent > 0;
+                completionData.usedZeroCopy     = async.bytesSent > 0 and PosixSendFile::usesZeroCopy();
                 if (res == 0)
                     return Result::Error(AsyncResultCategory, AsyncError::FileSendIncomplete);
             }
@@ -1510,7 +1571,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
     {
-        return setEventWatcher(eventLoop, async, async.handle, EVFILT_PROC, NOTE_EXIT | NOTE_EXITSTATUS);
+        return setEventWatcher(eventLoop, async, async.handle, EVFILT_PROC, PROCESS_EXIT_FLAGS);
     }
 
     static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
@@ -1529,7 +1590,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             // In this case we should just do a waitpid
             return completeProcessExitWaitPid(result);
         }
-        else if ((event.fflags & (NOTE_EXIT | NOTE_EXITSTATUS)) > 0)
+        else if ((event.fflags & PROCESS_EXIT_FLAGS) != 0)
         {
             return completeProcessExitWaitPid(result);
         }

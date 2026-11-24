@@ -6,8 +6,8 @@
 
 [SaneCppHttpClient.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttpClient.h)
 provides HTTP requests without making an HTTP stack another dependency of the application. It wraps
-`NSURLSession` on Apple platforms, WinHTTP on Windows, and libcurl on Linux behind one request and
-streaming-response model.
+`NSURLSession` on Apple platforms, WinHTTP on Windows, and libcurl on Linux, NetBSD, FreeBSD, and OpenBSD
+behind one request and streaming-response model. All BSD support belongs to the lower experimental platform tier.
 
 # Dependencies
 - Dependencies: *(none)*
@@ -18,14 +18,14 @@ streaming-response model.
 
 # Is HttpClient the right layer?
 
-Choose HttpClient when an application needs outbound HTTP or HTTPS on the three supported desktop
-platforms, wants native transport integration, and can budget memory before starting a request. The
+Choose HttpClient when an application needs outbound HTTP or HTTPS on a supported platform, wants
+native transport integration, and can budget memory before starting a request. The
 library is particularly suited to tools, agents, and embedded-style applications where an implicit
 heap-owned response, cookie jar, or worker object would be undesirable.
 
 It is not a byte-for-byte portable HTTP implementation. The operating system still owns DNS, TLS,
 connection pooling, and protocol negotiation, so observable transport behavior can differ between
-Apple, Windows, and Linux. `HttpClient::getCapabilities()` makes policy differences queryable, and
+platforms. `HttpClient::getCapabilities()` makes policy differences queryable, and
 request startup fails when a requested protocol, TLS, or proxy policy is unsupported; it does not
 quietly weaken an explicit requirement.
 
@@ -142,7 +142,7 @@ Capability fields describe what this build can request from its backend, not wha
 will negotiate. Applications with a hard deployment requirement can pass required backend/features
 to `HttpClient::init()` and fail before accepting work.
 
-On Linux, libcurl is loaded at runtime. The dynamic loader must be able to find
+On Linux, NetBSD, FreeBSD, and OpenBSD, libcurl is loaded at runtime. The dynamic loader must be able to find
 `libcurl.so.4` or `libcurl.so` with all required symbols. The loader tries each name in that order.
 The reported backend identifies the compiled transport. Initialization returns `RequiredBackendUnavailable`
 when neither candidate can be loaded with the required symbols.

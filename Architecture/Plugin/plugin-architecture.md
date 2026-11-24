@@ -59,6 +59,7 @@ Explicit anti-inspirations include closed-source prebuilt binary plugin distribu
 - [PLUGIN-0002 - Keep Plugin metadata and registry bounded and dependency-light](plugin-0002-keep-plugin-metadata-and-registry-bounded-and-dependency-light.md)
 - [PLUGIN-0003 - Make Plugin runtime and sysroot policy explicit](plugin-0003-make-plugin-runtime-and-sysroot-policy-explicit.md)
 - [PLUGIN-0004 - Use structured Plugin result errors](plugin-0004-use-structured-plugin-result-errors.md)
+- [PLUGIN-0006 - Port BSD dynamic loading and native compilation](plugin-0006-port-bsd-dynamic-loading-independently.md)
 - [SC-0003 - Keep libraries independently consumable](../Global/sc-0003-keep-libraries-independently-consumable.md)
 - [SC-0016 - Support layered adoption modes](../Global/sc-0016-support-layered-adoption-modes.md)
 
@@ -67,3 +68,4 @@ Explicit anti-inspirations include closed-source prebuilt binary plugin distribu
 - [PLUGIN-0001 - Compile source-defined plugins on demand and load them in-process](plugin-0001-compile-source-defined-plugins-on-demand-and-load-them-in-process.md)
 - [PLUGIN-0002 - Keep Plugin metadata and registry bounded and dependency-light](plugin-0002-keep-plugin-metadata-and-registry-bounded-and-dependency-light.md)
 - [PLUGIN-0003 - Make Plugin runtime and sysroot policy explicit](plugin-0003-make-plugin-runtime-and-sysroot-policy-explicit.md)
+- [PLUGIN-0006 - Port BSD dynamic loading and native compilation](plugin-0006-port-bsd-dynamic-loading-independently.md)

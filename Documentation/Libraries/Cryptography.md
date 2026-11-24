@@ -6,8 +6,8 @@
 
 [SaneCppCryptography.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppCryptography.h)
 provides synchronous, caller-buffered access to secure random bytes, AES-GCM, HMAC, HKDF, and legacy AES-CBC with
-PKCS#7 padding. The default `Native` backend delegates to operating-system providers. Apple, Windows, and Linux callers
-can explicitly select a runtime-loaded OpenSSL 3 backend instead. On Apple, the native backend implements the narrowly
+PKCS#7 padding. The default `Native` backend delegates to operating-system providers. Apple, Windows, Linux, NetBSD,
+FreeBSD, and OpenBSD callers can explicitly select a runtime-loaded OpenSSL 3 backend. On Apple, the native backend implements the narrowly
 scoped SP 800-38D GCM composition over CommonCrypto AES because CommonCrypto has no public GCM interface. No portable
 AES implementation is included.
 
@@ -36,7 +36,7 @@ protocol requires that exact construction; CBC encryption by itself does not aut
 | Requirement | API | Important boundary |
 |:------------|:----|:-------------------|
 | Generate keys, nonces, IVs, or salts | `SC::Cryptography::Random` | Random bytes still need protocol-specific length and reuse rules |
-| Encrypt and authenticate one message | `SC::Cryptography::Aead` | AES-GCM is available on Apple, Windows, and capable Linux kernels; never reuse a nonce with the same key |
+| Encrypt and authenticate one message | `SC::Cryptography::Aead` | Query AES-GCM support on the selected backend. Never reuse a nonce with the same key |
 | Authenticate a byte stream | `SC::Cryptography::Hmac` | Compare MACs with a constant-time comparison supplied by the protocol/application |
 | Derive independent keys | `SC::Cryptography::Hkdf` | `info` should identify the protocol, purpose, and key role |
 | Interoperate with legacy AES-CBC | `SC::Cryptography::Cipher` | CBC is unauthenticated; use only inside a correctly specified authenticated protocol |
@@ -70,7 +70,8 @@ if (openSSLFeatures.aes256Gcm)
 ```
 
 Default constructors, the original `queryFeatures()` overload, and the original `Hkdf::derive()` overload all use
-`Backend::Native`. On Linux this means AF_ALG. `Aead`, `Cipher`, and `Hmac` bind their backend at construction;
+`Backend::Native`. On Linux this means AF_ALG. On NetBSD, FreeBSD, and OpenBSD, native coverage consists of secure random
+generation. Select `Backend::OpenSSL` for symmetric operations there. `Aead`, `Cipher`, and `Hmac` bind their backend at construction;
 `Hkdf::derive()` has a backend-taking overload because it constructs HMAC sessions internally. OpenSSL remains
 optional on every platform: if a suitable OpenSSL 3 shared library cannot be loaded, its cryptographic features report
 unavailable without affecting the native backend.
@@ -233,6 +234,8 @@ key-erasure requirements need platform-specific memory and process controls in a
 | Windows, `OpenSSL` | CNG | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
 | Linux, `Native` | `getrandom()` | `AF_ALG cbc(aes)` when available | `AF_ALG gcm(aes)` when available | `AF_ALG hmac(sha256)` / `hmac(sha384)` when available |
 | Linux, `OpenSSL` | `getrandom()` | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
+| NetBSD, FreeBSD and OpenBSD, `Native` | `getentropy()` | Unavailable | Unavailable | Unavailable |
+| NetBSD, FreeBSD and OpenBSD, `OpenSSL` | `getentropy()` | OpenSSL 3 AES-128 / AES-256 CBC | OpenSSL 3 AES-128 / AES-256 GCM | OpenSSL 3 HMAC SHA-256 / SHA-384 |
 
 Linux capability reporting probes the running kernel. A Linux build can therefore compile successfully while a
 particular primitive reports unavailable at runtime. AES-GCM additionally requires the kernel's AF_ALG AEAD interface
@@ -245,7 +248,9 @@ kernels. `queryFeatures()` can detect whether the interface is usable, but it ca
 all relevant security fixes.
 
 The optional OpenSSL backend loads only an OpenSSL 3 `libcrypto` ABI, requires no OpenSSL headers or link-time
-`libcrypto` dependency, and probes actual provider algorithm initialization. Linux probes `libcrypto.so.3`. macOS first
+`libcrypto` dependency, and probes actual provider algorithm initialization. Linux probes `libcrypto.so.3`. NetBSD and
+FreeBSD try the base system's `/usr/lib/libcrypto.so` first, then `libcrypto.so.3`. OpenBSD tries `libcrypto.so.3`, the
+OpenSSL 3.5 port's private library directory, and then the normal `libcrypto.so` search. macOS first
 uses the dynamic loader's search paths for `libcrypto.3.dylib`, then checks the conventional Homebrew and MacPorts
 locations. Windows probes the architecture-specific OpenSSL 3 DLL name and `libcrypto-3.dll` through the safe default
 DLL directories. It does not search the process working directory.
@@ -266,6 +271,7 @@ Current Draft goals:
 
 - keep the API small, keep Sane code and the AF_ALG adapter allocation-free, and make OpenSSL allocations explicit;
 - validate every advertised primitive on macOS, Windows, and Linux;
+- retain NetBSD, FreeBSD, and OpenBSD as a lower experimental platform tier with release-specific validation;
 - keep the Apple GCM composition narrow, directly traceable to SP 800-38D, and covered by shared known-answer tests;
 - consider a C binding only after the C++ lifecycle and storage contract stabilizes;
 - keep the absence of a formal audit explicit and use sustained testing, real-world use, and focused community feedback

@@ -3,6 +3,7 @@
 #include "Hashing.h"
 
 #include "../Common/CompilerMacrosType.h"
+#include "../Common/PlacementNew.h"
 
 #if SC_PLATFORM_APPLE
 #include <CommonCrypto/CommonDigest.h>
@@ -168,6 +169,9 @@ bool SC::Hashing::getHash(Result& res)
     res.size = hashSize;
     return true;
 }
+
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+#include "Internal/HashingBSD.inl"
 
 #elif SC_PLATFORM_LINUX
 #if defined(__has_include)

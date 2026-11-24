@@ -49,6 +49,9 @@ namespace Tools
             return Result::Error(PackageResultCategory, PackageError::HostCommandFailed);
         break;
     case Platform::Linux:
+    case Platform::NetBSD:
+    case Platform::OpenBSD:
+    case Platform::FreeBSD:
     case Platform::Windows:
     case Platform::Emscripten:
         // Nothing to do
@@ -122,6 +125,19 @@ namespace Tools
                     return Result::Error(PackageResultCategory, PackageError::PackageDownloadFailed);
             }
         }
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+        if (not res)
+        {
+            Process nativeDownload;
+#if SC_PLATFORM_NETBSD
+            res = nativeDownload.exec({"ftp", "-V", "-o", localFile, remoteURL}, output);
+#else
+            res = nativeDownload.exec({"fetch", "-q", "-o", localFile, remoteURL}, output);
+#endif
+            if (res and nativeDownload.getExitStatus() != 0)
+                return Result::Error(PackageResultCategory, PackageError::PackageDownloadFailed);
+        }
+#endif
         if (not res)
         {
             return Result::Error(PackageResultCategory, PackageError::HostCommandUnavailable);

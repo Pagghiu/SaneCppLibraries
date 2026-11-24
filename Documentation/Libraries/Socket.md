@@ -3,7 +3,8 @@
 @brief 🟨 Synchronous IP and Unix-domain streams and datagrams, multicast configuration and DNS lookup
 
 [SaneCppSocket.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppSocket.h) provides a
-small, synchronous portability layer over native sockets on Windows, macOS and Linux.
+small, synchronous portability layer over native sockets on Windows, macOS and Linux. NetBSD, FreeBSD, and OpenBSD are
+available in the lower experimental platform tier.
 
 [TOC]
 

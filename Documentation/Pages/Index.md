@@ -1,7 +1,8 @@
 # Sane C++ Libraries
 
 [TOC]
-**Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux. [Platforms](@ref page_platforms).  
+**Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux. NetBSD, FreeBSD,
+and OpenBSD are available as a lower, experimental support tier. [Platforms](@ref page_platforms).
 
 Project [Principles](@ref page_principles):
 

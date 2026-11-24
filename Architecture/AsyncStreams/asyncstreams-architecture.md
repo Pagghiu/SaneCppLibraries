@@ -75,4 +75,5 @@ Inferred negative target: avoid treating `drain` as the only coordination primit
 - [ASYNCSTREAMS-0002 - Model back-pressure with caller-owned buffers and fixed queues](asyncstreams-0002-model-back-pressure-with-caller-owned-buffers-and-fixed-queues.md)
 - [ASYNCSTREAMS-0003 - Use a fixed-layout pipeline instead of dynamic stream graphs](asyncstreams-0003-use-a-fixed-layout-pipeline-instead-of-dynamic-stream-graphs.md)
 - [ASYNCSTREAMS-0004 - Keep ZLib compression as optional runtime loading, not a build dependency](asyncstreams-0004-keep-zlib-compression-as-optional-runtime-loading-not-a-build-dependency.md)
+- [ASYNCSTREAMS-0007 - Load BSD system zlib at runtime](asyncstreams-0007-load-bsd-system-zlib.md)
 - [ASYNCSTREAMS-0005 - Adapt Cryptography through template-only streams](asyncstreams-0005-adapt-cryptography-through-template-only-streams.md)

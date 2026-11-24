@@ -79,7 +79,8 @@ All Time values are small value types. The library performs no dynamic allocatio
 are no handles to close and no clock object whose lifetime must be managed. The only output object is the
 caller-provided `ParseResult`.
 
-The API deliberately exposes the common denominator of Windows, macOS, and Linux clocks. Consequently it does not
+The API deliberately exposes the common denominator of Windows, macOS, and Linux clocks, with NetBSD, FreeBSD, and
+OpenBSD available in the lower experimental platform tier. Consequently it does not
 promise a particular hardware resolution, monotonic-clock epoch, or timezone database. `Realtime` is millisecond
 precision; `Monotonic` also returns milliseconds even when the underlying clock is finer. High-resolution conversion
 is subject to integer range and truncation, and readings from different machines or processes should not be treated as

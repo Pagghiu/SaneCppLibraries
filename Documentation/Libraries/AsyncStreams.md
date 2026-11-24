@@ -104,6 +104,9 @@ the underlying view permits it.
 An `AsyncTransformStream` is a duplex stream: it consumes buffers through its writable side and emits new buffers from
 its readable side. `SyncZLibTransformStream` runs compression work synchronously; `AsyncZLibTransformStreamT` schedules
 the same work through a compatible event loop and can be directed to a caller-selected thread pool.
+Compression loads the system zlib runtime on demand and can fail when it is unavailable. The tested NetBSD, FreeBSD,
+and OpenBSD base-system runtimes are supported without a zlib link dependency. These BSD implementations belong to
+the lower experimental platform tier.
 
 A pipeline has a fixed layout rather than a dynamically growing graph. It supports at most eight transforms and eight
 sinks. Every sink receives the source data, with buffer references held until each write completes. This is useful for

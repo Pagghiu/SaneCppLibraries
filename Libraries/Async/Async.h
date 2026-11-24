@@ -47,7 +47,7 @@ struct EventObject;
 ///
 /// The kernel Async API used on each operating systems are the following:
 /// - `IOCP` on Windows
-/// - `kqueue` on macOS
+/// - `kqueue` on macOS, NetBSD and FreeBSD
 /// - `io_uring` on Linux
 /// - `epoll` on Linux
 ///
@@ -1002,7 +1002,7 @@ struct SC_ASYNC_EXPORT AsyncFileWrite : public AsyncRequest
 };
 
 /// @brief Starts a file descriptor readiness operation.
-/// Uses `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).
+/// Uses `kevent` (macOS, NetBSD and FreeBSD), `epoll` (Linux) and `io_uring` (Linux).
 /// Callback will be called when the OS signals readiness events on the given file descriptor.
 struct SC_ASYNC_EXPORT AsyncFileReadiness : public AsyncRequest
 {
@@ -1077,7 +1077,7 @@ struct SC_ASYNC_EXPORT AsyncExternalCompletion : public AsyncRequest
 /// Falls back to read/write loop on platforms or configurations where zero-copy is unavailable.
 /// Callback will be called when the file has been sent or an error occurred.
 ///
-/// @note On epoll/macOS/Windows this runs synchronously when scheduled and can optionally
+/// @note On epoll, kqueue and Windows this runs synchronously when scheduled and can optionally
 ///       use a thread pool for better concurrency.
 /// @note On io_uring this uses native async sendfile (IORING_OP_SEND_ZC when available).
 ///
@@ -1092,6 +1092,14 @@ struct SC_ASYNC_EXPORT AsyncExternalCompletion : public AsyncRequest
 /// **Posix (macOS/Linux with epoll):**
 /// Files should be opened with `FileOpen::blocking = false` to enable non-blocking `sendfile`.
 /// If opened with `blocking = true`, `sendfile` will block the event loop thread until completion.
+///
+/// **FreeBSD:**
+/// File sends use native `sendfile`; use a non-blocking socket for event-loop operation. Disk or system resource
+/// waits may still block, so configure a supplied thread pool when that is undesirable.
+///
+/// **NetBSD:**
+/// File sends use a bounded `pread`/`send` buffer instead of zero-copy. File reads can block the event loop;
+/// configure a supplied thread pool when that is undesirable. `usedZeroCopy()` reports `false`.
 ///
 /// **Linux with io_uring:**
 /// Files can be opened with any mode (blocking or non-blocking).

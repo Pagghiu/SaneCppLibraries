@@ -30,6 +30,8 @@ The host then drives four distinct stages:
 
 Loading a plugin recursively loads its declared dependencies. Unloading does the reverse: the registry first unloads plugins that depend on the requested one. This ordering is necessary because all instances and interfaces are ordinary in-process C++ objects, not isolated handles.
 
+Keep the dependency graph acyclic. The registry's recursive traversal currently assumes that property.
+
 # A representative host loop
 
 The following SCTest-backed example shows the complete shape: discover definitions, configure the toolchain, provide bounded registry storage, watch the source directory, and reload affected plugins. The production [SCExample](@ref page_examples) expands the same idea with error display and state serialization across reloads.
@@ -44,7 +46,10 @@ The example is intentionally explicit about policy. `Plugin` does not create a w
 
 The interface is a C++ ABI contract despite the C entry points used to find it. Host and plugin must agree on compiler ABI, data layout, compile definitions, and the exact interface header. `queryInterface` returns a pointer into the plugin instance; it becomes invalid before or during unload. Do not cache that pointer across a reload.
 
-The test plugins under `Tests/Libraries/Plugin/PluginTestDirectory` are the smallest concrete examples: the child declares a dependency on the parent, implements two interface bases, and exports them with `SC_PLUGIN_EXPORT_INTERFACES`. The host test verifies that reloading replaces executable behavior and that unloading the parent also unloads the dependent child.
+The test plugins under `Tests/Libraries/Plugin/PluginTestDirectory` form a diamond. The child declares two
+dependencies that share a parent. The child exports two interface bases with `SC_PLUGIN_EXPORT_INTERFACES`,
+including a call that passes and returns an aggregate. The host test verifies that the registry loads the shared
+parent once, reloads the child after a file change, and unloads both dependency paths when the parent is unloaded.
 
 # Allocation and lifetime boundaries
 
@@ -103,6 +108,11 @@ Compared with a conventional binary plugin SDK, source delivery gives the host c
 # Platform status and practical limits
 
 🟨 **MVP.** The implementation targets macOS, Windows, and Linux with Clang, GCC, and MSVC-style toolchains. It includes platform-specific host linking and Windows handling for debugger-held DLL/PDB files. The repository exercises real compile, link, interface-query, reload, dependency-unload, and runtime-free standard-header cases.
+
+On NetBSD, FreeBSD, and OpenBSD, dynamic loading and native plugin compilation belong to the lower experimental platform
+tier. Automatic compiler selection uses `g++` on NetBSD and `clang++` on FreeBSD and OpenBSD, resolved through the
+process search path. On the tested BSD guests, the registry fixture exercises dependency ordering, calls across the host
+and plugin ABI, and reload triggered by a native filesystem watcher event.
 
 The current design is most credible as a development-time hot-reload facility under control of the application team. Shipping it as an end-user extension system requires additional decisions around compiler distribution, source trust, ABI compatibility, diagnostics, versioning, and recovery from plugin faults. Precompiled closed-source plugins, cross-compiler ABI support, sandboxing, RPC isolation, and WASM hosting are not implemented features.
 

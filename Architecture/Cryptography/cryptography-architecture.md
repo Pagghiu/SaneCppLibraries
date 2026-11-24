@@ -77,3 +77,4 @@ platform coverage, documentation, and maintainer review justify promotion.
 - [CRYPTOGRAPHY-0007 - Offer OpenSSL alongside Linux AF_ALG](cryptography-0007-offer-openssl-alongside-linux-af-alg.md)
 - [CRYPTOGRAPHY-0008 - Load OpenSSL on Apple and Windows](cryptography-0008-load-openssl-on-apple-and-windows.md)
 - [CRYPTOGRAPHY-0009 - Use structured Cryptography result errors](cryptography-0009-use-structured-result-errors.md)
+- [CRYPTOGRAPHY-0012 - Load OpenSSL on BSD](cryptography-0012-load-openssl-on-bsd.md)

@@ -11,18 +11,20 @@
 
 struct SC::AsyncTest::FileSendContext
 {
-    bool   acceptDone         = false;
-    bool   connectDone        = false;
-    bool   sendDone           = false;
-    bool   receiveDone        = false;
-    size_t bytesSent          = 0;
-    size_t bytesReceived      = 0;
-    char   receiveBuffer[256] = {0};
+    bool   acceptDone           = false;
+    bool   connectDone          = false;
+    bool   sendDone             = false;
+    bool   receiveDone          = false;
+    size_t bytesSent            = 0;
+    size_t bytesReceived        = 0;
+    size_t expectedBytes        = 0;
+    char   receiveBuffer[12000] = {0};
+    char   receiveChunk[1024]   = {0};
 
     SocketDescriptor acceptedSocket;
 };
 
-void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
+void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst, bool large)
 {
     if (cancelFirst)
     {
@@ -58,8 +60,16 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
 
     // Write test content to file
-    const char testContent[] = "Hello, this is a test for AsyncFileSend!";
-    SC_TEST_EXPECT(fs.write(fileName, {testContent, sizeof(testContent) - 1}));
+    const char smallContent[] = "Hello, this is a test for AsyncFileSend!";
+    char       largeContent[10000];
+    if (large)
+    {
+        for (size_t idx = 0; idx < sizeof(largeContent); ++idx)
+            largeContent[idx] = static_cast<char>('a' + idx % 26);
+    }
+    const char*  testContent = large ? largeContent : smallContent;
+    const size_t contentSize = large ? sizeof(largeContent) : sizeof(smallContent) - 1;
+    SC_TEST_EXPECT(fs.write(fileName, {testContent, contentSize}));
 
     // 4. Create a TCP socket pair for testing
     SocketDescriptor serverSocket, clientSocket;
@@ -162,7 +172,7 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
     {
         bool earlyCompletion   = false;
         asyncFileSend.callback = [&earlyCompletion](AsyncFileSend::Result&) { earlyCompletion = true; };
-        SC_TEST_EXPECT(asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, 0, sizeof(testContent) - 1));
+        SC_TEST_EXPECT(asyncFileSend.start(eventLoop, fd, ctx.acceptedSocket, 0, contentSize));
         alignas(uint64_t) uint8_t storage[8192];
         AsyncKernelEvents         events;
         events.eventsMemory = storage;
@@ -179,7 +189,8 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
     }
 #endif
     const size_t rangeOffset = cancelFirst ? 2 : 0;
-    const size_t rangeLength = sizeof(testContent) - 1 - (cancelFirst ? 4 : 0);
+    const size_t rangeLength = contentSize - (cancelFirst ? 4 : 0);
+    ctx.expectedBytes        = rangeLength;
     asyncFileSend.callback   = [&ctx, &eofGuard](AsyncFileSend::Result& result)
     {
         ctx.bytesSent     = result.getBytesTransferred();
@@ -203,16 +214,20 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
     {
         Span<char> receivedData;
         SC_TEST_EXPECT(result.get(receivedData));
-        ctx.bytesReceived = receivedData.sizeInBytes();
-        // Copy received data for verification
-        if (receivedData.sizeInBytes() <= sizeof(ctx.receiveBuffer))
+        const size_t available = sizeof(ctx.receiveBuffer) - ctx.bytesReceived;
+        SC_TEST_EXPECT(receivedData.sizeInBytes() <= available);
+        if (receivedData.sizeInBytes() <= available)
         {
-            memcpy(ctx.receiveBuffer, receivedData.data(), receivedData.sizeInBytes());
+            memcpy(ctx.receiveBuffer + ctx.bytesReceived, receivedData.data(), receivedData.sizeInBytes());
+            ctx.bytesReceived += receivedData.sizeInBytes();
         }
-        ctx.receiveDone = true;
+        if (ctx.bytesReceived < ctx.expectedBytes and not receivedData.empty())
+            result.reactivateRequest(true);
+        else
+            ctx.receiveDone = true;
     };
     if (not pastEOF)
-        SC_TEST_EXPECT(asyncReceive.start(eventLoop, clientSocket, {ctx.receiveBuffer, sizeof(ctx.receiveBuffer)}));
+        SC_TEST_EXPECT(asyncReceive.start(eventLoop, clientSocket, {ctx.receiveChunk, sizeof(ctx.receiveChunk)}));
 
     // Run until both send and receive complete
     SC_TEST_EXPECT(eventLoop.run());
@@ -223,13 +238,13 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
         SC_TEST_EXPECT(guard.join());
         SC_TEST_EXPECT(not eofGuard.forcedGrowth.load());
         SC_TEST_EXPECT(not eofGuard.status and not eofGuard.complete and ctx.sendDone);
-        SC_TEST_EXPECT(ctx.bytesSent <= sizeof(testContent) - 1);
+        SC_TEST_EXPECT(ctx.bytesSent <= contentSize);
 #if SC_PLATFORM_WINDOWS
         if (useThreadPool)
 #endif
         {
             SC_TEST_EXPECT(eofGuard.status.isError(AsyncResultCategory, AsyncError::FileSendIncomplete));
-            SC_TEST_EXPECT(ctx.bytesSent == sizeof(testContent) - 1);
+            SC_TEST_EXPECT(ctx.bytesSent == contentSize);
         }
     }
     else
@@ -240,12 +255,16 @@ void SC::AsyncTest::fileSend(bool useThreadPool, bool pastEOF, bool cancelFirst)
         SC_TEST_EXPECT(memcmp(ctx.receiveBuffer, testContent + rangeOffset, rangeLength) == 0);
     }
 
-#if SC_PLATFORM_WINDOWS
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+    SC_TEST_EXPECT(not eofGuard.zeroCopy);
+#elif SC_PLATFORM_WINDOWS
     if (useThreadPool)
         SC_TEST_EXPECT(not eofGuard.zeroCopy);
     else
-#endif
         SC_TEST_EXPECT(ctx.bytesSent == 0 or eofGuard.zeroCopy);
+#else
+    SC_TEST_EXPECT(ctx.bytesSent == 0 or eofGuard.zeroCopy);
+#endif
 
     // 9. Cleanup
     SC_TEST_EXPECT(fd.close());

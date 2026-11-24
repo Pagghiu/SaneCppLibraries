@@ -1699,9 +1699,20 @@ static int linkPOSIX(CompilationInfo* ci, const char* compiler, const char* cCom
     if (strcmp(ci->targetOS, "Linux") == 0) {
         CommandLine_arg(&cmd, "-rdynamic");
     }
-    CommandLine_arg(&cmd, "-ldl");
+    if (strcmp(ci->targetOS, "NetBSD") == 0 || strcmp(ci->targetOS, "OpenBSD") == 0) {
+        // These systems provide dlopen in libc and backtrace in libexecinfo.
+        CommandLine_arg(&cmd, "-lexecinfo");
+    } else {
+        CommandLine_arg(&cmd, "-ldl");
+        if (strcmp(ci->targetOS, "FreeBSD") == 0) {
+            CommandLine_arg(&cmd, "-lexecinfo");
+            CommandLine_arg(&cmd, "-lmd");
+        }
+    }
     CommandLine_arg(&cmd, "-lpthread");
-    if (strcmp(ci->targetOS, "Linux") == 0 && !useClang && !bootstrapLinkStdCpp()) {
+    if ((strcmp(ci->targetOS, "Linux") == 0 || strcmp(ci->targetOS, "NetBSD") == 0 ||
+         strcmp(ci->targetOS, "FreeBSD") == 0 || strcmp(ci->targetOS, "OpenBSD") == 0) &&
+        !useClang && !bootstrapLinkStdCpp()) {
         CommandLine_arg(&cmd, "-lm");
     }
     if (useClang && !bootstrapLinkStdCpp()) {

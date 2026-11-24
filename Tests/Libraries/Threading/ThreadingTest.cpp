@@ -6,6 +6,10 @@
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Atomic.h"
 #include "Libraries/Threading/ThreadingErrorFormatter.h"
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+#include <pthread.h>
+#include <string.h>
+#endif
 
 namespace SC
 {
@@ -58,7 +62,10 @@ struct SC::ThreadingTest : public SC::TestCase
 
 void SC::ThreadingTest::testThread()
 {
-    bool   threadCalled = false;
+    bool threadCalled = false;
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    bool threadNameMatches = false;
+#endif
     Thread defaultInit;
     Result result = defaultInit.join();
     SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadNotStarted));
@@ -72,7 +79,14 @@ void SC::ThreadingTest::testThread()
     Thread thread;
     auto   lambda = [&](Thread& thread)
     {
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+        thread.setThreadName(SC_NATIVE_STR("SC %s test"));
+        char threadName[64] = {};
+        threadNameMatches   = pthread_getname_np(pthread_self(), threadName, sizeof(threadName)) == 0 and
+                            ::strcmp(threadName, "SC %s test") == 0;
+#else
         thread.setThreadName(SC_NATIVE_STR("test thread"));
+#endif
         threadCalled = true;
     };
     SC_TEST_EXPECT(thread.start(lambda));
@@ -85,6 +99,9 @@ void SC::ThreadingTest::testThread()
     result = thread.detach();
     SC_TEST_EXPECT(result.isError(ThreadingResultCategory, ThreadingError::ThreadNotStarted));
     SC_TEST_EXPECT(threadCalled);
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    SC_TEST_EXPECT(threadNameMatches);
+#endif
 
     Atomic<int> atomicInt(0);
 

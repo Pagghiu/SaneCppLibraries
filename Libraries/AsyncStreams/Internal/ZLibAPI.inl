@@ -114,10 +114,17 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
     const char* zlib_library_path = "zlib1.dll";
 #elif __APPLE__
     const char* zlib_library_path = "libz.dylib";
+#elif SC_PLATFORM_FREEBSD
+    const char* zlib_library_path = "libz.so.6";
+#elif SC_PLATFORM_OPENBSD
+    const char* zlib_library_path = "libz.so";
 #else
     const char* zlib_library_path = "libz.so.1";
 #endif
 
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    const bool useDefaultPath = libPath == nullptr;
+#endif
     if (libPath == nullptr)
     {
         libPath = zlib_library_path;
@@ -133,6 +140,12 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
     }
 #else
     library = ::dlopen(libPath, RTLD_NOW);
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
+    if (library == nullptr and useDefaultPath)
+    {
+        library = ::dlopen("libz.so", RTLD_NOW);
+    }
+#endif
 #endif
 
     if (!library)

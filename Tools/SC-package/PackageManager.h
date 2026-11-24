@@ -46,6 +46,9 @@ struct Download
         case Platform::Linux: //
             packagePlatform = "linux";
             break;
+        case Platform::NetBSD: packagePlatform = "netbsd"; break;
+        case Platform::FreeBSD: packagePlatform = "freebsd"; break;
+        case Platform::OpenBSD: packagePlatform = "openbsd"; break;
         case Platform::Windows: //
             packagePlatform = "windows";
             break;

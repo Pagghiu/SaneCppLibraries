@@ -77,7 +77,7 @@ SC::ResultPlugin SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, voi
                                              PluginErrorDetail::WindowsDynamicLibraryGetSymbol, ::GetLastError());
     return ResultPlugin(true);
 }
-#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 
 #include <dlfcn.h> // dlopen
 

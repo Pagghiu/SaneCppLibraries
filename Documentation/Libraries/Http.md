@@ -239,12 +239,18 @@ SC_TRY(SC::HttpWebSocketHandshake::computeAccept(clientKey, acceptStorage, accep
 | Windows | CNG from `bcrypt.dll` | Returns an error |
 | macOS | CommonCrypto | Returns an error |
 | Linux | Dynamically loaded OpenSSL EVP, then AF_ALG | Returns an error when both are unavailable |
+| NetBSD and FreeBSD | Dynamically loaded system OpenSSL EVP | Returns an error when unavailable; lower-tier BSD support is experimental |
+| OpenBSD | Dynamically loaded base LibreSSL EVP | Returns an error when unavailable; lower-tier BSD support is experimental |
 
 `Platform` adds no link-time dependency. Linux probes `libcrypto.so.3` and then `libcrypto.so.1.1`; if neither exposes
 the required public EVP functions, it tries AF_ALG. `SelfContained` never loads a provider and is useful for deployments
 that prefer one predictable binary over provider updates. Its implementation is tested against standard SHA-1 vectors,
 padding/block boundaries, chunked input, and the independent platform result. The known-answer cases come from
 [FIPS PUB 180-4](https://doi.org/10.6028/NIST.FIPS.180-4).
+
+NetBSD tries `libcrypto.so.16` and then `libcrypto.so`; FreeBSD tries `libcrypto.so.35` and then `libcrypto.so`;
+OpenBSD uses the base system's `libcrypto.so`. The versioned names are from the tested NetBSD 11 and FreeBSD 15 base
+systems. Other releases need a compatible provider under one of those names or can explicitly select `SelfContained`.
 
 # Advanced transport integration
 

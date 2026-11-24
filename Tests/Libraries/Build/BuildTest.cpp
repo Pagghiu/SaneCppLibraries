@@ -75,6 +75,9 @@ static constexpr StringView supportMatrixHostName(Build::Platform::Type platform
     case Build::Platform::Windows: return "Windows";
     case Build::Platform::Apple: return "macOS";
     case Build::Platform::Linux: return "Linux";
+    case Build::Platform::NetBSD: return "NetBSD";
+    case Build::Platform::FreeBSD: return "FreeBSD";
+    case Build::Platform::OpenBSD: return "OpenBSD";
     case Build::Platform::Wasm: return "Wasm";
     case Build::Platform::Unknown: return "unknown";
     }
@@ -154,6 +157,65 @@ struct SC::BuildTest : public SC::TestCase
         directories.libraryDirectory = report.libraryRootDirectory.view();
         directories.projectDirectory = report.libraryRootDirectory.view();
 
+        if (test_section("BSD native platform defaults"))
+        {
+            SC_TEST_EXPECT(Build::Platform::toString(Build::Platform::NetBSD) == "netbsd");
+            SC_TEST_EXPECT(Build::Platform::toString(Build::Platform::FreeBSD) == "freebsd");
+
+            SC_TEST_EXPECT(Build::Platform::toString(Build::Platform::OpenBSD) == "openbsd");
+
+            const Build::Platform::Type platforms[] = {Build::Platform::NetBSD, Build::Platform::FreeBSD,
+                                                       Build::Platform::OpenBSD};
+            for (const Build::Platform::Type platform : platforms)
+            {
+                Build::Parameters parameters;
+                parameters.platform  = platform;
+                parameters.generator = Build::Generator::Native;
+
+                parameters.directories.libraryDirectory = report.libraryRootDirectory.view();
+                parameters.directories.projectDirectory = report.libraryRootDirectory.view();
+
+                Build::Project project = {"BSD defaults"};
+
+                Build::Configuration config;
+                SC_TEST_EXPECT(config.applyPreset(project, Build::Configuration::Preset::Debug, parameters));
+                SC_TEST_EXPECT(not config.compile.enableASAN);
+                project.files.compile.enableASAN = true;
+                Build::Configuration explicitConfig;
+                SC_TEST_EXPECT(explicitConfig.applyPreset(project, Build::Configuration::Preset::Debug, parameters));
+                SC_TEST_EXPECT(not explicitConfig.compile.enableASAN.hasBeenSet());
+                const Build::CompileFlags* opinions[] = {&project.files.compile, &explicitConfig.compile};
+                Build::CompileFlags        merged;
+                SC_TEST_EXPECT(Build::CompileFlags::merge(opinions, merged));
+                SC_TEST_EXPECT(merged.enableASAN);
+
+                Build::Project noStdProject  = {"BSD no-runtime defaults"};
+                noStdProject.link.linkStdCpp = false;
+                Build::Configuration noStdConfig;
+                SC_TEST_EXPECT(noStdConfig.applyPreset(noStdProject, Build::Configuration::Preset::Debug, parameters));
+                SC_TEST_EXPECT(not noStdConfig.compile.enableASAN);
+
+                SC_TEST_EXPECT(Build::addSaneCppLibraries(project, parameters));
+                bool hasDl = false, hasExecinfo = false, hasMd = false, hasPthread = false;
+                for (const String& library : project.link.libraries)
+                {
+                    hasDl |= library == "dl";
+                    hasExecinfo |= library == "execinfo";
+                    hasMd |= library == "md";
+                    hasPthread |= library == "pthread";
+                }
+                SC_TEST_EXPECT(hasExecinfo and hasPthread);
+                SC_TEST_EXPECT(hasDl == (platform == Build::Platform::FreeBSD));
+                SC_TEST_EXPECT(hasMd == (platform == Build::Platform::FreeBSD));
+
+                Build::Definition definition;
+                parameters.generator = Build::Generator::Make;
+                SC_TEST_EXPECT(not definition.configure({}, parameters));
+                parameters.platform               = Build::Platform::Linux;
+                parameters.targetMachine.platform = platform;
+                SC_TEST_EXPECT(not definition.configure({}, parameters));
+            }
+        }
         if (test_section("Native backend support matrix"))
         {
             Span<const Build::SupportMatrixEntry> matrix = Build::getNativeBackendSupportMatrix();

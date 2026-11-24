@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-// Embedded libcurl type definitions and dlopen loader for Linux backend.
+// Embedded libcurl type definitions and dlopen loader for the POSIX backend.
 // Modeled after Libraries/Async/Internal/AsyncLinuxAPI.h (io_uring pattern).
 //
 // By default we supply our own minimal libcurl struct and enum definitions.
@@ -106,7 +106,7 @@ struct curl_slist
 
 // ── Loader struct: dlopen("libcurl.so") and resolve symbols via dlsym ──
 
-struct HttpClientLinuxLibCurlLoader
+struct HttpClientLibCurlLoader
 {
     void* libcurlHandle = nullptr;
 

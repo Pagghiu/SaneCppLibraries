@@ -508,7 +508,7 @@ void CryptographyTest::testFeatures()
         SC_TEST_EXPECT(features.hmacSha384);
     }
 #endif
-#if SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD
     if (backend == Cryptography::Backend::OpenSSL and requireOpenSSL())
     {
         SC_TEST_EXPECT(features.aes128Gcm);
@@ -536,6 +536,9 @@ void CryptographyTest::testSecureRandom()
         SC_TEST_EXPECT(Cryptography::Random::fill(randomBytes));
         SC_TEST_EXPECT(anyNonZero(randomBytes));
         //! [CryptographyRandomSnippet]
+        uint8_t largerBuffer[544] = {0};
+        SC_TEST_EXPECT(Cryptography::Random::fill(largerBuffer));
+        SC_TEST_EXPECT(anyNonZero({largerBuffer + 512, 32}));
     }
     else
     {
@@ -2052,7 +2055,8 @@ void CryptographyTest::testOverlapRejected()
 void runCryptographyTest(SC::TestReport& report)
 {
     CryptographyTest nativeTest(report, Cryptography::Backend::Native, "CryptographyTest");
-#if SC_PLATFORM_APPLE or SC_PLATFORM_WINDOWS or SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE || SC_PLATFORM_WINDOWS || SC_PLATFORM_LINUX || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD ||      \
+    SC_PLATFORM_OPENBSD
     CryptographyTest openSSLTest(report, Cryptography::Backend::OpenSSL, "CryptographyOpenSSLTest");
 #endif
 }

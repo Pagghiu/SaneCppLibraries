@@ -20,6 +20,11 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+
+namespace SC::AwaitVirtualReservation
+{
+#include "../Common/PosixVirtualReservation.inl"
+}
 #endif
 
 namespace SC
@@ -170,11 +175,7 @@ Result AwaitAllocator::createVirtual(AwaitAllocatorVirtualOptions options)
 #if SC_PLATFORM_WINDOWS
     virtualMemory = ::VirtualAlloc(nullptr, virtualReservedBytes, MEM_RESERVE, PAGE_NOACCESS);
 #else
-    virtualMemory = ::mmap(nullptr, virtualReservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (virtualMemory == MAP_FAILED)
-    {
-        virtualMemory = nullptr;
-    }
+    virtualMemory = AwaitVirtualReservation::reserveReadWritePages(virtualReservedBytes);
 #endif
     if (virtualMemory == nullptr)
     {

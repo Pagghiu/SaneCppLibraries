@@ -39,7 +39,7 @@ struct SC::AsyncEventLoop::Internal
         static Result removeAllAssociationsForSocketHandle(SocketDescriptor::Handle);
         static Result removeAllAssociationsForFileDescriptorHandle(FileDescriptor::Handle);
     };
-#elif SC_PLATFORM_APPLE
+#elif SC_PLATFORM_APPLE || SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
     struct KernelQueuePosix;
     struct KernelEventsPosix;
     using KernelQueue  = KernelQueuePosix;

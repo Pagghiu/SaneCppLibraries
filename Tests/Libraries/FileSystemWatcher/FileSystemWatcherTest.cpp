@@ -6,6 +6,7 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcherErrorFormatter.h"
+#include "Libraries/FileSystemWatcher/Internal/FileSystemWatcherKqueuePathState.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
@@ -30,12 +31,144 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         using namespace SC;
         const StringView appDirectory = report.applicationRootDirectory.view();
         initClose();
+        boundedPathState();
+        boundedPathMoves();
         structuredErrorsAndFormatter(appDirectory);
         failedRootCanBeReused(appDirectory);
         threadRunner(appDirectory);
 #if SC_PLATFORM_WINDOWS
         windowsThreadRunnerMultipleRoots(appDirectory);
 #endif
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+        bsdThreadCallbackLifecycle(appDirectory);
+#endif
+    }
+
+    void boundedPathMoves()
+    {
+        if (not test_section("bounded watcher path moves"))
+            return;
+
+        using State = FileSystemWatcherKqueuePathState;
+        using Error = State::Error;
+        State::Entry records[8];
+        char         names[24];
+        State        state;
+        auto         name = [](const char* value) { return Span<const char>{value, strlen(value)}; };
+        auto         info = [](int descriptor, uintptr_t token, bool directory)
+        { return State::NativeInfo{descriptor, token, 1, static_cast<uint64_t>(descriptor), directory}; };
+        size_t root = State::InvalidIndex, left = root, right = root, branch = root, leaf = root, sibling = root;
+        SC_TEST_EXPECT(state.reset(records, names) == Error::None);
+        SC_TEST_EXPECT(state.add(State::InvalidIndex, {}, info(20, 10, true), root) == Error::None);
+        SC_TEST_EXPECT(state.add(root, name("left"), info(21, 11, true), left) == Error::None);
+        SC_TEST_EXPECT(state.add(root, name("right"), info(22, 12, true), right) == Error::None);
+        SC_TEST_EXPECT(state.add(left, name("src"), info(23, 13, true), branch) == Error::None);
+        SC_TEST_EXPECT(state.add(branch, name("inside"), info(24, 14, false), leaf) == Error::None);
+        SC_TEST_EXPECT(state.add(right, name("other"), info(25, 15, false), sibling) == Error::None);
+
+        char path[32] = {};
+        SC_TEST_EXPECT(state.updatePath(branch, left, name("longer")) == Error::NameCapacity);
+        SC_TEST_EXPECT(state.copyRelativePath(leaf, path) == Error::None and strcmp(path, "left/src/inside") == 0);
+        SC_TEST_EXPECT(state.updatePath(branch, left, name("s")) == Error::None);
+        SC_TEST_EXPECT(state.copyRelativePath(leaf, path) == Error::None and strcmp(path, "left/s/inside") == 0);
+        SC_TEST_EXPECT(state.copyRelativePath(sibling, path) == Error::None and strcmp(path, "right/other") == 0);
+        SC_TEST_EXPECT(state.updatePath(branch, right, name("foo")) == Error::None);
+        SC_TEST_EXPECT(state.copyRelativePath(leaf, path) == Error::None and strcmp(path, "right/foo/inside") == 0);
+        SC_TEST_EXPECT(state.findChild(left, name("s")) == State::InvalidIndex);
+        SC_TEST_EXPECT(state.findChild(right, name("foo")) == branch);
+        SC_TEST_EXPECT(state.findToken(13) == branch and state.findToken(14) == leaf);
+        SC_TEST_EXPECT(state.get(branch) != nullptr and state.get(branch)->native.descriptor == 23);
+        SC_TEST_EXPECT(state.updatePath(branch, right, name("other")) == Error::DuplicateName);
+        SC_TEST_EXPECT(state.updatePath(right, branch, name("cycle")) == Error::InvalidParent);
+        SC_TEST_EXPECT(state.updatePath(root, right, name("root")) == Error::InvalidParent);
+        SC_TEST_EXPECT(state.updatePath(branch, leaf, name("child")) == Error::InvalidParent);
+        SC_TEST_EXPECT(state.updatePath(branch, right, name(".")) == Error::InvalidName);
+        SC_TEST_EXPECT(state.updatePath(branch, right, {names, 4}) == Error::InvalidName);
+        SC_TEST_EXPECT(state.updatePath(State::InvalidIndex, right, name("bad")) == Error::NotFound);
+        SC_TEST_EXPECT(state.copyRelativePath(leaf, path) == Error::None and strcmp(path, "right/foo/inside") == 0);
+        SC_TEST_EXPECT(state.updatePath(branch, right, name("foo")) == Error::None);
+        SC_TEST_EXPECT(state.updatePath(branch, right, name("bar")) == Error::None);
+        SC_TEST_EXPECT(state.copyRelativePath(leaf, path) == Error::None and strcmp(path, "right/bar/inside") == 0);
+        SC_TEST_EXPECT(state.copyRelativePath(sibling, path) == Error::None and strcmp(path, "right/other") == 0);
+        SC_TEST_EXPECT(state.size() == 6);
+    }
+
+    void boundedPathState()
+    {
+        if (not test_section("bounded watcher path state"))
+            return;
+
+        using State = FileSystemWatcherKqueuePathState;
+        using Error = State::Error;
+        State::Entry records[5];
+        char         names[14];
+        State        state;
+        auto         name = [](const char* value) { return Span<const char>{value, strlen(value)}; };
+        auto         info = [](int descriptor, uintptr_t token, bool directory)
+        { return State::NativeInfo{descriptor, token, 1, static_cast<uint64_t>(descriptor), directory}; };
+
+        size_t root = State::InvalidIndex, alpha = root, directory = root, nested = root, duplicate = root;
+        size_t untouched = 123;
+        SC_TEST_EXPECT(state.add(root, {}, info(10, 1, true), untouched) == Error::NotInitialized);
+        SC_TEST_EXPECT(untouched == 123);
+        SC_TEST_EXPECT(state.reset({nullptr, 5}, names) == Error::InvalidStorage);
+        SC_TEST_EXPECT(state.reset(records, {nullptr, 1}) == Error::InvalidStorage);
+        SC_TEST_EXPECT(state.reset(records, names) == Error::None);
+        SC_TEST_EXPECT(state.add(State::InvalidIndex, {}, info(10, 1, true), root) == Error::None);
+        SC_TEST_EXPECT(state.add(root, name("alpha"), info(11, 2, false), alpha) == Error::None);
+        SC_TEST_EXPECT(state.add(root, name("dir"), info(12, 3, true), directory) == Error::None);
+        SC_TEST_EXPECT(state.add(directory, name("x"), info(13, 4, false), nested) == Error::None);
+        SC_TEST_EXPECT(state.add(root, name("x"), info(14, 5, false), duplicate) == Error::None);
+        SC_TEST_EXPECT(state.findChild(root, name("x")) == duplicate);
+        SC_TEST_EXPECT(state.findChild(directory, name("x")) == nested);
+        SC_TEST_EXPECT(state.findToken(4) == nested);
+        SC_TEST_EXPECT(state.findToken(0) == State::InvalidIndex);
+        SC_TEST_EXPECT(state.add(root, name("x"), info(15, 6, false), untouched) == Error::DuplicateName);
+        SC_TEST_EXPECT(state.add(root, name("z"), info(15, 4, false), untouched) == Error::DuplicateToken);
+        SC_TEST_EXPECT(state.add(root, name("../bad"), info(15, 6, false), untouched) == Error::InvalidName);
+        SC_TEST_EXPECT(state.add(root, name("."), info(15, 6, false), untouched) == Error::InvalidName);
+        const char embeddedNul[] = {'a', '\0', 'b'};
+        SC_TEST_EXPECT(state.add(root, {embeddedNul, sizeof(embeddedNul)}, info(15, 6, false), untouched) ==
+                       Error::InvalidName);
+        SC_TEST_EXPECT(state.add(alpha, name("z"), info(15, 6, false), untouched) == Error::InvalidParent);
+        SC_TEST_EXPECT(state.add(root, name("z"), info(15, 6, false), untouched) == Error::RecordCapacity);
+        SC_TEST_EXPECT(untouched == 123 and state.size() == 5);
+        SC_TEST_EXPECT(state.reset(records, names) == Error::NotEmpty);
+        SC_TEST_EXPECT(state.release() == Error::NotEmpty);
+
+        char path[16] = {};
+        SC_TEST_EXPECT(state.copyRelativePath(root, path) == Error::None and strcmp(path, "") == 0);
+        SC_TEST_EXPECT(state.copyRelativePath(nested, path) == Error::None);
+        SC_TEST_EXPECT(strcmp(path, "dir/x") == 0);
+        char small[] = "keep";
+        SC_TEST_EXPECT(state.copyRelativePath(nested, {small, 3}) == Error::OutputTooSmall);
+        SC_TEST_EXPECT(strcmp(small, "keep") == 0);
+        State::NativeInfo retired;
+        SC_TEST_EXPECT(state.removeLeaf(directory, retired) == Error::HasChildren);
+        SC_TEST_EXPECT(state.removeLeaf(alpha, retired) == Error::None);
+        SC_TEST_EXPECT(retired.descriptor == 11 and retired.token == 2);
+        SC_TEST_EXPECT(state.findToken(2) == State::InvalidIndex);
+        SC_TEST_EXPECT(state.copyRelativePath(nested, path) == Error::None and strcmp(path, "dir/x") == 0);
+        SC_TEST_EXPECT(state.add(root, name("a very long name"), info(16, 6, false), untouched) == Error::NameCapacity);
+        size_t replacement = State::InvalidIndex;
+        SC_TEST_EXPECT(state.add(root, name("omega"), info(16, 6, false), replacement) == Error::None);
+        SC_TEST_EXPECT(replacement == alpha and state.findToken(6) == replacement);
+        SC_TEST_EXPECT(state.copyRelativePath(replacement, path) == Error::None and strcmp(path, "omega") == 0);
+        SC_TEST_EXPECT(state.removeLeaf(nested, retired) == Error::None);
+        SC_TEST_EXPECT(state.removeLeaf(directory, retired) == Error::None);
+        SC_TEST_EXPECT(state.removeLeaf(duplicate, retired) == Error::None);
+        SC_TEST_EXPECT(state.removeLeaf(replacement, retired) == Error::None);
+        SC_TEST_EXPECT(state.removeLeaf(root, retired) == Error::None and state.size() == 0);
+        SC_TEST_EXPECT(state.reset(records, names) == Error::None);
+        SC_TEST_EXPECT(state.release() == Error::None);
+        SC_TEST_EXPECT(state.findToken(1) == State::InvalidIndex and state.get(0) == nullptr);
+        SC_TEST_EXPECT(state.add(State::InvalidIndex, {}, info(10, 1, true), untouched) == Error::NotInitialized);
+
+        FileSystemWatcherKqueueRegistrationTokens tokens(UINTPTR_MAX - 1);
+
+        uintptr_t token = 0;
+        SC_TEST_EXPECT(tokens.next(token) and token == UINTPTR_MAX);
+        SC_TEST_EXPECT(not tokens.next(token) and token == 0);
     }
 
     void initClose()
@@ -113,6 +246,11 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(waitFormat);
         SC_TEST_EXPECT(StringView::fromNullTerminated(formattedMessage, StringEncoding::Ascii)
                            .containsString("inotify wait for events"));
+        const ResultFileSystemWatcher limitedCoverage(FileSystemWatcherError::CoverageLimited,
+                                                      FileSystemWatcherErrorDetail::BSDPassiveEntries);
+        SC_TEST_EXPECT(formatFileSystemWatcherError(limitedCoverage, formattedMessage));
+        SC_TEST_EXPECT(StringView::fromNullTerminated(formattedMessage, StringEncoding::Ascii)
+                           .containsString("BSD passive entries"));
 
         FileSystemWatcher::ThreadRunner runner;
         SC_TEST_EXPECT(fileEventsWatcher.init(runner));
@@ -417,6 +555,65 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
         SC_TEST_EXPECT(owner.watch(roots[1].watch, roots[1].path.view()));
         SC_TEST_EXPECT(write(roots[1], "marker-reopened.txt"));
         SC_TEST_EXPECT(::WaitForSingleObject(roots[1].notification, 5000) == WAIT_OBJECT_0);
+        SC_TEST_EXPECT(owner.close());
+        closeOwner.disarm();
+    }
+#endif
+
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
+    void bsdThreadCallbackLifecycle(const StringView appDirectory)
+    {
+        if (not test_section("BSD thread callback lifecycle"))
+            return;
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(appDirectory));
+        SC_TEST_EXPECT(fs.makeDirectory("__bsd_thread_callback"));
+        auto removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive("__bsd_thread_callback"); });
+
+        SC_TEST_EXPECT(fs.createSymbolicLink("__bsd_thread_callback/missing", "__bsd_thread_callback/link"));
+        StringPath directory;
+        SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__bsd_thread_callback"}));
+        FileSystemWatcher::ThreadRunner runner;
+
+        FileSystemWatcher owner;
+        SC_TEST_EXPECT(owner.init(runner));
+        auto closeOwner = MakeDeferred([&] { (void)owner.close(); });
+
+        FileSystemWatcher::FolderWatcher watcher;
+        struct State
+        {
+            FileSystemWatcher*                owner   = nullptr;
+            FileSystemWatcher::FolderWatcher* watcher = nullptr;
+
+            EventObject completed;
+            bool        closeRejected   = false;
+            bool        stopped         = false;
+            bool        coverageLimited = false;
+        } state{&owner, &watcher};
+        watcher.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+        {
+            if (event.kind == FileSystemWatcher::NotificationKind::CoverageLimited)
+            {
+                state.coverageLimited =
+                    event.failure.isError(FileSystemWatcherError::CoverageLimited) and event.relativePath.isEmpty();
+                return;
+            }
+            if (event.kind != FileSystemWatcher::NotificationKind::Change)
+                return;
+            const ResultFileSystemWatcher closed = state.owner->close();
+            state.closeRejected                  = closed.isError(FileSystemWatcherError::CloseFailed) and
+                                  closed.detail == FileSystemWatcherErrorDetail::PosixPthreadJoin;
+            state.stopped = static_cast<bool>(state.watcher->stopWatching());
+            state.completed.signal();
+        };
+        SC_TEST_EXPECT(owner.watch(watcher, directory.view()));
+        SC_TEST_EXPECT(fs.write("__bsd_thread_callback/file", "content"));
+        state.completed.wait();
+        SC_TEST_EXPECT(state.coverageLimited);
+        SC_TEST_EXPECT(state.closeRejected);
+        SC_TEST_EXPECT(state.stopped);
+        SC_TEST_EXPECT(watcher.stopWatching().isError(FileSystemWatcherError::NotWatching));
         SC_TEST_EXPECT(owner.close());
         closeOwner.disarm();
     }

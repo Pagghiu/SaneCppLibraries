@@ -203,6 +203,9 @@ static constexpr StringView hostPackagePlatformName()
     {
     case Platform::Apple: return "macos"_a8;
     case Platform::Linux: return "linux"_a8;
+    case Platform::NetBSD: return "netbsd"_a8;
+    case Platform::FreeBSD: return "freebsd"_a8;
+    case Platform::OpenBSD: return "openbsd"_a8;
     case Platform::Windows: return "windows"_a8;
     case Platform::Emscripten: return "emscripten"_a8;
     }

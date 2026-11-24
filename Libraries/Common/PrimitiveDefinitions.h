@@ -32,6 +32,8 @@ using uint16_t = unsigned short;    ///< Platform independent (2) bytes unsigned
 using uint32_t = unsigned int;      ///< Platform independent (4) bytes unsigned int
 #if defined(__linux__)
 using uint64_t = unsigned long int; ///< Platform independent (8) bytes unsigned int
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
+using uint64_t = __UINT64_TYPE__;    ///< Platform independent (8) bytes unsigned int
 #else
 using uint64_t = unsigned long long;///< Platform independent (8) bytes unsigned int
 #endif
@@ -40,6 +42,8 @@ using int16_t = short;              ///< Platform independent (2) bytes signed i
 using int32_t = int;                ///< Platform independent (4) bytes signed int
 #if defined(__linux__)
 using int64_t = signed long int;    ///< Platform independent (8) bytes signed int
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
+using int64_t = __INT64_TYPE__;     ///< Platform independent (8) bytes signed int
 #else
 using int64_t = long long;          ///< Platform independent (8) bytes signed int
 #endif

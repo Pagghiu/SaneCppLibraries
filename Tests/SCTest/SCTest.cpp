@@ -52,6 +52,7 @@ void runFileSystemWatcherTest(TestReport& report);
 // FileSystemWatcherAsync
 void runFileSystemWatcherAsyncTest(TestReport& report);
 void runFileSystemWatcherLinuxTest(TestReport& report);
+void runFileSystemWatcherKqueueTest(TestReport& report);
 
 // Hashing
 void runHashingTest(TestReport& report);
@@ -464,6 +465,8 @@ int main(int argc, const char* argv[])
     SC_RUN_TEST(runFileSystemWatcherAsyncTest);
 #if SC_PLATFORM_LINUX
     SC_RUN_TEST(runFileSystemWatcherLinuxTest);
+#elif SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+    SC_RUN_TEST(runFileSystemWatcherKqueueTest);
 #endif
 
     // Hashing tests
