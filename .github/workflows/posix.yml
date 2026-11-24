@@ -859,27 +859,30 @@ jobs:
         if-no-files-found: error
     - name: Wait for matching Fil-C producer artifact
       if: matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      id: filc-producer
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: >-
         python3 Support/Scripts/ProfileFilCObjectSharing.py wait-artifact
-        --name "filc-common-objects-${{ runner.arch }}-${{ github.run_attempt }}"
+        --name-prefix "filc-common-objects-${{ runner.arch }}"
         --output _Build/_ObjectProfiles/core/artifact-ready.json
     - name: Download Fil-C common object diagnostic bundle
-      if: matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      if: steps.filc-producer.outputs.artifact_id != ''
       uses: actions/download-artifact@v6
       with:
-        name: filc-common-objects-${{ runner.arch }}-${{ github.run_attempt }}
+        artifact-ids: ${{ steps.filc-producer.outputs.artifact_id }}
+        # Use the REST download path for artifacts discovered through the REST API.
+        github-token: ${{ github.token }}
         path: _Build/_ObjectProfiles/producer
     - name: Compare current Fil-C object contracts
-      if: matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
+      if: steps.filc-producer.outputs.artifact_id != ''
       run: >-
         python3 Support/Scripts/ProfileFilCObjectSharing.py compare
         --local _Build/_ObjectProfiles/core
         --bundle _Build/_ObjectProfiles/producer/objects.zip
         --output _Build/_ObjectProfiles/core/compatibility.json
     - name: Stage and import verified Fil-C objects
-      if: matrix.partition == 'core' && env.SC_REUSE_SHARED_OBJECTS == '1'
+      if: env.SC_REUSE_SHARED_OBJECTS == '1' && steps.filc-producer.outputs.artifact_id != ''
       run: |
         python3 Support/Scripts/ProfileFilCObjectSharing.py stage \
           --local _Build/_ObjectProfiles/core \
@@ -888,13 +891,16 @@ jobs:
           --output _Build/_ObjectProfiles/core/import-stage
         ./SC.sh build import-objects SCTestCore Release native --toolchain filc --manifest _Build/_ObjectProfiles/core/import-stage/import.txt
     - name: Link imported Fil-C Core with normal dependency and export checks
-      if: matrix.partition == 'core' && env.SC_REUSE_SHARED_OBJECTS == '1'
+      if: env.SC_REUSE_SHARED_OBJECTS == '1' && steps.filc-producer.outputs.artifact_id != ''
       run: |
         ./SC.sh build compile SCTestCore Release native --toolchain filc --verbose | tee _Build/_ObjectProfiles/core/import-link.log
         python3 Support/Scripts/ProfileFilCObjectSharing.py verify-link \
           --intermediate "_Build/_Intermediates/SCTestCore/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release" \
           --log _Build/_ObjectProfiles/core/import-link.log \
           --output _Build/_ObjectProfiles/core/import-link-proof.json
+    - name: Compile Fil-C Core locally when the retry has no producer bundle
+      if: matrix.partition == 'core' && env.SC_REUSE_SHARED_OBJECTS == '1' && steps.filc-producer.outputs.artifact_id == ''
+      run: ./SC.sh build compile SCTestCore Release native --toolchain filc --verbose
     - name: Upload Fil-C object sharing evidence
       if: always() && matrix.partition == 'core' && env.SC_PROFILE_SHARED_OBJECTS == '1'
       uses: actions/upload-artifact@v6
@@ -1001,14 +1007,14 @@ jobs:
         ./SC.sh build run SCAwaitCoroutineShimTest Release native --toolchain filc
 
     - name: Compare cold Fil-C object reuse on this runner
-      if: matrix.partition == 'core' && env.SC_COMPARE_SHARED_OBJECTS == '1'
+      if: env.SC_COMPARE_SHARED_OBJECTS == '1' && steps.filc-producer.outputs.artifact_id != ''
       run: >-
         python3 Support/Scripts/BenchmarkFilCObjectSharing.py
         --intermediate "_Build/_Intermediates/SCTestCore/linux-${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}-Native-filc-Release"
         --bundle _Build/_ObjectProfiles/producer/objects.zip
         --output _Build/_ObjectBenchmarks
     - name: Upload matched Fil-C object reuse measurements
-      if: always() && matrix.partition == 'core' && env.SC_COMPARE_SHARED_OBJECTS == '1'
+      if: always() && env.SC_COMPARE_SHARED_OBJECTS == '1' && steps.filc-producer.outputs.artifact_id != ''
       uses: actions/upload-artifact@v6
       with:
         name: filc-object-benchmark-${{ runner.arch }}-${{ github.run_attempt }}

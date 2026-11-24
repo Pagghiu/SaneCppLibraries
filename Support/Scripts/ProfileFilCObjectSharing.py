@@ -163,8 +163,8 @@ def compare(options):
         producer = json.loads(archive.read('manifest.json'))
         if local['format'] != 2 or producer['format'] != 2:
             raise ValueError('Unsupported object profile format')
-        if any(local.get(key) != producer.get(key) for key in ('revision', 'run_id', 'run_attempt', 'compilers')):
-            raise ValueError('Revision, run attempt or compiler identity differs')
+        if any(local.get(key) != producer.get(key) for key in ('revision', 'run_id', 'compilers')):
+            raise ValueError('Revision, workflow run or compiler identity differs')
         left = {row['source']: row for row in local['rows']}
         right = {row['source']: row for row in producer['rows']}
         if (len(left) != 40 or len(local['rows']) != 40 or len(producer['rows']) != 40
@@ -183,6 +183,7 @@ def compare(options):
             if hashlib.sha256(archive.read(source + '.d')).hexdigest() != other['dependency_sha256']:
                 raise ValueError(f'{source}: transmitted dependencies are corrupt')
         result = dict(compatible_contracts=40, transport_bytes=options.bundle.stat().st_size,
+                      producer_run_attempt=producer.get('run_attempt'), consumer_run_attempt=local.get('run_attempt'),
                       producer_collect_seconds=producer['collect_seconds'],
                       consumer_collect_seconds=local['collect_seconds'],
                       objects_imported=0, normal_objects_unchanged=True)
@@ -250,12 +251,15 @@ def verify_link(options):
 def wait_artifact(options):
     repository = os.environ['GITHUB_REPOSITORY']
     run_id = os.environ['GITHUB_RUN_ID']
+    attempt = int(os.environ['GITHUB_RUN_ATTEMPT'])
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository) or not run_id.isdigit():
         raise ValueError('Invalid GitHub run identity')
     start = time.monotonic()
-    query = urllib.parse.urlencode(dict(name=options.name, per_page=100))
-    url = f'https://api.github.com/repos/{repository}/actions/runs/{run_id}/artifacts?{query}'
-    while True:
+    current_name = f'{options.name_prefix}-{attempt}'
+
+    def find_artifact(name):
+        query = urllib.parse.urlencode(dict(name=name, per_page=100))
+        url = f'https://api.github.com/repos/{repository}/actions/runs/{run_id}/artifacts?{query}'
         request = urllib.request.Request(url, headers={
             'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
             'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
@@ -264,20 +268,37 @@ def wait_artifact(options):
         # delegated to actions/download-artifact, not forwarded to a redirect host.
         with urllib.request.urlopen(request, timeout=30) as response:
             data = json.load(response)
-        matches = [entry for entry in data['artifacts'] if entry['name'] == options.name and not entry['expired']]
-        elapsed = time.monotonic() - start
+        matches = [entry for entry in data['artifacts'] if entry['name'] == name and not entry['expired']]
         if len(matches) > 1:
             raise ValueError('Ambiguous producer artifact')
-        if matches:
-            result = dict(artifact_id=matches[0]['id'], name=options.name, wait_seconds=elapsed,
-                          size_in_bytes=matches[0]['size_in_bytes'])
-            options.output.write_text(json.dumps(result, indent=2) + '\n')
-            print(json.dumps(result, indent=2))
-            return
+        return matches[0] if matches else None
+
+    artifact = find_artifact(current_name)
+    # A failed-job retry keeps artifacts from successful jobs in earlier attempts.
+    for earlier_attempt in range(attempt - 1, 0, -1):
+        if artifact is not None:
+            break
+        artifact = find_artifact(f'{options.name_prefix}-{earlier_attempt}')
+    while artifact is None:
+        elapsed = time.monotonic() - start
         if elapsed >= options.timeout:
-            raise TimeoutError(f'Producer artifact {options.name} was not published in {options.timeout}s')
-        print(f'Waiting for producer artifact {options.name}: {elapsed:.1f}s', flush=True)
+            message = f'Producer artifact {current_name} was not published in {options.timeout}s'
+            if attempt == 1:
+                raise TimeoutError(message)
+            print(f'::warning::{message}. Continuing without shared Fil-C objects.', flush=True)
+            options.output.write_text(json.dumps(dict(artifact_id=None, wait_seconds=elapsed), indent=2) + '\n')
+            return
+        print(f'Waiting for producer artifact {current_name}: {elapsed:.1f}s', flush=True)
         time.sleep(min(5, options.timeout - elapsed))
+        artifact = find_artifact(current_name)
+
+    artifact_id = artifact['id']
+    result = dict(artifact_id=artifact_id, name=artifact['name'], wait_seconds=time.monotonic() - start,
+                  size_in_bytes=artifact['size_in_bytes'])
+    options.output.write_text(json.dumps(result, indent=2) + '\n')
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+        output.write(f'artifact_id={artifact_id}\n')
+    print(json.dumps(result, indent=2))
 
 
 def main():
@@ -302,7 +323,7 @@ def main():
     link_parser.add_argument('--log', type=Path, required=True)
     link_parser.add_argument('--output', type=Path, required=True)
     waiter = modes.add_parser('wait-artifact')
-    waiter.add_argument('--name', required=True)
+    waiter.add_argument('--name-prefix', required=True)
     waiter.add_argument('--timeout', type=int, default=300)
     waiter.add_argument('--output', type=Path, required=True)
     options = parser.parse_args()
