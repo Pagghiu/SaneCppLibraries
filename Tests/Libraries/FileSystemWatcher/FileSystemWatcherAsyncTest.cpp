@@ -11,12 +11,14 @@
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD || SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
+#endif
+#if SC_PLATFORM_LINUX
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #elif SC_PLATFORM_FREEBSD
 #include <sys/sysctl.h>
 #elif SC_PLATFORM_WINDOWS
@@ -44,6 +46,12 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopStopPendingNotification(appDirectory);
         eventLoopCloseMultipleWatchers(appDirectory);
         eventLoopOverlappingWatchers(appDirectory);
+        eventLoopCallbackLifecycle(appDirectory);
+        eventLoopDynamicTree(appDirectory);
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD || SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+        posixFailedRunnerInitialization(appDirectory);
+        eventLoopReadFailure(appDirectory);
+#endif
 #if SC_PLATFORM_WINDOWS
         windowsCompletionCoverage(appDirectory);
 #endif
@@ -53,14 +61,10 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
 #if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
         bsdCapacityAndFailure(appDirectory);
-        bsdFailedRunnerInitialization(appDirectory);
         bsdDescriptorExhaustion(appDirectory);
         bsdExtendedStorage(appDirectory);
         bsdPassiveEntries(appDirectory);
-        bsdCallbackLifecycle(appDirectory);
-        bsdDynamicTreeAndRootLoss(appDirectory);
-        bsdAsyncFailureCallbacks(appDirectory);
-        bsdNativeReadFailure(appDirectory);
+        bsdRootLoss(appDirectory);
 #endif
 #if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD
         eventLoopWatchInvalidation(appDirectory);
@@ -68,9 +72,14 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
 #if SC_PLATFORM_LINUX
         eventLoopLongNotificationPath();
-        eventLoopReadFailure(appDirectory);
 #endif
     }
+
+    void eventLoopCallbackLifecycle(const StringView appDirectory);
+    void eventLoopDynamicTree(const StringView appDirectory);
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD || SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+    void posixFailedRunnerInitialization(const StringView appDirectory);
+#endif
 
     void structuredNotInitializedError()
     {
@@ -1063,15 +1072,11 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
 
 #if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
-    void bsdFailedRunnerInitialization(const StringView appDirectory);
     void bsdCapacityAndFailure(const StringView appDirectory);
     void bsdDescriptorExhaustion(const StringView appDirectory);
     void bsdPassiveEntries(const StringView appDirectory);
     void bsdExtendedStorage(const StringView appDirectory);
-    void bsdCallbackLifecycle(const StringView appDirectory);
-    void bsdDynamicTreeAndRootLoss(const StringView appDirectory);
-    void bsdAsyncFailureCallbacks(const StringView appDirectory);
-    void bsdNativeReadFailure(const StringView appDirectory);
+    void bsdRootLoss(const StringView appDirectory);
 #endif
 
 #if SC_PLATFORM_LINUX
@@ -1508,10 +1513,10 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
 #endif
 
-#if SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD || SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
     void eventLoopReadFailure(const StringView appDirectory)
     {
-        if (not test_section("AsyncEventLoop inotify read failure"))
+        if (not test_section("AsyncEventLoop POSIX native read failure"))
             return;
         FileSystem             fs;
         const ResultFileSystem fsReady = fs.init(appDirectory);
@@ -1550,10 +1555,14 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 onEventLoopNotification(result);
             }
         } runner;
-        AsyncEventLoop          eventLoop;
+        AsyncEventLoop eventLoop;
+#if SC_PLATFORM_LINUX
         AsyncEventLoop::Options options;
         options.apiType        = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
         const Result loopReady = eventLoop.create(options);
+#else
+        const Result loopReady = eventLoop.create();
+#endif
         SC_TEST_EXPECT(loopReady);
         if (not loopReady)
             return;
@@ -1597,6 +1606,12 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         state.path   = directoryPath.view();
         state.fd     = runner.descriptor();
 
+        constexpr auto readFailure =
+#if SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+            FileSystemWatcherErrorDetail::KqueueReadEvents;
+#else
+            FileSystemWatcherErrorDetail::InotifyReadEvents;
+#endif
         watchers[0].notifyCallback = [&state](const FileSystemWatcher::Notification& notification)
         {
             if (notification.kind == FileSystemWatcher::NotificationKind::Change)
@@ -1611,7 +1626,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             state.failureDetails = notification.basePath == state.path and notification.relativePath.isEmpty() and
                                    notification.operation == FileSystemWatcher::Operation::AddRemoveRename and
                                    notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                                   notification.failure.detail == FileSystemWatcherErrorDetail::InotifyReadEvents and
+                                   notification.failure.detail == readFailure and
                                    notification.failure.nativeError == EBADF;
             if (::dup2(state.backupFd, state.fd) == state.fd)
             {
@@ -1634,11 +1649,10 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             if (notification.kind == FileSystemWatcher::NotificationKind::WatchStopped)
             {
                 ++state.failures;
-                state.failureDetails =
-                    state.failureDetails and notification.basePath == state.path and
-                    notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
-                    notification.failure.detail == FileSystemWatcherErrorDetail::InotifyReadEvents and
-                    notification.failure.nativeError == EBADF;
+                state.failureDetails = state.failureDetails and notification.basePath == state.path and
+                                       notification.failure.isError(FileSystemWatcherError::MonitoringFailed) and
+                                       notification.failure.detail == readFailure and
+                                       notification.failure.nativeError == EBADF;
                 state.closed = static_cast<bool>(state.owner->close());
             }
         };
@@ -1677,7 +1691,13 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(invalidated);
         if (not invalidated)
             return;
+#if SC_PLATFORM_LINUX
         SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.failures == 2; }));
+#else
+        // Drive the watcher read directly. A closed descriptor may be removed from the native poll queue.
+        SC_TEST_EXPECT(not fileEventsWatcher.asyncNotify(nullptr));
+        SC_TEST_EXPECT(state.failures == 2);
+#endif
         SC_TEST_EXPECT(state.restored and state.stopped and state.victimStopped and not state.victimCalled and
                        state.rejected and state.closed and state.failureDetails);
         if (not state.closed)
@@ -1727,6 +1747,209 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     }
 #endif
 };
+
+void SC::FileSystemWatcherAsyncTest::eventLoopCallbackLifecycle(const StringView appDirectory)
+{
+    if (not test_section("AsyncEventLoop callback lifecycle"))
+        return;
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(appDirectory));
+    SC_TEST_EXPECT(fs.makeDirectory("__sc_callback_lifecycle"));
+    auto removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive("__sc_callback_lifecycle"); });
+
+    StringPath directory;
+    SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__sc_callback_lifecycle"}));
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+    auto closeLoop = MakeDeferred([&] { (void)eventLoop.close(); });
+
+    FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+    runner.init(eventLoop);
+    FileSystemWatcher owner;
+    SC_TEST_EXPECT(owner.init(runner));
+
+    FileSystemWatcher::FolderWatcher first, second;
+    struct State
+    {
+        FileSystemWatcher*                owner  = nullptr;
+        FileSystemWatcher::FolderWatcher* first  = nullptr;
+        FileSystemWatcher::FolderWatcher* second = nullptr;
+
+        bool stopped = false;
+        bool closed  = false;
+        bool correct = true;
+    } state{&owner, &first, &second};
+    auto closeOwner      = MakeDeferred([&] { (void)owner.close(); });
+    first.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+    {
+        if (event.kind != FileSystemWatcher::NotificationKind::Change or event.relativePath != "stop")
+            return;
+        state.correct =
+            static_cast<bool>(state.first->stopWatching()) and static_cast<bool>(state.second->stopWatching());
+        state.stopped = true;
+    };
+    second.notifyCallback = [](const FileSystemWatcher::Notification&) {};
+    SC_TEST_EXPECT(owner.watch(first, directory.view()));
+    SC_TEST_EXPECT(owner.watch(second, directory.view()));
+    submitQueuedWatcher(eventLoop);
+    SC_TEST_EXPECT(fs.write("__sc_callback_lifecycle/stop", "x"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.stopped; }));
+    SC_TEST_EXPECT(state.correct);
+    SC_TEST_EXPECT(first.stopWatching().isError(FileSystemWatcherError::NotWatching));
+    SC_TEST_EXPECT(second.stopWatching().isError(FileSystemWatcherError::NotWatching));
+
+    first.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+    {
+        if (event.kind != FileSystemWatcher::NotificationKind::Change or event.relativePath != "close")
+            return;
+        state.correct = static_cast<bool>(state.owner->close());
+        state.closed  = true;
+    };
+    SC_TEST_EXPECT(owner.watch(first, directory.view()));
+    submitQueuedWatcher(eventLoop);
+    SC_TEST_EXPECT(fs.write("__sc_callback_lifecycle/close", "x"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.closed; }));
+    SC_TEST_EXPECT(state.correct);
+    closeOwner.disarm();
+    SC_TEST_EXPECT(eventLoop.close());
+    closeLoop.disarm();
+}
+
+void SC::FileSystemWatcherAsyncTest::eventLoopDynamicTree(const StringView appDirectory)
+{
+    if (not test_section("AsyncEventLoop dynamic tree"))
+        return;
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(appDirectory));
+    SC_TEST_EXPECT(fs.makeDirectory("__sc_dynamic_tree"));
+    auto removeDirectory = MakeDeferred(
+        [&]
+        {
+            (void)fs.removeDirectoryRecursive("__sc_dynamic_tree");
+            (void)fs.removeDirectoryRecursive("__sc_import_tree");
+        });
+    StringPath directory;
+    SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__sc_dynamic_tree"}));
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+    auto closeLoop = MakeDeferred([&] { (void)eventLoop.close(); });
+
+    FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+    runner.init(eventLoop);
+    FileSystemWatcher owner;
+    SC_TEST_EXPECT(owner.init(runner));
+    struct State
+    {
+        StringPath expected;
+        int        structural = 0;
+        int        matching   = 0;
+    } state;
+    FileSystemWatcher::FolderWatcher watcher;
+    watcher.notifyCallback = [&state](const FileSystemWatcher::Notification& event)
+    {
+        if (event.kind == FileSystemWatcher::NotificationKind::Change or
+            event.kind == FileSystemWatcher::NotificationKind::RescanRequired)
+        {
+            if (event.operation == FileSystemWatcher::Operation::AddRemoveRename)
+                ++state.structural;
+            if (event.relativePath == state.expected.view())
+                ++state.matching;
+        }
+    };
+    auto closeOwner = MakeDeferred([&] { (void)owner.close(); });
+    SC_TEST_EXPECT(owner.watch(watcher, directory.view()));
+    submitQueuedWatcher(eventLoop);
+    SC_TEST_EXPECT(fs.makeDirectory("__sc_dynamic_tree/new"));
+    SC_TEST_EXPECT(fs.makeDirectory("__sc_dynamic_tree/new/deep"));
+    SC_TEST_EXPECT(fs.write("__sc_dynamic_tree/new/deep/existing", "a"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.structural > 0; }));
+    SC_TEST_EXPECT(Path::join(state.expected, {"new", "deep", "later"}));
+    state.matching = 0;
+    SC_TEST_EXPECT(fs.write("__sc_dynamic_tree/new/deep/later", "b"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.matching > 0; }));
+    const int beforeMove = state.structural;
+    SC_TEST_EXPECT(fs.rename("__sc_dynamic_tree/new", "__sc_dynamic_tree/moved"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state, beforeMove] { return state.structural > beforeMove; }));
+    SC_TEST_EXPECT(Path::join(state.expected, {"moved", "deep", "existing"}));
+    state.matching = 0;
+    SC_TEST_EXPECT(fs.write("__sc_dynamic_tree/moved/deep/existing", "changed"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.matching > 0; }));
+    SC_TEST_EXPECT(fs.makeDirectory("__sc_import_tree"));
+    SC_TEST_EXPECT(fs.write("__sc_import_tree/preexisting", "a"));
+    const int beforeImport = state.structural;
+    SC_TEST_EXPECT(fs.rename("__sc_import_tree", "__sc_dynamic_tree/imported"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state, beforeImport] { return state.structural > beforeImport; }));
+    SC_TEST_EXPECT(Path::join(state.expected, {"imported", "preexisting"}));
+    state.matching = 0;
+    SC_TEST_EXPECT(fs.write("__sc_dynamic_tree/imported/preexisting", "b"));
+    SC_TEST_EXPECT(runUntil(eventLoop, [&state] { return state.matching > 0; }));
+    SC_TEST_EXPECT(owner.close());
+    closeOwner.disarm();
+    SC_TEST_EXPECT(eventLoop.close());
+    closeLoop.disarm();
+}
+
+#if SC_PLATFORM_LINUX || SC_PLATFORM_FREEBSD || SC_PLATFORM_NETBSD || SC_PLATFORM_OPENBSD
+void SC::FileSystemWatcherAsyncTest::posixFailedRunnerInitialization(const StringView appDirectory)
+{
+    if (not test_section("POSIX failed runner initialization"))
+        return;
+
+    struct FailedRunner : FileSystemWatcher::EventLoopRunner
+    {
+        int seenDescriptor = -1;
+
+        Result posixStartSharedFileReadiness() override
+        {
+            seenDescriptor = notifyFd;
+            return Result::Error(ResultCategory(99), 12);
+        }
+        Result posixStopSharedFileReadiness() override { return Result(true); }
+        bool   detached() const { return fileSystemWatcher == nullptr and notifyFd == -1; }
+    } failedRunner;
+    FileSystemWatcher             owner;
+    const ResultFileSystemWatcher failed = owner.init(failedRunner);
+    SC_TEST_EXPECT(not failed);
+    SC_TEST_EXPECT(failed.toResult().category() == ResultCategory(99));
+    SC_TEST_EXPECT(failed.toResult().errorValue() == 12);
+    SC_TEST_EXPECT(failedRunner.detached());
+    SC_TEST_EXPECT(failedRunner.seenDescriptor >= 0);
+    errno = 0;
+    SC_TEST_EXPECT(::fcntl(failedRunner.seenDescriptor, F_GETFD) == -1 and errno == EBADF);
+    SC_TEST_EXPECT(owner.close().isError(FileSystemWatcherError::NotInitialized));
+
+    FileSystemWatcher::ThreadRunner runner;
+    SC_TEST_EXPECT(owner.init(runner));
+    FileSystemWatcher secondOwner;
+    SC_TEST_EXPECT(secondOwner.init(runner).isError(FileSystemWatcherError::InitializationFailed));
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(appDirectory));
+    SC_TEST_EXPECT(fs.makeDirectory("__sc_posix_init"));
+    auto removeDirectory = MakeDeferred([&] { (void)fs.removeDirectoryRecursive("__sc_posix_init"); });
+
+    StringPath directory;
+    SC_TEST_EXPECT(Path::join(directory, {appDirectory, "__sc_posix_init"}));
+    FileSystemWatcher::FolderWatcher watcher;
+    watcher.notifyCallback = [](const FileSystemWatcher::Notification&) {};
+    SC_TEST_EXPECT(owner.watch(watcher, directory.view()));
+    SC_TEST_EXPECT(owner.close());
+    SC_TEST_EXPECT(secondOwner.init(runner));
+    SC_TEST_EXPECT(secondOwner.close());
+
+    struct IdleRunner : FileSystemWatcher::EventLoopRunner
+    {
+        Result posixStartSharedFileReadiness() override { return Result(true); }
+        Result posixStopSharedFileReadiness() override { return Result(true); }
+    } idle;
+    SC_TEST_EXPECT(owner.init(idle));
+    SC_TEST_EXPECT(secondOwner.init(idle).isError(FileSystemWatcherError::InitializationFailed));
+    SC_TEST_EXPECT(owner.close());
+    SC_TEST_EXPECT(secondOwner.init(idle));
+    SC_TEST_EXPECT(secondOwner.close());
+}
+#endif
 
 #if SC_PLATFORM_NETBSD || SC_PLATFORM_FREEBSD || SC_PLATFORM_OPENBSD
 #include "FileSystemWatcherBSDAsyncTest.inl"
